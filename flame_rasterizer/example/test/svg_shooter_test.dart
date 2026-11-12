@@ -16,6 +16,7 @@ import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/game_story.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/bottom_right_text.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/enemy_component.dart';
@@ -27,7 +28,6 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/pl
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/star_background_creator.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/star_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

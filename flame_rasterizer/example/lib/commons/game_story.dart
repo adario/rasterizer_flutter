@@ -1,7 +1,7 @@
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 
 /// Shows the game that [create] makes, over a status bar, zoomed to [zoom]
 /// and running at [speed].

@@ -1,9 +1,9 @@
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg_renderers_example.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// A game whose status the test starts and stops by hand, without a widget.

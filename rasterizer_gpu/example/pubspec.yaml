@@ -12,6 +12,7 @@ dependencies:
   archive: ^4.6.0
   flutter:
     sdk: flutter
+  material_ui: ^1.11.0
   rasterizer_gpu:
     path: ../
 

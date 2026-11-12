@@ -1,6 +1,6 @@
 import 'dart:async' show Timer, unawaited;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
 import 'pages/atlas_page.dart';

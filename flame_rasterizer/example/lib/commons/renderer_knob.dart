@@ -1,6 +1,6 @@
 import 'package:flame_rasterizer/flame_rasterizer.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
-import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
 
 /// The Renderer knob's label, which also names its field in the URL.

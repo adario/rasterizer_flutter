@@ -2,11 +2,11 @@ import 'dart:io';
 
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/main.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg_renderers_example.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'pump_while_loading.dart';

@@ -5,12 +5,12 @@ import 'package:flame/components.dart';
 import 'package:flame/flame.dart';
 import 'package:flame/game.dart';
 import 'package:flame_forge2d/flame_forge2d.dart' as forge2d;
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/collision_detection/multiple_shapes_example.dart';
 import 'package:flame_rasterizer_example/stories/forge2d/revolute_joint_svgs_example.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
 import 'package:flame_rasterizer_example/stories/svg/collidable_svgs_example.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

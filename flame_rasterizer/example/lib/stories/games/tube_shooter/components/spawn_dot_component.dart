@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flame_rasterizer_example/commons/material.dart' show Colors;
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/dot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
-import 'package:flutter/material.dart' show Colors;
 
 /// An enemy of [kind] still to come: a dot in its colour on the tube's far
 /// end.

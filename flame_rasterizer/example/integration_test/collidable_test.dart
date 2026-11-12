@@ -8,10 +8,10 @@
 // each an SVG placed in the frame, that the renderer draws together.
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/svg/collidable_svgs_example.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 

@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
-import 'package:flutter/material.dart';
 
 /// A zapper, which climbs its lane without firing, and electrifies it.
 ///

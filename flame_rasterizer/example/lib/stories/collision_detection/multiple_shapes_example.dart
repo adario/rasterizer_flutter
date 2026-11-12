@@ -6,10 +6,10 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
+import 'package:flame_rasterizer_example/commons/material.dart' show Colors;
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/svg/collidable_svgs_example.dart'
     show CollidableArena;
-import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/widgets.dart';
 
 /// The values of the example's knobs, except Zoom, Speed and the cache knobs.

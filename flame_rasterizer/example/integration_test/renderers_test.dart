@@ -10,9 +10,9 @@
 // components, but must keep the same game.
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg_renderers_example.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 

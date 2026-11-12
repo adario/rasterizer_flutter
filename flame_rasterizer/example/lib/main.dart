@@ -1,10 +1,10 @@
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_app.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/stories/collision_detection/collision_detection.dart';
 import 'package:flame_rasterizer_example/stories/forge2d/forge2d.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg.dart';
-import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
 
 /// flame_rasterizer's examples, in a Widgetbook, as Flame's are.

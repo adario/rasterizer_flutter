@@ -1,5 +1,5 @@
 import 'package:flame_rasterizer_example/commons/example_use_case.dart';
-import 'package:flutter/material.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:widgetbook/widgetbook.dart';
 

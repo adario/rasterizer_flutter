@@ -2,10 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flame/components.dart';
 import 'package:flame/particles.dart';
+import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
-import 'package:flutter/material.dart';
 
 /// What blows up: an enemy that a missile hit, an enemy that hit the player,
 /// or the player once its health runs out.
