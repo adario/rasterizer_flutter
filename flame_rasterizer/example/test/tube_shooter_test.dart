@@ -1458,8 +1458,10 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets("the round's number shows on the zoom; a text's glyphs share "
-      'their scenes, so that a changed score imports none', (tester) async {
+  testWidgets("the round's number shows on the zoom; a changed score keeps "
+      "the glyphs that stay, and the others share their glyphs' scenes", (
+    tester,
+  ) async {
     final game = await pumpGame(tester, SvgRenderer.rasterizer);
     game.spawning = false;
     Iterable<VectorTextComponent> texts(double capHeight) => game
@@ -1496,11 +1498,21 @@ void main() {
     await pumpFrames(tester, 2);
     final again = glyphs();
     expect(again, hasLength(8));
-    expect(again.first, isNot(same(first.first)));
-    expect(again[0].debugScene, same(s));
-    for (final glyph in again.skip(5)) {
-      expect(glyph.debugScene, same(one));
+    for (var i = 0; i < 7; i++) {
+      expect(again[i], same(first[i]));
     }
+    expect(again[0].debugScene, same(s));
+    expect(again[7].debugScene, same(one));
+
+    game.score = 5;
+    await pumpFrames(tester, 2);
+    expect(score.text, 'SCORE 5');
+    final shorter = glyphs();
+    expect(shorter, hasLength(6));
+    for (var i = 0; i < 5; i++) {
+      expect(shorter[i], same(first[i]));
+    }
+    expect(shorter[5], isNot(same(first[5])));
     await tester.pumpWidget(const SizedBox());
   });
 

@@ -11,8 +11,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// [color].
 ///
 /// It draws each glyph with a path component of the game's renderer. All the
-/// components of a glyph share its path, so setting a new text only imports
-/// the glyphs that no other text shows.
+/// components of a glyph share its path. Setting a new text replaces only the
+/// components of the characters that changed, and imports only the glyphs
+/// that no other text shows.
 ///
 /// With a [line], the text sits at the bottom right of its parent, [line]
 /// lines above the last one; without, at its middle. It keeps its place when
@@ -72,28 +73,51 @@ class VectorTextComponent({
     }
   }
 
-  /// Replaces its glyphs' components with new ones for [text].
+  /// The text its glyphs show.
+  String _laidOut = '';
+
+  /// Its glyphs' components, by their characters' indices in [_laidOut]:
+  /// null for a space.
+  final _glyphs = <Component?>[];
+
+  /// Replaces the components of the glyphs that changed with new ones for
+  /// [text]. A character that stays in its place keeps its component.
   void _layOut() {
-    removeAll(children);
     size.setValues(TubeFont.widthOf(_text), TubeFont.capHeight);
+    while (_glyphs.length > _text.length) {
+      _glyphs.removeLast()?.removeFromParent();
+    }
     for (final (i, char) in _text.split('').indexed) {
-      final glyph = TubeFont.glyph(char);
-      if (glyph == null) {
+      if (i < _laidOut.length && _laidOut[i] == char) {
         continue;
       }
-      final bounds = glyph.getBounds();
-      add(
-        gameRef.pathComponent(
-          glyph,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = TubeFont.stroke
-            ..strokeCap = StrokeCap.square
-            ..color = color,
-          position: Vector2(i * TubeFont.advance + bounds.left, bounds.top),
-          maxSize: glyphMaxSize,
-        ),
-      );
+      final glyph = TubeFont.glyph(char);
+      final component = glyph == null ? null : _glyphComponent(i, glyph);
+      if (i < _glyphs.length) {
+        _glyphs[i]?.removeFromParent();
+        _glyphs[i] = component;
+      } else {
+        _glyphs.add(component);
+      }
+      if (component != null) {
+        add(component);
+      }
     }
+    _laidOut = _text;
+  }
+
+  /// A component of [glyph] at index [i].
+  Component _glyphComponent(int i, Path glyph) {
+    final bounds = glyph.getBounds();
+    return gameRef.pathComponent(
+      glyph,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = TubeFont.stroke
+        ..strokeCap = StrokeCap.square
+        ..color = color,
+      position: Vector2(i * TubeFont.advance + bounds.left, bounds.top),
+      maxSize: glyphMaxSize,
+    );
   }
 }
