@@ -9,11 +9,12 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 
 /// The stars around the tube, never inside it.
 ///
-/// [count] stars lie [radii] from the tube's axis, and up to [far] from the
-/// eye, in tube units. Each frame, they come closer by as much as the eye went
-/// deeper, so on the zoom and the drop they stream outward as streaks. A star
-/// that passes the tube's near plane goes back to the farthest distance, as a
-/// dot somewhere else.
+/// [count] stars lie [radii] from the axis through the viewport's centre,
+/// and up to [far] from the eye, in tube units: see [StarComponent]. Each
+/// frame, they come closer by as much as the eye went deeper, so on the zoom
+/// and the drop they stream outward as streaks. A star that passes the
+/// tube's near plane goes back to the farthest distance, as a dot somewhere
+/// else.
 ///
 /// While the eye goes slower than [cruise], at the round's pace, the stars
 /// come at that speed instead, with short streaks, and a star wholly off
@@ -193,12 +194,16 @@ class StarFieldComponent()
     final drift = cruise * gameRef.pace * dt;
     final isSlow = deeper <= drift;
     final closer = isSlow ? drift : deeper;
-    // By the widest a star can be: half the longest slow streak, which is
-    // centred on the star.
-    final screen = gameRef.camera.visibleWorldRect.inflate(
-      StarComponent.widthScale * TubeView.rimPixels * view.devicePixel +
-          StarComponent.slowLength / gameRef.camera.viewfinder.zoom / 2,
-    );
+    // Round the viewport's centre, as the stars lie, and larger by the widest
+    // a star can be: half the longest slow streak, which is centred on the
+    // star.
+    final camera = gameRef.camera;
+    final screen = camera.visibleWorldRect
+        .shift(-camera.viewfinder.position.toOffset())
+        .inflate(
+          StarComponent.widthScale * TubeView.rimPixels * view.devicePixel +
+              StarComponent.slowLength / camera.viewfinder.zoom / 2,
+        );
     final turn = _turn(dt);
     for (final star in stars) {
       star

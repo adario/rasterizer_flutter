@@ -7,8 +7,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
 /// A star: a white dot that streaks as it moves.
 ///
-/// It lies [point] away from the tube's axis, and [eyeDistance] from the eye
-/// along the axis, in tube units.
+/// It lies [point] away from the axis through the viewport's centre, and
+/// [eyeDistance] from the eye along it, in tube units. That axis is the
+/// tube's, but for an open tube, whose drawing the camera centres instead.
 class StarComponent(Offset point, double eyeDistance) extends DotComponent {
   this : super(TubeColors.star);
 
@@ -52,7 +53,9 @@ class StarComponent(Offset point, double eyeDistance) extends DotComponent {
           view.lineWidthOf(eyeDistance),
         );
     final streak = point.distance * (scale - before);
-    position.setValues(drawn.dx, drawn.dy);
+    // Round the viewport's centre, where the camera looks.
+    final centre = gameRef.camera.viewfinder.position;
+    position.setValues(centre.x + drawn.dx, centre.y + drawn.dy);
     angle = point.direction;
     // A logical pixel is a world unit at the camera's zoom of 1.
     final slow = slowLength / gameRef.camera.viewfinder.zoom;

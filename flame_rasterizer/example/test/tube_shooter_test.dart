@@ -646,6 +646,24 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets("on an open tube, the stars lie round the viewport's centre, "
+      "where the camera looks, not round the tube's axis", (tester) async {
+    final floor = levels.indexWhere((level) => level.tube == Tubes.floor);
+    final game = await playing(tester, firstLevel: floor);
+    await pumpFrames(tester, 2);
+    final centre = game.camera.viewfinder.position;
+    expect(centre.y, greaterThan(0));
+    final view = game.view;
+    for (final star in game.starField.stars) {
+      final drawn =
+          star.point *
+          ((view.scaleOf(star.eyeDistance) + view.scaleOf(star.cameFrom)) / 2);
+      expect(star.position.x, closeTo(centre.x + drawn.dx, 1e-3));
+      expect(star.position.y, closeTo(centre.y + drawn.dy, 1e-3));
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('in play, stars drift at the cruise speed, their streaks very '
       'short, and one past the edge becomes a new one at the farthest', (
     tester,
