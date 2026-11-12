@@ -164,6 +164,39 @@ Future<void> fireOnce(WidgetTester tester, TubeShooterExample game) async {
   game.player.stopFire();
 }
 
+/// Walks the ship from one end of open [tube] to the other, on the tube's
+/// level, once the stars have settled at the first end.
+///
+/// Returns a star that starts 1.5 from the eye, how far it turned about the
+/// axis, and how far the ship's angle turned.
+Future<(StarComponent, double, double)> walkOpenTube(
+  WidgetTester tester,
+  Tube tube,
+) async {
+  final game = await playing(
+    tester,
+    firstLevel: levels.indexWhere((level) => level.tube == tube),
+  );
+  await pumpFrames(tester, 20);
+  expect(game.state, TubeState.play);
+  expect(tube.isOpen, isTrue);
+  game.player.moveBy(-100);
+  await pumpFrames(tester, 60);
+  // Near the camera's aim, the middle of the tube's drawing, so on screen.
+  const from = Offset(0.3, 0.6);
+  final star = game.starField.stars[0]
+    ..point = from
+    ..eyeDistance = 1.5;
+  final heading = PlayerComponent.headingOn(tube, game.player.step);
+  game.player.moveBy(100);
+  await pumpFrames(tester, 60);
+  return (
+    star,
+    star.point.direction - from.direction,
+    PlayerComponent.headingOn(tube, game.player.step) - heading,
+  );
+}
+
 void main() {
   final tube = Tubes.octagon;
 
@@ -784,6 +817,34 @@ void main() {
     }
     expect(near.point.distance, closeTo(nearPoint.distance, 1e-9));
     expect(far.point.distance, closeTo(farPoint.distance, 1e-9));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("along the Floor's straight, neither the ship nor the stars "
+      'turn', (tester) async {
+    final (_, turn, shipTurn) = await walkOpenTube(tester, Tubes.floor);
+    expect(shipTurn, 0);
+    expect(turn, 0);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("across the Ridge's peak, stars turn against the ship's turn "
+      'there, nearer ones more', (tester) async {
+    final ridge = Tubes.ridge;
+    final (star, turn, shipTurn) = await walkOpenTube(tester, ridge);
+    expect(
+      shipTurn,
+      closeTo(ridge.headings.last - ridge.headings.first, 1e-9),
+    );
+    expect(shipTurn.abs(), greaterThan(0.5));
+    double ratioAt(double distance) =>
+        StarFieldComponent.turnRatio * StarFieldComponent.bright / distance;
+    // As in the closed tube's test: nearly all of it, a bit more as the star
+    // comes closer.
+    expect(
+      -turn / shipTurn,
+      inInclusiveRange(0.98 * ratioAt(1.5), ratioAt(star.eyeDistance)),
+    );
     await tester.pumpWidget(const SizedBox());
   });
 

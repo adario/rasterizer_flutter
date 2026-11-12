@@ -101,10 +101,14 @@ class PlayerComponent()
     gameRef.keepStroke(drawing);
   }
 
-  /// Places it on the rim, or as far down its lane as it has dropped.
-  ///
-  /// Within a quarter lane of a corner, it turns between the angles of the
-  /// two lanes there.
+  /// Its angle at [step] round [tube], unwound as [Tube.headingAt].
+  static double headingOn(Tube tube, int step) => tube.headingAt(
+    step ~/ stepsPerLane,
+    (step % stepsPerLane + 0.5) / stepsPerLane,
+  );
+
+  /// Places it on the rim, or as far down its lane as it has dropped, at the
+  /// angle of [headingOn].
   void place() {
     final view = gameRef.view;
     final tube = view.tube;
@@ -119,25 +123,8 @@ class PlayerComponent()
         )! *
         scale;
     position.setValues(at.dx, at.dy);
-    final own = tube.angles[lane];
-    final before = tube.neighbour(lane, -1);
-    final after = tube.neighbour(lane, 1);
-    if (along < 0.25 && before != null) {
-      angle = _turn(tube.angles[before], own, 0.5 + along * 2);
-    } else if (along > 0.75 && after != null) {
-      angle = _turn(tube.angles[after], own, 2.5 - along * 2);
-    } else {
-      angle = own;
-    }
+    angle = headingOn(tube, step);
     this.scale.splat(tube.laneWidth * scale);
-  }
-
-  /// The angle [t] of the way from [from] to [to], turning the short way
-  /// round.
-  static double _turn(double from, double to, double t) {
-    var difference = to - from;
-    difference -= 2 * math.pi * (difference / (2 * math.pi)).roundToDouble();
-    return from + difference * t;
   }
 
   /// Brings it back at the rim, clearing its fade out from when it was

@@ -21,9 +21,10 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// screen goes back too.
 ///
 /// In play, as the ship moves round the rim, the stars turn about the axis the
-/// other way, easing in over about [turnLag]. Nearer stars turn more, as with
-/// parallax: see [turnRatio]. Their places turn, not their distances from the
-/// eye.
+/// other way, easing in over about [turnLag]: round a closed tube, by an even
+/// share for each lane, and along an open one, as the ship turns, so not at
+/// all along a straight. Nearer stars turn more, as with parallax: see
+/// [turnRatio]. Their places turn, not their distances from the eye.
 /// Stars are unseen at the farthest, and at their brightest from [bright] in.
 /// [show] fades them in over [fadeTime], and [hide] fades them out, then
 /// removes them.
@@ -43,9 +44,8 @@ class StarFieldComponent()
   /// they do the game.
   static const cruise = 0.1 * 2 * Tube.depth / TubeShooterExample.dropTime;
 
-  /// How much a star [bright] from the eye turns for each turn of the ship
-  /// round a closed tube. On any tube, a lane turns it by this much of a
-  /// closed tube's lane.
+  /// How much a star [bright] from the eye turns for each turn of the ship:
+  /// round a closed tube, or of its angle along an open one.
   ///
   /// A star's turn is this times [bright] over its distance from the eye, so
   /// nearer stars turn more. Their moves on screen, sideways as outward, then
@@ -77,7 +77,7 @@ class StarFieldComponent()
   Tube? _tube;
 
   /// How far a star that turns as much as the ship turns for each lane that
-  /// the ship moves along [_tube].
+  /// the ship moves round [_tube], if it's closed.
   double _turnPerLane = 0;
 
   /// Shows the stars, fading them in, or at once in a still world.
@@ -136,14 +136,16 @@ class StarFieldComponent()
     if (!identical(tube, _tube)) {
       _tube = tube;
       _turnPerLane = _turnPerLaneOn(tube);
+    } else if (gameRef.state == TubeState.play && tube.isOpen) {
+      _turnTarget -=
+          PlayerComponent.headingOn(tube, step) -
+          PlayerComponent.headingOn(tube, _step);
     } else if (gameRef.state == TubeState.play) {
       const stepsPerLane = PlayerComponent.stepsPerLane;
       final steps = stepsPerLane * tube.laneCount;
       var moved = step - _step;
-      if (!tube.isOpen) {
-        // The short way round, across the step where the lanes start again.
-        moved -= steps * (moved / steps).round();
-      }
+      // The short way round, across the step where the lanes start again.
+      moved -= steps * (moved / steps).round();
       _turnTarget += moved / stepsPerLane * _turnPerLane;
     }
     _step = step;
@@ -153,8 +155,8 @@ class StarFieldComponent()
   }
 
   /// How far a star that turns as much as the ship turns for each lane that
-  /// the ship moves along [tube]: against the way its lanes go round the
-  /// axis.
+  /// the ship moves round closed [tube]: against the way its lanes go round
+  /// the axis.
   static double _turnPerLaneOn(Tube tube) {
     var sweep = 0.0;
     for (var lane = 0; lane < tube.laneCount; lane++) {

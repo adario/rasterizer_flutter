@@ -85,6 +85,36 @@ class Tube(
       (points[i] - points[pointAfter(i)]).direction,
   ];
 
+  /// Each lane's angle, unwound: the first lane's, then each lane's the short
+  /// way round from the one before, so that the change from one lane to
+  /// another is how far the outline turns between them.
+  late final List<double> headings = () {
+    final headings = [angles.first];
+    for (var i = 1; i < laneCount; i++) {
+      headings.add(headings.last + _shortTurn(angles[i] - angles[i - 1]));
+    }
+    return headings;
+  }();
+
+  /// The angle of a shape [along] [lane], from 0 at its first point to 1 at
+  /// its second, unwound as [headings].
+  ///
+  /// Within a quarter lane of a corner, it turns between the angles of the
+  /// two lanes there, halfway at the corner.
+  double headingAt(int lane, double along) {
+    final own = headings[lane];
+    final before = neighbour(lane, -1);
+    final after = neighbour(lane, 1);
+    if (along < 0.25 && before != null) {
+      return own -
+          _shortTurn(angles[lane] - angles[before]) * (0.5 - 2 * along);
+    }
+    if (along > 0.75 && after != null) {
+      return own + _shortTurn(angles[after] - angles[lane]) * (2 * along - 1.5);
+    }
+    return own;
+  }
+
   /// A lane's width, at the rim.
   late final double laneWidth = (points[1] - points[0]).distance;
 
@@ -157,6 +187,10 @@ class Tube(
     }
     return lane;
   }
+
+  /// [angle] within half a turn of 0, the short way round.
+  static double _shortTurn(double angle) =>
+      angle - 2 * math.pi * (angle / (2 * math.pi)).roundToDouble();
 
   /// [offset] turned by [angle], clockwise on screen.
   static Offset rotate(Offset offset, double angle) {
