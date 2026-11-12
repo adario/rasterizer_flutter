@@ -392,10 +392,13 @@ void main() {
       int fps() =>
           game.camera.viewport.children.whereType<FpsTextComponent>().length;
 
+      // The first component is the master, under the ring. A game starts
+      // at the angles where the last one stopped, so it turns from there.
+      await frames(1);
+      final start = components().first.angle;
       await frames(30);
-      // The first component is the master, under the ring.
       final angle = components().first.angle;
-      expect(angle, greaterThan(1));
+      expect(angle, isNot(closeTo(start, 1)));
       await tester.pumpWidget(story(renderer, svg, count: 30, fade: true));
       await frames(1);
       expect(current(), same(game));
