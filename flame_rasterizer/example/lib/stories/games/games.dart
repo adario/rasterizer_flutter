@@ -102,8 +102,9 @@ class SvgShooterStory({
 /// The Level knob's label, which also names its field in the URL.
 const _levelLabel = 'Level';
 
-/// The Level knob's entry for the level at [index] in [levels].
-String _levelName(int index) => '${index + 1} ${levels[index].tube.name}';
+/// The Level knob's entry for the level at [index] in [levels]: its tube's
+/// name, which no other level's tube has.
+String _levelName(int index) => levels[index].tube.name;
 
 /// The Tube Shooter game for [renderer], over a status bar.
 ///

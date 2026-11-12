@@ -233,6 +233,8 @@ void main() {
         .widget<DropdownMenu<int>>(find.byType(DropdownMenu<int>))
         .initialSelection!;
 
+    // The knob names each level by its tube, so no two levels share one.
+    expect({for (final level in levels) level.tube.name}, hasLength(8));
     await settle();
     final first = game();
     await pumpWhileLoading(tester, () => !first.isLoaded);
@@ -258,7 +260,7 @@ void main() {
 
     await tester.tap(find.byType(DropdownMenu<int>));
     await settle();
-    await tester.tap(find.text('4 ${levels[3].tube.name}').last);
+    await tester.tap(find.text(levels[3].tube.name).last);
     await settle();
     final picked = game();
     expect(picked, isNot(same(first)));
