@@ -1,0 +1,37 @@
+name: Deploy example to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - name: Build the Flame example
+        working-directory: flame_rasterizer/example
+        run: flutter build web --release --base-href /rasterizer_flutter/
+      - name: Push it to gh-pages
+        env:
+          WEB: flame_rasterizer/example/build/web
+        run: |
+          touch "$WEB/.nojekyll"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git --work-tree "$WEB" add --all
+          commit=$(git commit-tree "$(git write-tree)" -m "Deployed ${GITHUB_SHA::7}.")
+          git push --force origin "$commit:refs/heads/gh-pages"
