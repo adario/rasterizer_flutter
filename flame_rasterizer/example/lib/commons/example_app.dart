@@ -14,7 +14,7 @@ class const ExampleApp({required final Widget child, super.key})
   Widget build(BuildContext context) {
     final useCase = WidgetbookState.of(context).useCase;
     return MaterialApp(
-      title: 'flame_rasterizer example',
+      title: 'Flame Rasterizer',
       debugShowCheckedModeBanner: false,
       darkTheme: ThemeData.dark(),
       home: Material(

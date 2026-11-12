@@ -1,6 +1,6 @@
 {
-    "name": "flame_rasterizer_example",
-    "short_name": "flame_rasterizer_example",
+    "name": "Flame Rasterizer",
+    "short_name": "Flame Rasterizer",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
