@@ -1,0 +1,5 @@
+# tiger.svg is AGPL (README.md, and the repository's THIRD_PARTY_NOTICES.md): it
+# stays in the repository, for the example and its tests, but out of
+# flame_rasterizer's pub.dev package. Without it, the example says so in its
+# status bar. Here, not in svgs/, which the app bundles whole.
+svgs/tiger.svg

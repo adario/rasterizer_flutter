@@ -1,0 +1,48 @@
+name: rasterizer_gpu
+resolution: workspace
+description: "Rasterizer's C++ core, built by a build hook and driven through Dart FFI, rendering SVG scenes with Flutter GPU, with a dart:ui Canvas fallback."
+version: 0.0.1
+repository: https://github.com/adario/rasterizer_flutter/tree/main/rasterizer_gpu
+issue_tracker: https://github.com/adario/rasterizer_flutter/issues
+publish_to: none
+topics:
+  - svg
+  - gpu
+  - vector-graphics
+  - ffi
+
+environment:
+  sdk: ^3.13.7
+  flutter: ">=3.47.9"
+
+dependencies:
+  code_assets: ^1.1.0
+  ffi: ^2.1.4
+  flutter:
+    sdk: flutter
+  flutter_gpu:
+    sdk: flutter
+  flutter_gpu_shaders: ^0.5.2
+  hooks: ^2.2.0
+  logging: ^1.3.0
+  native_toolchain_c: ^0.19.0
+  # The canvas renderer's SVG parser, pure Dart, so also on web.
+  vector_graphics_compiler: ^1.3.3
+  vector_math: ^2.4.3
+  xml: ">=6.3.0 <8.0.0"
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  test: ^1.28.0
+
+flutter:
+  # Android only, for the manifest that turns on Flutter GPU: the native code is built by hook/build.dart.
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+  assets:
+    # Written by hook/build.dart, and loaded as packages/rasterizer_gpu/build/shaderbundles/rasterizer.shaderbundle.
+    - build/shaderbundles/rasterizer.shaderbundle

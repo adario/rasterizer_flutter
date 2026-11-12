@@ -1,0 +1,5 @@
+# tiger.svg is AGPL (tiger/README.md, and the repository's
+# THIRD_PARTY_NOTICES.md): it stays in the repository, for the example and the
+# tests, but out of rasterizer_gpu's pub.dev package. Without it, the SVG page
+# says it failed. Here, not in tiger/, which the app bundles whole.
+tiger/tiger.svg

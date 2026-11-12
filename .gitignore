@@ -1,0 +1,24 @@
+# Build output and tools' files (each package and example app also has its own .gitignore)
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+coverage/
+*.pyc
+# Written by Flutter on every build, on each platform
+GeneratedPluginRegistrant.*
+
+# IDEs and local files
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+__MACOSX/
+local.properties
+
+# The pub workspace's single lock file, at the root: as in Flame's repo, it isn't
+# kept, so each checkout resolves Flame's latest main.
+pubspec.lock

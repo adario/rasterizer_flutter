@@ -1,0 +1,38 @@
+name: flame_rasterizer_example
+resolution: workspace
+description: "flame_rasterizer's example: its SVGs against flame_svg's, in Flame and Forge2D games, in a Widgetbook."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.7
+
+# flame, flame_forge2d and flame_svg come from Flame's main, through the
+# workspace's dependency overrides (the root pubspec.yaml).
+dependencies:
+  flame: ^2.0.0-dev.1
+  flame_forge2d: ^0.21.0-dev.1
+  flame_rasterizer:
+    path: ../
+  flame_svg: ^3.0.0-dev.1
+  flutter:
+    sdk: flutter
+  url_launcher: ^6.3.0
+  widgetbook: ^3.25.0
+
+dev_dependencies:
+  flame_lint: ^1.5.0-dev.1
+  # For integration tests on web, with flutter drive: see
+  # the repository's tool/device_tests.py.
+  flutter_driver:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/svgs/
+    - assets/svgs/wireframe/

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Created with Vectornator (http://vectornator.io/) -->
+<svg height="512.0px" stroke-miterlimit="10" style="fill-rule:nonzero;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;" version="1.1" viewBox="0 0 512 512" width="512.0px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<defs/>
+<clipPath id="ArtboardFrame">
+<rect height="512" width="512" x="0" y="0"/>
+</clipPath>
+<g clip-path="url(#ArtboardFrame)" id="Untitled">
+<g opacity="1">
+<path d="M154.796 172.658L154.796 339.353C154.796 349.217 162.793 357.213 172.656 357.213L339.351 357.213C349.215 357.213 357.211 349.216 357.211 339.353L357.211 172.658C357.211 162.794 349.214 154.798 339.351 154.798L172.656 154.798C162.792 154.797 154.796 162.794 154.796 172.658Z" fill="none" opacity="1" stroke="#4484F4" stroke-linecap="butt" stroke-linejoin="miter" stroke-width="4"/>
+<path d="M494.14 0.009L310.047 0.009C294.198 0.009 286.174 19.254 297.419 30.498L481.511 214.589C492.671 225.749 512 217.962 512 201.961L512 17.869C512 8.006 504.003 0.009 494.14 0.009Z" fill="none" opacity="1" stroke="#F44484" stroke-linecap="butt" stroke-linejoin="miter" stroke-width="4"/>
+<path d="M30.497 214.583L214.588 30.49C225.796 19.282 217.862 0 201.96 0L17.869 0C8.005 0 0.009 7.997 0.009 17.86L0.009 201.952C0.008 217.889 19.322 225.757 30.497 214.583Z" fill="none" opacity="1" stroke="#F44484" stroke-linecap="butt" stroke-linejoin="miter" stroke-width="4"/>
+<path d="M30.489 297.411C19.278 286.203 0 294.142 0 310.041L0 494.132C0 503.996 7.997 511.992 17.86 511.992L201.952 511.992C217.801 511.992 225.825 492.747 214.58 481.503L30.489 297.411Z" fill="none" opacity="1" stroke="#F44484" stroke-linecap="butt" stroke-linejoin="miter" stroke-width="4"/>
+<path d="M481.503 297.418L297.412 481.511C286.205 492.718 294.139 512 310.04 512L494.131 512C503.995 512 511.991 504.003 511.991 494.14L511.991 310.048C511.992 294.195 492.745 286.178 481.503 297.418Z" fill="none" opacity="1" stroke="#F44484" stroke-linecap="butt" stroke-linejoin="miter" stroke-width="4"/>
+</g>
+</g>
+</svg>

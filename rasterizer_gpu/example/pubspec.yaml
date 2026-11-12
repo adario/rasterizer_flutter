@@ -1,0 +1,39 @@
+name: rasterizer_gpu_example
+resolution: workspace
+description: "rasterizer_gpu's example: an SVG page to pan and zoom, the sweep, the atlas benchmark, and the golden tests."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  # zlib for the goldens' PNGs (lib/png.dart), on web too.
+  archive: ^4.6.0
+  flutter:
+    sdk: flutter
+  rasterizer_gpu:
+    path: ../
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  # For integration tests on web, with flutter drive: see
+  # the repository's tool/device_tests.py.
+  flutter_driver:
+    sdk: flutter
+
+flutter:
+  assets:
+    # Separately licensed test data: see assets/tiger/README.md. A folder,
+    # not the file, as the published package leaves tiger.svg out.
+    - assets/tiger/
+    # One golden set per platform: see lib/goldens.dart.
+    - goldens/macos/
+    - goldens/ios/
+    - goldens/android_emulator/
+    - goldens/android_emulator_gles/
+    - goldens/linux_llvmpipe/

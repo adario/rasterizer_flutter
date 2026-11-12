@@ -1,0 +1,34 @@
+name: flame_rasterizer_benchmark
+resolution: workspace
+description: "flame_rasterizer's benchmark: a demo, the benchmark and a correctness check."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flame: ^2.0.0-dev.1
+  flame_rasterizer:
+    path: ../
+  flame_svg: ^3.0.0-dev.1
+  flutter:
+    sdk: flutter
+  rasterizer_gpu:
+    path: ../../rasterizer_gpu
+
+dev_dependencies:
+  flame_lint: ^1.5.0-dev.1
+  # For integration tests on web, with flutter drive: see
+  # the repository's tool/device_tests.py.
+  flutter_driver:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/tiger.svg

@@ -1,0 +1,4 @@
+# tiger.svg is AGPL (the repository's THIRD_PARTY_NOTICES.md): it stays in the
+# repository, for the benchmark's --svgs tiger, but out of flame_rasterizer's
+# pub.dev package.
+tiger.svg

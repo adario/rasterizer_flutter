@@ -1,0 +1,17 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    - always_put_control_body_on_new_line
+    - lines_longer_than_80_chars
+    - unnecessary_primary_constructor_body
+    - use_primary_constructors
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - macos/**
+    - web/**
+    - linux/**

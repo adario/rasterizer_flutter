@@ -1,0 +1,724 @@
+--- a/Package/Sources/RasterizerCpp/include/Rasterizer.h
++++ b/src/core/Rasterizer.h
+@@ -1,3 +1,4 @@
++#pragma once
+ //
+ //  Copyright 2025 Nigel Timothy Barber - nigel@mindbrix.co.uk
+ //  SPDX-License-Identifier: MIT
+--- a/Package/Sources/RasterizerCpp/include/Rasterizer.hpp
++++ b/src/core/Rasterizer.hpp
+@@ -1,16 +1,16 @@
++#pragma once
+ //
+ //  Copyright 2025 Nigel Timothy Barber - nigel@mindbrix.co.uk
+ //  SPDX-License-Identifier: MIT
+ //
+ 
+-#import "Rasterizer.h"
+-#import "xxhash.h"
+-#import <map>
+-#import <vector>
+-#ifdef __APPLE__
+-#import <dispatch/dispatch.h>
+-#import <unistd.h>
+-#endif
++#include "Rasterizer.h"
++#include "xxhash.h"
++#include <deque>
++#include <map>
++#include <unordered_map>
++#include <vector>
++#include "ra_portable.h"
+ #pragma clang diagnostic ignored "-Wcomma"
+ 
+ struct Rasterizer {
+@@ -433,9 +433,25 @@
+         Color withOpacity(float opacity) const {
+             return Color(b, g, r, a * fmaxf(0.f, fminf(1.f, opacity)) + 0.5f);
+         }
++        Color scaled(float s) const {     // A premultiplied color's, all of its components scaled by s, from 0 to 1
++            return Color(b * s + 0.5f, g * s + 0.5f, r * s + 0.5f, a * s + 0.5f);
++        }
+         Component b, g, r, a;
+     };
+-    
++
++    struct ColorMatrix {    // A 4 x 4 matrix on premultiplied RGBA, row by row, its rows & columns r, g, b, a
++        bool keepsAlpha() const { return m[12] == 0.f && m[13] == 0.f && m[14] == 0.f && m[15] == 1.f; }
++        bool clearsAlpha() const { return m[12] == 0.f && m[13] == 0.f && m[14] == 0.f && m[15] == 0.f; }
++        // A premultiplied color, all of its components scaled by s, from 0 to 1, then transformed, & clamped from 0 to its alpha
++        Color transform(Color c, float s = 1.f) const {
++            float r = c.r * s, g = c.g * s, b = c.b * s, a = c.a * s;
++            float ta = fmaxf(0.f, fminf(255.f, m[12] * r + m[13] * g + m[14] * b + m[15] * a));
++            auto row = [&](const float *k) { return fmaxf(0.f, fminf(ta, k[0] * r + k[1] * g + k[2] * b + k[3] * a)) + 0.5f; };
++            return Color(row(m + 8), row(m + 4), row(m), ta + 0.5f);
++        }
++        float m[16];
++    };
++
+     struct Bitmap {
+         void addGradient(Color *stops, float *locations, size_t count, Transform transform) {
+             colors.add(stops, count);
+@@ -565,6 +581,7 @@
+         }
+         Path path;  Transform ctm;  Paint paint;  float width = 0.f;  uint8_t flags = kInvisible, blendMode = kBlendNormal;  Bounds clip, bnds;  Path clipPath = nullptr;
+     };
++    struct Instance;
+     struct Scene {
+         struct Entry {
+             Entry(const Path p, size_t idx) : p(p), idx(idx) {}
+@@ -586,18 +603,57 @@
+         // Calls bool f(size_t i, Draw& draw) for the draws in [i0, i1), which returns true if it changed the draw. A changed draw is
+         // revalidated, & only changes to what prepare() depends on need a prepare: a new path or visibility, or a stroke becoming a fill,
+         // which needs a P16 base. Transform, color, stroke width & blend mode changes don't, & a fill becoming a stroke leaves an unused entry.
+-        // Paints should be assigned whole, e.g. Paint(color), so their alpha range stays right.
++        // Paints should be assigned whole, e.g. Paint(color), so their alpha range stays right. A prepare, a fill becoming a stroke, or a
++        // stroke's new transform clears the cached outlines.
+         template<typename F>
+         void update(size_t i0, size_t i1, F f) {
+             for (size_t i = i0, end = i1 < count() ? i1 : count(); i < end; i++) {
+                 Draw& draw = draws[i];
+                 Geometry *path = draw.path.ptr;  bool isStroke = draw.width != 0;  uint8_t invisible = draw.flags & Draw::kInvisible;
++                Transform ctm = draw.ctm;
+                 if (f(i, draw)) {
+                     draw.validate();
+                     if (draw.path.ptr != path || (isStroke && draw.width == 0) || (draw.flags & Draw::kInvisible) != invisible)
+                         needPrepare = true;
+-                }
+-            }
++                    if (!isStroke ? draw.width != 0 : memcmp(& ctm, & draw.ctm, sizeof(Transform)) != 0)
++                        outlineSets.clear();
++                }
++            }
++        }
++        // Stroke outlines cached in scene space, one set per power of 2 scale (geometry cache, part 2). At scale 2^k, each stroke's
++        // Outliner pieces under its transform & that scale, scaled back, which a similarity transform of scale 2^k or less draws as
++        // precisely as outlining in device space would, as only cubics' piece counts depend on scale. Their izs hold their subpaths'
++        // kPCap & kNCap, for opaques. Strokes of one line subpaths, which Context::writeSegmentOutlines writes directly, are left out
++        struct Outlines {
++            int k;  Row<Instance> pieces;  Row<uint32_t> begins;     // Per draw, its pieces' begin, & then their end
++        };
++        const Outlines *outlines(int k) {
++            for (Outlines& set: outlineSets)
++                if (set.k == k)
++                    return & set;
++            Outlines& set = outlineSets.emplace_back();
++            float s = exp2f(float(k)), r = 1.f / s;
++            Row<Opaque> caps;
++            Outliner outliner;
++            outliner.iz = 0, outliner.outlines = & set.pieces, outliner.opaques = & caps;
++            set.k = k;
++            uint32_t *begin = set.begins.alloc(count() + 1);
++            for (size_t i = 0; i < count(); i++) {
++                Draw& draw = draws[i];
++                begin[i] = uint32_t(set.pieces.end);
++                if (draw.width != 0.f && (draw.flags & Draw::kInvisible) == 0 && !draw.path->isSegments())
++                    outliner.applyPath(draw.path.ptr, draw.ctm.concat(Transform(s, 0.f, 0.f, s, 0.f, 0.f)), Bounds::huge(), true, false);
++            }
++            begin[count()] = uint32_t(set.pieces.end);
++            for (size_t j = 0; j < set.pieces.end; j++) {
++                Instance& piece = set.pieces.base[j];
++                Quadratic& q = piece.outline.quad;
++                piece.iz = caps.base[j].iz & (Instance::kPCap | Instance::kNCap);
++                q.x0 *= r, q.y0 *= r, q.x2 *= r, q.y2 *= r;
++                if (q.x1 != FLT_MAX)
++                    q.x1 *= r, q.y1 *= r;
++            }
++            return & set;
+         }
+         Bounds bounds() const {
+             Bounds b;
+@@ -612,16 +668,12 @@
+         // prepare() scratch, shared by the scenes of a SceneList::prepare(), so scenes don't each keep peak-sized buffers
+         struct Scratch {
+             Scratch() {
+-#ifdef __APPLE__
+-                static const long online = sysconf(_SC_NPROCESSORS_ONLN);     // Queried once per process
+-                cpus = online < 1 ? 1 : size_t(online) < kMaxChunks ? size_t(online) : kMaxChunks;
+-#endif
++                static const size_t online = raProcessorCount();     // Queried once per process
++                cpus = online < kMaxChunks ? online : kMaxChunks;
+             }
+             void run(void (*function)(void *, size_t)) {
+-#ifdef __APPLE__
+                 if (chunks > 1)
+-                    return dispatch_apply_f(chunks, DISPATCH_APPLY_AUTO, this, function);
+-#endif
++                    return raParallelFor(chunks, this, function);
+                 for (size_t t = 0; t < chunks; t++)
+                     function(this, t);
+             }
+@@ -764,12 +816,14 @@
+             if (!needPrepare)
+                 return;
+             needPrepare = false;
++            outlineSets.clear();
+             scratch.prepare(this);
+         }
+         size_t refCount;
+         RefVector<Draw> draws;
+         bool needPrepare = false;
+         Row<uint32_t> p16bases;  RefVector<Entry> p16entries;  uint32_t p16total = 0;
++        std::deque<Outlines> outlineSets;     // A deque, so a frame's pointers to them stay valid as it adds more
+         Row<size_t> weights;  size_t weight = 0;
+     };
+     typedef Ref<Scene> SceneRef;
+@@ -815,6 +869,9 @@
+         }
+         Transform ctm;  Params params;
+         std::vector<SceneRef> scenes;  std::vector<Transform> ctms;  std::vector<Bounds> clips;
++        std::vector<Bounds> deviceClips;    // Empty, or one per scene, in device pixels
++        std::vector<float> opacities;       // Empty, or one per scene, from 0 to 1, which scales its draws' alpha
++        std::vector<ColorMatrix> colorMatrices;     // Empty, or one per scene, which transforms its draws' premultiplied colors
+     };
+     
+     struct Segment {
+@@ -882,7 +939,7 @@
+             Type type;  size_t begin, end;
+         };
+         
+-        void prepare(const SceneList& list) {
++        void prepare(const SceneList& list, float scale) {
+             params = list.params;
+             pathsCount = list.pathsCount();
+             texCount = 0;
+@@ -891,8 +948,31 @@
+             size_t colorsCount = (pathsCount / kColorTextureWidth + 1) * kColorTextureWidth;    // Whole color texture rows
+             colors = 0, paths = (colorsCount * sizeof(Color) + 15) & ~15;
+             headerSize = (paths + (pathsCount + 1) * sizeof(PathData) + 15) & ~15, entries.empty();
++
++            // Each scene's P16s are written once, at its first entry's base, which its other entries share
++            size_t n = list.scenes.size();
++            p16bases.resize(n), p16firsts.resize(n), p16count = 0, p16scenes.clear();
++            for (size_t i = 0; i < n; i++) {
++                auto it = p16scenes.emplace(list.scenes[i].ptr, uint32_t(p16count));
++                p16bases[i] = it.first->second, p16firsts[i] = it.second;
++                if (it.second)
++                    p16count += list.scenes[i]->p16total;
++            }
++            // Entries drawn with a similarity transform outline their strokes from their scene's cache at the power of 2 at or above
++            // their scale, & others with the Outliner, as its pieces' angles don't survive skews or unequal scales
++            Transform view = list.ctm.concat(Transform(scale, 0.f, 0.f, scale, 0.f, 0.f));
++            outlines.resize(n);
++            for (size_t i = 0; i < n; i++) {
++                Transform m = list.ctms[i].concat(view);
++                float p = m.a * m.a + m.b * m.b, q = m.c * m.c + m.d * m.d, e = 1e-3f * (p + q);
++                bool similar = !params.showOutlines && p > 0.f && p < FLT_MAX && fabsf(p - q) <= e && fabsf(m.a * m.c + m.b * m.d) <= e;
++                outlines[i] = similar ? list.scenes[i].ptr->outlines(int(fmaxf(-64.f, fminf(64.f, ceilf(0.5f * log2f(p)))))) : nullptr;
++            }
+         }
+         uint8_t *base = nullptr;  Row<Entry> entries;
++        std::vector<uint32_t> p16bases;  std::vector<bool> p16firsts;  size_t p16count = 0;     // Per list entry, & the P16s' total
++        std::vector<const Scene::Outlines *> outlines;      // Per list entry, its strokes' cached outlines, or null
++        std::unordered_map<const Scene *, uint32_t> p16scenes;
+         RefVector<Paint> images;    // The frame's images, which draws index with texIdxs
+         Params params;
+         size_t colors, paths, texStrips, p16s;
+@@ -940,8 +1020,8 @@
+     };
+     
+     struct TexRef {
+-        TexRef(size_t iz, Color *strip) : iz(uint32_t(iz)), strip(strip) {}
+-        uint32_t iz;  Color *strip;
++        TexRef(size_t iz, Color *strip, float opacity, const ColorMatrix *matrix) : iz(uint32_t(iz)), strip(strip), opacity(opacity), matrix(matrix) {}
++        uint32_t iz;  Color *strip;  float opacity;  const ColorMatrix *matrix;
+     };
+     struct ImageRef {
+         ImageRef(size_t iz, Paint *image) : iz(uint32_t(iz)), image(image) {}
+@@ -964,17 +1044,23 @@
+             bool clipActive = false;
+             
+             Color black(0, 0, 0, 255), red(0, 0, 255, 255);
+-            size_t lz, uz, i, clz, cuz, iz, is, cnt; uint32_t p16total = 0;
++            size_t lz, uz, i, clz, cuz, iz, is, cnt;
+             Geometry *lastClipPath = nullptr;  Transform lastClipCtm;  bool lastClipEvenOdd = false;
+             currentClipPath = nullptr, maskBounds = device;
+             float det, width, softclipMargin = 0.5f;
+             
+-            for (lz = uz = i = 0; i < list.scenes.size(); p16total += list.scenes[i]->p16total, i++, lz = uz ) {
++            for (lz = uz = i = 0; i < list.scenes.size(); i++, lz = uz ) {
+                 const Scene *scn = list.scenes[i].ptr;
+                 uz = lz + scn->count(), clz = lz < slz ? slz : lz > suz ? suz : lz, cuz = uz < slz ? slz : uz > suz ? suz : uz;
+                 Transform ctm = list.ctms[i].concat(view), clipquad, m, quad, invclip;
+-                Bounds dev, clip, clipBounds = device, sceneclip = list.clips[i], lastClip;
++                Bounds sceneDevice = list.deviceClips.empty() ? device : list.deviceClips[i].integral().intersect(device);
++                bool deviceClipped = memcmp(& sceneDevice, & device, sizeof(Bounds)) != 0;
++                Bounds dev, clip, clipBounds = sceneDevice, sceneclip = list.clips[i], lastClip;
+                 bool clipCtmChanged = memcmp(& lastClipCtm, & ctm, sizeof(Transform)) != 0;
++                float opacity = list.opacities.empty() ? 1.f : fmaxf(0.f, fminf(1.f, list.opacities[i]));
++                const ColorMatrix *matrix = list.colorMatrices.empty() ? nullptr : & list.colorMatrices[i];
++                if (opacity == 0.f || (matrix && matrix->clearsAlpha()))     // Drawn as its draws were invisible
++                    continue;
+ 
+                 for (is = clz - lz, iz = clz; iz < cuz; iz++, is++) {
+                     Draw& draw = scn->draws[is];
+@@ -985,10 +1071,11 @@
+                         if (memcmp(& draw.clip, & lastClip, sizeof(Bounds)) != 0) {
+                             lastClip = draw.clip;
+                             clipActive = !lastClip.isHuge() || !sceneclip.isHuge();
+-                            clipquad = clipActive ? sceneclip.intersect(lastClip).quad(ctm) : Transform(1e12f, 0.f, 0.f, 1e12f, -5e11f, -5e11f);
++                            clipquad = clipActive ? sceneclip.intersect(lastClip).quad(ctm) : deviceClipped ? sceneDevice.quad(Transform()) : Transform(1e12f, 0.f, 0.f, 1e12f, -5e11f, -5e11f);
++                            clipActive = clipActive || deviceClipped;
+                             softclipMargin = 0.5f + 1e-1f / fmaxf(1.f, clipquad.scale());
+                             invclip = clipquad.invert();
+-                            clipBounds = Bounds(clipquad).integral().intersect(device);
++                            clipBounds = Bounds(clipquad).integral().intersect(sceneDevice);
+                         }
+                         Geometry *clipPath = draw.clipPath.ptr;  bool clipEvenOdd = draw.flags & Draw::kClipEvenOdd;
+                         if (lastClipPath != clipPath || (clipPath && (clipCtmChanged || lastClipEvenOdd != clipEvenOdd))) {
+@@ -1012,7 +1099,7 @@
+                     if ((det || draw.width < 0.f) && clip.lx < clip.ux && clip.ly < clip.uy) {
+                         bool unclipped = clip.contains(dev);
+                         Paint *color = & draw.paint;
+-                        bool isOpaque = color->isOpaque();
++                        bool isOpaque = color->isOpaque() && opacity == 1.f && (!matrix || matrix->keepsAlpha());
+                         auto softUnclipped = [&]() {
+                             if (!isOpaque || lastClipPath != nullptr || draw.blendMode != kBlendNormal)     // Opaques are drawn before what's beneath them
+                                 return false;
+@@ -1027,7 +1114,7 @@
+                         size_t colorFlags = isImage ? Instance::kIsImage : (isGradient * Instance::kIsGradient | isRadial * Instance::kIsRadial);
+                         if (isGradient) {
+                             paths[iz].texCtm = color->bitmap->ctm.concat(m).invert();
+-                            texs.add(TexRef(iz, & color->bitmap->strip[0]));
++                            texs.add(TexRef(iz, & color->bitmap->strip[0], opacity, matrix));
+                         } else if (isImage) {
+                             paths[iz].texCtm = quad.invert();
+                             images.add(ImageRef(iz, color));
+@@ -1035,8 +1122,11 @@
+                         
+                         if (list.params.showOutlines)
+                             colors[iz] = draw.width == 0.f ? black : red;
+-                        else
+-                            colors[iz] = draw.paint.color.premultiplied();
++                        else {
++                            colors[iz] = (opacity == 1.f ? draw.paint.color : draw.paint.color.withOpacity(opacity)).premultiplied();
++                            if (matrix)
++                                colors[iz] = matrix->transform(colors[iz]);
++                        }
+                         
+                         paths[iz].clip = invclip;
+                         if (draw.blendMode != kBlendNormal)     // Only blended draws write their mode
+@@ -1052,8 +1142,11 @@
+                             outliner.iz = inst->iz, outliner.outlines = & outlines;
+                             if (width > 4.f && softUnclipped())
+                                 outliner.opaques = & opaques;
++                            const Scene::Outlines *cached = buffer->outlines[i];
+                             if (outliner.opaques == nullptr && g->isSegments())
+                                 writeSegmentOutlines(g, m, outlineClip, unclipped, inst->iz);
++                            else if (cached && unclipped && draw.width != 0.f && !g->isSegments())
++                                writeCachedOutlines(cached, is, ctm, inst->iz, outliner.opaques);
+                             else
+                                 outliner.applyPath(g, m, outlineClip, unclipped, false);
+                             i1 = uint32_t(outlines.idx);
+@@ -1064,7 +1157,7 @@
+                             bool fast = !buffer->params.useCurves || g->maxCurve * det < 16.f;
+                             Blend *inst = new (blends.alloc(1)) Blend(iz | colorFlags | Instance::kMolecule | bool(draw.flags & Draw::kFillEvenOdd) * Instance::kEvenOdd | fast * Instance::kFastEdges);
+                             inst->g = g, inst->quad.cover = 0;
+-                            inst->quad.base = int(p16total + scn->p16bases.base[is]);
++                            inst->quad.base = int(buffer->p16bases[i] + scn->p16bases.base[is]);
+                             inst->quad.molsbase = int(g->p16s.idx / 2);
+                             cnt = fast ? g->p16s.idx / kFastSegments : g->atoms.end;
+                             int type = fast ? Allocator::kFastMolecules : Allocator::kQuadMolecules;
+@@ -1096,6 +1189,27 @@
+                 }
+             }
+             outlines.idx = outlines.end += dst - dst0;
++        }
++        // Draw is's cached outline pieces, transformed by m, & their opaques, if any. Only unclipped draws use them: the Outliner
++        // splits clipped curves at the clip, which whole pieces, at high zooms, don't draw as precisely
++        void writeCachedOutlines(const Scene::Outlines *cached, size_t is, Transform m, uint32_t iz, Row<Opaque> *opaques) {
++            const Instance *src = cached->pieces.base + cached->begins.base[is], *end = cached->pieces.base + cached->begins.base[is + 1];
++            Instance *dst = outlines.alloc(end - src);
++            Opaque *opaque = opaques ? opaques->alloc(end - src) : nullptr;
++            for (; src < end; src++, dst++) {
++                const Quadratic& s = src->outline.quad;
++                Quadratic& q = dst->outline.quad;
++                dst->iz = iz, dst->outline.prev = src->outline.prev, dst->outline.next = src->outline.next;
++                q.x0 = s.x0 * m.a + s.y0 * m.c + m.tx, q.y0 = s.x0 * m.b + s.y0 * m.d + m.ty;
++                q.x2 = s.x2 * m.a + s.y2 * m.c + m.tx, q.y2 = s.x2 * m.b + s.y2 * m.d + m.ty;
++                if (s.x1 != FLT_MAX)
++                    q.x1 = s.x1 * m.a + s.y1 * m.c + m.tx, q.y1 = s.x1 * m.b + s.y1 * m.d + m.ty;
++                else
++                    q.x1 = FLT_MAX, q.y1 = 0.f;
++                if (opaque)
++                    opaque->iz = iz | src->iz, opaque->quad = q, opaque++;
++            }
++            outlines.idx = outlines.end;
+         }
+         // Clip commands are kClip blends, which split the instance batches. kClipMaskBegin's cell holds the clip mask's device bounds,
+         // & the instances after it, up to the next kClipEnable, render the clip path's coverage into the clip mask. Its g & quad.base
+@@ -1149,7 +1263,7 @@
+     static void radixSort(uint32_t *in, int size, uint32_t lower, uint32_t range, bool single, uint16_t *counts) {
+         range = range < 4 ? 4 : range;
+         uint32_t mask = range - 1;
+-        uint32_t *tmp = (uint32_t *)alloca(size * sizeof(uint32_t));
++        uint32_t *tmp = (uint32_t *)RA_ALLOCA(size * sizeof(uint32_t));
+         memset(counts, 0, sizeof(uint16_t) * range);
+         for (int i = 0; i < size; i++)
+             counts[(in[i] - lower) & mask]++;
+@@ -1498,7 +1612,7 @@
+             d = q2 * q2 + p3 / 27.0;
+             if (d < 0) {
+                 double r = sqrt(-p3 / 27.0), tcos = -q / (2 * r), crtr = 2 * copysign(cbrt(fabs(r)), r), sine, cosine;
+-                __sincos(acos(fmax(-1, fmin(1, tcos))) / 3, & sine, & cosine);
++                raSinCos(acos(fmax(-1, fmin(1, tcos))) / 3, & sine, & cosine);
+                 t = crtr * cosine - B; if (t > 0.f && t < 1.f)  *roots++ = t;
+                 t = crtr * (-0.5 * cosine - 0.866025403784439 * sine) - B; if (t > 0.0 && t < 1.0)  *roots++ = t;
+                 t = crtr * (-0.5 * cosine + 0.866025403784439 * sine) - B; if (t > 0.0 && t < 1.0)  *roots++ = t;
+@@ -1546,7 +1660,7 @@
+                 }
+             }
+         }
+-        __attribute__((always_inline)) void writeLine(float x0, float y0, float x1, float y1) {
++        RA_ALWAYS_INLINE void writeLine(float x0, float y0, float x1, float y1) {
+             y0 = fmaxf(clip.ly, fminf(clip.uy, y0));
+             y1 = fmaxf(clip.ly, fminf(clip.uy, y1));
+             size_t si = dst - dst0;
+@@ -1568,7 +1682,7 @@
+                 }
+             }
+         }
+-        __attribute__((always_inline)) void writeQuadratic(float x0, float y0, float x1, float y1, float x2, float y2) {
++        RA_ALWAYS_INLINE void writeQuadratic(float x0, float y0, float x1, float y1, float x2, float y2) {
+             y0 = fmaxf(clip.ly, fminf(clip.uy, y0));
+             y1 = fmaxf(clip.ly, fminf(clip.uy, y1));
+             y2 = fmaxf(clip.ly, fminf(clip.uy, y2));
+@@ -1868,9 +1982,8 @@
+         buffer.texCount = sz;
+         size += sz * kColorTextureWidth * sizeof(Color);
+         
+-        for (auto& scene: list.scenes)
+-            size += scene->p16total * sizeof(Point16);
+-        
++        size += buffer.p16count * sizeof(Point16);
++
+         Context *ctx = contexts;   Allocator::Pass *pass;
+         for (ctx = contexts, i = 0; i < count; i++, ctx++) {
+             for (j = 0; j < ctx->images.end(); j++)
+@@ -1897,7 +2010,14 @@
+             for (j = 0; j < contexts[i].texs.end(); j++) {
+                 auto ref = contexts[i].texs[j];
+                 paths[ref.iz].texIdx = texIdx++;
+-                memcpy(buffer.base + end, ref.strip, sz), end += sz;
++                if (ref.opacity == 1.f && !ref.matrix)
++                    memcpy(buffer.base + end, ref.strip, sz);
++                else {
++                    Color *dst = (Color *)(buffer.base + end);
++                    for (size_t k = 0; k < kColorTextureWidth; k++)
++                        dst[k] = ref.matrix ? ref.matrix->transform(ref.strip[k], ref.opacity) : ref.strip[k].scaled(ref.opacity);
++                }
++                end += sz;
+             }
+         for (texIdx = 0, i = 0; i < count; i++)     // Image draws index buffer.images, in the same order
+             for (j = 0; j < contexts[i].images.end(); j++)
+@@ -1960,20 +2080,23 @@
+         size_t i, j, count, size, ip, iz, ic, end, instbegin, passsize;
+         {
+             auto p16s = (Point16 *)(buffer.base + buffer.p16s);
+-            size_t p16paths = 0, p16total = 0, m0 = 0, m1 = 0, i0, i1, c0, c1;
+-            for (auto& scene: list.scenes)
+-                p16paths += scene->p16entries.end();
++            size_t p16paths = 0, m0 = 0, m1 = 0, i0, i1, c0, c1, s;
++            for (s = 0; s < list.scenes.size(); s++)     // A scene's first entry writes its P16s
++                p16paths += buffer.p16firsts[s] ? list.scenes[s]->p16entries.end() : 0;
+             i0 = index * p16paths / contextCount;
+             i1 = (index + 1) * p16paths / contextCount;
+-            for (auto& scene: list.scenes) {
++            for (s = 0; s < list.scenes.size(); s++) {
++                if (!buffer.p16firsts[s])
++                    continue;
++                auto& scene = list.scenes[s];
+                 m1 = m0 + scene->p16entries.end();
+                 c0 = m0 < i0 ? i0 : m0 > i1 ? i1 : m0;
+                 c1 = m1 < i0 ? i0 : m1 > i1 ? i1 : m1;
+                 for (; c0 < c1; c0++) {
+                     auto& entry = scene->p16entries[c0 - m0];
+-                    memcpy(p16s + p16total + entry.idx, entry.p->p16s.base, entry.p->p16s.end * sizeof(Point16));
+-                }
+-                m0 = m1, p16total += scene->p16total;
++                    memcpy(p16s + buffer.p16bases[s] + entry.idx, entry.p->p16s.base, entry.p->p16s.end * sizeof(Point16));
++                }
++                m0 = m1;
+             }
+         }
+         if (ctx->segments.end) {
+--- a/Package/Sources/RasterizerCpp/include/RasterizerSVG.hpp
++++ b/src/core/RasterizerSVG.hpp
+@@ -1,10 +1,11 @@
++#pragma once
+ //
+ //  Copyright 2025 Nigel Timothy Barber - nigel@mindbrix.co.uk
+ //  SPDX-License-Identifier: MIT
+ //
+ 
+-#import "Rasterizer.hpp"
+-#import "nanosvg.h"
++#include "Rasterizer.hpp"
++#include "nanosvg.h"
+ 
+ struct RasterizerSVG {
+     static const bool kWriteOneBigPath = false;
+--- a/Package/Sources/RasterizerCpp/include/nanosvg.h
++++ b/src/core/nanosvg.h
+@@ -1,3 +1,4 @@
++#pragma once
+ /*
+  * Copyright (c) 2013-14 Mikko Mononen memon@inside.org
+  *
+@@ -157,6 +158,7 @@
+ {
+ 	float width;				// Width of the image.
+ 	float height;				// Height of the image.
++	float viewBox[4];			// Its viewBox, minx, miny, width & height, or zeros if it has none.
+ 	NSVGshape* shapes;			// Linked list of shapes in the image.
+ } NSVGimage;
+ 
+@@ -275,10 +277,11 @@
+ 	if (!*s || *s == '?' || *s == '!')
+ 		return;
+ 
+-	// Get tag name
++	// Get tag name, which a self-closing tag's '/' can end, as in <defs/>
+ 	name = s;
+-	while (*s && !nsvg__isspace(*s)) s++;
+-	if (*s) { *s++ = '\0'; }
++	while (*s && !nsvg__isspace(*s) && *s != '/') s++;
++	if (*s == '/') { *s = '\0'; end = 1; }
++	else if (*s) { *s++ = '\0'; }
+ 
+ 	// Get attribs
+ 	while (!end && *s && nattr < NSVG_XML_MAX_ATTRIBS-3) {
+@@ -334,7 +337,17 @@
+ 	char* mark = s;
+ 	int state = NSVG_XML_CONTENT;
+ 	while (*s) {
+-		if (*s == '<' && state == NSVG_XML_CONTENT) {
++		if (*s == '<' && state == NSVG_XML_CONTENT &&
++			(strncmp(s, "<!--", 4) == 0 || strncmp(s, "<![CDATA[", 9) == 0)) {
++			// Skip comments and CDATA sections, whose '>' would otherwise end a
++			// tag, and whose elements would be parsed after it.
++			const char* close = s[2] == '-' ? "-->" : "]]>";
++			char* after = strstr(s, close);
++			*s = '\0';
++			nsvg__parseContent(mark, contentCb, ud);
++			if (!after) break;
++			s = mark = after + 3;
++		} else if (*s == '<' && state == NSVG_XML_CONTENT) {
+ 			// Start of a tag
+ 			*s++ = '\0';
+ 			nsvg__parseContent(mark, contentCb, ud);
+@@ -452,7 +465,8 @@
+ 	int alignX, alignY, alignType;
+ 	float dpi;
+ 	char pathFlag;
+-	char defsFlag;
++	int defsDepth;		// How deep in defs and other definitions, whose shapes are skipped but gradients parsed.
++	int skipDepth;		// How deep in elements vector_graphics_compiler doesn't handle, skipped with their content.
+ } NSVGparser;
+ 
+ static void nsvg__xformIdentity(float* t)
+@@ -812,7 +826,7 @@
+ 	return NULL;
+ }
+ 
+-static NSVGgradient* nsvg__createGradient(NSVGparser* p, const char* id, const float* localBounds, char* paintType)
++static NSVGgradient* nsvg__createGradient(NSVGparser* p, const char* id, const float* localBounds, float opacity, char* paintType)
+ {
+ 	NSVGattrib* attr = nsvg__getAttr(p);
+ 	NSVGgradientData* data = NULL;
+@@ -820,6 +834,7 @@
+ 	NSVGgradientStop* stops = NULL;
+ 	NSVGgradient* grad;
+ 	float ox, oy, sw, sh, sl;
++	float bounds[6];
+ 	int nstops = 0;
+ 
+ 	data = nsvg__findGradientData(p, id);
+@@ -837,15 +852,24 @@
+ 	}
+ 	if (stops == NULL) return NULL;
+ 
++	// A bounding box gradient isn't painted on a shape with no width or height.
++	if (data->units == NSVG_OBJECT_SPACE && (localBounds[2] <= localBounds[0] || localBounds[3] <= localBounds[1]))
++		return NULL;
++
+ 	grad = (NSVGgradient*)malloc(sizeof(NSVGgradient) + sizeof(NSVGgradientStop)*(nstops-1));
+ 	if (grad == NULL) return NULL;
+ 
+ 	// The shape width and height.
+ 	if (data->units == NSVG_OBJECT_SPACE) {
+-		ox = localBounds[0];
+-		oy = localBounds[1];
+-		sw = localBounds[2] - localBounds[0];
+-		sh = localBounds[3] - localBounds[1];
++		// The gradient is laid out in the unit square, where numbers are fractions of the shape's bounds and percentages
++		// hundredths, and its transform applies there, as SVG says; the square is then mapped to the bounds.
++		ox = 0;
++		oy = 0;
++		sw = 1;
++		sh = 1;
++		bounds[0] = localBounds[2] - localBounds[0]; bounds[1] = 0;
++		bounds[2] = 0; bounds[3] = localBounds[3] - localBounds[1];
++		bounds[4] = localBounds[0]; bounds[5] = localBounds[1];
+ 	} else {
+ 		ox = nsvg__actualOrigX(p);
+ 		oy = nsvg__actualOrigY(p);
+@@ -882,11 +906,21 @@
+ 	}
+ 
+ 	nsvg__xformMultiply(grad->xform, data->xform);
++	if (data->units == NSVG_OBJECT_SPACE)
++		nsvg__xformMultiply(grad->xform, bounds);
+ 	nsvg__xformMultiply(grad->xform, attr->xform);
+ 
+ 	grad->spread = data->spread;
+ 	memcpy(grad->stops, stops, nstops*sizeof(NSVGgradientStop));
+ 	grad->nstops = nstops;
++	// The fill's or stroke's opacity scales the stops' own, as it does a color's.
++	if (opacity < 1.0f) {
++		int i;
++		for (i = 0; i < nstops; i++) {
++			unsigned int a = (unsigned int)((grad->stops[i].color >> 24) * opacity);
++			grad->stops[i].color = (grad->stops[i].color & 0x00ffffff) | (a << 24);
++		}
++	}
+ 
+ 	*paintType = data->type;
+ 
+@@ -984,7 +1018,7 @@
+ 		float inv[6], localBounds[4];
+ 		nsvg__xformInverse(inv, attr->xform);
+ 		nsvg__getLocalBounds(localBounds, shape, inv);
+-		shape->fill.gradient = nsvg__createGradient(p, attr->fillGradient, localBounds, &shape->fill.type);
++		shape->fill.gradient = nsvg__createGradient(p, attr->fillGradient, localBounds, attr->fillOpacity, &shape->fill.type);
+ 		if (shape->fill.gradient == NULL) {
+ 			shape->fill.type = NSVG_PAINT_NONE;
+ 		}
+@@ -1001,7 +1035,7 @@
+ 		float inv[6], localBounds[4];
+ 		nsvg__xformInverse(inv, attr->xform);
+ 		nsvg__getLocalBounds(localBounds, shape, inv);
+-		shape->stroke.gradient = nsvg__createGradient(p, attr->strokeGradient, localBounds, &shape->stroke.type);
++		shape->stroke.gradient = nsvg__createGradient(p, attr->strokeGradient, localBounds, attr->strokeOpacity, &shape->stroke.type);
+ 		if (shape->stroke.gradient == NULL)
+ 			shape->stroke.type = NSVG_PAINT_NONE;
+ 	}
+@@ -2653,12 +2687,48 @@
+ 	stop->offset = curAttr->stopOffset;
+ }
+ 
++// Elements whose shapes aren't drawn where they are: defs, and those that
++// vector_graphics_compiler parses as definitions.
++static int nsvg__isDefinition(const char* el)
++{
++	return strcmp(el, "defs") == 0 || strcmp(el, "clipPath") == 0 ||
++		strcmp(el, "mask") == 0 || strcmp(el, "pattern") == 0 ||
++		strcmp(el, "symbol") == 0;
++}
++
++// The elements vector_graphics_compiler handles, which skips the others with
++// their content: those it draws, and those NanoSVG doesn't, use, image, text and
++// tspan, whose content it still draws.
++static int nsvg__isHandled(const char* el)
++{
++	static const char* handled[] = {
++		"svg", "g", "a", "use", "image", "text", "tspan", "path", "rect",
++		"circle", "ellipse", "line", "polyline", "polygon", "linearGradient",
++		"radialGradient", "stop",
++	};
++	int i;
++	if (nsvg__isDefinition(el)) return 1;
++	for (i = 0; i < (int)(sizeof(handled) / sizeof(handled[0])); i++)
++		if (strcmp(el, handled[i]) == 0) return 1;
++	return 0;
++}
++
+ static void nsvg__startElement(void* ud, const char* el, const char** attr)
+ {
+ 	NSVGparser* p = (NSVGparser*)ud;
+ 
+-	if (p->defsFlag) {
+-		// Skip everything but gradients in defs
++	// Each start in a skipped element is matched by an end, which comes first in
++	// nsvg__endElement, so a skipped g neither pushes nor pops attributes.
++	if (p->skipDepth > 0 || !nsvg__isHandled(el)) {
++		p->skipDepth++;
++		return;
++	}
++	if (nsvg__isDefinition(el)) {
++		p->defsDepth++;
++		return;
++	}
++	if (p->defsDepth > 0) {
++		// Skip everything but gradients in definitions
+ 		if (strcmp(el, "linearGradient") == 0) {
+ 			nsvg__parseGradient(p, attr, NSVG_PAINT_LINEAR_GRADIENT);
+ 		} else if (strcmp(el, "radialGradient") == 0) {
+@@ -2669,7 +2739,7 @@
+ 		return;
+ 	}
+ 
+-	if (strcmp(el, "g") == 0) {
++	if (strcmp(el, "g") == 0 || strcmp(el, "a") == 0) {
+ 		nsvg__pushAttr(p);
+ 		nsvg__parseAttribs(p, attr);
+ 	} else if (strcmp(el, "path") == 0) {
+@@ -2708,8 +2778,6 @@
+ 		nsvg__parseGradient(p, attr, NSVG_PAINT_RADIAL_GRADIENT);
+ 	} else if (strcmp(el, "stop") == 0) {
+ 		nsvg__parseGradientStop(p, attr);
+-	} else if (strcmp(el, "defs") == 0) {
+-		p->defsFlag = 1;
+ 	} else if (strcmp(el, "svg") == 0) {
+ 		nsvg__pushAttr(p);
+ 		nsvg__parseSVG(p, attr);
+@@ -2720,12 +2788,22 @@
+ {
+ 	NSVGparser* p = (NSVGparser*)ud;
+ 
+-	if (strcmp(el, "g") == 0) {
++	if (p->skipDepth > 0) {
++		p->skipDepth--;
++		return;
++	}
++	if (nsvg__isDefinition(el)) {
++		if (p->defsDepth > 0) p->defsDepth--;
++		return;
++	}
++	// A g in definitions didn't push its attributes.
++	if (p->defsDepth > 0)
++		return;
++
++	if (strcmp(el, "g") == 0 || strcmp(el, "a") == 0) {
+ 		nsvg__popAttr(p);
+ 	} else if (strcmp(el, "path") == 0) {
+ 		p->pathFlag = 0;
+-	} else if (strcmp(el, "defs") == 0) {
+-		p->defsFlag = 0;
+ 	} else if (strcmp(el, "svg") == 0) {
+ 		nsvg__popAttr(p);
+     }
+@@ -2887,6 +2965,8 @@
+     if (units)
+         nsvg__scaleToViewbox(p, units);
+ 
++	p->image->viewBox[0] = p->viewMinx, p->image->viewBox[1] = p->viewMiny;
++	p->image->viewBox[2] = p->viewWidth, p->image->viewBox[3] = p->viewHeight;
+ 	ret = p->image;
+ 	p->image = NULL;
+ 
+--- a/Package/Sources/RasterizerCpp/include/xxhash.h
++++ b/src/core/xxhash.h
+@@ -1,3 +1,4 @@
++#pragma once
+ /*
+  * xxHash - Extremely Fast Hash algorithm
+  * Header File
+--- a/Package/Sources/RasterizerCpp/nanosvg.cc
++++ b/src/core/nanosvg.cc
+@@ -1,4 +1,4 @@
+ #include <stdio.h>
+ 
+ #define NANOSVG_IMPLEMENTATION    // Expands implementation
+-#import "nanosvg.h"
++#include "nanosvg.h"

@@ -1,0 +1,78 @@
+{
+  "RaOpaquesVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_opaques.vert"
+  },
+  "RaOpaquesFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_opaques.frag"
+  },
+  "RaEdgesVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_edges.vert"
+  },
+  "RaFastEdgesFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_fast_edges.frag"
+  },
+  "RaFastMoleculesVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_fast_molecules.vert"
+  },
+  "RaFastMoleculesFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_fast_molecules.frag"
+  },
+  "RaQuadEdgesFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_quad_edges.frag"
+  },
+  "RaQuadMoleculesVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_quad_molecules.vert"
+  },
+  "RaQuadMoleculesFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_quad_molecules.frag"
+  },
+  "RaInstancesVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_instances.vert"
+  },
+  "RaInstancesFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_instances.frag"
+  },
+  "RaClearVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_clear.vert"
+  },
+  "RaClearFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_clear.frag"
+  },
+  "RaMeshVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_mesh.vert"
+  },
+  "RaMeshStrokedVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_mesh_stroked.vert"
+  },
+  "RaMeshFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_mesh.frag"
+  },
+  "RaMeshTransformedFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_mesh_transformed.frag"
+  },
+  "RaMeshGlowVertex": {
+    "type": "vertex",
+    "file": "shaders/ra_mesh_glow.vert"
+  },
+  "RaMeshGlowFragment": {
+    "type": "fragment",
+    "file": "shaders/ra_mesh_glow.frag"
+  }
+}

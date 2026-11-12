@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Turns on Flutter GPU, which rasterizer_gpu renders with. It doesn't ask for Impeller's Vulkan backend, which apps
+             can do with io.flutter.embedding.android.ImpellerBackend set to vulkan, in debug and profile builds only:
+             without it, Android may use OpenGL ES, where rasterizer_gpu's GPU renderers draw only once their self-test
+             passed (RasterizerGpu.allowOpenGles), else its canvas renderer does -->
+        <meta-data android:name="io.flutter.embedding.android.EnableFlutterGPU" android:value="true" />
+    </application>
+</manifest>

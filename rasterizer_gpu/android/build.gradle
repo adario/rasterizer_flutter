@@ -1,0 +1,42 @@
+// An Android library with no code, for its manifest, which merges into the app's & turns on Flutter GPU. The native code is
+// built by hook/build.dart, not by Gradle.
+
+group = "dev.rasterizer.rasterizer_gpu"
+version = "1.0"
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("com.android.tools.build:gradle:9.1.0")
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: "com.android.library"
+
+android {
+    namespace = "dev.rasterizer.rasterizer_gpu"
+
+    compileSdk = 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        // Flutter's minimum. Below API 29, Flutter renders with Skia rather than Impeller, so the canvas renderer
+        // draws
+        minSdk = 24
+    }
+}

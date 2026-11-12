@@ -1,0 +1,20 @@
+include: package:flame_lint/analysis_options_with_dcm.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+
+linter:
+  rules:
+    # The benchmark is configured with --dart-define, read by
+    # String.fromEnvironment and its kin.
+    do_not_use_environment: false
+    # Arguments from those constants equal their defaults only at the
+    # defines' defaults: removed, they'd ignore the defines.
+    avoid_redundant_argument_values: false

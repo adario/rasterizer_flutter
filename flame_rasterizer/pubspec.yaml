@@ -1,0 +1,28 @@
+name: flame_rasterizer
+resolution: workspace
+description: "Flame components drawn with rasterizer_gpu: SVGs and paths imported once for the GPU, each contiguous run of them drawn as one image."
+version: 0.0.1
+repository: https://github.com/adario/rasterizer_flutter/tree/main/flame_rasterizer
+issue_tracker: https://github.com/adario/rasterizer_flutter/issues
+publish_to: none
+topics:
+  - flame
+  - svg
+  - vector-graphics
+  - gpu
+
+environment:
+  sdk: ^3.13.7
+  flutter: ">=3.47.9"
+
+dependencies:
+  flame: ^2.0.0-dev.1
+  flutter:
+    sdk: flutter
+  rasterizer_gpu:
+    path: ../rasterizer_gpu
+
+dev_dependencies:
+  flame_lint: ^1.5.0-dev.1
+  flutter_test:
+    sdk: flutter
