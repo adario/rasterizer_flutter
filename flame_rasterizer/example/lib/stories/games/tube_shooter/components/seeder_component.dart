@@ -6,7 +6,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// A seeder, which lays spikes.
 ///
 /// It climbs its lane up to the level's `seederTurn`, growing the lane's
-/// spike behind it. Then it goes back down, and climbs another lane.
+/// spike behind it. Then it goes back down, and climbs another lane. It points
+/// away from the tube's axis, with its tail along the spike.
 class SeederComponent({required super.lane, required super.depth})
     extends EnemyComponent {
   this : super(EnemyKind.seeder);
@@ -31,5 +32,13 @@ class SeederComponent({required super.lane, required super.depth})
         lane = (lane + 1 + gameRef.random.nextInt(lanes - 1)) % lanes;
       }
     }
+  }
+
+  @override
+  void place() {
+    super.place();
+    // The spike runs from the lane's middle toward the axis, at the origin,
+    // and the shape's tail points along its y.
+    angle = (-gameRef.view.tube.middles[lane]).direction - math.pi / 2;
   }
 }
