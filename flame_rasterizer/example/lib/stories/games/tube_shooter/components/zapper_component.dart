@@ -9,7 +9,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// Now and then, it flips onto a neighbouring lane. At the rim, it flips
 /// toward the ship. While the zappers pulse, a bolt runs from it down its lane
 /// to the rim, and destroys the ship there. Just before a pulse, it flashes
-/// white.
+/// white. One that arrives too late to flash waits for the next pulse.
 class ZapperComponent({required super.lane, required super.depth})
     extends EnemyComponent {
   this : super(EnemyKind.zapper);
@@ -18,6 +18,12 @@ class ZapperComponent({required super.lane, required super.depth})
   double _untilFlip = 0;
   bool _white = false;
 
+  /// Whether it flashed white before the pulse coming or going on.
+  bool _warned = false;
+
+  /// Whether its bolt runs down its lane now.
+  bool get isZapping => _warned && gameRef.isPulsing && !isFlipping;
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
@@ -25,8 +31,7 @@ class ZapperComponent({required super.lane, required super.depth})
   }
 
   @override
-  bool destroysShip(int shipLane) =>
-      gameRef.isPulsing && !isFlipping && lane == shipLane;
+  bool destroysShip(int shipLane) => isZapping && lane == shipLane;
 
   @override
   void move(double dt) {
@@ -49,7 +54,13 @@ class ZapperComponent({required super.lane, required super.depth})
         flipAside(toward);
       }
     }
-    _flash(gameRef.isWarning);
+    final warning = gameRef.isWarning;
+    if (warning) {
+      _warned = true;
+    } else if (!gameRef.isPulsing) {
+      _warned = false;
+    }
+    _flash(warning);
   }
 
   /// Tints it white, or clears the tint. A tint doesn't import its shape

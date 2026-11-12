@@ -1155,6 +1155,22 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets("a zapper that arrives in the ship's lane during a pulse waits "
+      'for the next pulse, which it flashes white for', (tester) async {
+    final game = await playing(tester);
+    await pumpUntil(tester, () => game.isPulsing, frames: 240);
+    final zapper = ZapperComponent(lane: game.player.lane, depth: Tube.depth);
+    game.addEnemy(zapper);
+    await pumpFrames(tester, 3);
+    expect(game.isPulsing, isTrue);
+    expect(zapper.isZapping, isFalse);
+    expect(game.state, TubeState.play);
+    await pumpUntil(tester, () => game.isWarning, frames: 180);
+    expect(zapper.drawing.paint.colorFilter, isNotNull);
+    await pumpUntil(tester, () => game.state == TubeState.dying, frames: 40);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('an edge-walker on an edge lets shots pass; one crossing a lane '
       'is destroyed by a shot, and one at the rim destroys the ship', (
     tester,
