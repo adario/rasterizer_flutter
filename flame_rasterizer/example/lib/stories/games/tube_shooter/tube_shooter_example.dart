@@ -127,8 +127,9 @@ abstract class TubeShooterExample({
 
   static const startLives = 3;
 
-  /// The cap height, in logical pixels, of the round, lives and score, at
-  /// the bottom right, and of PURGE READY under the round's number.
+  /// The cap height, in logical pixels, of the level's name and the round, at
+  /// the bottom left, of the lives and score, at the bottom right, and of
+  /// PURGE READY under the round's number.
   static const hudCap = 12.0;
 
   /// The cap height, in logical pixels, of the round's number on the zoom,
@@ -259,7 +260,16 @@ abstract class TubeShooterExample({
         _pulseClock >= pulse - level.pulseWarning;
   }
 
-  final _roundText = VectorTextComponent(capHeight: hudCap, line: 2);
+  final _levelText = VectorTextComponent(
+    capHeight: hudCap,
+    line: 1,
+    left: true,
+  );
+  final _roundText = VectorTextComponent(
+    capHeight: hudCap,
+    line: 0,
+    left: true,
+  );
   final _livesText = VectorTextComponent(capHeight: hudCap, line: 1);
   final _scoreText = VectorTextComponent(capHeight: hudCap, line: 0);
   final _roundBanner = VectorTextComponent(capHeight: bannerCap);
@@ -529,7 +539,7 @@ abstract class TubeShooterExample({
     ]);
     // In the camera's viewport, as StoryGame's FPS counter is: above the
     // world, and unzoomed.
-    camera.viewport.addAll([_roundText, _livesText, _scoreText]);
+    camera.viewport.addAll([_levelText, _roundText, _livesText, _scoreText]);
     _nextRound();
     startStatus();
   }
@@ -567,6 +577,7 @@ abstract class TubeShooterExample({
     }
     _lastVersion = view.version;
     super.update(dt);
+    _levelText.text = level.tube.name.toUpperCase();
     _roundText.text = 'ROUND $round';
     _livesText.text = 'LIVES $lives';
     _scoreText.text = 'SCORE $score';

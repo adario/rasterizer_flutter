@@ -9,6 +9,7 @@ import 'dart:ui' as ui;
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
+import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/game_story.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
@@ -1498,6 +1499,20 @@ void main() {
         .whereType<VectorTextComponent>()
         .where((text) => text.capHeight == capHeight);
     expect(texts(TubeShooterExample.bannerCap).single.text, 'ROUND 1');
+    // The level's name and the round show at the bottom left, the round
+    // below, opposite the lives and the score.
+    VectorTextComponent hud(String text) => texts(
+      TubeShooterExample.hudCap,
+    ).singleWhere((component) => component.text == text);
+    final levelText = hud('OCTAGON');
+    final roundText = hud('ROUND 1');
+    expect(levelText.anchor, Anchor.bottomLeft);
+    expect(levelText.position.x, StoryGame.hudMargin);
+    expect(roundText.position.x, StoryGame.hudMargin);
+    expect(roundText.position.y, game.size.y - StoryGame.hudMargin);
+    expect(levelText.position.y, lessThan(roundText.position.y));
+    expect(hud('LIVES 3').position.y, levelText.position.y);
+    expect(hud('SCORE 0').position.y, roundText.position.y);
     // Under it, as each round recharges the purge.
     expect(
       texts(TubeShooterExample.hudCap).map((text) => text.text),
