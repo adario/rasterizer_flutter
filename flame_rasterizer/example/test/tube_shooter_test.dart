@@ -1439,8 +1439,15 @@ void main() {
   });
 
   testWidgets('the game is over after the last life, still, until a tap '
-      'starts a new one', (tester) async {
-    final game = await playing(tester);
+      'starts a new one at the level reached', (tester) async {
+    final game = await playing(tester, firstLevel: 0);
+    final reported = <int>[];
+    game.onLevel = reported.add;
+    game.clearSpawns();
+    await pumpUntil(tester, () => game.round == 2);
+    expect(game.levelIndex, 1);
+    expect(reported, [1]);
+    await beginLevel(tester, game);
     game.lives = 1;
     game.score = 500;
     game.addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
@@ -1463,6 +1470,8 @@ void main() {
     expect(game.lives, TubeShooterExample.startLives);
     expect(game.score, 0);
     expect(game.round, 1);
+    expect(game.levelIndex, 1);
+    expect(reported, [1, 1]);
     expect(game.world.timeScale, 1);
     expect(game.gameOverText.isMounted, isFalse);
     await tester.pumpWidget(const SizedBox());

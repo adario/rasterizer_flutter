@@ -56,13 +56,14 @@ enum TubeState() {
 ///
 /// In the world, the tube's axis is at the origin. The camera looks at it, or
 /// at the middle of an open tube's drawing. Each round plays on the next
-/// level's tube, starting from [firstLevel]. Subclasses pick the component
-/// that draws a path: see [pathComponent].
+/// level's tube, starting from [firstLevel]. A new game after Game Over
+/// starts at the level reached. Subclasses pick the component that draws a
+/// path: see [pathComponent].
 abstract class TubeShooterExample({
   required super.status,
   math.Random? random,
 
-  /// Which of the [levels] a new game starts at.
+  /// Which of the [levels] the first round plays.
   final int firstLevel = 0,
 }) extends ExampleGame with DragCallbacks, KeyboardEvents {
   /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
@@ -97,15 +98,16 @@ abstract class TubeShooterExample({
 
     Five kinds of enemies climb the tube. Once they're gone, the ship drops
     down its lane to the next of eight tubes, and any spike left in that lane
-    destroys it. Each round is 5% faster than the last.
+    destroys it. Each round is 5% faster than the last. After Game Over, a new
+    game starts at the level reached.
 
     The game makes some paths again every frame, such as the tube's during the
     zoom. It shares others among many components, such as the enemies'
     shapes. With the mesh renderer, the Glow knob makes the lines glow. The
-    other knobs pick the first level, keep the stars drifting, zoom the camera
-    and change the game's speed. The bar under the game shows the renderer,
-    the frame times, the renderer's own numbers and the paths made each
-    second.
+    Level knob shows the round's level, and starts a new game at the level it
+    picks. The other knobs keep the stars drifting, zoom the camera and change
+    the game's speed. The bar under the game shows the renderer, the frame
+    times, the renderer's own numbers and the paths made each second.
 
     Inspired by Atari's Tempest (1981).
   ''';
@@ -210,8 +212,14 @@ abstract class TubeShooterExample({
   bool purgeReady = true;
 
   /// The round's level.
-  Level get level => _level;
-  late Level _level = levels[firstLevel];
+  Level get level => levels[_levelIndex];
+
+  /// The index of the round's level in [levels].
+  int get levelIndex => _levelIndex;
+  late int _levelIndex = firstLevel;
+
+  /// Called with [levelIndex] each time a round starts.
+  void Function(int levelIndex)? onLevel;
 
   /// Where the camera looks, in tube units.
   Offset _look = Offset.zero;
@@ -926,15 +934,18 @@ abstract class TubeShooterExample({
     _setState(TubeState.dying);
   }
 
-  /// Starts the next round, or the first, on the next level's tube.
+  /// Starts the next round on the next level's tube, or the first round on
+  /// the round's level.
   ///
   /// The round starts with its enemies at random round the far end, no
   /// spikes, the purge ready, and the ship on the tube's bottom lane. The tube
   /// zooms in through the stars, with the ship hidden until the zoom ends.
   void _nextRound() {
+    if (round > 0) {
+      _levelIndex = (_levelIndex + 1) % levels.length;
+    }
     round++;
-    _level = levels[(firstLevel + round - 1) % levels.length];
-    view.tube = _level.tube;
+    view.tube = level.tube;
     _lookFrom = _look;
     spikes.clear();
     clearSpawns();
@@ -962,6 +973,7 @@ abstract class TubeShooterExample({
     _roundBanner.text = 'ROUND $round';
     camera.viewport.addAll([_roundBanner, _purgeReadyText]);
     _setState(TubeState.zoom);
+    onLevel?.call(_levelIndex);
   }
 
   /// Shows READY, until a tap or a key.
@@ -988,7 +1000,8 @@ abstract class TubeShooterExample({
   }
 
   /// Starts a new game in this one: no enemies, shots or explosions, a score
-  /// of 0, all lives, the first round, and the world at [speed].
+  /// of 0, all lives, the first round on the level that the last game
+  /// reached, and the world at [speed].
   void _newGame() {
     for (final enemy in [...enemies]) {
       discard(enemy);

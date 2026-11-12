@@ -5,8 +5,11 @@ import 'package:flame/game.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/main.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg_renderers_example.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'pump_while_loading.dart';
@@ -203,6 +206,66 @@ void main() {
     await tester.tap(find.text(SvgRenderer.flameSvg.label).last);
     await settle();
     expectNoGlow(SvgRenderer.flameSvg);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("Tube Shooter's Level knob follows the rounds, and a picked "
+      'level starts a new game', (tester) async {
+    tester.view
+      ..physicalSize = const Size(1280, 800)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      const FlameRasterizerExamples(initialRoute: '/?path=games/tube-shooter'),
+    );
+    Future<void> settle() async {
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    TubeShooterExample game() => tester
+        .widget<GameWidget<TubeShooterExample>>(
+          find.byWidgetPredicate((w) => w is GameWidget),
+        )
+        .game!;
+    int knob() => tester
+        .widget<DropdownMenu<int>>(find.byType(DropdownMenu<int>))
+        .initialSelection!;
+
+    await settle();
+    final first = game();
+    await pumpWhileLoading(tester, () => !first.isLoaded);
+    expect(first.levelIndex, 0);
+    expect(knob(), 0);
+    // A round without enemies ends as soon as it begins, and the ship drops
+    // to the next level.
+    first.spawning = false;
+    first.clearSpawns();
+    for (var i = 0; i < 100 && first.state != TubeState.ready; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
+    for (var i = 0; i < 100 && first.round < 2; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(first.round, 2);
+    expect(first.levelIndex, 1);
+    await settle();
+    expect(knob(), 1);
+    expect(game(), same(first));
+
+    await tester.tap(find.byType(DropdownMenu<int>));
+    await settle();
+    await tester.tap(find.text('4 ${levels[3].tube.name}').last);
+    await settle();
+    final picked = game();
+    expect(picked, isNot(same(first)));
+    await pumpWhileLoading(tester, () => !picked.isLoaded);
+    expect(picked.round, 1);
+    expect(picked.levelIndex, 3);
+    expect(knob(), 3);
     await tester.pumpWidget(const SizedBox());
   });
 
