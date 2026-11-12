@@ -16,13 +16,15 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// that no other text shows.
 ///
 /// With a [line], the text sits at the bottom right of its parent, [line]
-/// lines above the last one; without, at its middle. It keeps its place when
-/// the parent is resized. Its priority puts it under the FPS counter, so that
-/// it draws in the same run as the world.
+/// lines above the last one; without, at its middle, or [below] it, in
+/// logical pixels. It keeps its place when the parent is resized. Its
+/// priority puts it under the FPS counter, so that it draws in the same run
+/// as the world.
 class VectorTextComponent({
   required final double capHeight,
   String text = '',
   final int? line,
+  final double below = 0,
   final Color color = TubeColors.text,
 }) extends PositionComponent with HasGameRef<TubeShooterExample> {
   this
@@ -64,7 +66,7 @@ class VectorTextComponent({
     super.onParentResize(maxSize);
     final line = this.line;
     if (line == null) {
-      position = maxSize / 2;
+      position.setValues(maxSize.x / 2, maxSize.y / 2 + below);
     } else {
       position.setValues(
         maxSize.x - StoryGame.hudMargin,

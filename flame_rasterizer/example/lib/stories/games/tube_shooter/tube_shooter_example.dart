@@ -124,13 +124,16 @@ abstract class TubeShooterExample({
 
   static const startLives = 3;
 
-  /// The cap height, in logical pixels, of the round, lives, purge and score,
-  /// at the bottom right.
+  /// The cap height, in logical pixels, of the round, lives and score, at
+  /// the bottom right, and of PURGE READY under the round's number.
   static const hudCap = 12.0;
 
-  /// The cap height, in logical pixels, of the round's number on the zoom
-  /// and Game Over, at the middle.
+  /// The cap height, in logical pixels, of the round's number on the zoom,
+  /// PURGE once the purge is used, and Game Over, at the middle.
   static const bannerCap = 40.0;
+
+  /// How long PURGE shows once the purge is used, in seconds.
+  static const purgeTime = 1.0;
 
   /// The glow of the shapes' lines: 3 times as wide as the lines, and thinner
   /// with depth, as they are.
@@ -245,11 +248,24 @@ abstract class TubeShooterExample({
         _pulseClock >= pulse - level.pulseWarning;
   }
 
-  final _roundText = VectorTextComponent(capHeight: hudCap, line: 3);
-  final _livesText = VectorTextComponent(capHeight: hudCap, line: 2);
-  final _purgeText = VectorTextComponent(capHeight: hudCap, line: 1);
+  final _roundText = VectorTextComponent(capHeight: hudCap, line: 2);
+  final _livesText = VectorTextComponent(capHeight: hudCap, line: 1);
   final _scoreText = VectorTextComponent(capHeight: hudCap, line: 0);
   final _roundBanner = VectorTextComponent(capHeight: bannerCap);
+
+  /// PURGE READY, under the round's number on the zoom: each round recharges
+  /// the purge.
+  final _purgeReadyText = VectorTextComponent(
+    text: 'PURGE READY',
+    capHeight: hudCap,
+    below: 1.2 * bannerCap,
+  );
+
+  /// PURGE, for [purgeTime] once the purge is used.
+  final _purgeText = VectorTextComponent(text: 'PURGE', capHeight: bannerCap);
+
+  /// The seconds left before PURGE goes.
+  double _purgeLeft = 0;
 
   /// READY, in the camera's viewport while the game waits for the player.
   final readyText = VectorTextComponent(text: 'READY', capHeight: bannerCap);
@@ -502,7 +518,7 @@ abstract class TubeShooterExample({
     ]);
     // In the camera's viewport, as StoryGame's FPS counter is: above the
     // world, and unzoomed.
-    camera.viewport.addAll([_roundText, _livesText, _purgeText, _scoreText]);
+    camera.viewport.addAll([_roundText, _livesText, _scoreText]);
     _nextRound();
     startStatus();
   }
@@ -542,8 +558,14 @@ abstract class TubeShooterExample({
     super.update(dt);
     _roundText.text = 'ROUND $round';
     _livesText.text = 'LIVES $lives';
-    _purgeText.text = 'PURGE ${purgeReady ? 'READY' : 'USED'}';
     _scoreText.text = 'SCORE $score';
+    // In real time, so that it goes in a still world too.
+    if (_purgeLeft > 0) {
+      _purgeLeft -= dt;
+      if (_purgeLeft <= 0) {
+        _purgeText.removeFromParent();
+      }
+    }
   }
 
   /// Fits the tube's rim in 90% of the game's shorter side, with its lines'
@@ -611,6 +633,7 @@ abstract class TubeShooterExample({
         if (progress == 1) {
           player.isVisible = true;
           _roundBanner.removeFromParent();
+          _purgeReadyText.removeFromParent();
           _waitForPlayer();
         }
       case TubeState.play:
@@ -864,6 +887,10 @@ abstract class TubeShooterExample({
       return;
     }
     purgeReady = false;
+    if (!_purgeText.isMounted) {
+      camera.viewport.add(_purgeText);
+    }
+    _purgeLeft = purgeTime;
     for (final enemy in [...enemies]) {
       destroy(enemy, purged: true);
     }
@@ -933,7 +960,7 @@ abstract class TubeShooterExample({
       ..isVisible = false;
     view.eyeShift = -zoomDistance;
     _roundBanner.text = 'ROUND $round';
-    camera.viewport.add(_roundBanner);
+    camera.viewport.addAll([_roundBanner, _purgeReadyText]);
     _setState(TubeState.zoom);
   }
 

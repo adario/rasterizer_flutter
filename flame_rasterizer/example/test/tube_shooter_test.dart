@@ -1376,6 +1376,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 16));
     expect(game.purgeReady, isFalse);
     expect(game.enemies, isEmpty);
+
+    // PURGE shows for a second.
+    Iterable<String> banners() => game.camera.viewport.children
+        .whereType<VectorTextComponent>()
+        .where((text) => text.capHeight == TubeShooterExample.bannerCap)
+        .map((text) => text.text);
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(banners(), contains('PURGE'));
+    await pumpFrames(tester, 70);
+    expect(banners(), isNot(contains('PURGE')));
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -1471,9 +1481,18 @@ void main() {
         .whereType<VectorTextComponent>()
         .where((text) => text.capHeight == capHeight);
     expect(texts(TubeShooterExample.bannerCap).single.text, 'ROUND 1');
+    // Under it, as each round recharges the purge.
+    expect(
+      texts(TubeShooterExample.hudCap).map((text) => text.text),
+      contains('PURGE READY'),
+    );
     await pumpUntil(tester, () => game.state == TubeState.ready);
     await tester.pump(const Duration(milliseconds: 16));
     expect(texts(TubeShooterExample.bannerCap).single.text, 'READY');
+    expect(
+      texts(TubeShooterExample.hudCap).map((text) => text.text),
+      isNot(contains('PURGE READY')),
+    );
     await beginLevel(tester, game);
     await tester.pump(const Duration(milliseconds: 16));
     expect(texts(TubeShooterExample.bannerCap), isEmpty);
