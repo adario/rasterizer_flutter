@@ -115,6 +115,7 @@ flutter test integration_test/atlas_test.dart -d <device>        # atlas pages s
 flutter test integration_test/mesh_test.dart -d <device>         # the mesh renderer's draws, paints and targets
 flutter test integration_test/projective_test.dart -d <device>   # perspective, with each renderer
 flutter test integration_test/opacity_test.dart -d <device>      # entries' opacities, with each renderer
+flutter test integration_test/edge_test.dart -d <device>         # entries near a run's edges, with each renderer
 flutter test integration_test/run_paint_test.dart -d <device>    # a GPU run's paint, and entries' color transforms
 flutter test integration_test/upload_test.dart -d <device>       # the GPU renderer's upload buffers growing, shrinking
 ```
@@ -156,7 +157,7 @@ Chrome, with `flutter drive` and the app's `test_driver/integration_test.dart`. 
 `python3 -I tool/matrix.py web_goldens_js web_goldens_wasm` runs the golden tests with CanvasKit and with skwasm.
 
 - This example's web steps in the matrix are the golden tests, which test the canvas renderer against the `macos` set,
-  and `opacity_test`.
+  `opacity_test` and `edge_test`.
 - They need Chrome for Testing's chromedriver for the installed Chrome's version, unzipped into the repository's
   `build/chromedriver/` (on an Apple silicon Mac, `chromedriver-mac-arm64/chromedriver`).
 - flutter drive reports only widget tests' failures there: a plain `test` that fails passes. So the tests that run on

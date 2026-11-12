@@ -3,6 +3,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWasm, kIsWeb;
+
 import '../rasterizer_gpu.dart';
 import 'canvas_paths.dart';
 import 'paths/scene_paths.dart';
@@ -327,9 +329,19 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     if (scale != 1) {
       canvas.scale(1 / scale);
     }
-    canvas.clipRect(
-      ui.Rect.fromLTWH(0, 0, _frame.width.toDouble(), _frame.height.toDouble()),
-    );
+    // CanvasKit drops some pictures drawn near this clip's edge, though they
+    // lie inside it, so it draws without it, as Flame's components do. A
+    // WebAssembly build draws with skwasm, which draws them.
+    if (!kIsWeb || kIsWasm) {
+      canvas.clipRect(
+        ui.Rect.fromLTWH(
+          0,
+          0,
+          _frame.width.toDouble(),
+          _frame.height.toDouble(),
+        ),
+      );
+    }
     final m = _matrix;
     for (var i = 0; i < _count; i++) {
       final k = 9 * i;
