@@ -57,7 +57,7 @@ enum TubeState() {
 /// In the world, the tube's axis is at the origin. The camera looks at it, or
 /// at the middle of an open tube's drawing. Each round plays on the next
 /// level's tube, starting from [firstLevel]. A new game after Game Over
-/// starts at the level reached. Subclasses pick the component that draws a
+/// starts at the round reached. Subclasses pick the component that draws a
 /// path: see [pathComponent].
 abstract class TubeShooterExample({
   required super.status,
@@ -98,8 +98,9 @@ abstract class TubeShooterExample({
 
     Five kinds of enemies climb the tube. Once they're gone, the ship drops
     down its lane to the next of eight tubes, and any spike left in that lane
-    destroys it. Each round is 5% faster than the last. After Game Over, a new
-    game starts at the level reached.
+    destroys it. Each round is 5% faster than the last, and a game that starts
+    at a later level goes as fast as if it had started at the first. After
+    Game Over, a new game starts at the round reached, as fast.
 
     The game makes some paths again every frame, such as the tube's during the
     zoom. It shares others among many components, such as the enemies'
@@ -233,8 +234,10 @@ abstract class TubeShooterExample({
   /// The view's version at the last update.
   int _lastVersion = -1;
 
-  /// How fast the round goes: 1 in the first round, faster in each later one.
-  double get pace => math.pow(roundSpeedUp, round - 1).toDouble();
+  /// How fast the round goes: as fast as if the game had started at the first
+  /// level, so 1 on the first level's first round, and faster in each later
+  /// round.
+  double get pace => math.pow(roundSpeedUp, firstLevel + round - 1).toDouble();
 
   /// Seconds since the last enemy came, at the first round's pace.
   double _sinceSpawn = 0;
@@ -936,15 +939,20 @@ abstract class TubeShooterExample({
 
   /// Starts the next round on the next level's tube, or the first round on
   /// the round's level.
-  ///
-  /// The round starts with its enemies at random round the far end, no
-  /// spikes, the purge ready, and the ship on the tube's bottom lane. The tube
-  /// zooms in through the stars, with the ship hidden until the zoom ends.
   void _nextRound() {
     if (round > 0) {
       _levelIndex = (_levelIndex + 1) % levels.length;
     }
     round++;
+    _startRound();
+  }
+
+  /// Starts the round on its level's tube.
+  ///
+  /// The round starts with its enemies at random round the far end, no
+  /// spikes, the purge ready, and the ship on the tube's bottom lane. The tube
+  /// zooms in through the stars, with the ship hidden until the zoom ends.
+  void _startRound() {
     view.tube = level.tube;
     _lookFrom = _look;
     spikes.clear();
@@ -1000,8 +1008,8 @@ abstract class TubeShooterExample({
   }
 
   /// Starts a new game in this one: no enemies, shots or explosions, a score
-  /// of 0, all lives, the first round on the level that the last game
-  /// reached, and the world at [speed].
+  /// of 0, all lives, the round that the last game reached, at its pace, and
+  /// the world at [speed].
   void _newGame() {
     for (final enemy in [...enemies]) {
       discard(enemy);
@@ -1009,10 +1017,9 @@ abstract class TubeShooterExample({
     explosionGroup.removeAll(explosionGroup.children.toList());
     score = 0;
     lives = startLives;
-    round = 0;
     gameOverText.removeFromParent();
     world.timeScale = _speed;
-    _nextRound();
+    _startRound();
   }
 
   /// Starts firing, unless the game is waiting at READY or Game Over. Then

@@ -663,7 +663,10 @@ void main() {
     await frame();
     expect(
       drifting.eyeDistance,
-      closeTo(eyeDistance - StarFieldComponent.cruise * 0.016, 1e-9),
+      closeTo(
+        eyeDistance - StarFieldComponent.cruise * game.pace * 0.016,
+        1e-9,
+      ),
     );
     // Later rounds speed it up, at the game's pace.
     game.round = 5;
@@ -1306,6 +1309,10 @@ void main() {
   testWidgets('a round ends with the drop down the ship lane, then the next '
       'round, 5% faster, zooms in', (tester) async {
     final game = await playing(tester);
+    // A game that starts at a later level goes as fast as if it had started
+    // at the first.
+    expect(game.pace, closeTo(math.pow(1.05, octagonLevel), 1e-9));
+    final pace = game.pace;
     game.spikes.grow(7, 1);
     game.clearSpawns();
     await tester.pump(const Duration(milliseconds: 16));
@@ -1317,7 +1324,7 @@ void main() {
     expect(game.view.eyeShift, game.player.depth);
     await pumpUntil(tester, () => game.state == TubeState.zoom, frames: 80);
     expect(game.round, 2);
-    expect(game.pace, closeTo(1.05, 1e-9));
+    expect(game.pace, closeTo(pace * 1.05, 1e-9));
     expect(game.spawns, hasLength(18));
     expect(game.spikes.lengths.every((length) => length == 0), isTrue);
     expect(game.lives, TubeShooterExample.startLives);
@@ -1439,7 +1446,7 @@ void main() {
   });
 
   testWidgets('the game is over after the last life, still, until a tap '
-      'starts a new one at the level reached', (tester) async {
+      'starts a new one at the round reached', (tester) async {
     final game = await playing(tester, firstLevel: 0);
     final reported = <int>[];
     game.onLevel = reported.add;
@@ -1469,8 +1476,9 @@ void main() {
     expect(game.state, TubeState.zoom);
     expect(game.lives, TubeShooterExample.startLives);
     expect(game.score, 0);
-    expect(game.round, 1);
+    expect(game.round, 2);
     expect(game.levelIndex, 1);
+    expect(game.pace, closeTo(1.05, 1e-9));
     expect(reported, [1, 1]);
     expect(game.world.timeScale, 1);
     expect(game.gameOverText.isMounted, isFalse);
