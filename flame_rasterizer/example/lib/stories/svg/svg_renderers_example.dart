@@ -54,8 +54,8 @@ abstract class SvgRenderersExample(
 
     The other knobs pick the SVG and the SVG number, fade the ring's SVGs,
     zoom the camera and change the rotation's speed. Only a new renderer makes
-    a new game. The bar under the game shows the renderer, the frame times and
-    the renderer's own numbers.
+    a new game, which turns on from the same angles. The bar under the game
+    shows the renderer, the frame times and the renderer's own numbers.
 
     flame_rasterizer doesn't support clip paths, so alien, invader_1,
     invader_2, recycle, recycle_merge, setup and setup_merge draw unclipped
@@ -84,10 +84,14 @@ abstract class SvgRenderersExample(
   PositionComponent? _master;
   final _ring = <PositionComponent>[];
 
-  /// Seconds of the world's time since the game started, scaled by [speed].
-  /// The rotations follow it, so that new components turn as far as those
-  /// they replace.
-  double _time = 0;
+  /// The last game's [_time], so that a new game, for another renderer, turns
+  /// on from the same angles.
+  static double _lastTime = 0;
+
+  /// Seconds of the world's time, scaled by [speed], since the first game
+  /// started. The rotations follow it, so that new components turn as far as
+  /// those they replace.
+  double _time = _lastTime;
 
   /// Whether [onLoad] has run.
   bool _started = false;
@@ -239,6 +243,7 @@ abstract class SvgRenderersExample(
     // the old SVGs are freed below.
     super.update(dt);
     _time += dt * speed;
+    _lastTime = _time;
     for (final svg in _retired) {
       unloadSvg(svg);
     }
