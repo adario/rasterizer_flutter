@@ -18,7 +18,7 @@ USER dev
 
 # The same Flutter as on the Mac (~/Applications/flutter/version), with the Linux host's artifacts and the universal ones
 # (fonts, sky_engine, flutter_gpu, the engine): otherwise each `docker run --rm` downloads them again
-ARG FLUTTER_VERSION=3.47.9
+ARG FLUTTER_VERSION=3.50.0
 ENV PATH=/opt/flutter/bin:$PATH PUB_CACHE=/home/dev/.pub-cache
 RUN git clone --depth 1 --branch "$FLUTTER_VERSION" https://github.com/flutter/flutter.git /opt/flutter \
     && flutter --disable-analytics \
