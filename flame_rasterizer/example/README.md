@@ -334,6 +334,11 @@ Inspired by Atari's Tempest (1981): a tube shooter with a tube, enemies, colours
   - the round's number in the middle during each zoom, READY, and Game Over, 40 high.
 
   They draw before the FPS, in the world's run.
+- **Sounds.** Firing, enemy shots, explosions, the ship's, hits on spikes, the zappers' pulses, the purge, the zoom
+  and the drop each have a sound, in `assets/audio/`, which `tool/make_sounds.py` synthesizes. They play through
+  `flame_audio`'s players, 3 a sound, each sound at most once a frame, so that the purge's explosions sound as one.
+  The players don't ask the platform for their positions every frame, as by default they do, which cost about 10% of
+  the frames on macOS.
 
 Its knobs pick:
 
@@ -348,6 +353,8 @@ Its knobs pick:
 - **Glow**: shown with GPU (mesh) only, the one renderer that draws glows, and off by default. It makes the lines glow,
   thinner with depth, as they are: the shapes' glows 3 times as wide as their lines, and those of the tube, the ship's
   lane, the spikes and the bolts 2 times. It changes the running game, whose lines are imported again.
+- **Sound**: on by default. It changes the running game, which loads its sounds the first time it's on. Tests build
+  the game with its sounds off.
 - **Zoom**: the camera's zoom on the tube, whose lines keep their widths in device pixels, as the game makes its paths
   and strokes again for it.
 - **Speed**: as above.

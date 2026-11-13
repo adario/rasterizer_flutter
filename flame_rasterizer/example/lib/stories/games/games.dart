@@ -58,6 +58,7 @@ WidgetbookComponent gamesStories() {
             glow:
                 renderer == SvgRenderer.rasterizer &&
                 context.knobs.boolean(label: 'Glow'),
+            sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
             speed: speedKnob(context),
           );
@@ -129,6 +130,9 @@ class TubeShooterStory({
   /// Whether the lines glow. Only the mesh renderer draws glows.
   final bool glow = false,
 
+  /// Whether the game plays its sounds.
+  final bool sound = true,
+
   /// The camera's zoom.
   final double zoom = 1,
 
@@ -176,10 +180,12 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
             )
             ..driftingStars = widget.driftingStars
             ..glow = widget.glow
+            ..sound = widget.sound
             ..onLevel = _onLevel,
       update: (game) => game
         ..driftingStars = widget.driftingStars
-        ..glow = widget.glow,
+        ..glow = widget.glow
+        ..sound = widget.sound,
       zoom: widget.zoom,
       speed: widget.speed,
     );

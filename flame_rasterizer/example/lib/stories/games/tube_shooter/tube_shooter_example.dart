@@ -21,8 +21,10 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/s
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_field_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/tube_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/vector_text_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/zapper_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/sounds.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -106,8 +108,8 @@ abstract class TubeShooterExample({
     zoom. It shares others among many components, such as the enemies'
     shapes. With the mesh renderer, the Glow knob makes the lines glow. The
     Level knob shows the round's level, and starts a new game at the level it
-    picks. The other knobs keep the stars drifting, zoom the camera and change
-    the game's speed. The bar under the game shows the renderer, the frame
+    picks. The other knobs keep the stars drifting, turn the sounds on and
+    off, zoom the camera and change the game's speed. The bar under the game shows the renderer, the frame
     times, the renderer's own numbers and the paths made each second.
 
     Inspired by Atari's Tempest (1981).
@@ -414,6 +416,37 @@ abstract class TubeShooterExample({
     }
   }
 
+  /// The Sound knob's value: whether the game plays its sounds. Off by
+  /// default, so that tests stay silent.
+  ///
+  /// The sounds load the first time it's on, and stay loaded when it's off.
+  bool get sound => _sound;
+  bool _sound = false;
+
+  set sound(bool value) {
+    _sound = value;
+    if (value && isLoaded) {
+      _loadSounds();
+    }
+  }
+
+  /// The sounds, once [sound] was on.
+  TubeSounds? _sounds;
+
+  /// Loads the sounds, unless they're loaded or loading.
+  Future<void> _loadSounds() async {
+    if (_sounds == null) {
+      await (_sounds = TubeSounds()).load();
+    }
+  }
+
+  /// Plays [sound], if the Sound knob is on and the sounds are loaded.
+  void _play(Sound sound) {
+    if (_sound) {
+      _sounds?.play(sound);
+    }
+  }
+
   /// The shapes' glow, if the Glow knob is on.
   RasterizerGlow? get _shapeGlow => _glow ? lineGlow : null;
 
@@ -540,8 +573,18 @@ abstract class TubeShooterExample({
     // In the camera's viewport, as StoryGame's FPS counter is: above the
     // world, and unzoomed.
     camera.viewport.addAll([_levelText, _roundText, _livesText, _scoreText]);
+    // Before the first round, so that its zoom sounds.
+    if (_sound) {
+      await _loadSounds();
+    }
     _nextRound();
     startStatus();
+  }
+
+  @override
+  void onRemove() {
+    _sounds?.dispose();
+    super.onRemove();
   }
 
   @override
@@ -549,6 +592,7 @@ abstract class TubeShooterExample({
 
   @override
   void update(double dt) {
+    _sounds?.nextFrame();
     _clock += dt;
     _pathsTime += dt;
     if (_pathsTime >= 1) {
@@ -659,7 +703,15 @@ abstract class TubeShooterExample({
           _waitForPlayer();
         }
       case TubeState.play:
+        final wasPulsing = isPulsing;
         _pulseClock = (_pulseClock + dt * pace) % level.pulsePeriod;
+        if (!wasPulsing &&
+            isPulsing &&
+            enemies.any(
+              (enemy) => enemy is ZapperComponent && enemy.isZapping,
+            )) {
+          _play(Sound.zap);
+        }
         _spawn(dt);
         _collide();
         if (_state == TubeState.play && spawns.isEmpty && enemies.isEmpty) {
@@ -667,6 +719,7 @@ abstract class TubeShooterExample({
             discard(shot);
           }
           _setState(TubeState.drop);
+          _play(Sound.drop);
         }
       case TubeState.drop:
         final progress = math.min(1.0, _stateTime / dropTime);
@@ -740,6 +793,7 @@ abstract class TubeShooterExample({
       if (tip != null && shot.depth >= tip) {
         spikes.shorten(shot.lane, spikeHit);
         score += spikeScore;
+        _play(Sound.spike);
         discard(shot);
         continue;
       }
@@ -801,6 +855,7 @@ abstract class TubeShooterExample({
     final shot = ShotComponent(lane: lane, depth: depth);
     shots.add(shot);
     shotGroup.add(shot);
+    _play(Sound.fire);
   }
 
   /// Fires a shot from [enemy] up its lane, if fewer than the level's
@@ -815,6 +870,7 @@ abstract class TubeShooterExample({
     );
     enemyShots.add(shot);
     shotGroup.add(shot);
+    _play(Sound.enemyFire);
   }
 
   /// Which way an enemy at the rim in [lane] goes toward the ship: 1 or -1,
@@ -857,6 +913,7 @@ abstract class TubeShooterExample({
       return;
     }
     _explode(enemy, enemy.depth, rayColor: enemy.kind.color);
+    _play(Sound.explosion);
     score += enemy.kind.score;
     if (enemy is SplitterComponent && !purged) {
       split(enemy);
@@ -913,6 +970,7 @@ abstract class TubeShooterExample({
       camera.viewport.add(_purgeText);
     }
     _purgeLeft = purgeTime;
+    _play(Sound.purge);
     for (final enemy in [...enemies]) {
       destroy(enemy, purged: true);
     }
@@ -932,6 +990,7 @@ abstract class TubeShooterExample({
     _dyingOnDrop = _state == TubeState.drop;
     lives--;
     _explode(player, player.depth, color: TubeColors.ship);
+    _play(Sound.crash);
     player.drawing.add(
       OpacityEffect.fadeOut(EffectController(duration: respawnTime * 2 / 3)),
     );
@@ -992,6 +1051,7 @@ abstract class TubeShooterExample({
     _roundBanner.text = 'ROUND $round';
     camera.viewport.addAll([_roundBanner, _purgeReadyText]);
     _setState(TubeState.zoom);
+    _play(Sound.zoom);
     onLevel?.call(_levelIndex);
   }
 

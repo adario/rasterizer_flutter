@@ -15,13 +15,19 @@ dev_dependencies:
 
 # Flame's main, for every package in the workspace, which flame_rasterizer
 # asks for as flame ^2.0.0-dev.1, with its lints, flame_lint ^1.5.0-dev.1, and
-# flame_forge2d for the example. Remove these once flame 2.0, flame_lint 1.5,
-# flame_forge2d 0.21 and flame_svg 3.0 are on pub.dev.
+# flame_audio and flame_forge2d for the example. Remove these once flame 2.0,
+# flame_lint 1.5, flame_audio 2.13, flame_forge2d 0.21 and flame_svg 3.0 are on
+# pub.dev.
 dependency_overrides:
   flame:
     git:
       url: https://github.com/flame-engine/flame
       path: packages/flame
+      ref: main
+  flame_audio:
+    git:
+      url: https://github.com/flame-engine/flame
+      path: packages/flame_audio
       ref: main
   flame_forge2d:
     git:

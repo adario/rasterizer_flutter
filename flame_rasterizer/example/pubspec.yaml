@@ -7,10 +7,11 @@ version: 0.1.0+1
 environment:
   sdk: ^3.13.7
 
-# flame, flame_forge2d and flame_svg come from Flame's main, through the
-# workspace's dependency overrides (the root pubspec.yaml).
+# flame, flame_audio, flame_forge2d and flame_svg come from Flame's main,
+# through the workspace's dependency overrides (the root pubspec.yaml).
 dependencies:
   flame: ^2.0.0-dev.1
+  flame_audio: ^2.13.0-dev.1
   flame_forge2d: ^0.21.0-dev.1
   flame_rasterizer:
     path: ../
@@ -34,5 +35,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/audio/
     - assets/svgs/
     - assets/svgs/wireframe/
