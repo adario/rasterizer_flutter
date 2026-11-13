@@ -46,10 +46,10 @@ Not tested: other iPhone or iPad GPUs, physical Android devices, Linux on a GPU 
 Windows.
 
 The mesh renderer passes its own tests (`mesh_test`, `projective_test`, the self-test and switch tests, and the opacity
-test) on macOS, in the Linux container, and on the emulator's Vulkan and OpenGL ES. On the emulator's OpenGL ES, its
-self-test passes 4× multisampled. On the iPhone, its golden, mesh, opacity and projective tests pass too. Its goldens
-are recorded on macOS, the iPhone, the emulator, and in the Linux container, where it draws on llvmpipe. It hasn't run
-on the iOS Simulator.
+test) on macOS, on the iOS Simulator, in the Linux container, and on the emulator's Vulkan and OpenGL ES. On the
+emulator's OpenGL ES, its self-test passes 4× multisampled. On the iPhone, its golden, mesh, opacity and projective
+tests pass too, and on the iOS Simulator its golden tests pass against the `macos` set. Its goldens are recorded on
+macOS, the iPhone, the emulator, and in the Linux container, where it draws on llvmpipe.
 
 On the emulator's Vulkan with the Mac's GPU, Impeller can't draw a frame of more than about 800 draws, with or without
 this package. The emulator reports a full descriptor pool as `ErrorFragmentedPool`. Impeller, as of Flutter 3.47.9,

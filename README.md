@@ -39,7 +39,7 @@ still change.
 
 GPU means either GPU renderer: the atlas renderer, rasterizer_gpu's default, or the mesh renderer, flame_rasterizer's.
 Both draw on the same platforms. On OpenGL ES, an app that opts in gets the canvas renderer until the GPU renderer's
-self-test passes. The mesh renderer hasn't run on the iOS Simulator.
+self-test passes.
 
 On web, these tests ran: the canvas renderer's golden tests, against the `macos` set, and its opacity test;
 flame_rasterizer's limits test and Flame check; and, on CanvasKit only, the example's renderers, collidable and
