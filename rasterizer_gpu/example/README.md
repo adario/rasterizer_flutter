@@ -39,11 +39,11 @@ Timings mean something only in a profile build: `flutter run --profile -d macos 
     250 ms, and the backend it settled on.
 
   `DEFER_FIRST_FRAME=n` defers the first frame by n seconds, as a splash screen would.
-- On Android, the app's manifest asks for Impeller's Vulkan backend, which only debug and profile builds read. Release
-  builds on the emulator get OpenGL ES anyway. `IMPELLER_BACKEND=opengles flutter run ...` builds the app with
-  Impeller's OpenGL ES backend instead. Below API 29, build with `IMPELLER_BACKEND=auto`, which asks for no backend:
-  Flutter then renders with Skia, and the canvas renderer draws. Asking for a backend forces Impeller there, which
-  crashes at launch.
+- On Android, the app leaves Impeller's backend to Flutter, which picks OpenGL ES on the emulator and on devices whose
+  Vulkan can't work. A debug or profile build with `IMPELLER_BACKEND=vulkan` or `IMPELLER_BACKEND=opengles` asks for
+  that backend, through the manifest; release builds ignore it. A backend asked for crashes at launch where it can't
+  start: Vulkan on some older GPUs, and any backend below API 29, where Flutter renders with Skia. There, the canvas
+  renderer draws.
 - On Linux, Impeller renders with OpenGL ES. The app's runner turns Flutter GPU on in `linux/runner/my_application.cc`.
 - On web, only the canvas renderer draws: `flutter run -d chrome`, or `flutter build web [--wasm]`.
 

@@ -6,7 +6,8 @@ STOPPED, with the step, the test, its log and the steps not run, and exits with 
 failure of NAME's tests whose names match REGEX expected: EXPECTED FAIL, and the run goes on. `--keep-going` runs
 every step whatever fails.
 - DIR is relative to the repository's root, e.g. rasterizer_gpu/example or flame_rasterizer/benchmark.
-- ENV is one variable for the build, e.g. IMPELLER_BACKEND=opengles for the emulator's OpenGL ES, or empty.
+- ENV is one variable for the build, e.g. IMPELLER_BACKEND=vulkan or IMPELLER_BACKEND=opengles for the emulator's
+  Vulkan or OpenGL ES, or empty, for Flutter's own pick: OpenGL ES on the emulator.
 - TEST is the test file, with any flutter test flags, e.g. 'integration_test/golden_test.dart --dart-define=BACKEND=gpu'.
 - DEVICE defaults to emulator-5554: macos, an iPhone's UDID, or chrome, otherwise. With chrome, the test runs on web,
   in headless Chrome, with `flutter drive` and the app's test_driver/integration_test.dart, through the chromedriver in

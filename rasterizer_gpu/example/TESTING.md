@@ -6,11 +6,11 @@ folder, except those of the repository's `tool/`, which run from its root.
 ## Golden tests
 
 ```sh
-flutter test integration_test/golden_test.dart -d macos            # Metal
-flutter test integration_test/golden_test.dart -d <iOS udid>       # Metal, on an iOS Simulator or device
-flutter test integration_test/golden_test.dart -d emulator-5554    # Vulkan, on the Android emulator
+flutter test integration_test/golden_test.dart -d macos                                      # Metal
+flutter test integration_test/golden_test.dart -d <iOS udid>                                 # Metal, on an iOS Simulator or device
+IMPELLER_BACKEND=vulkan flutter test integration_test/golden_test.dart -d emulator-5554      # Vulkan, on the Android emulator
 IMPELLER_BACKEND=opengles flutter test integration_test/golden_test.dart -d emulator-5554    # OpenGL ES
-flutter test integration_test/golden_test.dart -d linux            # OpenGL ES, in the Linux container (see below)
+flutter test integration_test/golden_test.dart -d linux                                      # OpenGL ES, in the Linux container (see below)
 ```
 
 From a clean checkout, build the app once first, on any platform: `flutter build macos`, `flutter build ios` (with

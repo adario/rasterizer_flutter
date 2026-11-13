@@ -30,7 +30,8 @@ Below, `<device>` is `macos`, an iOS udid or `emulator-5554`.
   triangles.
 - **`--dart-define=BACKEND=canvas`** draws with rasterizer_gpu's canvas renderer, even where its GPU renderers are
   supported. It draws each SVG as a picture, or its paths with `--dart-define=CANVAS_PICTURES=false`. On web, and on
-  Android built with `IMPELLER_BACKEND=opengles`, the app picks the canvas renderer by itself.
+  Android's OpenGL ES, as on the emulator unless built with `IMPELLER_BACKEND=vulkan`, the app picks the canvas renderer
+  by itself.
   - On the Android emulator's Vulkan with the host GPU, the check hangs, as any frame of more than about 800 draws does
     there (see rasterizer_gpu's README). Use OpenGL ES, or start the emulator with `-gpu swiftshader_indirect`.
 - **`flutter test integration_test/check_test.dart -d <device> [--dart-define=BACKEND=atlas|canvas]`** runs the check
@@ -84,11 +85,10 @@ with the renderer's own CPU, upload and encode times. Benchmark runs keep the de
 
 ## Android and clean checkouts
 
-The Android manifest asks for Impeller's Vulkan backend, as the emulator otherwise gets OpenGL ES. The
-`IMPELLER_BACKEND` environment variable, read when building, can ask for another, such as `opengles`. Only debug and
-profile builds read the manifest's key: a release build gets OpenGL ES on the emulator. Below API 29, build with
-`IMPELLER_BACKEND=auto`. Flutter then renders with Skia, whereas a backend asked for forces Impeller, which crashes at
-launch there.
+On Android, the app leaves Impeller's backend to Flutter, which picks OpenGL ES on the emulator and on devices whose
+Vulkan can't work. A debug or profile build with `IMPELLER_BACKEND=vulkan` or `IMPELLER_BACKEND=opengles` asks for that
+backend, through the manifest; release builds ignore it. A backend asked for crashes at launch where it can't start:
+Vulkan on some older GPUs, and any backend below API 29, where Flutter renders with Skia.
 
 From a clean checkout, build the app once (`flutter build macos`, `flutter build ios`, or
 `flutter build apk --debug --target-platform android-arm64`) before `flutter test`. Otherwise `flutter test` checks the

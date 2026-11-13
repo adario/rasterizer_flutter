@@ -437,12 +437,13 @@ From a clean checkout, build the app once (`flutter build macos`, `flutter build
 `flutter build apk --debug --target-platform android-arm64`) before `flutter test`. Otherwise `flutter test` checks the
 assets before rasterizer_gpu's build hook has written its shader bundle.
 
-The Android manifest asks for Impeller's Vulkan backend, as the emulator otherwise gets OpenGL ES. A build with
-`IMPELLER_BACKEND=opengles` asks for OpenGL ES instead. Only debug and profile builds read the manifest's choice. Below
-API 29, build with `IMPELLER_BACKEND=auto`. On the emulator's Vulkan with its host GPU, the canvas renderer hangs with
-100 SVGs, as any frame of more than about 800 draws does there (see rasterizer_gpu's README). There,
-`renderers_test.dart` runs with `--name "^(GPU|Flame SVG)"`, without Canvas's games and the switching test, and in full
-with `IMPELLER_BACKEND=opengles`.
+On Android, the app leaves Impeller's backend to Flutter, which picks OpenGL ES on the emulator and on devices whose
+Vulkan can't work. A debug or profile build with `IMPELLER_BACKEND=vulkan` or `IMPELLER_BACKEND=opengles` asks for that
+backend, through the manifest; release builds ignore it. A backend asked for crashes at launch where it can't start:
+Vulkan on some older GPUs, and any backend below API 29, where Flutter renders with Skia. On the emulator's Vulkan with
+its host GPU, the canvas renderer hangs with 100 SVGs, as any frame of more than about 800 draws does there (see
+rasterizer_gpu's README). There, `renderers_test.dart` runs with `--name "^(GPU|Flame SVG)"`, without Canvas's games and
+the switching test, and in full on OpenGL ES.
 
 ## The SVGs' licences
 

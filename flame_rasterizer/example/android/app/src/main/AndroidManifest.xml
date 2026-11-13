@@ -27,9 +27,10 @@
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
-        <!-- Impeller's Vulkan backend, which the emulator only gets when asked for, in debug and profile builds. The
-             IMPELLER_BACKEND environment variable sets it when building, e.g. to opengles, where rasterizer_gpu's GPU renderer
-             draws once its self-test passes: see build.gradle.kts -->
+        <!-- Impeller's backend: auto, Flutter's own pick: OpenGL ES on the emulator and where Vulkan can't work.
+             Debug and profile builds can ask for vulkan or opengles with the IMPELLER_BACKEND environment variable,
+             when building: see build.gradle.kts. A backend asked for crashes at launch where it can't start. On
+             OpenGL ES, rasterizer_gpu's GPU renderer draws once its self-test passes -->
         <meta-data
             android:name="io.flutter.embedding.android.ImpellerBackend"
             android:value="${impellerBackend}" />

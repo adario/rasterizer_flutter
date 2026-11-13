@@ -26,8 +26,8 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Impeller's backend: vulkan, unless IMPELLER_BACKEND says otherwise, e.g. opengles (see AndroidManifest.xml)
-        manifestPlaceholders["impellerBackend"] = System.getenv("IMPELLER_BACKEND") ?: "vulkan"
+        // Impeller's backend: auto, unless IMPELLER_BACKEND asks for vulkan or opengles (see AndroidManifest.xml)
+        manifestPlaceholders["impellerBackend"] = System.getenv("IMPELLER_BACKEND") ?: "auto"
     }
 
     buildTypes {
