@@ -34,7 +34,7 @@ On each, the example's golden tests pass with the GPU and canvas renderers:
 
 - The iPhone's set matches macOS's within 1/255, except for the tiger sweep's frame 119, where at most 141 pixels
   differ, by up to 10/255. The emulator's Vulkan and OpenGL ES sets match macOS's within 1/255.
-- On the iPhone, the atlas, self-test and switch tests pass too.
+- On the iPhone and the iOS Simulator, the atlas, self-test and switch tests pass too.
 - In the Linux container, the self-test, switch, defer and atlas tests pass on the GPU renderer, and so does the crash
   guard, tested with `kill -9`.
 - On web, in headless Chrome with CanvasKit and with skwasm, the canvas renderer's golden tests pass against the
