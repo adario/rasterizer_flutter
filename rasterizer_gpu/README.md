@@ -140,8 +140,8 @@ foreground.draw(canvas, scale: devicePixelRatio);
     40/255 on a few hundred edge pixels of a 40 px SVG, and sepia by up to 8/255 on 20 pixels. Tints are exact.
 - **Paints:** `draw(canvas, paint: …)` applies the paint to the run as a whole, as to an image. The GPU renderer draws
   its parts' images with it, and the canvas renderer draws its paths in a layer with it. The GPU renderer still uses a
-  layer in three cases: on Linux's OpenGL ES, for an image or mask filter (which is unbounded), and for a blend mode
-  that changes what's under transparent pixels, such as `srcIn`, across several parts. A color filter that colors
+  layer in two cases: for an image or mask filter (which is unbounded), and for a blend mode that changes what's under
+  transparent pixels, such as `srcIn`, across several parts. A color filter that colors
   transparent pixels, such as a `srcOver` mode, colors each part's rectangle rather than the run's bounds.
 - **Slots:** a frame's images are valid until `slots` frames later, when their textures are rendered into again.
 - **Parts:** a run is drawn from its parts (`run.parts`). Entries whose bounds, grown by a 2 px margin, overlap in a

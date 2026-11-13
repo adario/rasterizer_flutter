@@ -6,8 +6,7 @@
 // that paint. The test compares that with the same run drawn into a layer
 // with the paint, clipped to the run's parts, over a background so that
 // blend modes show. It does so for a run of one part, drawn as an image, and
-// a run of two, drawn as an atlas. On Linux's OpenGL ES, the run draws
-// through a layer too, so both are alike.
+// a run of two, drawn as an atlas.
 //
 // It also checks entries' color transforms, which the core applies to each
 // path's color. It compares them with each entry drawn in a layer with the

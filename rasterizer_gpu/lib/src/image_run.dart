@@ -1,8 +1,6 @@
-import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
 import '../rasterizer_gpu.dart';
-import 'atlas.dart' show openGles;
 
 /// A run drawn as images, from its parts' rectangles.
 ///
@@ -27,12 +25,9 @@ abstract class ImageRun() extends RasterizerRun {
     // paint, without the layer's offscreen pass. A layer is still needed:
     // - unbounded, for an image or mask filter, which reaches outside the
     //   images;
-    // - on Linux's OpenGL ES, where Impeller draws an image with a color
-    //   filter about a pixel off, at least on llvmpipe (the Android
-    //   emulator's OpenGL ES doesn't);
     // - for several parts, with a blend mode that changes what's under
     //   transparent pixels, as the gaps between the parts are.
-    // The last two take a layer bounded to the parts, and clipped to those
+    // The last takes a layer bounded to the parts, and clipped to those
     // bounds too, as Impeller takes a layer's bounds only as a hint. A srcIn
     // layer cleared the whole canvas around the parts, where an image drawn
     // with srcIn clears only its own rectangle.
@@ -43,13 +38,7 @@ abstract class ImageRun() extends RasterizerRun {
       canvas.restore();
       return;
     }
-    // On Linux's OpenGL ES, every paint takes the layer, not only one with a
-    // color filter, at the cost of its pass. RasterizerCanvas draws a run with
-    // no paint when its paint only fades, or only filters colors as a
-    // RasterizerColorTransform. So only its other paints pay for the layer,
-    // and paints given to draw directly.
-    if ((openGles && Platform.isLinux) ||
-        (parts.length > 1 && _clearsUnder.contains(paint.blendMode))) {
+    if (parts.length > 1 && _clearsUnder.contains(paint.blendMode)) {
       final bounds = _bounds(scale);
       canvas
         ..save()

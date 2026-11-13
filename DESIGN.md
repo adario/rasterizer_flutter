@@ -90,8 +90,8 @@ the Android emulator's OpenGL ES and on Mesa's llvmpipe.
 - **`RasterizerCanvas` wraps the game's canvas.** Vector components add entries to the current run, with the canvas's
   transform, perspective included. Any other draw, clip or layer ends the run. The whole transform goes to the GPU, so
   vectors stay sharp at any zoom.
-- **A run's image is drawn with its paint**, not in a layer. The exceptions are image and mask filters, and Linux's
-  OpenGL ES, where Impeller draws a filtered image about a pixel off.
+- **A run's image is drawn with its paint**, not in a layer. The exceptions are image and mask filters, and blend modes
+  that change what's under transparent pixels, across several parts.
 - **`SvgHitbox` polygons are shared** per outline and size. Making a hitbox takes 0.002 ms, against 0.004–0.03 ms when
   Flame builds each hitbox's polygons, path and segments itself.
 - **Flame's main branch**, through the root `pubspec.yaml`'s overrides, until Flame 2.0 is on pub.dev.
