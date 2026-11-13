@@ -3,12 +3,14 @@
 # Arch-neutral: built here it's linux/arm64; on an x86_64 Linux machine, linux/amd64.
 FROM debian:trixie-slim
 
-# Flutter's Linux desktop requirements, gcc & clang, Mesa (EGL, OpenGL ES, llvmpipe) & its info tools, Xvfb & x11vnc
+# Flutter's Linux desktop requirements, gcc & clang, Mesa (EGL, OpenGL ES, llvmpipe) & its info tools, Xvfb & x11vnc,
+# and GStreamer with its WAV parser, for audioplayers_linux: flame_rasterizer's example plays sounds with flame_audio
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git unzip xz-utils file rsync procps \
       clang g++ cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
       libegl1 libgles2 libgl1-mesa-dri mesa-utils \
       xvfb xauth x11vnc \
+      libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --shell /bin/bash dev \
