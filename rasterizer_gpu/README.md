@@ -402,8 +402,9 @@ everywhere, for scenes and renderers created after it's set.
     to the gradient. SVG, Chrome and the core tilt them with the bounds' proportions.
   - Skews: vector_graphics_compiler reads `skewX` and `skewY` angles as radians rather than degrees, on shapes and
     gradients.
-  - On the iOS Simulator, Impeller doesn't draw strokes painted with horizontal or vertical linear gradients, which
-    macOS draws from the same calls.
+  - On the iOS Simulator, Impeller draws only the inner half of a stroked rectangle whose horizontal or vertical linear
+    gradient ends on the rectangle's bounds, as SVG's default gradients do. macOS draws the whole stroke from the same
+    calls.
   - On web, CanvasKit gives `Path.combine`'s result a nonzero fill type rather than an even-odd one, so a difference's
     holes are filled, as with Flutter's own `drawPath`. Set its `fillType` to `PathFillType.evenOdd` again.
 

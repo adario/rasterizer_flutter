@@ -78,9 +78,10 @@ List<Affine> gridTransforms(
 /// with fill, stroke and stop opacities.
 ///
 /// vector_graphics_compiler draws them all as SVG says, as Chrome does. The
-/// strokes' gradients are diagonal: the iOS Simulator's Impeller doesn't draw
-/// strokes painted with horizontal or vertical linear gradients, while macOS's
-/// draws them from the same canvas calls.
+/// strokes' gradients are diagonal: the iOS Simulator's Impeller draws only
+/// the inner half of a stroked rectangle whose horizontal or vertical linear
+/// gradient ends on its bounds, while macOS's draws the whole stroke from the
+/// same canvas calls.
 const gradientsSvg = '''
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
 <defs>
