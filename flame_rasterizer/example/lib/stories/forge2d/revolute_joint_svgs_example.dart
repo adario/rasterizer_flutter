@@ -11,6 +11,8 @@ import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flutter/foundation.dart';
 
+part 'revolute_joint_svgs_snapshot.dart';
+
 /// The values of the example's knobs, except Zoom, Speed and the cache knobs.
 typedef RevoluteJointSvgsSettings = ({SvgRenderer renderer, bool pieces});
 
@@ -27,32 +29,39 @@ typedef RevoluteJointSvgsSettings = ({SvgRenderer renderer, bool pieces});
 /// The status adds the bodies dropped to [StoryGame]'s. As in
 /// flame_path_shapes, the number of bodies at the top right counts the
 /// walls, the ramps and the wheel too.
+///
+/// Given the snapshot of a game with another renderer, it goes on from there,
+/// with the same bodies: see [RevoluteJointSvgsSnapshots].
 abstract class RevoluteJointSvgsExample({
   required var bool pieces,
   required super.status,
   math.Random? random,
+  RevoluteJointSvgsSnapshot? from,
 }) extends Forge2DExampleGame with ExampleSvgs {
   this : super(world: RevoluteJointSvgsWorld());
 
   /// Creates the game for [settings]' renderer, with flame_svg's [cache] for
-  /// Flame SVG.
+  /// Flame SVG, which goes on from [from], if any.
   factory RevoluteJointSvgsExample.of(
     RevoluteJointSvgsSettings settings,
     ValueNotifier<String> status, {
     SvgCache cache = defaultSvgCache,
     math.Random? random,
+    RevoluteJointSvgsSnapshot? from,
   }) => settings.renderer == SvgRenderer.flameSvg
       ? FlameSvgRevoluteJointExample(
           pieces: settings.pieces,
           status: status,
           cache: cache,
           random: random,
+          from: from,
         )
       : RasterizerRevoluteJointExample(
           pieces: settings.pieces,
           status: status,
           renderer: settings.renderer,
           random: random,
+          from: from,
         );
 
   static const description = '''
@@ -68,9 +77,10 @@ abstract class RevoluteJointSvgsExample({
 
     The knobs pick the renderer, draw the convex pieces over the SVGs, zoom
     the camera and change the physics' speed. With Flame SVG, the cache knobs
-    set flame_svg's cache. Only a new renderer or cache makes a new game. The
-    frame rate is at the top left, and the number of bodies at the top right.
-    The bar under the game shows the renderer, the frame times, the
+    set flame_svg's cache. Only a new renderer or cache makes a new game. A
+    new renderer's game goes on with the same bodies, from where they were.
+    The frame rate is at the top left, and the number of bodies at the top
+    right. The bar under the game shows the renderer, the frame times, the
     renderer's own numbers and the bodies dropped.
 
     Based on flame_path_shapes' RevoluteJointWithMotorExample.
@@ -100,6 +110,12 @@ abstract class RevoluteJointSvgsExample({
   static const _spreadSpeed = 2.0;
 
   final math.Random random = random ?? math.Random();
+
+  /// The snapshot that it goes on from, if any.
+  final RevoluteJointSvgsSnapshot? _from = from;
+
+  /// The wheel, from [onLoad] on.
+  CircleShuffler? _wheel;
 
   /// The SVG bodies dropped so far.
   final svgBodies = <SvgBody>[];
@@ -149,11 +165,12 @@ abstract class RevoluteJointSvgsExample({
     final center = Vector2.zero();
     world.addAll([
       ...(_walls = Wall.around(_arena)),
-      CircleShuffler(center),
+      _wheel = CircleShuffler(center, from: _from?.wheel),
       CornerRamp(center, isMirrored: true),
       CornerRamp(center),
       PiecesLayer(),
     ]);
+    _restoreBodies();
     startStatus();
   }
 
@@ -213,27 +230,52 @@ abstract class RevoluteJointSvgsExample({
   (double, BodyComponent Function(Vector2, Vector2)) _randomSvg() {
     final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
     final side = random.nextInt(_sides);
-    final svg = _svgs[name]!;
-    final (size, pieces) = _pieces[(name, side)] ??= () {
-      final s = (_minSide + side / 10) / math.max(svg.size.x, svg.size.y);
-      final size = svg.size * s;
-      return (size, convexPiecesOf(svg.outline, size));
-    }();
+    final (size, _) = _sizeAndPieces(name, side);
     final color = ExampleColors.dynamicColor(_tint++);
     final angle = random.nextDouble() * 2 * math.pi;
     return (
       size.length / 2,
-      (position, velocity) => SvgBody(
-        svg,
-        size,
-        pieces,
-        position,
-        velocity,
-        angle: angle,
-        color: color,
-      ),
+      (position, velocity) =>
+          _svgBody(name, side, position, velocity, angle: angle, color: color),
     );
   }
+
+  /// Creates the body of the SVG [name] at its [side]th size, in [color],
+  /// which starts at [position] and [angle], moving at [velocity], or goes on
+  /// from [from], if any.
+  SvgBody _svgBody(
+    String name,
+    int side,
+    Vector2 position,
+    Vector2 velocity, {
+    required double angle,
+    required Color color,
+    BodySnapshot? from,
+  }) {
+    final (size, pieces) = _sizeAndPieces(name, side);
+    return SvgBody(
+      _svgs[name]!,
+      size,
+      pieces,
+      position,
+      velocity,
+      angle: angle,
+      color: color,
+      name: name,
+      side: side,
+      from: from,
+    );
+  }
+
+  /// The size and convex pieces of the SVG [name] at its [side]th size,
+  /// worked out once.
+  (Vector2, List<List<Vector2>>) _sizeAndPieces(String name, int side) =>
+      _pieces[(name, side)] ??= () {
+        final svg = _svgs[name]!;
+        final s = (_minSide + side / 10) / math.max(svg.size.x, svg.size.y);
+        final size = svg.size * s;
+        return (size, convexPiecesOf(svg.outline, size));
+      }();
 
   /// Moves the walls to the game's new edges, and removes the bodies they
   /// leave outside, which would fall forever.
@@ -270,8 +312,9 @@ class RevoluteJointSvgsWorld()
 /// A body that draws [svg], [size] meters large and centered on it, and
 /// collides as the SVG's convex [pieces].
 ///
-/// It starts at [_position] and [_angle], moving at [_velocity], and draws
-/// above the other bodies. [PiecesLayer] draws its pieces in [color].
+/// It starts at [_position] and [_angle], moving at [_velocity], or goes on
+/// from [from], if any, and draws above the other bodies. [PiecesLayer] draws
+/// its pieces in [color].
 class SvgBody(
   final ExampleSvg svg,
   final Vector2 size,
@@ -280,6 +323,13 @@ class SvgBody(
   final Vector2 _velocity, {
   required final double _angle,
   required final Color color,
+
+  /// The SVG's name, for a game with another renderer to load it.
+  required final String name,
+
+  /// The index of the SVG's size, for a game with another renderer.
+  required final int side,
+  final BodySnapshot? from,
 }) extends BodyComponent {
   this : super(renderBody: false, priority: 1);
 
@@ -318,7 +368,7 @@ class SvgBody(
     for (final piece in pieces) {
       body.createShape(Polygon(piece), shapeDef);
     }
-    return body;
+    return body..goOnFrom(from);
   }
 }
 
@@ -364,8 +414,9 @@ class PiecesLayer()
 }
 
 /// flame_path_shapes' wheel: five circles, 25 meters below [_center], that a
-/// motor turns.
-class CircleShuffler(final Vector2 _center) extends BodyComponent {
+/// motor turns. It goes on from [from], if any.
+class CircleShuffler(final Vector2 _center, {final BodySnapshot? from})
+    extends BodyComponent {
   @override
   Body createBody() {
     const pieces = 5;
@@ -398,7 +449,7 @@ class CircleShuffler(final Vector2 _center) extends BodyComponent {
         enableMotor: true,
       ),
     );
-    return body;
+    return body..goOnFrom(from);
   }
 }
 
@@ -436,6 +487,7 @@ class RasterizerRevoluteJointExample({
   required super.status,
   @override required final SvgRenderer renderer,
   super.random,
+  super.from,
 }) extends RevoluteJointSvgsExample
     with HasRasterizer, ExampleRasterizer, RasterizerSvgs {
   this {
@@ -450,6 +502,7 @@ class FlameSvgRevoluteJointExample({
   required super.status,
   final SvgCache cache = defaultSvgCache,
   super.random,
+  super.from,
 }) extends RevoluteJointSvgsExample with FlameSvgs {
   @override
   SvgCacheMode get cacheMode => cache.mode;

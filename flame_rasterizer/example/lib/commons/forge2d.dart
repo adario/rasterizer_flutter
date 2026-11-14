@@ -196,13 +196,50 @@ class Wall(final Vector2 start, final Vector2 end)
         ..createShape(Segment(point1: start, point2: end), ShapeDef());
 }
 
+/// Where a body is and how it moves, for a body in a game with another
+/// renderer to go on from.
+typedef BodySnapshot = ({
+  Vector2 position,
+  Rot rotation,
+  Vector2 linearVelocity,
+  double angularVelocity,
+  bool isAwake,
+});
+
+/// Takes a [Body]'s snapshot, and goes on from one.
+extension BodySnapshots on Body {
+  /// Where it is and how it moves.
+  BodySnapshot get snapshot => (
+    position: position.clone(),
+    rotation: rotation,
+    linearVelocity: linearVelocity.clone(),
+    angularVelocity: angularVelocity,
+    isAwake: isAwake,
+  );
+
+  /// Puts it where [from] was, moving as it was, if [from] is given.
+  ///
+  /// Call it once its shapes are created, before the physics' first step.
+  /// Box2D's linear velocity is its center of mass's, which each new shape
+  /// moves. So it would go on a little faster or slower if it spins.
+  void goOnFrom(BodySnapshot? from) {
+    if (from case final from?) {
+      setTransform(from.position, from.rotation);
+      linearVelocity = from.linearVelocity;
+      angularVelocity = from.angularVelocity;
+      isAwake = from.isAwake;
+    }
+  }
+}
+
 /// A ball with a radius of [radius] meters, in `color`, which starts at
-/// [_position], moving at [_velocity].
+/// [_position], moving at [_velocity], or goes on from [from], if any.
 class Ball(
   final Vector2 _position,
   final Vector2 _velocity, {
   required final double radius,
   required Color color,
+  final BodySnapshot? from,
 }) extends BodyComponent with GlowingBody {
   this : super(paint: Paint()..color = color);
 
@@ -220,7 +257,7 @@ class Ball(
       Circle(radius: radius),
       ShapeDef(material: SurfaceMaterial(restitution: 0.7)),
     );
-    return body;
+    return body..goOnFrom(from);
   }
 }
 

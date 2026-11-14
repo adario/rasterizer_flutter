@@ -150,6 +150,69 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  // At speed 0, a new renderer's game shows the same bodies, where the old
+  // game's were, and hands the same snapshot on to the next game. It's the
+  // only test here with flame_svg, which shares its loads between tests.
+  testWidgets('a new renderer goes on from where the bodies were', (
+    tester,
+  ) async {
+    late RevoluteJointSvgsExample game;
+    Widget story(SvgRenderer renderer, {double speed = 1}) => MaterialApp(
+      home: GameStory<RevoluteJointSvgsExample, RevoluteJointSvgsSnapshot>(
+        renderer: renderer,
+        create: (status, from) => game = RevoluteJointSvgsExample.of(
+          (renderer: renderer, pieces: false),
+          status,
+          random: math.Random(1),
+          from: from,
+        ),
+        snapshot: (game) => game.snapshot,
+        speed: speed,
+      ),
+    );
+    await pumpGame(tester, story(SvgRenderer.rasterizer), () => game);
+    await tester.pump(const Duration(milliseconds: 16));
+    final rect = tester.getRect(
+      find.byType(GameWidget<RevoluteJointSvgsExample>),
+    );
+    await tester.tapAt(Offset(rect.center.dx, rect.top + 60));
+    for (var i = 0; i < 120; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await tester.pumpWidget(story(SvgRenderer.rasterizer, speed: 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    var last = game;
+    final snapshot = last.snapshot;
+    expect(snapshot.wheel, isNotNull);
+    expect(snapshot.balls.length + snapshot.svgBodies.length, 15);
+
+    for (final renderer in [
+      SvgRenderer.rasterizerCanvas,
+      SvgRenderer.flameSvg,
+      SvgRenderer.rasterizer,
+    ]) {
+      await pumpGame(tester, story(renderer, speed: 0), () => game);
+      expect(game, isNot(same(last)));
+      expect(last.isAttached, isFalse);
+      for (var i = 0; i < 2; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final next = game.snapshot;
+      expect(next.wheel, snapshot.wheel, reason: renderer.label);
+      expect(next.balls, snapshot.balls, reason: renderer.label);
+      expect(next.svgBodies, snapshot.svgBodies, reason: renderer.label);
+      expect(next.tint, snapshot.tint);
+      expect(
+        game.camera.viewport.children.whereType<TextComponent>().map(
+          (text) => text.text,
+        ),
+        contains('Bodies: ${15 + 7}'),
+      );
+      last = game;
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
+
   // Box2D has room for 128 worlds at once, so each game must destroy its own.
   testWidgets('new games, one after another, have room for their worlds', (
     tester,
