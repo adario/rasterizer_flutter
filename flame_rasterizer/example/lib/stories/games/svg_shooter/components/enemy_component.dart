@@ -14,18 +14,32 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_e
 /// down, and whether it swings.
 typedef EnemyKind = ({ExampleSvg svg, bool turned, bool swings});
 
+/// What an enemy picks at random: its tint, the angle that it swings by,
+/// either way, or tilts by, and its velocity.
+typedef EnemyPicks = ({
+  Color color,
+  double swing,
+  double tilt,
+  Vector2 velocity,
+});
+
 /// An enemy of [kind], which falls down the game and explodes when hit.
 ///
 /// It tints its SVG with one of [ExampleColors.dynamics], at random, and
 /// has a passive [SvgHitbox]. An enemy that swings falls straight down at
 /// [speed], and swings like a pendulum around its center, by a random angle.
 /// Its swing starts [age] seconds in, as the first wave's enemies have been
-/// falling that long. Other enemies tilt by a random angle, and fly where
+/// falling that long, and [age] goes on with the seconds that it falls. Other
+/// enemies tilt by a random angle, and fly where
 /// they point at a random speed around [speed].
+///
+/// Given the picks of an enemy in a game with another renderer, it makes
+/// those, not random ones.
 class EnemyComponent(
   final EnemyKind kind, {
   required super.position,
-  final double age = 0,
+  var double age = 0,
+  EnemyPicks? from,
 }) extends PositionComponent with HasGameRef<SvgShooterExample> {
   /// The enemies' speed, in world units a second: 10% slower than Rogue
   /// Shooter's 150.
@@ -51,11 +65,17 @@ class EnemyComponent(
   /// SVGs' content fills the full height of their square.
   static final Vector2 initialSize = Vector2.all(29);
 
+  /// The picks that it makes, if given.
+  final EnemyPicks? _from = from;
+
+  /// What it picked as it loaded.
+  late final EnemyPicks picks;
+
   /// The tint of its SVG.
-  late final Color color;
+  Color get color => picks.color;
 
   /// Where it flies, and how fast, in world units a second.
-  late final Vector2 velocity;
+  Vector2 get velocity => picks.velocity;
 
   this
     : super(
@@ -66,9 +86,7 @@ class EnemyComponent(
 
   @override
   Future<void> onLoad() async {
-    final random = gameRef.random;
-    const colors = ExampleColors.dynamics;
-    color = colors[random.nextInt(colors.length)];
+    picks = _from ?? _pick(gameRef.random);
     final svg = kind.svg.component()..size = size;
     (svg as HasPaint).tint(color);
     addAll([
@@ -80,28 +98,47 @@ class EnemyComponent(
       ),
     ]);
     if (kind.swings) {
-      velocity = Vector2(0, speed.toDouble());
-      final (least, most) = swingDegrees;
-      final degrees = least + random.nextInt(most - least + 1);
       add(
         RotateEffect.by(
-          degrees * math.pi / 180,
+          picks.swing,
           InfiniteEffectController(SineEffectController(period: swingPeriod))
             ..advance(age),
         ),
       );
     } else {
-      final degrees = random.nextInt(2 * tiltDegrees + 1) - tiltDegrees;
-      final tilt = degrees * math.pi / 180;
-      angle += tilt;
-      final spread = speedSpread * (2 * random.nextDouble() - 1);
-      velocity = Vector2(0, speed * (1 + spread))..rotate(tilt);
+      angle += picks.tilt;
     }
+  }
+
+  /// Picks its tint, its swing or tilt, and its velocity with [random].
+  EnemyPicks _pick(math.Random random) {
+    const colors = ExampleColors.dynamics;
+    final color = colors[random.nextInt(colors.length)];
+    if (kind.swings) {
+      final (least, most) = swingDegrees;
+      final degrees = least + random.nextInt(most - least + 1);
+      return (
+        color: color,
+        swing: degrees * math.pi / 180,
+        tilt: 0,
+        velocity: Vector2(0, speed.toDouble()),
+      );
+    }
+    final degrees = random.nextInt(2 * tiltDegrees + 1) - tiltDegrees;
+    final tilt = degrees * math.pi / 180;
+    final spread = speedSpread * (2 * random.nextDouble() - 1);
+    return (
+      color: color,
+      swing: 0,
+      tilt: tilt,
+      velocity: Vector2(0, speed * (1 + spread))..rotate(tilt),
+    );
   }
 
   @override
   void update(double dt) {
     super.update(dt);
+    age += dt;
     position.addScaled(velocity, dt);
     // Remove it past the bottom, or once it's wholly out of a side, where a
     // tilted enemy can fly.

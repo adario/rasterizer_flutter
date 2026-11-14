@@ -11,6 +11,17 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/ex
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/missile_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
 
+/// What a player in a game for another renderer goes on from: where it is,
+/// its health, the seconds since its last hit and volley, and, once
+/// destroyed, since then.
+typedef PlayerSnapshot = ({
+  Vector2 position,
+  int health,
+  double sinceHit,
+  double sinceVolley,
+  double? sinceDestroyed,
+});
+
 /// The player's spaceship, which draws [svg] and collides with an
 /// [SvgHitbox] in the SVG's shape.
 ///
@@ -19,7 +30,10 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_e
 /// [health]. After [healDelay] without a hit, its health comes back at
 /// [healRate] a second. At 0, it blows up, turns red and fades out, and then
 /// the game is over.
-class PlayerComponent(final ExampleSvg svg)
+///
+/// Given [from], the snapshot of the player in a game with another renderer,
+/// it goes on from there.
+class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
     extends PositionComponent
     with HasGameRef<SvgShooterExample>, CollisionCallbacks {
   /// About 15% narrower than Rogue Shooter's player, which is 75 wide. The
@@ -70,8 +84,10 @@ class PlayerComponent(final ExampleSvg svg)
 
   /// Whether its health ran out. It then neither moves, fires nor gets hit
   /// until a new game.
-  bool get isDestroyed => _isDestroyed;
-  bool _isDestroyed = false;
+  bool get isDestroyed => _sinceDestroyed != null;
+
+  /// Seconds since its health ran out, or null while it hasn't.
+  double? _sinceDestroyed;
 
   this : super(size: initialSize, anchor: Anchor.center);
 
@@ -88,13 +104,32 @@ class PlayerComponent(final ExampleSvg svg)
         onTick: _createMissile,
       ),
     ]);
+    if (from case final from?) {
+      position = from.position;
+      health = from.health;
+      _sinceHit = from.sinceHit;
+      _sinceVolley = from.sinceVolley;
+      if (from.sinceDestroyed case final since?) {
+        _destroy(since: since);
+      }
+    }
   }
+
+  /// What a player in a game for another renderer goes on from.
+  PlayerSnapshot get snapshot => (
+    position: position.clone(),
+    health: health,
+    sinceHit: _sinceHit,
+    sinceVolley: _sinceVolley,
+    sinceDestroyed: _sinceDestroyed,
+  );
 
   @override
   void update(double dt) {
     super.update(dt);
     _sinceVolley += dt;
-    if (_isDestroyed) {
+    if (_sinceDestroyed case final since?) {
+      _sinceDestroyed = since + dt;
       return;
     }
     _move(gameRef.keyDirection, dt);
@@ -151,7 +186,7 @@ class PlayerComponent(final ExampleSvg svg)
   /// drag.
   void beginFire() {
     final timer = missileCreator.timer;
-    if (_isDestroyed || timer.isRunning()) {
+    if (isDestroyed || timer.isRunning()) {
       return;
     }
     if (_sinceVolley >= firePeriod) {
@@ -169,7 +204,7 @@ class PlayerComponent(final ExampleSvg svg)
 
   /// Takes [hitDamage] off its [health], and destroys it at 0.
   void takeHit() {
-    if (_isDestroyed) {
+    if (isDestroyed) {
       return;
     }
     _sinceHit = 0;
@@ -181,20 +216,44 @@ class PlayerComponent(final ExampleSvg svg)
 
   /// Blows it up in red, and turns it red as it fades out. Then the game is
   /// over.
-  void _destroy() {
-    _isDestroyed = true;
+  ///
+  /// A player destroyed [since] seconds before, in a game with another
+  /// renderer, is as red and as faded as it was, without the explosion.
+  void _destroy({double since = 0}) {
+    _sinceDestroyed = since;
     stopFire();
     _hitbox.collisionType = CollisionType.inactive;
-    gameRef.explosionGroup.add(
-      ExplosionComponent(ExplosionKind.playerDestroyed, position: position),
-    );
-    _ship.addAll([
-      ColorEffect(Colors.red, EffectController(duration: reddenTime)),
-      OpacityEffect.fadeOut(
-        EffectController(duration: fadeTime),
-        onComplete: gameRef.gameOver,
-      ),
-    ]);
+    final reddened = math.min(since / reddenTime, 1.0);
+    final faded = math.min(since / fadeTime, 1.0);
+    if (since == 0) {
+      gameRef.explosionGroup.add(
+        ExplosionComponent(ExplosionKind.playerDestroyed, position: position),
+      );
+    } else {
+      // The effects are linear, so they go on from here over the time left.
+      (_ship as HasPaint)
+        ..tint(Colors.red.withValues(alpha: reddened))
+        ..opacity = 1 - faded;
+    }
+    if (reddened < 1) {
+      _ship.add(
+        ColorEffect(
+          Colors.red,
+          EffectController(duration: reddenTime - since),
+          opacityFrom: reddened,
+        ),
+      );
+    }
+    if (faded < 1) {
+      _ship.add(
+        OpacityEffect.fadeOut(
+          EffectController(duration: fadeTime - since),
+          onComplete: gameRef.gameOver,
+        ),
+      );
+    } else {
+      gameRef.gameOver();
+    }
   }
 
   /// Puts it back as at the start of a game: at the center, not faded, with
@@ -204,7 +263,7 @@ class PlayerComponent(final ExampleSvg svg)
     health = maxHealth;
     _sinceHit = 0;
     _sinceVolley = firePeriod;
-    _isDestroyed = false;
+    _sinceDestroyed = null;
     _hitbox.collisionType = CollisionType.active;
     (_ship as HasPaint)
       ..opacity = 1

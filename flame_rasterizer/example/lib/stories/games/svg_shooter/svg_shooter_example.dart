@@ -11,11 +11,14 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/bo
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/enemy_creator.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/game_over_text.dart';
+import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/missile_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/star_background_creator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult;
+
+part 'svg_shooter_snapshot.dart';
 
 /// Flame's Rogue Shooter, drawn with SVGs: see [description].
 ///
@@ -23,21 +26,35 @@ import 'package:flutter/widgets.dart' show KeyEventResult;
 /// corner. The camera looks at the middle of the play area, which is the
 /// game's size. Subclasses pick what loads and draws the SVGs: see
 /// [ExampleSvgs].
-abstract class SvgShooterExample({required super.status, math.Random? random})
-    extends ExampleGame
+///
+/// Given the snapshot of a game with another renderer, it goes on from there:
+/// see [SvgShooterSnapshots].
+abstract class SvgShooterExample({
+  required super.status,
+  math.Random? random,
+  SvgShooterSnapshot? from,
+}) extends ExampleGame
     with ExampleSvgs, HasCollisionDetection, DragCallbacks, KeyboardEvents {
-  /// Creates the game for [renderer], with flame_svg's [cache] for Flame SVG.
+  /// Creates the game for [renderer], with flame_svg's [cache] for Flame SVG,
+  /// which goes on from [from], if any.
   factory SvgShooterExample.of(
     SvgRenderer renderer,
     ValueNotifier<String> status, {
     SvgCache cache = defaultSvgCache,
     math.Random? random,
+    SvgShooterSnapshot? from,
   }) => renderer == SvgRenderer.flameSvg
-      ? FlameSvgShooterExample(status: status, cache: cache, random: random)
+      ? FlameSvgShooterExample(
+          status: status,
+          cache: cache,
+          random: random,
+          from: from,
+        )
       : RasterizerSvgShooterExample(
           status: status,
           renderer: renderer,
           random: random,
+          from: from,
         );
 
   static const description = '''
@@ -58,7 +75,9 @@ abstract class SvgShooterExample({required super.status, math.Random? random})
     Hundreds of SVGs are on screen at once, each with an SvgHitbox in the shape
     of its paths. The stars are sprites, and the explosions are particles. The
     other knobs zoom the camera and change the game's speed; with Flame SVG,
-    the cache knobs set flame_svg's cache. The health, the score and the number
+    the cache knobs set flame_svg's cache. Only a new renderer or cache makes
+    a new game. A new renderer's game goes on with the same score, spaceship,
+    enemies and missiles, from where they were. The health, the score and the number
     of components are at the bottom right. The bar under the game shows the
     renderer, the frame times and the renderer's own numbers.
 
@@ -66,6 +85,9 @@ abstract class SvgShooterExample({required super.status, math.Random? random})
   ''';
 
   final math.Random random = random ?? math.Random();
+
+  /// The snapshot that it goes on from, if any.
+  final SvgShooterSnapshot? _from = from;
 
   /// The player's SVG.
   late final ExampleSvg playerSvg;
@@ -90,7 +112,7 @@ abstract class SvgShooterExample({required super.status, math.Random? random})
   final explosionGroup = Component();
 
   late final PlayerComponent player;
-  final _enemyCreator = EnemyCreator();
+  final _enemyCreator = EnemyCreator(sinceWave: from?.sinceWave);
 
   /// The image that every star draws, once loaded.
   Image? _starImage;
@@ -203,11 +225,12 @@ abstract class SvgShooterExample({required super.status, math.Random? random})
     }
     _starImage = starImage;
     world.addAll([starGroup, missileGroup, enemyGroup, explosionGroup]);
-    world.add(player = PlayerComponent(playerSvg));
+    world.add(player = PlayerComponent(playerSvg, from: _from?.player));
     // Like StoryGame's FPS text, these go in the viewport, so that they're
     // drawn above the world and not zoomed.
     camera.viewport.addAll([_healthText, _scoreText, _componentCounter]);
     world.addAll([_enemyCreator, StarBackgroundCreator(starImage)]);
+    _restoreEnemiesAndMissiles();
     startStatus();
   }
 
@@ -363,6 +386,7 @@ class RasterizerSvgShooterExample({
   required super.status,
   @override required final SvgRenderer renderer,
   super.random,
+  super.from,
 }) extends SvgShooterExample
     with HasRasterizer, ExampleRasterizer, RasterizerSvgs {
   this {
@@ -376,6 +400,7 @@ class FlameSvgShooterExample({
   required super.status,
   final SvgCache cache = defaultSvgCache,
   super.random,
+  super.from,
 }) extends SvgShooterExample with FlameSvgs {
   @override
   SvgCacheMode get cacheMode => cache.mode;

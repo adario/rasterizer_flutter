@@ -34,24 +34,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'pump_while_loading.dart';
 import 'slow_bundle.dart';
 
-/// The Svg Shooter story with [renderer], at [zoom]. A seeded random makes
-/// the game repeat from run to run.
-Widget story(SvgRenderer renderer, {double zoom = 1}) => MaterialApp(
-  home: GameStory<SvgShooterExample, Never>(
-    renderer: renderer,
-    create: (status, _) =>
-        SvgShooterExample.of(renderer, status, random: math.Random(1)),
-    zoom: zoom,
-  ),
-);
+/// The Svg Shooter story with [renderer], at [zoom] and [speed]. A seeded
+/// random makes the game repeat from run to run.
+Widget story(SvgRenderer renderer, {double zoom = 1, double speed = 1}) =>
+    MaterialApp(
+      home: GameStory<SvgShooterExample, SvgShooterSnapshot>(
+        renderer: renderer,
+        create: (status, from) => SvgShooterExample.of(
+          renderer,
+          status,
+          random: math.Random(1),
+          from: from,
+        ),
+        snapshot: (game) => game.snapshot,
+        zoom: zoom,
+        speed: speed,
+      ),
+    );
 
 /// Pumps [story], and waits for its game and its stars to load.
 Future<SvgShooterExample> pumpGame(
   WidgetTester tester,
   SvgRenderer renderer, {
   double zoom = 1,
+  double speed = 1,
 }) async {
-  await tester.pumpWidget(story(renderer, zoom: zoom));
+  await tester.pumpWidget(story(renderer, zoom: zoom, speed: speed));
   final game = tester
       .widget<GameWidget<SvgShooterExample>>(
         find.byWidgetPredicate((w) => w is GameWidget),
@@ -759,6 +767,95 @@ void main() {
     expect(game.explosionGroup.children, isEmpty);
     await tester.pump(const Duration(milliseconds: 16));
     expectFirstWave(game, seconds: 0.016 * 1.5);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  // At speed 0, a new renderer's game shows the same score, player, enemies
+  // and missiles, where the old game's were, and hands the same snapshot on
+  // to the next game. Flame SVG is left out: flame_svg shares its loads
+  // between tests.
+  testWidgets('a new renderer goes on from the same score, player, enemies '
+      'and missiles', (tester) async {
+    var game = await pumpGame(tester, SvgRenderer.rasterizer);
+    final drag = await tester.startGesture(
+      tester.getCenter(find.byWidgetPredicate((w) => w is GameWidget)),
+    );
+    await drag.moveBy(const Offset(20, 0));
+    await pumpFrames(tester, 30);
+    await drag.up();
+    game.player.takeHit();
+    game.score = 7;
+    await tester.pumpWidget(story(SvgRenderer.rasterizer, speed: 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    final snapshot = game.snapshot;
+    expect(snapshot.player?.health, 98);
+    expect(snapshot.sinceWave, isNotNull);
+    expect(snapshot.enemies, isNotEmpty);
+    expect(snapshot.missiles, isNotEmpty);
+
+    for (final renderer in [
+      SvgRenderer.rasterizerCanvas,
+      SvgRenderer.rasterizer,
+    ]) {
+      final last = game;
+      game = await pumpGame(tester, renderer, speed: 0);
+      expect(game, isNot(same(last)));
+      await pumpFrames(tester, 2);
+      final next = game.snapshot;
+      expect(next.score, 7, reason: renderer.label);
+      expect(next.player, snapshot.player, reason: renderer.label);
+      expect(next.sinceWave, snapshot.sinceWave, reason: renderer.label);
+      expect(next.enemies, snapshot.enemies, reason: renderer.label);
+      expect(next.missiles, snapshot.missiles, reason: renderer.label);
+      expect(healthTextOf(game), 'Health: 98%');
+      expect(game.explosionGroup.children, isEmpty);
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("a new renderer goes on from the player's fade, and from Game "
+      'Over', (tester) async {
+    var game = await pumpGame(tester, SvgRenderer.rasterizer);
+    stopWaves(game);
+    for (var i = 0; i < 100 && game.player.health > 0; i++) {
+      game.player.takeHit();
+    }
+    // Up to 1 s after the last hit, half faded out.
+    await pumpFrames(tester, 61);
+    await tester.pumpWidget(story(SvgRenderer.rasterizer, speed: 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    RasterizerSvgComponent shipOf(SvgShooterExample game) =>
+        game.player.children.whereType<RasterizerSvgComponent>().single;
+    final faded = shipOf(game).opacity;
+    expect(faded, closeTo(0.5, 0.02));
+    final red = shipOf(game).paint.colorFilter;
+    expect(red, isNotNull);
+
+    // Without its explosion, as red and as faded as it was.
+    game = await pumpGame(tester, SvgRenderer.rasterizerCanvas, speed: 0);
+    final ship = shipOf(game);
+    expect(game.player.isDestroyed, isTrue);
+    expect(game.player.health, 0);
+    expect(game.explosionGroup.children, isEmpty);
+    expect(ship.opacity, closeTo(faded, 0.01));
+    expect(ship.paint.colorFilter, red);
+    expect(game.isGameOver, isFalse);
+
+    // The fade goes on in the world's time, and then the game is over.
+    await tester.pumpWidget(story(SvgRenderer.rasterizerCanvas));
+    await pumpFrames(tester, 70);
+    expect(game.isGameOver, isTrue);
+    expect(ship.opacity, 0);
+
+    // A new renderer's game is over too, and stands still.
+    game = await pumpGame(tester, SvgRenderer.rasterizer);
+    expect(game.isGameOver, isTrue);
+    expect(game.world.timeScale, 0);
+    expect(shipOf(game).opacity, 0);
+    expect(
+      game.camera.viewport.children.whereType<GameOverText>(),
+      hasLength(1),
+    );
     await tester.pumpWidget(const SizedBox());
   });
 

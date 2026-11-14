@@ -72,8 +72,10 @@ WidgetbookComponent gamesStories() {
 
 /// The Svg Shooter game for [renderer], over a status bar.
 ///
-/// A new renderer or flame_svg [cache] makes a new game, with new SVGs. A new
-/// [zoom] or [speed] changes the same game.
+/// A new renderer makes a new game, which goes on with the same score,
+/// spaceship, enemies and missiles, from where they were. A new flame_svg
+/// [cache] makes a new game, from the start. A new [zoom] or [speed] changes
+/// the same game.
 // The lint misses that its key isn't constant.
 // ignore: prefer_const_constructors_in_immutables
 class SvgShooterStory({
@@ -88,14 +90,15 @@ class SvgShooterStory({
   /// flame_svg's cache settings, for Flame SVG.
   final SvgCache cache = defaultSvgCache,
 }) extends StatelessWidget {
-  this : super(key: ValueKey((renderer, cache)));
+  this : super(key: ValueKey(cache));
 
   @override
   Widget build(BuildContext context) {
-    return GameStory<SvgShooterExample, Never>(
+    return GameStory<SvgShooterExample, SvgShooterSnapshot>(
       renderer: renderer,
-      create: (status, _) =>
-          SvgShooterExample.of(renderer, status, cache: cache),
+      create: (status, from) =>
+          SvgShooterExample.of(renderer, status, cache: cache, from: from),
+      snapshot: (game) => game.snapshot,
       zoom: zoom,
       speed: speed,
     );

@@ -7,7 +7,12 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_e
 /// The waves come a quarter less often than Rogue Shooter's. A game starts
 /// with the enemies that would be falling already in the top
 /// [firstWaveDepth] of the game, well above the player.
-class EnemyCreator() extends TimerComponent with HasGameRef<SvgShooterExample> {
+///
+/// Given [sinceWave], the seconds since the last wave in a game with another
+/// renderer, it goes on from there, without a first wave.
+class EnemyCreator({final double? sinceWave})
+    extends TimerComponent
+    with HasGameRef<SvgShooterExample> {
   /// Seconds from a wave to the next: a third longer than Rogue Shooter's
   /// 0.05, so that 75 enemies come each second, not 100.
   static const wavePeriod = 1 / 15;
@@ -24,7 +29,11 @@ class EnemyCreator() extends TimerComponent with HasGameRef<SvgShooterExample> {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    createFirstWave();
+    if (sinceWave case final since?) {
+      timer.update(since);
+    } else {
+      createFirstWave();
+    }
   }
 
   /// Adds the waves that would be falling already, down to [firstWaveDepth]
