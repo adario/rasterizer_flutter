@@ -19,9 +19,9 @@ share these knobs:
 - **Cache mode** and **Cache size**: flame_svg's image cache, shown with Flame SVG only. Tube Shooter, which draws no
   SVGs, doesn't have them.
 
-Zoom and Speed are continuous sliders, which show their values to two decimals. A new renderer makes a new game. So does
-a new cache, except in Svg Renderers, which loads its SVG again in the running game. The other knobs change the running
-game.
+Zoom and Speed are continuous sliders, which show their values to two decimals. A new renderer makes a new game, which
+goes on from where the old one was. So does a new cache, except in Svg Renderers, which loads its SVG again in the
+running game. The other knobs change the running game.
 
 The use cases other than Svg Renderers, Svg Shooter and Tube Shooter pick their SVGs at random from 14 of the 27
 (`randomSvgNames`, in `commons/svg_renderers.dart`). They leave out:
@@ -110,7 +110,7 @@ Its knobs pick:
   All the SVGs shrink again when too many wouldn't fit.
 - **Zoom**: the camera's zoom on the arena, whose walls stay put.
 - **Speed**: as above.
-- **Cache mode** and **Cache size**: as above. A new cache makes a new game.
+- **Cache mode** and **Cache size**: as above.
 
 The status bar adds the collisions so far. Hitboxes aren't drawn.
 
@@ -392,8 +392,9 @@ The status bar shows the paths made a second, after the renderer's numbers. Thin
 - `multiple_shapes_test.dart`: Multiple Shapes loads with each renderer and both shapes, with 15 shapes and a hitbox
   for each. An SVG's shapes share its path and one scene. A shape is tinted green on another and purple on a wall, all
   in one run, with both shapes. A new shape number adds shapes to the running game or removes some, resized. New shapes
-  make a new game, as does a new cache with Flame SVG. At speed 0, the shapes stand still. A shape wholly outside the
-  arena comes back in on the other side.
+  make a new game. A new cache with Flame SVG makes a new game with the same shapes, as does another renderer, which
+  hides the cache knobs. At speed 0, the shapes stand still. A shape wholly outside the arena comes back in on the other
+  side.
 - `forge2d_test.dart`: each SVG's convex pieces fit Box2D at each size. A tap drops 15 bodies, which stay inside the
   walls, the SVG bodies in one run, with Pieces on too. 130 games, one after another, have room for their Box2D worlds.
 - `svg_shooter_test.dart`: Svg Shooter loads with each renderer, with the player and each enemy hitboxed, and the

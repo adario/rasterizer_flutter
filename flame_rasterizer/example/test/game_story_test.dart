@@ -94,4 +94,35 @@ void main() {
     expect(last.count, greaterThan(count));
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('a new cache goes on from a snapshot', (tester) async {
+    final games = <_CountingGame>[];
+    Widget story(SvgCache cache) => MaterialApp(
+      home: GameStory<_CountingGame, int>(
+        renderer: SvgRenderer.flameSvg,
+        cache: cache,
+        create: (status, from) {
+          final game = _CountingGame(from, Future.value(), status: status);
+          games.add(game);
+          return game;
+        },
+        snapshot: (game) => game.count,
+      ),
+    );
+
+    await tester.pumpWidget(story(defaultSvgCache));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    final first = games.single;
+    expect(first.count, greaterThan(0));
+
+    await tester.pumpWidget(
+      story((mode: SvgCacheMode.fixed, size: SvgCacheSize.standard)),
+    );
+    expect(games, hasLength(2));
+    expect(first.isRemoved, isTrue);
+    expect(games.last.from, first.count);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

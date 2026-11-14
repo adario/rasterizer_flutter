@@ -50,9 +50,9 @@ WidgetbookComponent collisionDetectionStories() {
 
 /// The Multiple Shapes game for [settings], over a status bar.
 ///
-/// A new renderer makes a new game, which goes on with the same shapes, from
-/// where they were. New shapes or a new flame_svg [cache] make a new game,
-/// with new shapes. The other knobs change the same game.
+/// A new renderer or flame_svg [cache] makes a new game, which goes on with
+/// the same shapes, from where they were. New shapes make a new game, with
+/// new shapes. The other knobs change the same game.
 // The lint misses that its key isn't constant.
 // ignore: prefer_const_constructors_in_immutables
 class MultipleShapesStory({
@@ -67,12 +67,13 @@ class MultipleShapesStory({
   /// flame_svg's cache settings, for Flame SVG with SVGs.
   final SvgCache cache = defaultSvgCache,
 }) extends StatelessWidget {
-  this : super(key: ValueKey((settings.shapes, cache)));
+  this : super(key: ValueKey(settings.shapes));
 
   @override
   Widget build(BuildContext context) {
     return GameStory<MultipleShapesExample, MultipleShapesSnapshot>(
       renderer: settings.renderer,
+      cache: cache,
       create: (status, from) =>
           MultipleShapesExample.of(settings, status, cache: cache, from: from),
       snapshot: (game) => game.snapshot,

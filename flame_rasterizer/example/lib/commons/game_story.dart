@@ -7,12 +7,12 @@ import 'package:flutter/foundation.dart';
 /// Shows the game that [create] makes, over a status bar, zoomed to [zoom]
 /// and running at [speed].
 ///
-/// A new [renderer] makes a new game, from a snapshot of the old one that
-/// [snapshot] takes, so that it looks the same. A new [zoom] or [speed]
-/// changes the same game, as do the knobs that [update] passes to it. Give
-/// this widget a key made of whatever else needs a new game, which starts
-/// afresh. The game has the keyboard focus at the start, and a pointer down
-/// on it takes the focus back from the knobs.
+/// A new [renderer] or [cache] makes a new game, from a snapshot of the old
+/// one that [snapshot] takes, so that it looks the same. A new [zoom] or
+/// [speed] changes the same game, as do the knobs that [update] passes to
+/// it. Give this widget a key made of whatever else needs a new game, which
+/// starts afresh. The game has the keyboard focus at the start, and a
+/// pointer down on it takes the focus back from the knobs.
 class const GameStory<G extends StoryGame, S extends Object>({
   /// The renderer that the game draws with.
   required final SvgRenderer renderer,
@@ -21,8 +21,11 @@ class const GameStory<G extends StoryGame, S extends Object>({
   /// goes on from the snapshot it gets, if any.
   required final G Function(ValueNotifier<String> status, S? from) create,
 
-  /// Takes a snapshot of the game, for a new game with another renderer to go
-  /// on from. Without it, the new game starts afresh.
+  /// flame_svg's cache settings, for Flame SVG.
+  final SvgCache cache = defaultSvgCache,
+
+  /// Takes a snapshot of the game, for a new game with another renderer or
+  /// cache to go on from. Without it, the new game starts afresh.
   final S Function(G game)? snapshot,
 
   /// Passes the story's other knobs to the running game, each time the story
@@ -56,7 +59,8 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
   @override
   void didUpdateWidget(GameStory<G, S> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.renderer != oldWidget.renderer) {
+    if (widget.renderer != oldWidget.renderer ||
+        widget.cache != oldWidget.cache) {
       // The snapshot is taken here, as the old game is removed only after the
       // new one is built. A game that hasn't loaded yet hasn't gone on from
       // its snapshot either, so it hands that one on.

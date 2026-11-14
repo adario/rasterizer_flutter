@@ -32,12 +32,10 @@ WidgetbookComponent forge2dStories() {
 
 /// The Revolute Joint Svgs game for [settings], over a status bar.
 ///
-/// A new renderer makes a new game, with a new physics world, which goes on
-/// with the same bodies, from where they were. A new flame_svg [cache] makes
-/// a new game, with no bodies dropped. The other knobs change the same game.
-// The lint misses that its key isn't constant.
-// ignore: prefer_const_constructors_in_immutables
-class RevoluteJointSvgsStory({
+/// A new renderer or flame_svg [cache] makes a new game, with a new physics
+/// world, which goes on with the same bodies, from where they were. The other
+/// knobs change the same game.
+class const RevoluteJointSvgsStory({
   required final RevoluteJointSvgsSettings settings,
 
   /// The camera's zoom, on top of the world's 10 pixels a meter.
@@ -48,13 +46,13 @@ class RevoluteJointSvgsStory({
 
   /// flame_svg's cache settings, for Flame SVG.
   final SvgCache cache = defaultSvgCache,
+  super.key,
 }) extends StatelessWidget {
-  this : super(key: ValueKey(cache));
-
   @override
   Widget build(BuildContext context) {
     return GameStory<RevoluteJointSvgsExample, RevoluteJointSvgsSnapshot>(
       renderer: settings.renderer,
+      cache: cache,
       create: (status, from) => RevoluteJointSvgsExample.of(
         settings,
         status,

@@ -387,31 +387,40 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('a new cache makes a new game with Flame SVG', (tester) async {
+  testWidgets('a new cache goes on from where the shapes were', (
+    tester,
+  ) async {
     // With paths, which load no SVG with flame_svg: see the comment at the
-    // top of main. The story's key holds the cache with paths too, as with
-    // SVGs.
-    Widget cacheStory(SvgCache cache) => MaterialApp(
+    // top of main. The game gets the cache with paths too, as with SVGs.
+    Widget cacheStory(SvgRenderer renderer, SvgCache cache) => MaterialApp(
       home: MultipleShapesStory(
-        settings: (
-          renderer: SvgRenderer.flameSvg,
-          shapes: Shapes.paths,
-          count: 4,
-        ),
+        settings: (renderer: renderer, shapes: Shapes.paths, count: 4),
+        speed: 0,
         cache: cache,
       ),
     );
 
-    await tester.pumpWidget(cacheStory(defaultSvgCache));
-    final first = await loadGame(tester);
     await tester.pumpWidget(
-      cacheStory((mode: SvgCacheMode.fixed, size: SvgCacheSize.large)),
+      cacheStory(SvgRenderer.flameSvg, defaultSvgCache),
     );
+    final first = await loadGame(tester);
+    final snapshot = first.snapshot;
+    const cache = (mode: SvgCacheMode.fixed, size: SvgCacheSize.large);
+    await tester.pumpWidget(cacheStory(SvgRenderer.flameSvg, cache));
     final game = await loadGame(tester) as FlameMultipleShapesExample;
     expect(game, isNot(same(first)));
     expect(game.cacheMode, SvgCacheMode.fixed);
     expect(game.cacheSize, SvgCacheSize.large);
     expect(first.isAttached, isFalse);
+    expect(game.snapshot.shapes, snapshot.shapes);
+    // Another renderer hides the cache knobs, which then give the default
+    // cache. The game still goes on.
+    await tester.pumpWidget(
+      cacheStory(SvgRenderer.rasterizerCanvas, defaultSvgCache),
+    );
+    final next = await loadGame(tester);
+    expect(next, isNot(same(game)));
+    expect(next.snapshot.shapes, snapshot.shapes);
     await tester.pumpWidget(const SizedBox());
   });
 
