@@ -342,7 +342,7 @@ void main() {
         },
       );
       expect(
-        find.textContaining('flame_rasterizer, canvas (forced)'),
+        find.textContaining('canvas (forced)'),
         findsOneWidget,
       );
       await tester.pumpWidget(const SizedBox());
@@ -355,9 +355,9 @@ void main() {
   // test's fake time doesn't run another test's loads.
   var nextSvg = 0;
   for (final (renderer, status) in [
-    (SvgRenderer.rasterizer, 'flame_rasterizer, canvas (noImpeller)'),
-    (SvgRenderer.rasterizerAtlas, 'flame_rasterizer, canvas (noImpeller)'),
-    (SvgRenderer.rasterizerCanvas, 'flame_rasterizer, canvas (forced)'),
+    (SvgRenderer.rasterizer, 'canvas (noImpeller)'),
+    (SvgRenderer.rasterizerAtlas, 'canvas (noImpeller)'),
+    (SvgRenderer.rasterizerCanvas, 'canvas (forced)'),
     (SvgRenderer.flameSvg, 'flame_svg'),
   ]) {
     for (final fade in [false, true]) {

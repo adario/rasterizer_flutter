@@ -23,9 +23,9 @@ Future<void> settleRenderer(WidgetTester tester, SvgRenderer renderer) async {
 String rendererStatus(SvgRenderer renderer) => switch (renderer) {
   SvgRenderer.rasterizer || SvgRenderer.rasterizerAtlas =>
     renderer.supported
-        ? 'flame_rasterizer, ${renderer.text} · '
-        : 'flame_rasterizer, canvas '
+        ? '${renderer.text} · '
+        : 'canvas '
               '(${RasterizerGpu.of(renderer.gpu).support.name}) · ',
-  SvgRenderer.rasterizerCanvas => 'flame_rasterizer, canvas (forced) · ',
+  SvgRenderer.rasterizerCanvas => 'canvas (forced) · ',
   SvgRenderer.flameSvg => 'flame_svg · ',
 };

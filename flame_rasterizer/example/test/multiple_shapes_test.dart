@@ -87,13 +87,13 @@ void main() {
     (
       SvgRenderer.rasterizer,
       Shapes.svgs,
-      'flame_rasterizer, canvas (noImpeller)',
+      'canvas (noImpeller)',
     ),
     (SvgRenderer.flameSvg, Shapes.svgs, 'flame_svg'),
     (
       SvgRenderer.rasterizer,
       Shapes.paths,
-      'flame_rasterizer, canvas (noImpeller)',
+      'canvas (noImpeller)',
     ),
     (SvgRenderer.flameSvg, Shapes.paths, "Flame's PathComponent"),
   ]) {

@@ -372,7 +372,7 @@ void main() {
   });
 
   for (final (renderer, status) in [
-    (SvgRenderer.rasterizer, 'flame_rasterizer, canvas (noImpeller)'),
+    (SvgRenderer.rasterizer, 'canvas (noImpeller)'),
     (SvgRenderer.flameSvg, "Flame's PathComponent"),
   ]) {
     testWidgets('the game loads with ${renderer.label}, and zooms in, the '

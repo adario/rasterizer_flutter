@@ -230,19 +230,16 @@ mixin ExampleRasterizer<W extends World> on StoryGame<W>, HasRasterizer<W> {
   @override
   RasterizerBackend get rasterizerGpu => renderer.gpu;
 
-  /// flame_rasterizer and the renderer's entry. With the canvas renderer, it
-  /// says whether the knob forced it, or else why the GPU renderer doesn't
-  /// run.
+  /// The renderer's entry. With the canvas renderer, it says whether the knob
+  /// forced it, or else why the GPU renderer doesn't run.
   @override
   String get rendererText {
     final gpu = RasterizerGpu.of(rasterizerGpu);
     final backend = rasterizer?.backend ?? gpu.backend;
     if (backend != RasterizerBackend.canvas) {
-      return 'flame_rasterizer, ${renderer.text}';
+      return renderer.text;
     }
-    return forceCanvas
-        ? 'flame_rasterizer, canvas (forced)'
-        : 'flame_rasterizer, canvas (${gpu.support.name})';
+    return forceCanvas ? 'canvas (forced)' : 'canvas (${gpu.support.name})';
   }
 
   /// The frame's runs (see [RasterizerCanvas]) and entries.
