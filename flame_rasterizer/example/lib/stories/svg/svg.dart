@@ -108,8 +108,9 @@ class const SvgRenderersStory({
 
 /// The Collidable Svgs game for [settings], over a status bar.
 ///
-/// A new renderer or flame_svg [cache] makes a new game, with new SVGs. The
-/// other knobs change the same game.
+/// A new renderer makes a new game, which goes on with the same SVGs, from
+/// where they were. A new flame_svg [cache] makes a new game, with new SVGs.
+/// The other knobs change the same game.
 // The lint misses that its key isn't constant.
 // ignore: prefer_const_constructors_in_immutables
 class CollidableSvgsStory({
@@ -124,14 +125,15 @@ class CollidableSvgsStory({
   /// flame_svg's cache settings, for Flame SVG.
   final SvgCache cache = defaultSvgCache,
 }) extends StatelessWidget {
-  this : super(key: ValueKey((settings.renderer, cache)));
+  this : super(key: ValueKey(cache));
 
   @override
   Widget build(BuildContext context) {
-    return GameStory<CollidableSvgsExample, Never>(
+    return GameStory<CollidableSvgsExample, CollidableSvgsSnapshot>(
       renderer: settings.renderer,
-      create: (status, _) =>
-          CollidableSvgsExample.of(settings, status, cache: cache),
+      create: (status, from) =>
+          CollidableSvgsExample.of(settings, status, cache: cache, from: from),
+      snapshot: (game) => game.snapshot,
       update: (game) => game.count = settings.count,
       zoom: zoom,
       speed: speed,

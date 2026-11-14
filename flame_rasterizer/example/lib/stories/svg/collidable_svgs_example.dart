@@ -8,6 +8,8 @@ import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flutter/widgets.dart';
 
+part 'collidable_svgs_snapshot.dart';
+
 /// The values of the example's knobs, except Zoom, Speed and the cache knobs.
 typedef CollidableSvgsSettings = ({SvgRenderer renderer, int count});
 
@@ -17,30 +19,37 @@ typedef CollidableSvgsSettings = ({SvgRenderer renderer, int count});
 /// The walls are an [arena] of the game's size, centred on the world's
 /// origin. The status adds the collisions so far to [ExampleGame]'s.
 /// Subclasses pick what loads and draws the SVGs: see [ExampleSvgs].
+///
+/// Given the snapshot of a game with another renderer, it goes on from there,
+/// with the same SVGs: see [CollidableSvgsSnapshots].
 abstract class CollidableSvgsExample({
   required var int _count,
   required super.status,
   math.Random? random,
+  CollidableSvgsSnapshot? from,
 }) extends ExampleGame with ExampleSvgs, HasCollisionDetection {
   /// Creates the game for [settings]' renderer, with flame_svg's [cache] for
-  /// Flame SVG.
+  /// Flame SVG, which goes on from [from], if any.
   factory CollidableSvgsExample.of(
     CollidableSvgsSettings settings,
     ValueNotifier<String> status, {
     SvgCache cache = defaultSvgCache,
     math.Random? random,
+    CollidableSvgsSnapshot? from,
   }) => settings.renderer == SvgRenderer.flameSvg
       ? FlameSvgCollidableExample(
           count: settings.count,
           status: status,
           cache: cache,
           random: random,
+          from: from,
         )
       : RasterizerCollidableExample(
           count: settings.count,
           status: status,
           renderer: settings.renderer,
           random: random,
+          from: from,
         );
 
   static const description = '''
@@ -52,8 +61,9 @@ abstract class CollidableSvgsExample({
 
     The knobs pick the renderer and the SVG number, zoom the camera and change
     the SVGs' speed. With Flame SVG, the cache knobs set flame_svg's cache.
-    Only a new renderer or cache makes a new game. The bar under the game
-    shows the renderer, the frame times, the renderer's own numbers and the
+    Only a new renderer or cache makes a new game. A new renderer's game goes
+    on with the same SVGs, from where they were. The bar under the game shows
+    the renderer, the frame times, the renderer's own numbers and the
     collisions so far.
 
     Based on flame_path_shapes' CollidableSvgPathsExample.
@@ -73,6 +83,9 @@ abstract class CollidableSvgsExample({
   static const _cover = 0.25;
 
   final math.Random random = random ?? math.Random();
+
+  /// The snapshot that it goes on from, if any.
+  final CollidableSvgsSnapshot? _from = from;
 
   /// The SVG Number knob's value. A new value changes the running game: it
   /// adds SVGs where there's room, or removes the last ones, and shrinks them
@@ -121,9 +134,11 @@ abstract class CollidableSvgsExample({
   @override
   Future<void> onLoad() async {
     _started = true;
+    _restorePicks();
     arena = CollidableArena(size: size.clone());
     world.add(arena);
     await _apply();
+    _restoreSvgs();
     startStatus();
   }
 
@@ -402,6 +417,7 @@ class RasterizerCollidableExample({
   required super.status,
   @override required final SvgRenderer renderer,
   super.random,
+  super.from,
 }) extends CollidableSvgsExample
     with HasRasterizer, ExampleRasterizer, RasterizerSvgs {
   this {
@@ -416,6 +432,7 @@ class FlameSvgCollidableExample({
   required super.status,
   final SvgCache cache = defaultSvgCache,
   super.random,
+  super.from,
 }) extends CollidableSvgsExample with FlameSvgs {
   @override
   SvgCacheMode get cacheMode => cache.mode;

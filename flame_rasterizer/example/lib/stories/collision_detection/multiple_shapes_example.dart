@@ -12,6 +12,8 @@ import 'package:flame_rasterizer_example/stories/svg/collidable_svgs_example.dar
     show CollidableArena;
 import 'package:flutter/widgets.dart';
 
+part 'multiple_shapes_snapshot.dart';
+
 /// The values of the example's knobs, except Zoom, Speed and the cache knobs.
 typedef MultipleShapesSettings = ({
   SvgRenderer renderer,
@@ -36,19 +38,24 @@ enum Shapes(final String label) {
 /// arena is a rectangle of the game's size, centred on the world's origin.
 /// The shapes are the SVGs, or their outlines, as [shapes] says. The status
 /// adds the shapes and those colliding now to [ExampleGame]'s.
+///
+/// Given the snapshot of a game with another renderer, it goes on from there,
+/// with the same shapes: see [MultipleShapesSnapshots].
 abstract class MultipleShapesExample({
   required final Shapes shapes,
   required var int _count,
   required super.status,
   math.Random? random,
+  MultipleShapesSnapshot? from,
 }) extends ExampleGame with ExampleSvgs, HasCollisionDetection {
   /// Creates the game for [settings]' renderer and shapes, with flame_svg's
-  /// [cache] for Flame SVG.
+  /// [cache] for Flame SVG, which goes on from [from], if any.
   factory MultipleShapesExample.of(
     MultipleShapesSettings settings,
     ValueNotifier<String> status, {
     SvgCache cache = defaultSvgCache,
     math.Random? random,
+    MultipleShapesSnapshot? from,
   }) => settings.renderer == SvgRenderer.flameSvg
       ? FlameMultipleShapesExample(
           shapes: settings.shapes,
@@ -56,6 +63,7 @@ abstract class MultipleShapesExample({
           status: status,
           cache: cache,
           random: random,
+          from: from,
         )
       : RasterizerMultipleShapesExample(
           shapes: settings.shapes,
@@ -63,6 +71,7 @@ abstract class MultipleShapesExample({
           status: status,
           renderer: settings.renderer,
           random: random,
+          from: from,
         );
 
   static const description = '''
@@ -82,9 +91,10 @@ abstract class MultipleShapesExample({
 
     The other knobs pick the shape number, zoom the camera and change the
     game's speed. With Flame SVG and SVGs, the cache knobs set flame_svg's
-    cache. Only a new renderer, new shapes or a new cache make a new game. The
-    bar under the game shows the renderer, the frame times, the renderer's
-    own numbers, the shapes and those colliding now.
+    cache. Only a new renderer, new shapes or a new cache make a new game. A
+    new renderer's game goes on with the same shapes, from where they were.
+    The bar under the game shows the renderer, the frame times, the
+    renderer's own numbers, the shapes and those colliding now.
 
     Based on Flame's MultipleShapesExample.
   ''';
@@ -119,6 +129,9 @@ abstract class MultipleShapesExample({
   static const _strokeShare = 1 / 50;
 
   final math.Random random = random ?? math.Random();
+
+  /// The snapshot that it goes on from, if any.
+  final MultipleShapesSnapshot? _from = from;
 
   /// The Shape Number knob's value, the snowman aside.
   ///
@@ -210,7 +223,9 @@ abstract class MultipleShapesExample({
       velocity: Vector2(-100, 100),
     );
     world.add(snowman);
+    _restorePicks();
     _fit();
+    _restoreCollidables();
     _laidOut = true;
     startStatus();
   }
@@ -368,7 +383,7 @@ abstract class MovingCollidable({
   required super.position,
   required super.size,
   required final Vector2 velocity,
-  required final double rotationSpeed,
+  required var double rotationSpeed,
   super.anchor = Anchor.center,
 }) extends PositionComponent
     with DragCallbacks, CollisionCallbacks, GestureHitboxes {
@@ -681,6 +696,7 @@ class RasterizerMultipleShapesExample({
   required super.status,
   @override required final SvgRenderer renderer,
   super.random,
+  super.from,
 }) extends MultipleShapesExample
     with HasRasterizer, ExampleRasterizer, RasterizerSvgs {
   this {
@@ -707,6 +723,7 @@ class FlameMultipleShapesExample({
   required super.status,
   final SvgCache cache = defaultSvgCache,
   super.random,
+  super.from,
 }) extends MultipleShapesExample with FlameSvgs {
   @override
   SvgCacheMode get cacheMode => cache.mode;

@@ -19,20 +19,23 @@ import 'pump_while_loading.dart';
 /// The Multiple Shapes story with [renderer] and [count] shapes of the kind
 /// [shapes], at [speed]. A seeded random picks the shapes.
 ///
-/// The story keeps the same game for a new [count].
+/// The story keeps the same game for a new [count]. A new renderer makes a new
+/// game, which goes on from the old one's snapshot.
 Widget story(
   SvgRenderer renderer, {
   Shapes shapes = Shapes.svgs,
   int count = 15,
   double speed = 1,
 }) => MaterialApp(
-  home: GameStory<MultipleShapesExample, Never>(
+  home: GameStory<MultipleShapesExample, MultipleShapesSnapshot>(
     renderer: renderer,
-    create: (status, _) => MultipleShapesExample.of(
+    create: (status, from) => MultipleShapesExample.of(
       (renderer: renderer, shapes: shapes, count: count),
       status,
       random: math.Random(1),
+      from: from,
     ),
+    snapshot: (game) => game.snapshot,
     update: (game) => game.count = count,
     speed: speed,
   ),
@@ -309,7 +312,53 @@ void main() {
     });
   }
 
-  testWidgets('new shapes make a new game, as a new renderer does', (
+  // At speed 0, a new renderer's game shows the same shapes, where the old
+  // game's were, and hands the same snapshot on to the next game. Paths load
+  // nothing with flame_svg, so they can switch to Flame SVG: see the comment
+  // at the top of main.
+  for (final (shapes, renderers) in [
+    (
+      Shapes.svgs,
+      [SvgRenderer.rasterizerCanvas, SvgRenderer.rasterizer],
+    ),
+    (
+      Shapes.paths,
+      [SvgRenderer.flameSvg, SvgRenderer.rasterizerCanvas],
+    ),
+  ]) {
+    testWidgets('a new renderer goes on from where the ${shapes.label} were', (
+      tester,
+    ) async {
+      var game = await pumpGame(tester, SvgRenderer.rasterizer, shapes: shapes);
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pumpWidget(
+        story(SvgRenderer.rasterizer, shapes: shapes, speed: 0),
+      );
+      await tester.pump(const Duration(milliseconds: 16));
+      final snapshot = game.snapshot;
+      expect(snapshot.shapes, hasLength(15));
+      for (final renderer in renderers) {
+        final next = await pumpGame(tester, renderer, shapes: shapes, speed: 0);
+        expect(next, isNot(same(game)));
+        expect(game.isAttached, isFalse);
+        await tester.pump(const Duration(milliseconds: 16));
+        final nextSnapshot = next.snapshot;
+        expect(nextSnapshot.picks, snapshot.picks);
+        expect(nextSnapshot.snowman, snapshot.snowman);
+        expect(nextSnapshot.shapes, snapshot.shapes);
+        expect(
+          [for (final shape in next.tintedShapes) shape.size],
+          [for (final shape in game.tintedShapes) shape.size],
+        );
+        game = next;
+      }
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  testWidgets('new shapes make a new game', (
     tester,
   ) async {
     Widget shapesStory(Shapes shapes, {int count = 4}) => MaterialApp(

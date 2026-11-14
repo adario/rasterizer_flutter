@@ -16,16 +16,19 @@ import 'slow_bundle.dart';
 /// The Collidable Svgs story with [renderer] and [count] SVGs, picked with a
 /// seeded random, at [speed].
 ///
-/// A new count changes the same game.
+/// A new count changes the same game. A new renderer makes a new game, which
+/// goes on from the old one's snapshot.
 Widget story(SvgRenderer renderer, {int count = 4, double speed = 1}) =>
     MaterialApp(
-      home: GameStory<CollidableSvgsExample, Never>(
+      home: GameStory<CollidableSvgsExample, CollidableSvgsSnapshot>(
         renderer: renderer,
-        create: (status, _) => CollidableSvgsExample.of(
+        create: (status, from) => CollidableSvgsExample.of(
           (renderer: renderer, count: count),
           status,
           random: math.Random(1),
+          from: from,
         ),
+        snapshot: (game) => game.snapshot,
         update: (game) => game.count = count,
         speed: speed,
       ),
@@ -194,6 +197,44 @@ void main() {
     expect(game.svgs, kept.take(2));
     expect(game.world.children.whereType<CollidableSvg>(), hasLength(2));
     expect(first.size.x, width);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  // At speed 0, a new renderer's game shows the same SVGs, where the old
+  // game's were, and hands the same snapshot on to the next game.
+  testWidgets('a new renderer goes on from where the SVGs were', (
+    tester,
+  ) async {
+    var game = await pumpGame(tester, SvgRenderer.rasterizer, count: 12);
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await tester.pumpWidget(
+      story(SvgRenderer.rasterizer, count: 12, speed: 0),
+    );
+    await tester.pump(const Duration(milliseconds: 16));
+    final snapshot = game.snapshot;
+    expect(snapshot.svgs, hasLength(12));
+    for (final renderer in [
+      SvgRenderer.rasterizerCanvas,
+      SvgRenderer.rasterizerAtlas,
+      SvgRenderer.rasterizer,
+    ]) {
+      final next = await pumpGame(tester, renderer, count: 12, speed: 0);
+      expect(next, isNot(same(game)));
+      expect(game.isAttached, isFalse);
+      await tester.pump(const Duration(milliseconds: 16));
+      final nextSnapshot = next.snapshot;
+      expect(nextSnapshot.names, snapshot.names);
+      expect(nextSnapshot.widths, snapshot.widths);
+      expect(nextSnapshot.svgs, snapshot.svgs);
+      expect(nextSnapshot.collisions, snapshot.collisions);
+      expect(
+        [for (final svg in next.svgs) svg.size],
+        [for (final svg in game.svgs) svg.size],
+      );
+      game = next;
+    }
     await tester.pumpWidget(const SizedBox());
   });
 
