@@ -196,7 +196,7 @@ class CanvasFrame._(final CanvasRenderer _renderer) implements RasterizerFrame {
 }
 
 /// A canvas renderer's run: [draw] draws its entries, transformed and clipped
-/// to the viewport.
+/// to the viewport, and skips those that paint nothing in it.
 class CanvasRun._(final CanvasFrame _frame, @override final int index)
     extends RasterizerRun {
   // The entries' scenes, and their transforms, 9 values each:
@@ -332,7 +332,8 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     // CanvasKit drops some pictures drawn near this clip's edge, though they
     // lie inside it, so it draws without it, as Flame's components do. A
     // WebAssembly build draws with skwasm, which draws them.
-    if (!kIsWeb || kIsWasm) {
+    final clipped = !kIsWeb || kIsWasm;
+    if (clipped) {
       canvas.clipRect(
         ui.Rect.fromLTWH(
           0,
@@ -342,8 +343,18 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
         ),
       );
     }
+    // Entries that paint nothing in the viewport are skipped, as the clip
+    // would hide them. Without the clip, they're skipped unless the paint can
+    // spread them into the viewport.
+    final skips =
+        clipped ||
+        paint == null ||
+        (paint.imageFilter == null && paint.maskFilter == null);
     final m = _matrix;
     for (var i = 0; i < _count; i++) {
+      if (skips && _missesViewport(i)) {
+        continue;
+      }
       final k = 9 * i;
       m
         ..[0] = _ctms[k]
@@ -384,49 +395,14 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     }
     double left = double.infinity, top = left, right = -left, bottom = -left;
     for (var i = 0; i < _count; i++) {
-      final s = _scenes[i].paintedBounds;
-      if (s.isEmpty) {
+      if (_scenes[i].paintedBounds.isEmpty) {
         continue;
       }
-      final k = 9 * i;
-      final a = _ctms[k], b = _ctms[k + 1], c = _ctms[k + 2], d = _ctms[k + 3];
-      final g = _ctms[k + 6], h = _ctms[k + 7], w = _ctms[k + 8];
-      if (g != 0 || h != 0 || w != 1) {
-        // The projected corners, if all are in front of the eye, else the
-        // viewport.
-        for (final (x, y) in [
-          (s.left, s.top),
-          (s.right, s.top),
-          (s.left, s.bottom),
-          (s.right, s.bottom),
-        ]) {
-          final q = g * x + h * y + w;
-          if (!(q > 0)) {
-            left = min(left, 0);
-            top = min(top, 0);
-            right = max(right, _frame.width.toDouble());
-            bottom = max(bottom, _frame.height.toDouble());
-            break;
-          }
-          final px = (a * x + c * y + _ctms[k + 4]) / q,
-              py = (b * x + d * y + _ctms[k + 5]) / q;
-          left = min(left, px);
-          right = max(right, px);
-          top = min(top, py);
-          bottom = max(bottom, py);
-        }
-        continue;
-      }
-      // Each corner's x' and y' are sums of a term in x and a term in y, so
-      // their extremes are the sums of each term's extremes.
-      final ax0 = a * s.left, ax1 = a * s.right;
-      final cy0 = c * s.top, cy1 = c * s.bottom;
-      final bx0 = b * s.left, bx1 = b * s.right;
-      final dy0 = d * s.top, dy1 = d * s.bottom;
-      left = min(left, min(ax0, ax1) + min(cy0, cy1) + _ctms[k + 4]);
-      right = max(right, max(ax0, ax1) + max(cy0, cy1) + _ctms[k + 4]);
-      top = min(top, min(bx0, bx1) + min(dy0, dy1) + _ctms[k + 5]);
-      bottom = max(bottom, max(bx0, bx1) + max(dy0, dy1) + _ctms[k + 5]);
+      final (l, t, r, b) = _paintedInViewport(i);
+      left = min(left, l);
+      top = min(top, t);
+      right = max(right, r);
+      bottom = max(bottom, b);
     }
     if (left > right) {
       return ui.Rect.zero;
@@ -436,6 +412,64 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
       (top - 1) / scale,
       (right + 1) / scale,
       (bottom + 1) / scale,
+    );
+  }
+
+  /// Whether entry [i] paints nothing within a device pixel of the viewport,
+  /// or its bounds are NaN.
+  bool _missesViewport(int i) {
+    final (left, top, right, bottom) = _paintedInViewport(i);
+    return !(right > -1 &&
+        bottom > -1 &&
+        left < _frame.width + 1 &&
+        top < _frame.height + 1);
+  }
+
+  /// The bounds of what entry [i] can paint, in the viewport, as left, top,
+  /// right and bottom.
+  ///
+  /// With a corner behind the eye, they take in the viewport too.
+  (double, double, double, double) _paintedInViewport(int i) {
+    final s = _scenes[i].paintedBounds;
+    final k = 9 * i;
+    final a = _ctms[k], b = _ctms[k + 1], c = _ctms[k + 2], d = _ctms[k + 3];
+    final tx = _ctms[k + 4], ty = _ctms[k + 5];
+    final g = _ctms[k + 6], h = _ctms[k + 7], w = _ctms[k + 8];
+    if (g != 0 || h != 0 || w != 1) {
+      double left = double.infinity, top = left, right = -left, bottom = -left;
+      for (final (x, y) in [
+        (s.left, s.top),
+        (s.right, s.top),
+        (s.left, s.bottom),
+        (s.right, s.bottom),
+      ]) {
+        final q = g * x + h * y + w;
+        if (!(q > 0)) {
+          left = min(left, 0);
+          top = min(top, 0);
+          right = max(right, _frame.width.toDouble());
+          bottom = max(bottom, _frame.height.toDouble());
+          continue;
+        }
+        final px = (a * x + c * y + tx) / q, py = (b * x + d * y + ty) / q;
+        left = min(left, px);
+        right = max(right, px);
+        top = min(top, py);
+        bottom = max(bottom, py);
+      }
+      return (left, top, right, bottom);
+    }
+    // Each corner's x' and y' are sums of a term in x and a term in y, so
+    // their extremes are the sums of each term's extremes.
+    final ax0 = a * s.left, ax1 = a * s.right;
+    final cy0 = c * s.top, cy1 = c * s.bottom;
+    final bx0 = b * s.left, bx1 = b * s.right;
+    final dy0 = d * s.top, dy1 = d * s.bottom;
+    return (
+      min(ax0, ax1) + min(cy0, cy1) + tx,
+      min(bx0, bx1) + min(dy0, dy1) + ty,
+      max(ax0, ax1) + max(cy0, cy1) + tx,
+      max(bx0, bx1) + max(dy0, dy1) + ty,
     );
   }
 }

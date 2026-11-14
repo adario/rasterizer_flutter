@@ -380,10 +380,13 @@ everywhere, for scenes and renderers created after it's set.
   the same `viewBox`, `bounds` and coordinates as the core's, so the same transforms place both renderers' output in
   the same place.
 - **Drawing:** a run draws its entries when it's drawn (`RasterizerRun.draw`), each with its transform, clipped to the
-  viewport, except with CanvasKit, on the web, which dropped some entries near the clip's edge. There's no atlas, no
-  image, and nothing to render, so a frame's timings and `pageSizes` are empty, and a run has no `parts`. A canvas run
-  draws its entries as they are when it's drawn, so only until the next `beginFrame`. Each scene is recorded once as a
-  `Picture`, and drawn with `drawPicture`, which halved the UI thread's time in a benchmark.
+  viewport, except with CanvasKit, on the web, which dropped some entries near the clip's edge. It skips the entries
+  that paint nothing in the viewport, strokes included. In an example zoomed in on 455 SVGs, 21 of them in view, that
+  saved 1 ms of a frame's UI thread on macOS, and 2 ms of 7.5 on the web's main thread, with CanvasKit. Without the
+  clip, it skips them only if the run's paint has no image or mask filter, which could spread them into the viewport.
+  There's no atlas, no image, and nothing to render, so a frame's timings and `pageSizes` are empty, and a run has no
+  `parts`. A canvas run draws its entries as they are when it's drawn, so only until the next `beginFrame`. Each scene
+  is recorded once as a `Picture`, and drawn with `drawPicture`, which halved the UI thread's time in a benchmark.
   `RasterizerGpu.canvasPictures = false` draws its paths instead.
 - **What it draws, as the core does:** paths, filled and stroked, with caps, joins, miter limits and dashes, even-odd
   fills, and linear and radial gradients.
