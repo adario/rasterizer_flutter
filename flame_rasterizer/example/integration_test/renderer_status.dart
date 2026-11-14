@@ -16,13 +16,14 @@ Future<void> settleRenderer(WidgetTester tester, SvgRenderer renderer) async {
 
 /// The start of the status of a game with [renderer].
 ///
-/// With flame_rasterizer's GPU renderers, it names the renderer asked for
-/// wherever that's supported, so that a fallback to the canvas renderer
-/// fails the test. Elsewhere it names the canvas renderer, and why.
+/// With flame_rasterizer's GPU renderers, it names the renderer asked for,
+/// with its graphics API, wherever that's supported, so that a fallback to
+/// the canvas renderer fails the test. Elsewhere it names the canvas
+/// renderer, and why.
 String rendererStatus(SvgRenderer renderer) => switch (renderer) {
   SvgRenderer.rasterizer || SvgRenderer.rasterizerAtlas =>
     renderer.supported
-        ? 'flame_rasterizer, ${renderer.label} · '
+        ? 'flame_rasterizer, ${renderer.text} · '
         : 'flame_rasterizer, canvas '
               '(${RasterizerGpu.of(renderer.gpu).support.name}) · ',
   SvgRenderer.rasterizerCanvas => 'flame_rasterizer, canvas (forced) · ',
