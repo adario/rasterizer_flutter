@@ -89,13 +89,17 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Flame doesn't clip the game, so components drawn outside it would
+        // paint over the widgets around it.
         Expanded(
-          child: Listener(
-            onPointerDown: (_) => _focusNode.requestFocus(),
-            child: GameWidget<G>(
-              key: ObjectKey(_game),
-              game: _game,
-              focusNode: _focusNode,
+          child: ClipRect(
+            child: Listener(
+              onPointerDown: (_) => _focusNode.requestFocus(),
+              child: GameWidget<G>(
+                key: ObjectKey(_game),
+                game: _game,
+                focusNode: _focusNode,
+              ),
             ),
           ),
         ),
