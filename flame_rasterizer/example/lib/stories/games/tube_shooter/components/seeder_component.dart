@@ -8,11 +8,25 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// It climbs its lane up to the level's `seederTurn`, growing the lane's
 /// spike behind it. Then it goes back down, and climbs another lane. It points
 /// away from the tube's axis, with its tail along the spike.
-class SeederComponent({required super.lane, required super.depth})
-    extends EnemyComponent {
+class SeederComponent({
+  required super.lane,
+  required super.depth,
+  super.from,
+}) extends EnemyComponent {
   this : super(EnemyKind.seeder);
 
   bool _descending = false;
+
+  @override
+  Future<void> onLoad() async {
+    if (from?.own case (:final bool descending)) {
+      _descending = descending;
+    }
+    await super.onLoad();
+  }
+
+  @override
+  Record get ownSnapshot => (descending: _descending);
 
   @override
   void move(double dt) {

@@ -114,12 +114,11 @@ String _levelName(int index) => levels[index].tube.name;
 
 /// The Tube Shooter game for [renderer], over a status bar.
 ///
-/// A new renderer makes a new game, at [firstLevel]. So does a new
-/// [firstLevel], unless it's the round's level, which the game reports to
-/// [onLevel]. The other knobs change the same game.
-// The lint misses that its key isn't constant.
-// ignore: prefer_const_constructors_in_immutables
-class TubeShooterStory({
+/// A new renderer makes a new game, which goes on with the same round, ship,
+/// enemies and shots, from where they were. A new [firstLevel] makes a new
+/// game at that level, unless it's the round's level, which the game reports
+/// to [onLevel]. The other knobs change the same game.
+class const TubeShooterStory({
   required final SvgRenderer renderer,
 
   /// The level that a new game starts at.
@@ -143,9 +142,8 @@ class TubeShooterStory({
 
   /// The game's speed, from 0, which stands still, to 2.
   final double speed = 1,
+  super.key,
 }) extends StatefulWidget {
-  this : super(key: ValueKey(renderer));
-
   @override
   State<TubeShooterStory> createState() => _TubeShooterStoryState();
 }
@@ -175,19 +173,21 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
 
   @override
   Widget build(BuildContext context) {
-    return GameStory<TubeShooterExample, Never>(
+    return GameStory<TubeShooterExample, TubeShooterSnapshot>(
       key: ValueKey(_game),
       renderer: widget.renderer,
-      create: (status, _) =>
+      create: (status, from) =>
           TubeShooterExample.of(
               widget.renderer,
               status,
               firstLevel: widget.firstLevel,
+              from: from,
             )
             ..driftingStars = widget.driftingStars
             ..glow = widget.glow
             ..sound = widget.sound
             ..onLevel = _onLevel,
+      snapshot: (game) => game.snapshot,
       update: (game) => game
         ..driftingStars = widget.driftingStars
         ..glow = widget.glow

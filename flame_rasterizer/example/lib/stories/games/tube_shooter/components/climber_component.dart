@@ -7,8 +7,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 ///
 /// Now and then, it flips onto a neighbouring lane. At the rim, it flips
 /// toward the ship, and destroys it once in the ship's lane.
-class ClimberComponent({required super.lane, required super.depth})
-    extends EnemyComponent {
+class ClimberComponent({
+  required super.lane,
+  required super.depth,
+  super.from,
+}) extends EnemyComponent {
   this : super(EnemyKind.climber);
 
   /// Seconds until it flips, at the first round's pace.
@@ -20,10 +23,18 @@ class ClimberComponent({required super.lane, required super.depth})
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    if (from?.own case (:final double untilFlip, :final double untilFire)) {
+      _untilFlip = untilFlip;
+      _untilFire = untilFire;
+      return;
+    }
     final level = gameRef.level;
     _untilFlip = between(level.flipPeriod);
     _untilFire = between(level.firePeriod);
   }
+
+  @override
+  Record get ownSnapshot => (untilFlip: _untilFlip, untilFire: _untilFire);
 
   @override
   bool destroysShip(int shipLane) =>

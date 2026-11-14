@@ -2,17 +2,33 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+
+/// What the ship in a game for another renderer goes on from: its step and
+/// the fraction of a step past it, its depth, the seconds since its last
+/// shot, whether it's visible, and how faded out it is.
+typedef PlayerSnapshot = ({
+  int step,
+  double partStep,
+  double depth,
+  double sinceShot,
+  bool isVisible,
+  double opacity,
+});
 
 /// The ship, which moves round the rim and fires down its lane.
 ///
 /// It moves round the tube in [stepsPerLane] steps a lane. While firing, it
 /// fires a shot every [firePeriod] seconds, with at most [maxShots] in the
 /// tube. Its [depth] is the rim's, 0, except while it drops down its lane.
-class PlayerComponent()
+///
+/// Given [from], it goes on from there. The keys and the drags, which the new
+/// game hasn't seen go down, don't move it or fire.
+class PlayerComponent({final PlayerSnapshot? from})
     extends PositionComponent
     with HasGameRef<TubeShooterExample>, HasVisibility {
   this : super(priority: 4);
@@ -30,6 +46,9 @@ class PlayerComponent()
 
   /// Where it starts in its lane: the middle.
   static const startStep = stepsPerLane ~/ 2;
+
+  /// Seconds it takes to fade out once destroyed.
+  static const fadeTime = TubeShooterExample.respawnTime * 2 / 3;
 
   int step = startStep;
   double depth = 0;
@@ -51,7 +70,38 @@ class PlayerComponent()
   @override
   Future<void> onLoad() async {
     add(drawing = gameRef.shapeComponent(Shapes.ship, TubeColors.ship));
+    if (from case final from?) {
+      step = from.step;
+      _partStep = from.partStep;
+      depth = from.depth;
+      _sinceShot = from.sinceShot;
+      isVisible = from.isVisible;
+      if (from.opacity < 1) {
+        fadeOut(from: from.opacity);
+      }
+    }
     place();
+  }
+
+  /// What a game with another renderer goes on from.
+  PlayerSnapshot get snapshot => (
+    step: step,
+    partStep: _partStep,
+    depth: depth,
+    sinceShot: _sinceShot,
+    isVisible: isVisible,
+    opacity: isLoaded ? drawing.opacity : 1,
+  );
+
+  /// Fades it out over [fadeTime], or, [from] an opacity, over the time
+  /// left.
+  void fadeOut({double from = 1}) {
+    drawing.opacity = from;
+    if (from > 0) {
+      drawing.add(
+        OpacityEffect.fadeOut(EffectController(duration: fadeTime * from)),
+      );
+    }
   }
 
   /// Moves it [lanes] round the tube, in whole steps, stopping at an open

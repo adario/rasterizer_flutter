@@ -7,8 +7,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 ///
 /// When shot, or at the rim, it splits into two climbers, which flip onto the
 /// lanes on either side.
-class SplitterComponent({required super.lane, required super.depth})
-    extends EnemyComponent {
+class SplitterComponent({
+  required super.lane,
+  required super.depth,
+  super.from,
+}) extends EnemyComponent {
   this : super(EnemyKind.splitter);
 
   @override

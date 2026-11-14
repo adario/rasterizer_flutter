@@ -42,19 +42,63 @@ enum EnemyKind(final int score) {
         zapper => ZapperComponent(lane: lane, depth: depth),
         edgeWalker => EdgeWalkerComponent(lane: lane, depth: depth),
       };
+
+  /// Creates an enemy of this kind that goes on from [from], the snapshot of
+  /// an enemy in a game with another renderer.
+  EnemyComponent goOnFrom(EnemySnapshot from) {
+    final (:lane, :depth, previousDepth: _) = from.at;
+    return switch (this) {
+      climber => ClimberComponent(lane: lane, depth: depth, from: from),
+      splitter => SplitterComponent(lane: lane, depth: depth, from: from),
+      seeder => SeederComponent(lane: lane, depth: depth, from: from),
+      zapper => ZapperComponent(lane: lane, depth: depth, from: from),
+      edgeWalker => EdgeWalkerComponent(lane: lane, depth: depth, from: from),
+    };
+  }
 }
 
+/// What an enemy in a game for another renderer goes on from: its kind, where
+/// it is, its flip, if any, and what its kind keeps, as
+/// [EnemyComponent.ownSnapshot] gives it.
+typedef EnemySnapshot = ({
+  EnemyKind kind,
+  LaneSnapshot at,
+  ({int to, double progress, double angle})? flip,
+  Record? own,
+});
+
 /// An enemy in a lane of the tube, which can flip onto a neighbouring lane.
+///
+/// Given [from], it goes on from there.
 abstract class EnemyComponent(
   final EnemyKind kind, {
   required super.lane,
   required super.depth,
+  final EnemySnapshot? from,
 }) extends LaneComponent {
-  this : super(kind.shape, kind.color);
+  this : super(kind.shape, kind.color, previousDepth: from?.at.previousDepth);
 
-  int? _flipTo;
-  double _flipProgress = 0;
-  double _flipAngle = 0;
+  int? _flipTo = from?.flip?.to;
+  double _flipProgress = from?.flip?.progress ?? 0;
+  double _flipAngle = from?.flip?.angle ?? 0;
+
+  /// What a game with another renderer goes on from.
+  ///
+  /// An enemy that hasn't loaded yet has made no picks of its kind, so the
+  /// new game's makes them.
+  EnemySnapshot get snapshot => (
+    kind: kind,
+    at: laneSnapshot,
+    flip: switch (_flipTo) {
+      final to? => (to: to, progress: _flipProgress, angle: _flipAngle),
+      null => null,
+    },
+    own: isLoaded ? ownSnapshot : null,
+  );
+
+  /// What its kind keeps beyond [snapshot]'s, if anything, for a game with
+  /// another renderer to go on from.
+  Record? get ownSnapshot => null;
 
   bool get isFlipping => _flipTo != null;
 

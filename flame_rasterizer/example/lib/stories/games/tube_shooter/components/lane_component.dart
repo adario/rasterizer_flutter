@@ -4,6 +4,10 @@ import 'package:flame/components.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 
+/// Where something in a lane of the tube is, for a game with another renderer
+/// to go on from: its lane, its depth, and its depth before its last update.
+typedef LaneSnapshot = ({int lane, double depth, double previousDepth});
+
 /// Something in a [lane] of the tube, at a [depth], drawn as [shape] in
 /// [color].
 ///
@@ -14,13 +18,18 @@ abstract class LaneComponent(
   final Color color, {
   required int lane,
   required double depth,
+  double? previousDepth,
 }) extends PositionComponent with HasGameRef<TubeShooterExample> {
   int lane = lane;
   double depth = depth;
 
   /// Its depth before its last update, so that two things that pass each
   /// other within one frame still hit.
-  late double previousDepth = depth;
+  double previousDepth = previousDepth ?? depth;
+
+  /// Where it is, for a game with another renderer to go on from.
+  LaneSnapshot get laneSnapshot =>
+      (lane: lane, depth: depth, previousDepth: previousDepth);
 
   /// The component that draws its [shape].
   late final PathComponent drawing;

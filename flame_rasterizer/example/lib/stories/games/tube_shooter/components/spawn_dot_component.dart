@@ -6,14 +6,30 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/d
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
+/// What an enemy still to come in a game for another renderer goes on from:
+/// its kind, where it is round the far end, its wandering, once it has
+/// loaded, and its arrival.
+typedef SpawnSnapshot = ({
+  EnemyKind kind,
+  double at,
+  ({double speed, double turnIn})? wander,
+  double? arriving,
+  bool white,
+});
+
 /// An enemy of [kind] still to come: a dot in its colour on the tube's far
 /// end.
 ///
 /// It wanders round the far end, turning back at random, faster each round.
 /// Once it [arrive]s, it moves to its lane's middle, flashing white, until it
 /// [hasArrived]. The game then replaces it with the enemy, in that lane.
-class SpawnDotComponent(final EnemyKind kind, {required double at})
-    extends DotComponent {
+///
+/// Given [from], it goes on from there.
+class SpawnDotComponent(
+  final EnemyKind kind, {
+  required double at,
+  final SpawnSnapshot? from,
+}) extends DotComponent {
   this : super(kind.color);
 
   /// Its width, in device pixels.
@@ -43,7 +59,7 @@ class SpawnDotComponent(final EnemyKind kind, {required double at})
   double _turnIn = 0;
 
   /// The seconds since it began to arrive, if it has.
-  double? _arriving;
+  double? _arriving = from?.arriving;
 
   bool _white = false;
 
@@ -53,6 +69,15 @@ class SpawnDotComponent(final EnemyKind kind, {required double at})
   bool get isArriving => _arriving != null;
 
   bool get hasArrived => (_arriving ?? 0) >= arriveTime;
+
+  /// What a game with another renderer goes on from.
+  SpawnSnapshot get snapshot => (
+    kind: kind,
+    at: at,
+    wander: isLoaded ? (speed: _speed, turnIn: _turnIn) : null,
+    arriving: _arriving,
+    white: _white,
+  );
 
   /// Starts arriving.
   void arrive() => _arriving = 0;
@@ -65,13 +90,19 @@ class SpawnDotComponent(final EnemyKind kind, {required double at})
 
   @override
   Future<void> onLoad() async {
-    final random = gameRef.random;
-    final (least, most) = speeds;
-    _speed =
-        (least + (most - least) * random.nextDouble()) *
-        (random.nextBool() ? 1 : -1);
-    _turnIn = _turnPeriod();
+    if (from?.wander case final wander?) {
+      _speed = wander.speed;
+      _turnIn = wander.turnIn;
+    } else {
+      final random = gameRef.random;
+      final (least, most) = speeds;
+      _speed =
+          (least + (most - least) * random.nextDouble()) *
+          (random.nextBool() ? 1 : -1);
+      _turnIn = _turnPeriod();
+    }
     await super.onLoad();
+    _flash(from?.white ?? false);
   }
 
   double _turnPeriod() {

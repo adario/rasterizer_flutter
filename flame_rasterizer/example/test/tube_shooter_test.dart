@@ -54,14 +54,16 @@ Widget story(
           data: MediaQuery.of(context).copyWith(devicePixelRatio: pixelRatio),
           child: child!,
         ),
-  home: GameStory<TubeShooterExample, Never>(
+  home: GameStory<TubeShooterExample, TubeShooterSnapshot>(
     renderer: renderer,
-    create: (status, _) => TubeShooterExample.of(
+    create: (status, from) => TubeShooterExample.of(
       renderer,
       status,
       random: math.Random(1),
       firstLevel: firstLevel,
+      from: from,
     ),
+    snapshot: (game) => game.snapshot,
     zoom: zoom,
     speed: speed,
   ),
@@ -1661,6 +1663,199 @@ void main() {
     }
     expect(shorter[5], isNot(same(first[5])));
     await tester.pumpWidget(const SizedBox());
+  });
+
+  group('a new renderer', () {
+    /// The story at the octagon's level, with [renderer], at [speed].
+    Widget storyWith(SvgRenderer renderer, {double speed = 1}) =>
+        story(renderer, speed: speed, firstLevel: octagonLevel);
+
+    /// Pumps [storyWith], and waits for its game, a new one for a new
+    /// renderer, to load.
+    Future<TubeShooterExample> pumpStory(
+      WidgetTester tester,
+      SvgRenderer renderer, {
+      double speed = 1,
+    }) async {
+      await tester.pumpWidget(storyWith(renderer, speed: speed));
+      final game = tester
+          .widget<GameWidget<TubeShooterExample>>(
+            find.byWidgetPredicate((w) => w is GameWidget),
+          )
+          .game!;
+      await pumpWhileLoading(tester, () => !game.isLoaded);
+      await pumpFrames(tester, 2);
+      return game;
+    }
+
+    /// Stills the world of [game], with renderer [from], switches the
+    /// renderer to each of [renderers], and expects each new game to go on
+    /// from the same snapshot as [game]'s.
+    ///
+    /// Returns the last game.
+    Future<TubeShooterExample> switchStill(
+      WidgetTester tester,
+      TubeShooterExample game,
+      SvgRenderer from,
+      List<SvgRenderer> renderers,
+    ) async {
+      await tester.pumpWidget(storyWith(from, speed: 0));
+      await tester.pump(const Duration(milliseconds: 16));
+      final snapshot = game.snapshot;
+      var last = game;
+      for (final renderer in renderers) {
+        final next = await pumpStory(tester, renderer, speed: 0);
+        expect(next, isNot(same(last)));
+        expect(last.isAttached, isFalse);
+        final again = next.snapshot;
+        final reason = renderer.label;
+        // Records compare their lists by identity, so the lists go apart.
+        expect(again.spikes, snapshot.spikes, reason: reason);
+        expect(again.spawns, snapshot.spawns, reason: reason);
+        expect(again.enemies, snapshot.enemies, reason: reason);
+        expect(again.shots, snapshot.shots, reason: reason);
+        expect(again.enemyShots, snapshot.enemyShots, reason: reason);
+        expect(
+          (
+            again.firstLevel,
+            again.levelIndex,
+            again.round,
+            again.state,
+            again.stateTime,
+            again.dyingOnDrop,
+            again.score,
+            again.lives,
+            again.purgeReady,
+            again.purgeLeft,
+            again.sinceSpawn,
+            again.pulseClock,
+            again.look,
+            again.lookFrom,
+            again.eyeShift,
+            again.player,
+          ),
+          (
+            snapshot.firstLevel,
+            snapshot.levelIndex,
+            snapshot.round,
+            snapshot.state,
+            snapshot.stateTime,
+            snapshot.dyingOnDrop,
+            snapshot.score,
+            snapshot.lives,
+            snapshot.purgeReady,
+            snapshot.purgeLeft,
+            snapshot.sinceSpawn,
+            snapshot.pulseClock,
+            snapshot.look,
+            snapshot.lookFrom,
+            snapshot.eyeShift,
+            snapshot.player,
+          ),
+          reason: reason,
+        );
+        expect(explosionsOf(next), isEmpty);
+        last = next;
+      }
+      return last;
+    }
+
+    // Flame's PathComponent loads nothing through flame_svg, so it can go
+    // in too.
+    const renderers = [
+      SvgRenderer.rasterizerCanvas,
+      SvgRenderer.flameSvg,
+      SvgRenderer.rasterizer,
+    ];
+
+    testWidgets('goes on from the same round, ship, enemies and shots', (
+      tester,
+    ) async {
+      final game = await pumpStory(tester, SvgRenderer.rasterizer);
+      await beginLevel(tester, game);
+      game.player.beginFire();
+      await pumpUntil(
+        tester,
+        () =>
+            game.enemies.length >= 2 && game.shots.isNotEmpty && game.score > 0,
+        frames: 900,
+      );
+      expect(game.state, TubeState.play);
+      expect(game.spawns, isNotEmpty);
+      final next = await switchStill(
+        tester,
+        game,
+        SvgRenderer.rasterizer,
+        renderers,
+      );
+      expect(
+        next.camera.viewport.children.whereType<VectorTextComponent>().map(
+          (text) => text.text,
+        ),
+        containsAll(['ROUND 1', 'SCORE ${game.score}', 'LIVES 3']),
+      );
+
+      expect(next.pace, game.pace);
+
+      // The new game's first level is the old game's, whatever level its
+      // story starts at, as the Level knob shows the round's level.
+      final again = TubeShooterExample.of(
+        SvgRenderer.flameSvg,
+        ValueNotifier(''),
+        from: game.snapshot,
+      );
+      expect(again.firstLevel, octagonLevel);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets("goes on from the zoom, a lost ship's fade, and Game Over", (
+      tester,
+    ) async {
+      var game = await pumpStory(tester, SvgRenderer.rasterizer);
+      await pumpFrames(tester, 30);
+      expect(game.state, TubeState.zoom);
+      game = await switchStill(tester, game, SvgRenderer.rasterizer, [
+        SvgRenderer.rasterizerCanvas,
+      ]);
+      final banners = game.camera.viewport.children
+          .whereType<VectorTextComponent>()
+          .map((text) => text.text);
+      expect(banners, containsAll(['ROUND 1', 'PURGE READY']));
+      expect(game.player.isVisible, isFalse);
+
+      // The zoom goes on, to READY.
+      await tester.pumpWidget(storyWith(SvgRenderer.rasterizerCanvas));
+      await beginLevel(tester, game);
+      game
+        ..spawning = false
+        ..lives = 1
+        ..addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
+      await pumpFrames(tester, 30);
+      expect(game.state, TubeState.dying);
+      final faded = game.player.drawing.opacity;
+      expect(faded, inExclusiveRange(0, 1));
+      game = await switchStill(tester, game, SvgRenderer.rasterizerCanvas, [
+        SvgRenderer.flameSvg,
+        SvgRenderer.rasterizer,
+      ]);
+      expect(game.player.drawing.opacity, faded);
+
+      // The fade goes on, and then the game is over.
+      await tester.pumpWidget(storyWith(SvgRenderer.rasterizer));
+      await pumpUntil(tester, () => game.state == TubeState.over);
+      expect(game.player.drawing.opacity, 0);
+      game = await switchStill(tester, game, SvgRenderer.rasterizer, [
+        SvgRenderer.rasterizerCanvas,
+      ]);
+      expect(game.world.timeScale, 0);
+      expect(
+        game.camera.viewport.children.whereType<VectorTextComponent>().map(
+          (text) => text.text,
+        ),
+        contains('GAME OVER'),
+      );
+      await tester.pumpWidget(const SizedBox());
+    });
   });
 
   group('the canvas fallback', () {

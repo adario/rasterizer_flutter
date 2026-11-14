@@ -14,8 +14,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// while crossing the ship's lane or standing on one of its edges.
 ///
 /// Its [lane] is the one it crosses, or the one that starts at its [edge].
-class EdgeWalkerComponent({required super.lane, required super.depth})
-    extends EnemyComponent {
+class EdgeWalkerComponent({
+  required super.lane,
+  required super.depth,
+  super.from,
+}) extends EnemyComponent {
   this : super(EnemyKind.edgeWalker);
 
   /// How fast it spins, in turns a second.
@@ -43,6 +46,21 @@ class EdgeWalkerComponent({required super.lane, required super.depth})
 
   @override
   Future<void> onLoad() async {
+    if (from?.own case (
+      :final int edge,
+      :final int? crossTo,
+      :final double crossProgress,
+      :final double untilCross,
+      :final double turns,
+    )) {
+      _edge = edge;
+      _crossTo = crossTo;
+      _crossProgress = crossProgress;
+      _untilCross = untilCross;
+      _turns = turns;
+      await super.onLoad();
+      return;
+    }
     // It starts halfway across its lane, toward one of the lane's edges.
     final next = gameRef.view.tube.pointAfter(lane);
     if (gameRef.random.nextBool()) {
@@ -56,6 +74,15 @@ class EdgeWalkerComponent({required super.lane, required super.depth})
     _untilCross = between(gameRef.level.crossPeriod);
     await super.onLoad();
   }
+
+  @override
+  Record get ownSnapshot => (
+    edge: _edge,
+    crossTo: _crossTo,
+    crossProgress: _crossProgress,
+    untilCross: _untilCross,
+    turns: _turns,
+  );
 
   @override
   bool destroysShip(int shipLane) =>

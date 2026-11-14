@@ -10,8 +10,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// toward the ship. While the zappers pulse, a bolt runs from it down its lane
 /// to the rim, and destroys the ship there. Just before a pulse, it flashes
 /// white. One that arrives too late to flash waits for the next pulse.
-class ZapperComponent({required super.lane, required super.depth})
-    extends EnemyComponent {
+class ZapperComponent({
+  required super.lane,
+  required super.depth,
+  super.from,
+}) extends EnemyComponent {
   this : super(EnemyKind.zapper);
 
   /// Seconds until it flips, at the first round's pace.
@@ -27,8 +30,22 @@ class ZapperComponent({required super.lane, required super.depth})
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    if (from?.own case (
+      :final double untilFlip,
+      :final bool white,
+      :final bool warned,
+    )) {
+      _untilFlip = untilFlip;
+      _warned = warned;
+      _flash(white);
+      return;
+    }
     _untilFlip = between(gameRef.level.zapperFlipPeriod);
   }
+
+  @override
+  Record get ownSnapshot =>
+      (untilFlip: _untilFlip, white: _white, warned: _warned);
 
   @override
   bool destroysShip(int shipLane) => isZapping && lane == shipLane;

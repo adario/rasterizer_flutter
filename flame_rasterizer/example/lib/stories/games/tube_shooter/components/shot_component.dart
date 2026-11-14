@@ -3,8 +3,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
 /// A shot from the ship, which flies down its lane and is gone at the far end.
-class ShotComponent({required super.lane, required super.depth})
-    extends LaneComponent {
+class ShotComponent({
+  required super.lane,
+  required super.depth,
+  super.previousDepth,
+}) extends LaneComponent {
   this : super(Shapes.shot, TubeColors.shot);
 
   /// The seconds a shot takes to cross the tube.
@@ -24,8 +27,11 @@ class ShotComponent({required super.lane, required super.depth})
 ///
 /// The game removes it at the rim, where it destroys the ship if the ship is
 /// in its lane.
-class EnemyShotComponent({required super.lane, required super.depth})
-    extends LaneComponent {
+class EnemyShotComponent({
+  required super.lane,
+  required super.depth,
+  super.previousDepth,
+}) extends LaneComponent {
   this : super(Shapes.enemyShot, TubeColors.shot);
 
   @override

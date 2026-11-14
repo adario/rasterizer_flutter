@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
-import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
@@ -29,6 +28,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
+
+part 'tube_shooter_snapshot.dart';
 
 /// The game's states.
 enum TubeState() {
@@ -61,31 +62,38 @@ enum TubeState() {
 /// level's tube, starting from [firstLevel]. A new game after Game Over
 /// starts at the round reached. Subclasses pick the component that draws a
 /// path: see [pathComponent].
+///
+/// Given the snapshot of a game with another renderer, it goes on from there:
+/// see [TubeShooterSnapshots].
 abstract class TubeShooterExample({
   required super.status,
   math.Random? random,
 
   /// Which of the [levels] the first round plays.
   final int firstLevel = 0,
+  TubeShooterSnapshot? from,
 }) extends ExampleGame with DragCallbacks, KeyboardEvents {
   /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
-  /// SVG.
+  /// SVG, which goes on from [from], if any, at its first level and pace.
   factory TubeShooterExample.of(
     SvgRenderer renderer,
     ValueNotifier<String> status, {
     math.Random? random,
     int firstLevel = 0,
+    TubeShooterSnapshot? from,
   }) => renderer == SvgRenderer.flameSvg
       ? FlameTubeShooterExample(
           status: status,
           random: random,
-          firstLevel: firstLevel,
+          firstLevel: from?.firstLevel ?? firstLevel,
+          from: from,
         )
       : RasterizerTubeShooterExample(
           status: status,
           renderer: renderer,
           random: random,
-          firstLevel: firstLevel,
+          firstLevel: from?.firstLevel ?? firstLevel,
+          from: from,
         );
 
   static const description = '''
@@ -109,8 +117,10 @@ abstract class TubeShooterExample({
     shapes. With the mesh renderer, the Glow knob makes the lines glow. The
     Level knob shows the round's level, and starts a new game at the level it
     picks. The other knobs keep the stars drifting, turn the sounds on and
-    off, zoom the camera and change the game's speed. The bar under the game shows the renderer, the frame
-    times, the renderer's own numbers and the paths made each second.
+    off, zoom the camera and change the game's speed. A new renderer's game
+    goes on with the same round, ship, enemies and shots, from where they
+    were. The bar under the game shows the renderer, the frame times, the
+    renderer's own numbers and the paths made each second.
 
     Inspired by Atari's Tempest (1981).
   ''';
@@ -172,6 +182,10 @@ abstract class TubeShooterExample({
   static const doubleTapTime = 0.35;
 
   final math.Random random = random ?? math.Random();
+
+  /// The snapshot that it goes on from, if any.
+  final TubeShooterSnapshot? _from = from;
+
   final view = TubeView();
 
   final tubeGroup = Component();
@@ -179,7 +193,7 @@ abstract class TubeShooterExample({
   final enemyGroup = Component(priority: 1);
   final shotGroup = Component(priority: 2);
   final explosionGroup = Component(priority: 5);
-  final player = PlayerComponent();
+  final player = PlayerComponent(from: from?.player);
   final tube = TubeComponent();
   final spikes = SpikesComponent();
   final bolts = BoltsComponent();
@@ -577,7 +591,11 @@ abstract class TubeShooterExample({
     if (_sound) {
       await _loadSounds();
     }
-    _nextRound();
+    if (_from case final from?) {
+      _restoreRound(from);
+    } else {
+      _nextRound();
+    }
     startStatus();
   }
 
@@ -769,9 +787,10 @@ abstract class TubeShooterExample({
   }
 
   /// Adds an enemy of [kind] to come next, as a dot [at] lanes round the far
-  /// end.
-  void _addSpawn(EnemyKind kind, double at) {
-    final spawn = SpawnDotComponent(kind, at: at);
+  /// end, which goes on [from] a dot in a game with another renderer, if
+  /// given.
+  void _addSpawn(EnemyKind kind, double at, {SpawnSnapshot? from}) {
+    final spawn = SpawnDotComponent(kind, at: at, from: from);
     spawns.add(spawn);
     spawnGroup.add(spawn);
   }
@@ -991,9 +1010,7 @@ abstract class TubeShooterExample({
     lives--;
     _explode(player, player.depth, color: TubeColors.ship);
     _play(Sound.crash);
-    player.drawing.add(
-      OpacityEffect.fadeOut(EffectController(duration: respawnTime * 2 / 3)),
-    );
+    player.fadeOut();
     for (final spawn in spawns) {
       spawn.wander();
     }
@@ -1225,6 +1242,7 @@ class RasterizerTubeShooterExample({
   @override required final SvgRenderer renderer,
   super.random,
   super.firstLevel,
+  super.from,
 }) extends TubeShooterExample with HasRasterizer, ExampleRasterizer {
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
@@ -1263,6 +1281,7 @@ class FlameTubeShooterExample({
   required super.status,
   super.random,
   super.firstLevel,
+  super.from,
 }) extends TubeShooterExample {
   @override
   String get rendererText => "Flame's PathComponent";
