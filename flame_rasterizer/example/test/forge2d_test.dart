@@ -213,6 +213,44 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  // The bottom wall would cut through the wheel 25 meters down in games
+  // shorter than about 650 pixels, and stop it.
+  for (final height in [300.0, 500.0, 700.0]) {
+    testWidgets('the wheel turns in a game $height pixels high', (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = Size(800, height)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      late RevoluteJointSvgsExample game;
+      await pumpGame(
+        tester,
+        MaterialApp(
+          home: GameStory<RevoluteJointSvgsExample, Never>(
+            renderer: SvgRenderer.rasterizer,
+            create: (status, _) => game = RevoluteJointSvgsExample.of(
+              (renderer: SvgRenderer.rasterizer, pieces: false),
+              status,
+              random: math.Random(1),
+            ),
+          ),
+        ),
+        () => game,
+      );
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final wheel = game.snapshot.wheel!;
+      // The motor's speed, negative as the joint holds the wheel to the
+      // ground.
+      expect(wheel.angularVelocity, closeTo(-math.pi, 0.01));
+      final bottom = game.size.y / game.metersToPixels / 2;
+      expect(wheel.position.y, lessThan(bottom));
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
   // Box2D has room for 128 worlds at once, so each game must destroy its own.
   testWidgets('new games, one after another, have room for their worlds', (
     tester,

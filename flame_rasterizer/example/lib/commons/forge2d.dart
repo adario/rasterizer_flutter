@@ -171,6 +171,10 @@ class Wall(final Vector2 start, final Vector2 end)
   /// Its width as drawn, in meters.
   static const width = 0.15;
 
+  /// Its collision category, for a body to leave out of its mask so that it
+  /// passes through the walls.
+  static const category = 2;
+
   /// Creates the walls along [rect]'s edges.
   static List<Wall> around(Rect rect) {
     final topLeft = Vector2(rect.left, rect.top);
@@ -191,9 +195,11 @@ class Wall(final Vector2 start, final Vector2 end)
   /// Creates a fixed segment with the default material, whose friction lets
   /// bodies come to rest against the wall instead of sliding along it.
   @override
-  Body createBody() =>
-      world.createBody(BodyDef())
-        ..createShape(Segment(point1: start, point2: end), ShapeDef());
+  Body createBody() => world.createBody(BodyDef())
+    ..createShape(
+      Segment(point1: start, point2: end),
+      ShapeDef(filter: Filter(categoryBits: category)),
+    );
 }
 
 /// Where a body is and how it moves, for a body in a game with another

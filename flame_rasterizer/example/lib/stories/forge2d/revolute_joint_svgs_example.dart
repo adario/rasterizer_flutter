@@ -109,6 +109,17 @@ abstract class RevoluteJointSvgsExample({
   /// second.
   static const _spreadSpeed = 2.0;
 
+  /// The wheel's depth below the funnel's center, in meters, as in
+  /// flame_path_shapes.
+  static const _maxWheelDepth = 25.0;
+
+  /// The room that the wheel leaves for the largest SVG, in meters.
+  static const _wheelClearance = _minSide + (_sides - 1) / 10;
+
+  /// The wheel's least depth, in meters, which leaves [_wheelClearance]
+  /// between it and the ramps' tips, 6 meters from the funnel's center.
+  static const _minWheelDepth = 9.0;
+
   final math.Random random = random ?? math.Random();
 
   /// The snapshot that it goes on from, if any.
@@ -151,6 +162,16 @@ abstract class RevoluteJointSvgsExample({
     height: size.y / metersToPixels,
   );
 
+  /// The wheel's center: [_maxWheelDepth] below the funnel's center, or
+  /// higher in a short game, to leave [_wheelClearance] above the bottom
+  /// wall. In a game shorter still, it stays at [_minWheelDepth], over the
+  /// bottom wall.
+  Vector2 get _wheelPosition {
+    final depth =
+        _arena.bottom - Wall.width - CircleShuffler.reach - _wheelClearance;
+    return Vector2(0, depth.clamp(_minWheelDepth, _maxWheelDepth));
+  }
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
@@ -165,7 +186,7 @@ abstract class RevoluteJointSvgsExample({
     final center = Vector2.zero();
     world.addAll([
       ...(_walls = Wall.around(_arena)),
-      _wheel = CircleShuffler(center, from: _from?.wheel),
+      _wheel = CircleShuffler(_wheelPosition, from: _from?.wheel),
       CornerRamp(center, isMirrored: true),
       CornerRamp(center),
       PiecesLayer(),
@@ -413,28 +434,40 @@ class PiecesLayer()
   }
 }
 
-/// flame_path_shapes' wheel: five circles, 25 meters below [_center], that a
-/// motor turns. It goes on from [from], if any.
-class CircleShuffler(final Vector2 _center, {final BodySnapshot? from})
+/// flame_path_shapes' wheel: five circles around [_position] that a motor
+/// turns. It goes on from [from], if any.
+///
+/// It passes through the walls, which a short game brings into its way.
+class CircleShuffler(final Vector2 _position, {final BodySnapshot? from})
     extends BodyComponent {
+  /// The distance of the circles' centers from the wheel's, in meters.
+  static const _radius = 6.0;
+
+  /// The circles' radius, in meters.
+  static const _circleRadius = 1.2;
+
+  /// How far the wheel reaches from its center, in meters.
+  static const reach = _radius + _circleRadius;
+
   @override
   Body createBody() {
     const pieces = 5;
-    const radius = 6.0;
     final body = world.createBody(
-      BodyDef(type: BodyType.dynamic, position: _center + Vector2(0, 25)),
+      BodyDef(type: BodyType.dynamic, position: _position),
+    );
+    final shapeDef = ShapeDef(
+      density: 50,
+      material: SurfaceMaterial(friction: 0.5, restitution: 0.4),
+      filter: Filter(maskBits: Filter.allCategories & ~Wall.category),
     );
     for (var i = 0; i < pieces; i++) {
       final angle = 2 * math.pi * i / pieces;
       body.createShape(
         Circle(
-          radius: 1.2,
-          center: Vector2(radius * math.cos(angle), radius * math.sin(angle)),
+          radius: _circleRadius,
+          center: Vector2(_radius * math.cos(angle), _radius * math.sin(angle)),
         ),
-        ShapeDef(
-          density: 50,
-          material: SurfaceMaterial(friction: 0.5, restitution: 0.4),
-        ),
+        shapeDef,
       );
     }
     // The joint holds the wheel to an empty static body, as its ground.
