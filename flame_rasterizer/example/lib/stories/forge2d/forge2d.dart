@@ -52,8 +52,9 @@ class RevoluteJointSvgsStory({
 
   @override
   Widget build(BuildContext context) {
-    return GameStory<RevoluteJointSvgsExample>(
-      create: (status) =>
+    return GameStory<RevoluteJointSvgsExample, Never>(
+      renderer: settings.renderer,
+      create: (status, _) =>
           RevoluteJointSvgsExample.of(settings, status, cache: cache),
       update: (game) => game.pieces = settings.pieces,
       zoom: zoom,

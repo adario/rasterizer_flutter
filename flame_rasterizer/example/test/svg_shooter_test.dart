@@ -37,8 +37,9 @@ import 'slow_bundle.dart';
 /// The Svg Shooter story with [renderer], at [zoom]. A seeded random makes
 /// the game repeat from run to run.
 Widget story(SvgRenderer renderer, {double zoom = 1}) => MaterialApp(
-  home: GameStory<SvgShooterExample>(
-    create: (status) =>
+  home: GameStory<SvgShooterExample, Never>(
+    renderer: renderer,
+    create: (status, _) =>
         SvgShooterExample.of(renderer, status, random: math.Random(1)),
     zoom: zoom,
   ),

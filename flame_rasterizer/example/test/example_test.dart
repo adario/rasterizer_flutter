@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
@@ -44,18 +45,24 @@ Future<SvgRenderersExample> pumpGame(
   String svg, {
   bool fade = false,
   double zoom = 1,
+  double speed = 1,
 }) async {
-  await tester.pumpWidget(story(renderer, svg, fade: fade, zoom: zoom));
-  final game = tester
-      .widget<GameWidget<SvgRenderersExample>>(
-        find.byWidgetPredicate((w) => w is GameWidget),
-      )
-      .game!;
+  await tester.pumpWidget(
+    story(renderer, svg, fade: fade, zoom: zoom, speed: speed),
+  );
+  final game = currentGame(tester);
   // The game's assets load outside the test's fake time.
   await pumpWhileLoading(tester, () => !game.isLoaded);
   expect(game.isLoaded, isTrue);
   return game;
 }
+
+/// The game that the story shows.
+SvgRenderersExample currentGame(WidgetTester tester) => tester
+    .widget<GameWidget<SvgRenderersExample>>(
+      find.byWidgetPredicate((w) => w is GameWidget),
+    )
+    .game!;
 
 /// The paths of the use cases with the Renderer, Zoom and Speed knobs.
 const paths = [
@@ -426,6 +433,55 @@ void main() {
     });
   }
 
+  // A new renderer makes a new game, which goes on from the angles where the
+  // old one stopped. At speed 0, it draws the same frame. It hands the same
+  // snapshot on to the next game.
+  testWidgets('a new renderer goes on from the same angles', (tester) async {
+    final svg = svgNames[nextSvg++];
+    var game = await pumpGame(tester, SvgRenderer.rasterizer, svg);
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await tester.pumpWidget(story(SvgRenderer.rasterizer, svg, speed: 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(currentGame(tester), same(game));
+    final snapshot = game.snapshot;
+    expect(snapshot.time, greaterThan(0));
+    // Angles turned by, to a full turn.
+    List<double> angles(SvgRenderersExample game) => [
+      for (final c in game.world.children.whereType<PositionComponent>())
+        c.angle % (2 * math.pi),
+    ];
+    final turned = angles(game);
+    expect(turned, hasLength(21));
+
+    for (final renderer in [
+      SvgRenderer.flameSvg,
+      SvgRenderer.rasterizerCanvas,
+      SvgRenderer.rasterizer,
+    ]) {
+      final next = await pumpGame(tester, renderer, svg, speed: 0);
+      expect(next, isNot(same(game)));
+      expect(game.isRemoved, isTrue);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(next.speed, 0);
+      expect(next.snapshot, snapshot);
+      final nextTurned = angles(next);
+      expect(nextTurned, hasLength(turned.length));
+      for (var i = 0; i < turned.length; i++) {
+        // The same angle, maybe on either side of a full turn.
+        final apart = (nextTurned[i] - turned[i]).abs();
+        expect(
+          math.min(apart, 2 * math.pi - apart),
+          closeTo(0, 1e-6),
+          reason: 'SVG $i with ${renderer.label}',
+        );
+      }
+      game = next;
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
+
   // The other knobs keep the same game too. New components replace the old
   // ones, turned as far, and a new SVG loads into the same game. A missing
   // SVG shows its error until another loads.
@@ -457,8 +513,7 @@ void main() {
       int fps() =>
           game.camera.viewport.children.whereType<FpsTextComponent>().length;
 
-      // The first component is the master, under the ring. A game starts
-      // at the angles where the last one stopped, so it turns from there.
+      // The first component is the master, under the ring.
       await frames(1);
       final start = components().first.angle;
       await frames(30);

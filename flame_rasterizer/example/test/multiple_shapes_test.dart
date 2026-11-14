@@ -26,8 +26,9 @@ Widget story(
   int count = 15,
   double speed = 1,
 }) => MaterialApp(
-  home: GameStory<MultipleShapesExample>(
-    create: (status) => MultipleShapesExample.of(
+  home: GameStory<MultipleShapesExample, Never>(
+    renderer: renderer,
+    create: (status, _) => MultipleShapesExample.of(
       (renderer: renderer, shapes: shapes, count: count),
       status,
       random: math.Random(1),

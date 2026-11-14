@@ -20,23 +20,33 @@ typedef SvgRenderersSettings = ({
   SvgCacheSize cacheSize,
 });
 
+/// What a game for another renderer goes on from: the world's time, which
+/// the rotations follow.
+typedef SvgRenderersSnapshot = ({double time});
+
 /// The same SVG drawn many times: see [description].
 ///
 /// A master SVG rotates at the world's origin, which the camera looks at,
 /// and a ring of more SVGs rotates around it, as many as [settings] say.
 /// Each SVG in the ring is smaller and starts later than the one before.
 /// Subclasses pick what loads and draws the SVG: see [ExampleSvgs].
+///
+/// Given the [snapshot] of a game with another renderer, it goes on from
+/// there, so that it turns on from the same angles.
 abstract class SvgRenderersExample(
   var SvgRenderersSettings _settings, {
   required super.status,
+  SvgRenderersSnapshot? from,
 }) extends ExampleGame with ExampleSvgs {
-  /// Creates the game for [settings]' renderer.
+  /// Creates the game for [settings]' renderer, which goes on from [from], if
+  /// any.
   factory SvgRenderersExample.of(
     SvgRenderersSettings settings,
-    ValueNotifier<String> status,
-  ) => settings.renderer == SvgRenderer.flameSvg
-      ? FlameSvgRenderersExample(settings, status: status)
-      : RasterizerRenderersExample(settings, status: status);
+    ValueNotifier<String> status, {
+    SvgRenderersSnapshot? from,
+  }) => settings.renderer == SvgRenderer.flameSvg
+      ? FlameSvgRenderersExample(settings, status: status, from: from)
+      : RasterizerRenderersExample(settings, status: status, from: from);
 
   static const description = '''
     The same SVG drawn many times, by flame_rasterizer or by flame_svg: one in
@@ -84,14 +94,10 @@ abstract class SvgRenderersExample(
   PositionComponent? _master;
   final _ring = <PositionComponent>[];
 
-  /// The last game's [_time], so that a new game, for another renderer, turns
-  /// on from the same angles.
-  static double _lastTime = 0;
-
-  /// Seconds of the world's time, scaled by [speed], since the first game
-  /// started. The rotations follow it, so that new components turn as far as
-  /// those they replace.
-  double _time = _lastTime;
+  /// Seconds of the world's time, scaled by [speed], since the story's first
+  /// game started. The rotations follow it, so that new components turn as
+  /// far as those they replace.
+  double _time = from?.time ?? 0;
 
   /// Whether [onLoad] has run.
   bool _started = false;
@@ -115,6 +121,9 @@ abstract class SvgRenderersExample(
       _apply();
     }
   }
+
+  /// What a game for another renderer goes on from.
+  SvgRenderersSnapshot get snapshot => (time: _time);
 
   /// Whether its components match its settings. They don't while it loads a
   /// new SVG.
@@ -243,7 +252,6 @@ abstract class SvgRenderersExample(
     // the old SVGs are freed below.
     super.update(dt);
     _time += dt * speed;
-    _lastTime = _time;
     for (final svg in _retired) {
       unloadSvg(svg);
     }
@@ -286,8 +294,11 @@ abstract class SvgRenderersExample(
 
 /// The example with flame_rasterizer: [RasterizerSvgComponent]s draw its
 /// SVG, with the renderer that the Renderer knob picks.
-class RasterizerRenderersExample(super._settings, {required super.status})
-    extends SvgRenderersExample
+class RasterizerRenderersExample(
+  super._settings, {
+  required super.status,
+  super.from,
+}) extends SvgRenderersExample
     with HasRasterizer, ExampleRasterizer, RasterizerSvgs {
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
@@ -299,9 +310,11 @@ class RasterizerRenderersExample(super._settings, {required super.status})
 
 /// The example with flame_svg: its `SvgComponent`s draw its SVG as images,
 /// cached as its settings say when the SVG loads.
-class FlameSvgRenderersExample(super._settings, {required super.status})
-    extends SvgRenderersExample
-    with FlameSvgs {
+class FlameSvgRenderersExample(
+  super._settings, {
+  required super.status,
+  super.from,
+}) extends SvgRenderersExample with FlameSvgs {
   @override
   SvgCacheMode get cacheMode => settings.cacheMode;
 

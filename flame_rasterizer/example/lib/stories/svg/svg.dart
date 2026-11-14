@@ -79,11 +79,10 @@ WidgetbookComponent svgStories() {
 
 /// The Svg Renderers game for [settings], over a status bar.
 ///
-/// A new renderer makes a new game, as a game draws with one renderer. The
-/// other knobs change the same game.
-// The lint misses that its key isn't constant.
-// ignore: prefer_const_constructors_in_immutables
-class SvgRenderersStory({
+/// A new renderer makes a new game, as a game draws with one renderer, which
+/// goes on from the angles where the old one stopped. The other knobs change
+/// the same game.
+class const SvgRenderersStory({
   required final SvgRenderersSettings settings,
 
   /// The camera's zoom.
@@ -91,13 +90,15 @@ class SvgRenderersStory({
 
   /// The rotation's speed, from 0, which stands still, to 2.
   final double speed = 1,
+  super.key,
 }) extends StatelessWidget {
-  this : super(key: ValueKey(settings.renderer));
-
   @override
   Widget build(BuildContext context) {
-    return GameStory<SvgRenderersExample>(
-      create: (status) => SvgRenderersExample.of(settings, status),
+    return GameStory<SvgRenderersExample, SvgRenderersSnapshot>(
+      renderer: settings.renderer,
+      create: (status, from) =>
+          SvgRenderersExample.of(settings, status, from: from),
+      snapshot: (game) => game.snapshot,
       update: (game) => game.settings = settings,
       zoom: zoom,
       speed: speed,
@@ -127,8 +128,9 @@ class CollidableSvgsStory({
 
   @override
   Widget build(BuildContext context) {
-    return GameStory<CollidableSvgsExample>(
-      create: (status) =>
+    return GameStory<CollidableSvgsExample, Never>(
+      renderer: settings.renderer,
+      create: (status, _) =>
           CollidableSvgsExample.of(settings, status, cache: cache),
       update: (game) => game.count = settings.count,
       zoom: zoom,

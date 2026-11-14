@@ -47,7 +47,7 @@ void main() {
         ..devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: SvgRenderersStory(
             settings: (
               renderer: SvgRenderer.rasterizerCanvas,

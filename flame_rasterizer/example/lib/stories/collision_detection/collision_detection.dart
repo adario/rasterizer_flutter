@@ -70,8 +70,9 @@ class MultipleShapesStory({
 
   @override
   Widget build(BuildContext context) {
-    return GameStory<MultipleShapesExample>(
-      create: (status) =>
+    return GameStory<MultipleShapesExample, Never>(
+      renderer: settings.renderer,
+      create: (status, _) =>
           MultipleShapesExample.of(settings, status, cache: cache),
       update: (game) => game.count = settings.count,
       zoom: zoom,

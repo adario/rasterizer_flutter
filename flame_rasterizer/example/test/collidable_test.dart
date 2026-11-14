@@ -19,8 +19,9 @@ import 'slow_bundle.dart';
 /// A new count changes the same game.
 Widget story(SvgRenderer renderer, {int count = 4, double speed = 1}) =>
     MaterialApp(
-      home: GameStory<CollidableSvgsExample>(
-        create: (status) => CollidableSvgsExample.of(
+      home: GameStory<CollidableSvgsExample, Never>(
+        renderer: renderer,
+        create: (status, _) => CollidableSvgsExample.of(
           (renderer: renderer, count: count),
           status,
           random: math.Random(1),

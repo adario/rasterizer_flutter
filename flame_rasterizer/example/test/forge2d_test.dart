@@ -94,8 +94,9 @@ void main() {
   ) async {
     late RevoluteJointSvgsExample game;
     Widget story({bool pieces = false}) => MaterialApp(
-      home: GameStory<RevoluteJointSvgsExample>(
-        create: (status) => game = RevoluteJointSvgsExample.of(
+      home: GameStory<RevoluteJointSvgsExample, Never>(
+        renderer: SvgRenderer.rasterizer,
+        create: (status, _) => game = RevoluteJointSvgsExample.of(
           (renderer: SvgRenderer.rasterizer, pieces: pieces),
           status,
           random: math.Random(1),

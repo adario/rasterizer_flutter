@@ -92,8 +92,10 @@ class SvgShooterStory({
 
   @override
   Widget build(BuildContext context) {
-    return GameStory<SvgShooterExample>(
-      create: (status) => SvgShooterExample.of(renderer, status, cache: cache),
+    return GameStory<SvgShooterExample, Never>(
+      renderer: renderer,
+      create: (status, _) =>
+          SvgShooterExample.of(renderer, status, cache: cache),
       zoom: zoom,
       speed: speed,
     );
@@ -170,9 +172,10 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
 
   @override
   Widget build(BuildContext context) {
-    return GameStory<TubeShooterExample>(
+    return GameStory<TubeShooterExample, Never>(
       key: ValueKey(_game),
-      create: (status) =>
+      renderer: widget.renderer,
+      create: (status, _) =>
           TubeShooterExample.of(
               widget.renderer,
               status,

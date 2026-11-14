@@ -54,8 +54,9 @@ Widget story(
           data: MediaQuery.of(context).copyWith(devicePixelRatio: pixelRatio),
           child: child!,
         ),
-  home: GameStory<TubeShooterExample>(
-    create: (status) => TubeShooterExample.of(
+  home: GameStory<TubeShooterExample, Never>(
+    renderer: renderer,
+    create: (status, _) => TubeShooterExample.of(
       renderer,
       status,
       random: math.Random(1),
