@@ -111,42 +111,14 @@ and `RasterizerPathComponent`.
 
 ## Differences from upstream
 
-Upstream renders with Metal, on Apple platforms, from Swift or Objective-C. This port:
-
-- **Renders with Flutter GPU and GLSL**, instead of Metal. The build hook compiles upstream's `Shaders.metal`, ported to
-  GLSL, into a shader bundle. Instead of Metal buffers, each frame is copied once into a host-visible buffer, blitted
-  into an `r32g32b32a32Float` data texture, and read with `texelFetch`.
-- **Renders into an atlas.** All of a frame's runs are rendered once, into atlas pages. Each run is then drawn with
-  `Canvas.drawImageRect` at its place in the paint order, so vector content keeps its z-order among other content.
-- **Patches the core** (see `rasterizer_gpu/src/core/README.md`):
-  - for portability off Apple platforms: `std::thread` and other replacements for GCD and Apple-only calls;
-  - device clips: a device-pixel rectangle per scene, with its soft clip, for the atlas;
-  - NanoSVG's viewBox, which it otherwise drops;
-  - NanoSVG's bounding box gradients and gradient opacity, drawn as SVG and Chrome draw them. Upstream paints most
-    bounding box gradients in their last stop's colour, and gradient shapes opaque.
-- **Works around two render pass bugs in Impeller's Vulkan backend:** a texture's first render pass is reused for its
-  later ones, and depth never survives a pass. So targets are cleared by drawing, and opaque paths redraw their depth in
-  each later pass.
-- **Runs the GPU renderers on Metal and Android's Vulkan**, and on Android's and Linux's OpenGL ES if the app opts in
-  and a self-test passes. 32-bit ARM isn't supported. Elsewhere, on Skia, web and Windows, the canvas renderer draws. It
-  parses SVGs in Dart with vector_graphics_compiler, through a trimmed copy of `SvgPaths`, a class written for
-  flame_svg.
-- **Has known differences in the canvas renderer**, from vector_graphics_compiler. On shapes that aren't square,
-  diagonal or rotated bounding box linear gradients keep their bands perpendicular to the gradient. `skewX` and `skewY`
-  angles are read as radians. Its antialiasing is Impeller's or Skia's, not the core's exact coverage.
-- **Doesn't port** clip masks, blend modes, images, text, PDF, or the draw-editing API.
-- **Adds a mesh renderer**, flame_rasterizer's default. It flattens each SVG once, for the largest size it's drawn at,
-  triangulates its fills and stroke outlines with libtess2, and draws them 4× multisampled by default. So a frame's CPU
-  work doesn't depend on the SVGs' paths, whereas upstream works out most paths again each frame, in device space.
-- **Adds a Flame integration**, flame_rasterizer.
-- **Tests with generated scenes and per-platform goldens**, rather than by comparing with upstream's renderer. The
-  goldens were checked against upstream's Metal renderer, given the same frames, then against Chrome for the gradient
-  patches. Upstream's Metal renderer isn't in this repository.
+Upstream renders with Metal, on Apple platforms. [UPSTREAM.md](UPSTREAM.md) lists how this port differs: Flutter GPU
+instead of Metal, the atlas and mesh renderers, the patches to the core, the platforms, what isn't ported, and how it's
+tested.
 
 ## Repository
 
 ```
-README.md, DESIGN.md, LICENSE, THIRD_PARTY_NOTICES.md
+README.md, DESIGN.md, UPSTREAM.md, LICENSE, THIRD_PARTY_NOTICES.md
 pubspec.yaml             the pub workspace of the five packages, with melos
 rasterizer_gpu/          the renderer package, its example app with the golden tests, and its tools
 flame_rasterizer/        the Flame package, its example (a Widgetbook) and its benchmark app: demo, benchmark and check
