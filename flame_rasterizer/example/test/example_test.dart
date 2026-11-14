@@ -210,7 +210,8 @@ void main() {
     expectNoGlow(SvgRenderer.rasterizerCanvas);
     await tester.tap(find.byType(DropdownMenu<SvgRenderer>));
     await settle();
-    await tester.tap(find.text(SvgRenderer.flameSvg.label).last);
+    // Tube Shooter draws no SVGs, so Flame SVG shows Flame.
+    await tester.tap(find.text('Flame').last);
     await settle();
     expectNoGlow(SvgRenderer.flameSvg);
     await tester.pumpWidget(const SizedBox());
@@ -336,7 +337,8 @@ void main() {
           'GPU (mesh)': false,
           'GPU (atlas)': false,
           'Canvas': true,
-          'Flame SVG': true,
+          // Tube Shooter draws no SVGs, so Flame SVG shows Flame there.
+          path == 'games/tube-shooter' ? 'Flame' : 'Flame SVG': true,
         },
       );
       expect(

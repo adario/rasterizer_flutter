@@ -19,11 +19,13 @@ const _gpus = [SvgRenderer.rasterizer, SvgRenderer.rasterizerAtlas];
 /// can't make an entry inactive, so this knob has a dropdown of its own.
 ///
 /// The entries show their [SvgRenderer.text], such as Metal (mesh) for an
-/// active GPU (mesh). Links keep their [SvgRenderer.label], so that a link
-/// picks the same entry on every device.
-SvgRenderer rendererKnob(BuildContext context) {
+/// active GPU (mesh). Without [svgs], for a game that draws no SVGs, Flame
+/// SVG shows Flame, as Flame's own components draw then. Links keep their
+/// [SvgRenderer.label], so that a link picks the same entry on every device
+/// and in every use case.
+SvgRenderer rendererKnob(BuildContext context, {bool svgs = true}) {
   final renderer = context.knobs.onKnobAdded(
-    _RendererKnob(initialValue: _firstChoice()),
+    _RendererKnob(initialValue: _firstChoice(), svgs: svgs),
   );
   // A link can pick a GPU entry where it's inactive: Canvas draws then.
   return renderer == null || !renderer.supported
@@ -127,12 +129,15 @@ Future<void> refreshRendererKnob(BuildContext context) async {
 }
 
 /// The Renderer knob, whose dropdown can make entries inactive.
-class _RendererKnob({required super.initialValue}) extends Knob<SvgRenderer?> {
+class _RendererKnob({
+  required super.initialValue,
+  required final bool svgs,
+}) extends Knob<SvgRenderer?> {
   this : super(label: _label);
 
   @override
   List<Field> get fields => [
-    _RendererField(name: label, initialValue: initialValue),
+    _RendererField(name: label, initialValue: initialValue, svgs: svgs),
   ];
 
   @override
@@ -140,10 +145,19 @@ class _RendererKnob({required super.initialValue}) extends Knob<SvgRenderer?> {
       valueOf(label, group);
 }
 
-class _RendererField({required super.name, required super.initialValue})
-    extends ObjectDropdownField<SvgRenderer> {
+class _RendererField({
+  required super.name,
+  required super.initialValue,
+
+  /// Whether the game draws SVGs: without them, Flame SVG shows Flame.
+  required final bool svgs,
+}) extends ObjectDropdownField<SvgRenderer> {
   this
     : super(values: SvgRenderer.values, labelBuilder: (value) => value.label);
+
+  /// What the entry for [renderer] shows.
+  String _text(SvgRenderer renderer) =>
+      renderer == SvgRenderer.flameSvg && !svgs ? 'Flame' : renderer.text;
 
   /// Builds Widgetbook's dropdown, with the GPU entries inactive where their
   /// renderers aren't supported, and each entry's text. The URL has the
@@ -164,7 +178,7 @@ class _RendererField({required super.name, required super.initialValue})
         for (final renderer in values)
           DropdownMenuEntry(
             value: renderer,
-            label: renderer.text,
+            label: _text(renderer),
             enabled: renderer.supported,
           ),
       ],

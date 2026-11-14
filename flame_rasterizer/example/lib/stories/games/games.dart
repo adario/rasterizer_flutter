@@ -30,7 +30,8 @@ WidgetbookComponent gamesStories() {
       ExampleUseCase(
         name: 'Tube Shooter',
         builder: (context) {
-          final renderer = rendererKnob(context);
+          // Its paths are drawn by Flame's own components with Flame SVG.
+          final renderer = rendererKnob(context, svgs: false);
           return TubeShooterStory(
             renderer: renderer,
             firstLevel: context.knobs.object.dropdown(

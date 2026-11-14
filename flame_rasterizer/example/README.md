@@ -46,7 +46,7 @@ a little later. Its knobs, in Widgetbook's panel, pick:
   - GPU (atlas): flame_rasterizer with rasterizer_gpu's atlas renderer, which rasterizes the SVGs into an atlas each
     frame;
   - Canvas: flame_rasterizer with the canvas renderer everywhere (`RasterizerGpu.forceCanvas`);
-  - Flame SVG: flame_svg.
+  - Flame SVG: flame_svg. Tube Shooter, which draws no SVGs, shows it as Flame: Flame's own components draw there.
 
   A GPU entry is inactive where its renderer isn't supported: on web, off Impeller, and on OpenGL ES until its
   self-test passes. The example starts the self-tests, the mesh renderer's first. The first choice is GPU (mesh), else
@@ -54,7 +54,8 @@ a little later. Its knobs, in Widgetbook's panel, pick:
   knob switches to that GPU entry, and the game goes on from where it was, unless a link or you picked an entry. An
   active GPU entry shows the graphics API that Impeller renders with: Metal
   (mesh) and Metal (atlas) on iOS and macOS, Vulkan (mesh) and Vulkan (atlas) on Android, and GLES (mesh) and GLES
-  (atlas) on OpenGL ES. Links keep GPU (mesh) and GPU (atlas), so that a link picks the same entry on every device.
+  (atlas) on OpenGL ES. Links keep GPU (mesh), GPU (atlas) and Flame SVG, so that a link picks the same entry on every
+  device and in every use case.
   Widgetbook's dropdown can't make an entry inactive, so this knob is the example's own (`commons/renderer_knob.dart`).
 - **Svg**: one of the 27 SVGs in `assets/svgs/` and `assets/svgs/wireframe/`, loaded into the running game.
 - **SVG Number**: the number of SVGs in the ring, from 10 to 500, 100 by default.
@@ -347,9 +348,9 @@ Inspired by Atari's Tempest (1981): a tube shooter with a tube, enemies, colours
 
 Its knobs pick:
 
-- **Renderer**: GPU (mesh), GPU (atlas) and Canvas draw with `RasterizerPathComponent`s, Flame SVG with Flame's
-  `PathComponent`s. On web, the GPU entries are inactive, as Flutter GPU isn't available there, and the canvas renderer
-  draws the paths.
+- **Renderer**: GPU (mesh), GPU (atlas) and Canvas draw with `RasterizerPathComponent`s, Flame with Flame's
+  `PathComponent`s. Flame is the Flame SVG entry of the other use cases. On web, the GPU entries are inactive, as
+  Flutter GPU isn't available there, and the canvas renderer draws the paths.
 - **Level**: the level a new game starts at, by its number and its tube's name, so that any tube can be seen without
   playing up to it.
 - **Drifting stars**: on by default. On, the stars stay between the zoom and the drop. Off, they only show on those,
@@ -378,8 +379,9 @@ The status bar shows the paths made a second, after the renderer's numbers. Thin
 - `example_test.dart`: the Widgetbook builds. Each use case's knobs fit in windows 800, 840 and 1280 wide, in
   Widgetbook's sheet and side panel. flame_svg's knobs show only with Flame SVG, and Tube Shooter's Glow knob only with
   GPU (mesh). Zoom and Speed are continuous, shown to two decimals in tabular figures. Off Impeller, the GPU entries
-  are inactive in the Renderer knob. With each renderer, faded or not, the Svg Renderers game loads, zooms and slows
-  down in place, takes a new SVG, SVG number and fade in place, and shows a missing SVG's error.
+  are inactive in the Renderer knob, whose Flame SVG shows Flame in Tube Shooter. With each renderer, faded or not, the
+  Svg Renderers game loads, zooms and slows down in place, takes a new SVG, SVG number and fade in place, and shows a
+  missing SVG's error.
 - `cache_knobs_test.dart`: the other use cases' flame_svg knobs show only with Flame SVG, and in Multiple Shapes only
   with SVGs. It's a file of its own, as these games load SVGs at random with flame_svg, whose loads a file's tests
   share.
