@@ -114,10 +114,18 @@ class _CheckPageState() extends State<CheckPage> {
       var maxDiff = 0;
       var over1 = 0;
       var over8 = 0;
+      var drawn = 0;
       for (var i = 0; i < w * h; i++) {
         var d = 0;
         for (var c = 0; c < 4; c++) {
           d = math.max(d, (a[4 * i + c] - b[4 * i + c]).abs());
+        }
+        // Anything but the opaque black background.
+        if (b[4 * i] != 0 ||
+            b[4 * i + 1] != 0 ||
+            b[4 * i + 2] != 0 ||
+            b[4 * i + 3] != 255) {
+          drawn++;
         }
         if (d > maxDiff) {
           maxDiff = d;
@@ -138,7 +146,8 @@ class _CheckPageState() extends State<CheckPage> {
           gameImage.width == referenceImage.width &&
           gameImage.height == referenceImage.height &&
           runs == expectedRuns &&
-          over8 <= w * h ~/ _over8Ratio;
+          over8 <= w * h ~/ _over8Ratio &&
+          drawn >= w * h ~/ _drawnRatio;
       await _save(gameImage, 'flame_check_game');
       await _save(referenceImage, 'flame_check_reference');
       gameImage.dispose();
@@ -148,6 +157,7 @@ class _CheckPageState() extends State<CheckPage> {
           '$runs (expected $expectedRuns), '
           'max diff $maxDiff/255, $over1 pixels over 1/255, $over8 over '
           '8/255 (at most ${w * h ~/ _over8Ratio}), '
+          '$drawn drawn in the reference (at least ${w * h ~/ _drawnRatio}), '
           '${pngDirectory == null ? 'not saved' : 'saved to $pngDirectory'}';
       debugPrint(result);
       if (mounted) {
@@ -182,6 +192,14 @@ class _CheckPageState() extends State<CheckPage> {
       kIsWeb || RasterizerGpu.support == RasterizerSupport.noImpeller
       ? 800
       : 10000;
+
+  /// At least 1 pixel of the reference in this many must differ from the
+  /// black background.
+  ///
+  /// Otherwise two empty frames would match, as on the Android emulator's
+  /// Vulkan with the host GPU, where the canvas renderer's frames came out
+  /// black.
+  static const _drawnRatio = 100;
 
   /// Waits for [n] frames, scheduling each one.
   static Future<void> _frames(int n) async {

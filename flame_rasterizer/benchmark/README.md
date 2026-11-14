@@ -19,7 +19,8 @@ Below, `<device>` is `macos`, an iOS udid or `emulator-5554`.
     change (`RASTERIZER_PAGES`).
 - **`--dart-define=MODE=check`** runs the check. It draws the game, and the same frame composed with rasterizer_gpu's
   API, with transforms computed from the layout rather than by Flame. It reads both back, and logs
-  `FLAME_RASTERIZER check PASS` or `FAIL`. `CHECK_TIME` picks the frame, and so the camera's zoom. Except on web, it
+  `FLAME_RASTERIZER check PASS` or `FAIL`. It also fails when less than 1% of the composed frame is drawn, so that two
+  empty frames don't pass. `CHECK_TIME` picks the frame, and so the camera's zoom. Except on web, it
   saves both images to the temporary directory. In the composed frame:
   - the faded, tinted and hue-turned items draw in one run, with their tint and hue as color transforms, as the game
     folds them;
@@ -33,8 +34,8 @@ Below, `<device>` is `macos`, an iOS udid or `emulator-5554`.
   Android's OpenGL ES, as on the emulator unless built with `IMPELLER_BACKEND=vulkan`, the app picks the canvas renderer
   by itself.
   - On the Android emulator's Vulkan with the host GPU, the check doesn't work (see rasterizer_gpu's README): with
-    Flutter 3.47.9, it hangs, and with Flutter 3.50.0, both frames come out black, so it passes without checking
-    anything. Use OpenGL ES, or start the emulator with `-gpu swiftshader_indirect`.
+    Flutter 3.47.9, it hangs, and with Flutter 3.50.0, it fails, as both frames come out black. Use OpenGL ES, or
+    start the emulator with `-gpu swiftshader_indirect`.
 - **`flutter test integration_test/check_test.dart -d <device> [--dart-define=BACKEND=atlas|canvas]`** runs the check
   as a test, at 4 times, so at camera zooms from 0.5 to 1.6 times the zoom that fits the world.
 - **`flutter test integration_test/limits_test.dart -d <device> [--dart-define=BACKEND=atlas|canvas]`** checks
