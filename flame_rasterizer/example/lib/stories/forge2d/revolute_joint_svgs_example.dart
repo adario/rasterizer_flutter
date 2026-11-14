@@ -457,7 +457,7 @@ class CircleShuffler(final Vector2 _position, {final BodySnapshot? from})
     );
     final shapeDef = ShapeDef(
       density: 50,
-      material: SurfaceMaterial(friction: 0.5, restitution: 0.4),
+      material: SurfaceMaterial(friction: 0.4, restitution: 0.6),
       filter: Filter(maskBits: Filter.allCategories & ~Wall.category),
     );
     for (var i = 0; i < pieces; i++) {
