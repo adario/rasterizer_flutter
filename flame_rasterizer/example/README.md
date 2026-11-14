@@ -445,7 +445,9 @@ Vulkan can't work. A debug or profile build with `IMPELLER_BACKEND=vulkan` or `I
 backend, through the manifest; release builds ignore it. A backend asked for crashes at launch where it can't start:
 Vulkan on some older GPUs, and any backend below API 29, where Flutter renders with Skia. On the emulator's Vulkan with
 its host GPU, the canvas renderer can't draw 100 SVGs: with Flutter 3.47.9 it hangs, and with Flutter 3.50.0 its
-frames come out empty or wrong (see rasterizer_gpu's README). There, `renderers_test.dart` runs with
+frames come out empty or wrong (see rasterizer_gpu's README). Widgetbook's Navigation, Addons and Knobs panels don't
+show there either: the screen dims, but nothing draws above the dimming, even in a plain Flutter app with Flutter
+3.50.0. On that Vulkan, `renderers_test.dart` runs with
 `--name "^(GPU|Flame SVG)"`, without Canvas's games and the switching test, and in full on OpenGL ES.
 
 ## The SVGs' licences
