@@ -104,14 +104,27 @@ void main() {
       '${RasterizerGpu.of(RasterizerBackend.mesh).support.name}, GPU '
       '${RasterizerGpu.support.name} '
       '(${atFirst ? 'at first' : 'after the self-tests'}), '
-      'selected ${menu.initialSelection?.label}',
+      'selected ${menu.initialSelection?.text}',
     );
     expect(
-      [for (final entry in menu.dropdownMenuEntries) entry.label],
-      ['GPU (mesh)', 'GPU (atlas)', 'Canvas', 'Flame SVG'],
+      [for (final entry in menu.dropdownMenuEntries) entry.value],
+      SvgRenderer.values,
     );
+    // An active GPU entry shows the graphics API, an inactive one its label.
+    final gpuText = RegExp(r'^(Metal|Vulkan|GLES) \((mesh|atlas)\)$');
     for (final entry in menu.dropdownMenuEntries) {
-      expect(entry.enabled, entry.value.supported, reason: entry.label);
+      final renderer = entry.value;
+      expect(entry.enabled, renderer.supported, reason: entry.label);
+      if (renderer == SvgRenderer.rasterizer ||
+          renderer == SvgRenderer.rasterizerAtlas) {
+        expect(
+          entry.label,
+          renderer.supported ? matches(gpuText) : renderer.label,
+          reason: renderer.label,
+        );
+      } else {
+        expect(entry.label, renderer.label);
+      }
     }
     // GPU (mesh) is the first choice where it's supported from the start.
     // Otherwise it's Canvas, which the game keeps once GPU (mesh) becomes

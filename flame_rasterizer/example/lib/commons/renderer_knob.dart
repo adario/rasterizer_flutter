@@ -16,6 +16,10 @@ const _gpus = [SvgRenderer.rasterizer, SvgRenderer.rasterizerAtlas];
 /// (see [refreshRendererKnob]). GPU (mesh) is the first choice, or Canvas
 /// where GPU (mesh) is inactive. Widgetbook's own dropdown can't make an
 /// entry inactive, so this knob has a dropdown of its own.
+///
+/// The entries show their [SvgRenderer.text], such as Metal (mesh) for an
+/// active GPU (mesh). Links keep their [SvgRenderer.label], so that a link
+/// picks the same entry on every device.
 SvgRenderer rendererKnob(BuildContext context) {
   final renderer = context.knobs.onKnobAdded(
     _RendererKnob(
@@ -134,7 +138,8 @@ class _RendererField({required super.name, required super.initialValue})
     : super(values: SvgRenderer.values, labelBuilder: (value) => value.label);
 
   /// Builds Widgetbook's dropdown, with the GPU entries inactive where their
-  /// renderers aren't supported.
+  /// renderers aren't supported, and each entry's text. The URL has the
+  /// entry's label, from [labelBuilder].
   @override
   Widget toWidget(BuildContext context, String group, SvgRenderer? value) {
     return DropdownMenu<SvgRenderer>(
@@ -151,7 +156,7 @@ class _RendererField({required super.name, required super.initialValue})
         for (final renderer in values)
           DropdownMenuEntry(
             value: renderer,
-            label: labelBuilder(renderer),
+            label: renderer.text,
             enabled: renderer.supported,
           ),
       ],

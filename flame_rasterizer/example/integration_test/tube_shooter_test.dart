@@ -42,7 +42,7 @@ void main() {
   // its paths.
   testWidgets('warm-up', timeout: _timeout, (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: TubeShooterStory(renderer: SvgRenderer.rasterizer, glow: true),
       ),
     );

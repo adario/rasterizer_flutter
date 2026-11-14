@@ -6,6 +6,8 @@ import 'package:flame/components.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_svg/flame_svg.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 
 /// The SVGs in `assets/svgs/` and its directories, by path without `.svg`.
 /// Svg Renderers' SVG knob lists them all.
@@ -72,7 +74,7 @@ final randomSvgNames = [
 ];
 
 /// What draws an example's SVGs: the Renderer knob's entries, each with its
-/// [label].
+/// [label] in links and its [text] on screen.
 enum SvgRenderer(final String label) {
   /// flame_rasterizer with rasterizer_gpu's mesh renderer, its default.
   ///
@@ -100,6 +102,24 @@ enum SvgRenderer(final String label) {
   /// else the mesh renderer.
   RasterizerBackend get gpu =>
       this == rasterizerAtlas ? RasterizerBackend.gpu : RasterizerBackend.mesh;
+
+  /// What the Renderer knob and the status bar show for it: its [label], or,
+  /// for a GPU entry whose renderer runs, the graphics API that Impeller
+  /// renders with, such as Metal (mesh).
+  String get text => switch (this) {
+    rasterizer when supported => '${_gpuApi()} (mesh)',
+    rasterizerAtlas when supported => '${_gpuApi()} (atlas)',
+    _ => label,
+  };
+
+  /// The graphics API that Impeller renders with, where a GPU renderer runs:
+  /// OpenGL ES, else Metal on Apple's platforms and Vulkan elsewhere.
+  static String _gpuApi() => RasterizerGpu.openGles
+      ? 'GLES'
+      : switch (defaultTargetPlatform) {
+          TargetPlatform.iOS || TargetPlatform.macOS => 'Metal',
+          _ => 'Vulkan',
+        };
 
   /// Whether it draws as its label says, on this device.
   ///
@@ -216,7 +236,7 @@ mixin ExampleRasterizer<W extends World> on StoryGame<W>, HasRasterizer<W> {
     final gpu = RasterizerGpu.of(rasterizerGpu);
     final backend = rasterizer?.backend ?? gpu.backend;
     if (backend != RasterizerBackend.canvas) {
-      return 'flame_rasterizer, ${renderer.label}';
+      return 'flame_rasterizer, ${renderer.text}';
     }
     return forceCanvas
         ? 'flame_rasterizer, canvas (forced)'
