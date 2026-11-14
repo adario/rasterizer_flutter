@@ -50,6 +50,7 @@ const svgNames = [
 ///   Shooter's.
 /// - tiger stays out until the cost of its hitboxes, and of its pieces in
 ///   Box2D, is measured.
+/// - android doesn't really support collisions
 const notRandomSvgNames = {
   'setup_merge',
   'recycle_merge',
@@ -64,6 +65,7 @@ const notRandomSvgNames = {
   'wireframe/rocket_ship',
   'wireframe/missile',
   'tiger',
+  'android',
 };
 
 /// The SVGs that the examples other than Svg Renderers pick at random:
