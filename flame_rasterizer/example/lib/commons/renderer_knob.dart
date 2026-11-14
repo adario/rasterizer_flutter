@@ -6,33 +6,37 @@ import 'package:widgetbook/widgetbook.dart';
 /// The Renderer knob's label, which also names its field in the URL.
 const _label = 'Renderer';
 
-/// The knob's GPU entries, in the order that their self-tests run.
+/// The knob's GPU entries, in the order that their self-tests run, which is
+/// also the order of the first choice.
 const _gpus = [SvgRenderer.rasterizer, SvgRenderer.rasterizerAtlas];
 
 /// The Renderer knob: a dropdown of the [SvgRenderer]s.
 ///
 /// A GPU entry is inactive where its renderer isn't [SvgRenderer.supported]:
 /// on the web, without Impeller, and on OpenGL ES until its self-test passes
-/// (see [refreshRendererKnob]). GPU (mesh) is the first choice, or Canvas
-/// where GPU (mesh) is inactive. Widgetbook's own dropdown can't make an
-/// entry inactive, so this knob has a dropdown of its own.
+/// (see [refreshRendererKnob]). The first choice is GPU (mesh), else GPU
+/// (atlas), else Canvas, whichever is active first. Widgetbook's own dropdown
+/// can't make an entry inactive, so this knob has a dropdown of its own.
 ///
 /// The entries show their [SvgRenderer.text], such as Metal (mesh) for an
 /// active GPU (mesh). Links keep their [SvgRenderer.label], so that a link
 /// picks the same entry on every device.
 SvgRenderer rendererKnob(BuildContext context) {
   final renderer = context.knobs.onKnobAdded(
-    _RendererKnob(
-      initialValue: SvgRenderer.rasterizer.supported
-          ? SvgRenderer.rasterizer
-          : SvgRenderer.rasterizerCanvas,
-    ),
+    _RendererKnob(initialValue: _firstChoice()),
   );
   // A link can pick a GPU entry where it's inactive: Canvas draws then.
   return renderer == null || !renderer.supported
       ? SvgRenderer.rasterizerCanvas
       : renderer;
 }
+
+/// The Renderer knob's first choice: the first active entry of [_gpus], else
+/// Canvas.
+SvgRenderer _firstChoice() => _gpus.firstWhere(
+  (renderer) => renderer.supported,
+  orElse: () => SvgRenderer.rasterizerCanvas,
+);
 
 /// The Zoom knob: the camera's zoom, from 0.25 to 5, on a continuous slider.
 double zoomKnob(BuildContext context) => context.knobs.onKnobAdded(
@@ -94,8 +98,10 @@ SvgCache cacheKnobs(BuildContext context, {required bool shown}) {
 ///
 /// It waits for each renderer's self-test in turn, the mesh renderer's
 /// first. When one passes, it rebuilds the knobs panel. The Renderer knob
-/// keeps the renderer that the game has, from a link or else Canvas, the
-/// first choice until then, so that the game goes on.
+/// keeps an entry that a link or the user picked. Otherwise it takes its new
+/// first choice: from Canvas, if no GPU renderer was supported as the knob
+/// was built, so that the game goes on from where it was with the GPU
+/// renderer. A later pass doesn't change it.
 Future<void> refreshRendererKnob(BuildContext context) async {
   for (final renderer in _gpus) {
     if (renderer.supported) {
@@ -113,7 +119,9 @@ Future<void> refreshRendererKnob(BuildContext context) async {
     state.updateQueryField(
       group: 'knobs',
       field: _label,
-      value: knobs[_label] ?? SvgRenderer.rasterizerCanvas.label,
+      // A link or the user puts the entry in the URL, the first choice
+      // doesn't. Written down, it stays as the next self-test passes.
+      value: knobs[_label] ?? _firstChoice().label,
     );
   }
 }

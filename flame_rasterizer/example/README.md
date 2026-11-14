@@ -49,8 +49,10 @@ a little later. Its knobs, in Widgetbook's panel, pick:
   - Flame SVG: flame_svg.
 
   A GPU entry is inactive where its renderer isn't supported: on web, off Impeller, and on OpenGL ES until its
-  self-test passes. The example starts the self-tests, the mesh renderer's first. GPU (mesh) is the first choice, or
-  Canvas where GPU (mesh) is inactive. An active GPU entry shows the graphics API that Impeller renders with: Metal
+  self-test passes. The example starts the self-tests, the mesh renderer's first. The first choice is GPU (mesh), else
+  GPU (atlas), else Canvas, whichever is active. On OpenGL ES, that's Canvas at first; when a self-test passes, the
+  knob switches to that GPU entry, and the game goes on from where it was, unless a link or you picked an entry. An
+  active GPU entry shows the graphics API that Impeller renders with: Metal
   (mesh) and Metal (atlas) on iOS and macOS, Vulkan (mesh) and Vulkan (atlas) on Android, and GLES (mesh) and GLES
   (atlas) on OpenGL ES. Links keep GPU (mesh) and GPU (atlas), so that a link picks the same entry on every device.
   Widgetbook's dropdown can't make an entry inactive, so this knob is the example's own (`commons/renderer_knob.dart`).
@@ -411,9 +413,9 @@ The integration tests, in `integration_test/`, run on a device, with
 
 - `knobs_test.dart`, on a phone: the Svg menu reaches its last SVG, above the system's bars. The app sits in the safe
   area, as Flutter's menus can be as tall as the screen, but are placed in its safe area. The Renderer knob's GPU
-  entries are active where their renderers are supported, and then show the graphics API, such as Metal (mesh): GPU
-  (mesh) is the first choice if it's supported from the start, else once the OpenGL ES self-tests pass, with Canvas
-  kept. Tube Shooter's Glow knob shows with GPU (mesh).
+  entries are active where their renderers are supported, and then show the graphics API, such as Metal (mesh). The
+  knob picks the first active one, after the OpenGL ES self-tests too, but keeps the Canvas of a link. Tube Shooter's
+  Glow knob shows with GPU (mesh).
 - `renderers_test.dart`: each renderer draws all 27 SVGs, every other one faded, with 100 in the ring, and
   flame_rasterizer draws them in one run. Then the test switches between renderers.
 - `collidable_test.dart`: Collidable Svgs with each renderer, with 4 and 50 SVGs, for about two seconds.

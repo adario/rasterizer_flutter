@@ -4,7 +4,8 @@
 //
 // Every SVG must be reachable in the Svg menu, the last one too, above the
 // system's bars. The Renderer knob's GPU entries must be active only where
-// their renderers are supported. Tube Shooter's Glow knob must show with
+// their renderers are supported, and the knob must pick the first active
+// one, unless a link picks Canvas. Tube Shooter's Glow knob must show with
 // GPU (mesh).
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
@@ -12,6 +13,7 @@ import 'package:flame_rasterizer_example/main.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg_renderers_example.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:widgetbook/widgetbook.dart' show FieldCodec;
 
 void main() {
   // Fully live, so that frames draw while the tests await: on OpenGL ES, the
@@ -126,13 +128,52 @@ void main() {
         expect(entry.label, renderer.label);
       }
     }
-    // GPU (mesh) is the first choice where it's supported from the start.
-    // Otherwise it's Canvas, which the game keeps once GPU (mesh) becomes
-    // active.
+    // The first choice is the first active entry of GPU (mesh), GPU (atlas)
+    // and Canvas. On OpenGL ES, it's Canvas at first, and the knob switches
+    // to a GPU entry once its self-test passes.
     expect(
       menu.initialSelection,
-      atFirst ? SvgRenderer.rasterizer : SvgRenderer.rasterizerCanvas,
+      SvgRenderer.values.firstWhere((renderer) => renderer.supported),
     );
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('the Renderer knob keeps the Canvas of a link', (tester) async {
+    Future<void> settle() async {
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    final route = Uri(
+      path: '/',
+      queryParameters: {
+        'path': 'svg/svg-renderers',
+        'knobs': FieldCodec.encodeQueryGroup({'Renderer': 'Canvas'}),
+      },
+    );
+    await tester.pumpWidget(
+      FlameRasterizerExamples(initialRoute: route.toString()),
+    );
+    await settle();
+    // On OpenGL ES, the GPU entries become active, but a link's entry stays.
+    await tester.runAsync(() async {
+      for (final renderer in [
+        SvgRenderer.rasterizer,
+        SvgRenderer.rasterizerAtlas,
+      ]) {
+        await RasterizerGpu.of(renderer.gpu).initialize();
+      }
+    });
+    await settle();
+    if (find.text('Renderer').evaluate().isEmpty) {
+      await tester.tap(find.text('Knobs'));
+      await settle();
+    }
+    final menu = tester.widget<DropdownMenu<SvgRenderer>>(
+      find.byType(DropdownMenu<SvgRenderer>),
+    );
+    expect(menu.initialSelection, SvgRenderer.rasterizerCanvas);
     await tester.pumpWidget(const SizedBox());
   });
 
