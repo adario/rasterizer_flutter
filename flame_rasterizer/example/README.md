@@ -165,7 +165,8 @@ Its knobs pick:
   closely the bodies follow the SVGs.
 - **Zoom**: the camera's zoom, on top of the world's 10 pixels a meter. The walls stay put.
 - **Speed**: the physics' speed.
-- **Cache mode** and **Cache size**: as in Collidable Svgs.
+- **Cache mode** and **Cache size**: as in Collidable Svgs. The SVGs are sized in pixels and scaled to meters, so that
+  fixed mode rasterizes them at 10 pixels a meter, not at their size in meters.
 
 The status bar adds the balls and SVGs dropped. As in flame_path_shapes, the number of bodies, the walls, ramps and
 wheel included, is at the top right.
@@ -396,7 +397,8 @@ The status bar shows the paths made a second, after the renderer's numbers. Thin
   hides the cache knobs. At speed 0, the shapes stand still. A shape wholly outside the arena comes back in on the other
   side.
 - `forge2d_test.dart`: each SVG's convex pieces fit Box2D at each size. A tap drops 15 bodies, which stay inside the
-  walls, the SVG bodies in one run, with Pieces on too. 130 games, one after another, have room for their Box2D worlds.
+  walls, the SVG bodies in one run, with Pieces on too. Their SVGs are sized in pixels and scaled to meters. 130 games,
+  one after another, have room for their Box2D worlds.
 - `svg_shooter_test.dart`: Svg Shooter loads with each renderer, with the player and each enemy hitboxed, and the
   health, the score and the number of components at the bottom right. Its waves, their first wave, the robots' swings,
   the tilted enemies, the player's drags, keys and volleys, its colours, the hits, the health, Game Over and the stars

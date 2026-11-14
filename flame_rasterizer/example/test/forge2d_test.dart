@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flame/components.dart' show TextComponent;
+import 'package:flame/components.dart' show PositionComponent, TextComponent;
 import 'package:flame/game.dart';
 import 'package:flame_forge2d/flame_forge2d.dart' as forge2d;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
@@ -114,6 +114,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
     }
     expect(game.svgBodies.length + game.balls.length, 15);
+    // The SVGs are sized in pixels, for flame_svg's fixed cache mode, and
+    // scaled back to meters.
+    for (final body in game.svgBodies) {
+      final svg = body.children.whereType<PositionComponent>().single;
+      expect(svg.size, body.size * game.metersToPixels);
+      expect(svg.scaledSize.x, closeTo(body.size.x, 1e-6));
+      expect(svg.scaledSize.y, closeTo(body.size.y, 1e-6));
+    }
     final arena = Rect.fromCenter(
       center: Offset.zero,
       width: game.size.x / game.metersToPixels,

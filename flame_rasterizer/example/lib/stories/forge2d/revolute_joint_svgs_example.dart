@@ -366,9 +366,13 @@ class SvgBody(
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    // Sized in pixels and scaled back to meters, as flame_svg's fixed cache
+    // mode rasterizes an SVG at its component's size, without the camera's.
+    final pixels = gameRef.metersToPixels;
     add(
       svg.component()
-        ..size = size
+        ..size = size * pixels
+        ..scale = Vector2.all(1 / pixels)
         ..anchor = Anchor.center,
     );
   }
