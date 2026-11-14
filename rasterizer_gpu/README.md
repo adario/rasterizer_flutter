@@ -51,11 +51,14 @@ emulator's OpenGL ES, its self-test passes 4× multisampled. On the iPhone, its 
 tests pass too, and on the iOS Simulator its golden tests pass against the `macos` set. Its goldens are recorded on
 macOS, the iPhone, the emulator, and in the Linux container, where it draws on llvmpipe.
 
-On the emulator's Vulkan with the Mac's GPU, Impeller can't draw a frame of more than about 800 draws, with or without
-this package. The emulator reports a full descriptor pool as `ErrorFragmentedPool`. Impeller, as of Flutter 3.47.9,
-doesn't replace the pool on that error, as it does on `ErrorOutOfPoolMemory`, so the app hangs or crashes. The canvas
-renderer, which draws each path, reaches that limit with a few hundred SVGs. To test it there, use OpenGL ES, or the
-emulator's software GPU (`emulator -avd <name> -gpu swiftshader_indirect`), whose Vulkan reports the full pool.
+On the emulator's Vulkan with the Mac's GPU, the canvas renderer, which draws each path, doesn't reliably draw frames of
+a few hundred paths or more. The emulator reports a full descriptor pool as `ErrorFragmentedPool`. Flutter 3.47.9's
+Impeller doesn't replace the pool on that error, as it does on `ErrorOutOfPoolMemory`, so a frame of more than about
+800 draws hangs or crashes the app, with or without this package. Flutter 3.50.0's Impeller replaces it, but such
+frames come out empty or wrong, on screen as in `toImage`, and the heaviest, such as 100 of the example's tigers, of
+301 paths each, make the emulator's memory grow by gigabytes within seconds. The emulator's OpenGL ES, and its software
+GPU (`emulator -avd <name> -gpu swiftshader_indirect`), whose Vulkan reports the full pool, draw them. To test the
+canvas renderer on the emulator, use either.
 
 ## App setup
 

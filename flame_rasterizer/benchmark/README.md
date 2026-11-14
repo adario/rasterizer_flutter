@@ -32,8 +32,9 @@ Below, `<device>` is `macos`, an iOS udid or `emulator-5554`.
   supported. It draws each SVG as a picture, or its paths with `--dart-define=CANVAS_PICTURES=false`. On web, and on
   Android's OpenGL ES, as on the emulator unless built with `IMPELLER_BACKEND=vulkan`, the app picks the canvas renderer
   by itself.
-  - On the Android emulator's Vulkan with the host GPU, the check hangs, as any frame of more than about 800 draws does
-    there (see rasterizer_gpu's README). Use OpenGL ES, or start the emulator with `-gpu swiftshader_indirect`.
+  - On the Android emulator's Vulkan with the host GPU, the check doesn't work (see rasterizer_gpu's README): with
+    Flutter 3.47.9, it hangs, and with Flutter 3.50.0, both frames come out black, so it passes without checking
+    anything. Use OpenGL ES, or start the emulator with `-gpu swiftshader_indirect`.
 - **`flutter test integration_test/check_test.dart -d <device> [--dart-define=BACKEND=atlas|canvas]`** runs the check
   as a test, at 4 times, so at camera zooms from 0.5 to 1.6 times the zoom that fits the world.
 - **`flutter test integration_test/limits_test.dart -d <device> [--dart-define=BACKEND=atlas|canvas]`** checks
