@@ -318,9 +318,16 @@ void main() {
         ..physicalSize = const Size(1280, 800)
         ..devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(
-        FlameRasterizerExamples(initialRoute: '/?path=$path'),
+      // Tube Shooter's sounds, which it loads before it starts its status,
+      // don't load in a test's fake time.
+      final route = Uri(
+        path: '/',
+        queryParameters: {
+          'path': path,
+          if (path == 'games/tube-shooter') 'knobs': '{Sound:false}',
+        },
       );
+      await tester.pumpWidget(FlameRasterizerExamples(initialRoute: '$route'));
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
