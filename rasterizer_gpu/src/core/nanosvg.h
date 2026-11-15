@@ -1452,10 +1452,53 @@ static unsigned int nsvg__parseColor(const char* str)
 	return nsvg__parseColorName(str);
 }
 
+// Reads a number as sscanf's "%f" does, after any whitespace, but always with a '.' as its decimal point: sscanf follows
+// the C locale's LC_NUMERIC, which a GTK app sets from the user's, so "0.5" read as 0 under a locale such as en_DK or
+// de_DE. Returns whether it read one, and sets *end to the character after it.
+static int nsvg__parseFloat(const char* s, float* val, const char** end)
+{
+	char it[64];
+	const char* start;
+	int digits = 0, n;
+	while (*s && nsvg__isspace(*s)) s++;
+	start = s;
+	if (*s == '-' || *s == '+') s++;
+	while (nsvg__isdigit(*s)) {
+		s++;
+		digits++;
+	}
+	if (*s == '.') {
+		s++;
+		while (nsvg__isdigit(*s)) {
+			s++;
+			digits++;
+		}
+	}
+	if (digits == 0) {
+		*end = start;
+		return 0;
+	}
+	// An exponent only with its digits, so that "1em" is 1 and its units em
+	if (*s == 'e' || *s == 'E') {
+		const char* e = s + 1;
+		if (*e == '-' || *e == '+') e++;
+		if (nsvg__isdigit(*e)) {
+			while (nsvg__isdigit(*e)) e++;
+			s = e;
+		}
+	}
+	n = (int)(s - start) < 63 ? (int)(s - start) : 63;
+	memcpy(it, start, n);
+	it[n] = '\0';
+	*val = (float)nsvg__atof(it);
+	*end = s;
+	return 1;
+}
+
 static float nsvg__parseOpacity(const char* str)
 {
 	float val = 0;
-	sscanf(str, "%f", &val);
+	nsvg__parseFloat(str, &val, &str);
 	if (val < 0.0f) val = 0.0f;
 	if (val > 1.0f) val = 1.0f;
 	return val;
@@ -1464,7 +1507,7 @@ static float nsvg__parseOpacity(const char* str)
 static float nsvg__parseMiterLimit(const char* str)
 {
 	float val = 0;
-	sscanf(str, "%f", &val);
+	nsvg__parseFloat(str, &val, &str);
 	if (val < 0.0f) val = 0.0f;
 	return val;
 }
@@ -1496,7 +1539,13 @@ static NSVGcoordinate nsvg__parseCoordinateRaw(const char* str)
 {
 	NSVGcoordinate coord = {0, NSVG_UNITS_USER};
 	char units[32]="";
-	sscanf(str, "%f%31s", &coord.value, units);
+	int i = 0;
+	// As sscanf's "%f%31s": the units are the non-space characters after the number and any whitespace
+	if (nsvg__parseFloat(str, &coord.value, &str)) {
+		while (*str && nsvg__isspace(*str)) str++;
+		while (*str && !nsvg__isspace(*str) && i < 31) units[i++] = *str++;
+		units[i] = '\0';
+	}
 	coord.units = nsvg__parseUnits(units);
 	return coord;
 }
@@ -2547,7 +2596,14 @@ static void nsvg__parseSVG(NSVGparser* p, const char** attr)
 			} else if (strcmp(attr[i], "height") == 0) {
 				p->image->height = nsvg__parseCoordinate(p, attr[i + 1], 0.0f, 0.0f);
 			} else if (strcmp(attr[i], "viewBox") == 0) {
-				sscanf(attr[i + 1], "%f%*[%%, \t]%f%*[%%, \t]%f%*[%%, \t]%f", &p->viewMinx, &p->viewMiny, &p->viewWidth, &p->viewHeight);
+				// As sscanf's "%f%*[%%, \t]%f%*[%%, \t]%f%*[%%, \t]%f": it stops at the first value it can't read
+				float* box[4] = { &p->viewMinx, &p->viewMiny, &p->viewWidth, &p->viewHeight };
+				const char* s = attr[i + 1];
+				for (int k = 0; k < 4 && nsvg__parseFloat(s, box[k], &s); k++) {
+					const char* sep = s;
+					while (*s && strchr("%, \t", *s)) s++;
+					if (s == sep) break;
+				}
 			} else if (strcmp(attr[i], "preserveAspectRatio") == 0) {
 				if (strstr(attr[i + 1], "none") != 0) {
 					// No uniform scaling
