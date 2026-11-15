@@ -99,10 +99,13 @@ RasterizerSupport checkSupport() {
 /// which may be transient. Only a conclusive failure is remembered. The test
 /// runs wherever the renderer can, as tests check it on Metal and Vulkan too.
 ///
-/// The GPU renderer's test renders [selfTestSvg], accumulating in r32Float,
-/// else in r16g16b16a16Float. The format that passes becomes
-/// [accumulationFormat], unless [apply] is false. The mesh renderer's test
-/// renders it through an affine transform and a projective one. For tests,
+/// Each test renders [selfTestSvg]'s scene, built without parsing it
+/// (`src/ra_self_test.hpp`), so that it checks the GPU alone: a parser's bug
+/// would fail it as if the GPU drew wrongly. The GPU renderer's test
+/// accumulates coverage in r32Float, else in r16g16b16a16Float. The format
+/// that passes becomes [accumulationFormat], unless [apply] is false. The mesh
+/// renderer's test renders the scene through an affine transform and a
+/// projective one. For tests,
 /// [fail] names formats to treat as failing, and `mesh` fails the mesh
 /// renderer's test.
 Future<({bool passed, String detail, bool conclusive})> selfTest(
@@ -190,8 +193,8 @@ Future<({bool passed, String detail, bool conclusive})> selfTest(
   );
 }
 
-/// Renders [selfTestSvg] with curves and without, and reads it back through a
-/// canvas.
+/// Renders [selfTestSvg]'s scene with curves and without, and reads it back
+/// through a canvas.
 ///
 /// Returns null if its pixels are as expected, else the failure.
 Future<String?> _selfTest(gpu.PixelFormat format, _SelfTestRun testRun) async {
@@ -200,9 +203,8 @@ Future<String?> _selfTest(gpu.PixelFormat format, _SelfTestRun testRun) async {
   if (library == null) {
     return "can't load ${RasterizerGpu.shaderBundle}";
   }
-  final scene = AtlasScene(
-    ra.Scene.fromSvgBytes(Uint8List.fromList(selfTestSvg.codeUnits)),
-  );
+  // Built without parsing, so that a parser's bug doesn't fail the GPU.
+  final scene = AtlasScene(ra.Scene.selfTest());
   AtlasRenderer? renderer;
   try {
     await testRun.step();
@@ -235,8 +237,8 @@ Future<String?> _selfTest(gpu.PixelFormat format, _SelfTestRun testRun) async {
   }
 }
 
-/// Renders [selfTestSvg] with a mesh renderer, and reads it back through a
-/// canvas.
+/// Renders [selfTestSvg]'s scene with a mesh renderer, and reads it back
+/// through a canvas.
 ///
 /// It renders through an affine transform, then through a projective one that
 /// draws the same. Returns null if the pixels are as expected, else the
@@ -247,10 +249,8 @@ Future<String?> _meshSelfTest(_SelfTestRun testRun) async {
   if (library == null) {
     return "can't load ${RasterizerGpu.shaderBundle}";
   }
-  final scene = parseMeshScene(
-    Uint8List.fromList(selfTestSvg.codeUnits),
-    selfTestSize.toDouble(),
-  );
+  // Built without parsing, so that a parser's bug doesn't fail the GPU.
+  final scene = MeshScene(ra.Mesh.selfTest(maxSize: selfTestSize.toDouble()));
   MeshRenderer? renderer;
   try {
     await testRun.step();

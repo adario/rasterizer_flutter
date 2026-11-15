@@ -142,6 +142,9 @@ external Pointer<RaSceneHandle> ra_scene_from_svg_data(
   Pointer<RaTransform> ctm,
 );
 
+@Native<Pointer<RaSceneHandle> Function(Pointer<RaTransform>)>()
+external Pointer<RaSceneHandle> ra_scene_self_test(Pointer<RaTransform> ctm);
+
 @Native<Void Function(Pointer<RaSceneHandle>)>()
 external void ra_scene_release(Pointer<RaSceneHandle> scene);
 
@@ -305,6 +308,9 @@ external Pointer<RaMeshHandle> ra_mesh_from_svg_data(
   int length,
   double maxSize,
 );
+
+@Native<Pointer<RaMeshHandle> Function(Float)>()
+external Pointer<RaMeshHandle> ra_mesh_self_test(double maxSize);
 
 @Native<RaMeshData Function(Pointer<RaMeshHandle>)>(isLeaf: true)
 external RaMeshData ra_mesh_data(Pointer<RaMeshHandle> mesh);

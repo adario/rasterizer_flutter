@@ -8,6 +8,7 @@
 #include "ra_frame.hpp"
 #include "ra_mesh.hpp"
 #include "ra_paths.hpp"
+#include "ra_self_test.hpp"
 #include "RasterizerSVG.hpp"
 
 struct RaScene { Ra::SceneRef scene; RaBounds svgBounds = { 0.f, 0.f, 0.f, 0.f }; };
@@ -94,6 +95,9 @@ RaScene *ra_scene_from_svg(const char *path, RaTransform *ctm) {
 }
 RaScene *ra_scene_from_svg_data(const char *data, uint64_t length, RaTransform *ctm) {
     return sceneFromImage(guarded<NSVGimage *>(nullptr, [&] { return parseSvgData(data, length); }), ctm);
+}
+RaScene *ra_scene_self_test(RaTransform *ctm) {
+    return sceneFromImage(RaSelfTest::image(), ctm);
 }
 void ra_scene_release(RaScene *scene) {
     delete scene;
@@ -206,15 +210,23 @@ RaFrame ra_render(RaRenderer *renderer, const RaList *list, float w, float h, fl
     return frame;
 }
 
-RaMesh *ra_mesh_from_svg_data(const char *data, uint64_t length, float maxSize) {
-    if (!(maxSize > 0.f) || !isfinite(maxSize))
-        return nullptr;
-    NSVGimage *image = guarded<NSVGimage *>(nullptr, [&] { return parseSvgData(data, length); });
+// Imports an image, which it deletes, into a new mesh
+static RaMesh *meshFromImage(NSVGimage *image, float maxSize) {
     if (image == nullptr)
         return nullptr;
     RaMesh *mesh = guarded<RaMesh *>(nullptr, [&] { return RasterizerMesh::createMesh(image, svgBounds(image), maxSize); });
     nsvgDelete(image);
     return mesh;
+}
+RaMesh *ra_mesh_from_svg_data(const char *data, uint64_t length, float maxSize) {
+    if (!(maxSize > 0.f) || !isfinite(maxSize))
+        return nullptr;
+    return meshFromImage(guarded<NSVGimage *>(nullptr, [&] { return parseSvgData(data, length); }), maxSize);
+}
+RaMesh *ra_mesh_self_test(float maxSize) {
+    if (!(maxSize > 0.f) || !isfinite(maxSize))
+        return nullptr;
+    return meshFromImage(RaSelfTest::image(), maxSize);
 }
 RaMeshData ra_mesh_data(const RaMesh *mesh) {
     bool small = mesh->indices32.empty();

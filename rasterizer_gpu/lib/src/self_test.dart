@@ -5,6 +5,11 @@ import 'dart:typed_data';
 
 /// A 160 x 160 SVG for the OpenGL ES self-test.
 ///
+/// The self-test doesn't parse it: `src/ra_self_test.hpp` builds its shapes as
+/// NanoSVG parses them, so that a parser's bug can't fail the GPU renderers.
+/// A change here needs the same change there, which
+/// `test/self_test_scene_test.dart` checks.
+///
 /// Drawn by the GPU renderer, its paths make each kind of entry that the core
 /// writes for SVGs: opaques (the opaque paths' inner cells), instances, fast
 /// and quad edges, and fast and quad molecules (the small paths). Back to
@@ -75,6 +80,10 @@ const List<({int x, int y, List<_Colour> layers})> _probes = [
   (x: 80, y: 146, layers: [_orange]),
   (x: 80, y: 139, layers: [_orange]),
 ];
+
+/// The pixels that [checkSelfTest] checks.
+Iterable<({int x, int y})> get selfTestPixels =>
+    _probes.map((p) => (x: p.x, y: p.y));
 
 /// The largest difference allowed in each channel from the expected colour,
 /// for the rounding of alpha and of blending to 8 bits.
