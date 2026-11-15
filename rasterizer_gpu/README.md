@@ -34,8 +34,8 @@ On each, the example's golden tests pass with the GPU and canvas renderers:
 
 - The iPhone's set matches macOS's within 1/255, except for the tiger sweep's frame 119, where at most 141 pixels
   differ, by up to 10/255. The emulator's Vulkan and OpenGL ES sets match macOS's within 1/255.
-- On macOS, the emulator's Vulkan and OpenGL ES, and in the Linux container, the format probe, defer and atlas tests
-  pass too; on the iPhone and the iOS Simulator, the atlas test does.
+- On macOS, the iPhone, the iOS Simulator, the emulator's Vulkan and OpenGL ES, and in the Linux container, the format
+  probe, defer and atlas tests pass too.
 - On web, in headless Chrome with CanvasKit and with skwasm, the canvas renderer's golden tests pass against the
   `macos` set, and so does the opacity test.
 - On Skia (`--no-enable-impeller`, or API 28), on macOS and the emulators, the canvas renderer's golden tests and the
@@ -45,10 +45,10 @@ Not tested: other iPhone or iPad GPUs, physical Android devices, Linux on a GPU 
 Windows.
 
 The mesh renderer passes its own tests (`mesh_test`, `projective_test` and the opacity test) on macOS, on the iOS
-Simulator, in the Linux container, and on the emulator's Vulkan and OpenGL ES, and all but the iOS Simulator pass the
-defer test too. On the emulator's OpenGL ES, it draws 4× multisampled. On the iPhone, its golden, mesh, opacity and projective
-tests pass too, and on the iOS Simulator its golden tests pass against the `macos` set. Its goldens are recorded on
-macOS, the iPhone, the emulator, and in the Linux container, where it draws on llvmpipe.
+Simulator, in the Linux container, and on the emulator's Vulkan and OpenGL ES, and the defer test too. On the
+emulator's OpenGL ES, it draws 4× multisampled. On the iPhone, its golden, mesh, opacity and projective tests pass too,
+and on the iOS Simulator its golden tests pass against the `macos` set. Its goldens are recorded on macOS, the iPhone,
+the emulator, and in the Linux container, where it draws on llvmpipe.
 
 On the emulator's Vulkan with the Mac's GPU, the canvas renderer, which draws each path, doesn't reliably draw frames of
 a few hundred paths or more. The emulator reports a full descriptor pool as `ErrorFragmentedPool`. Flutter 3.47.9's
