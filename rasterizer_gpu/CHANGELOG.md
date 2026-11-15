@@ -15,8 +15,8 @@
 - SVGs read opacities, lengths and viewBoxes the same whatever the C locale.
   Under a locale whose decimal point is a comma, such as `en_DK` or `de_DE`,
   which a GTK app on Linux sets from the user's, `0.5` read as 0: translucent
-  paths vanished, and lengths lost their fractions. Lengths in `em` or `ex`
-  with a fraction, such as `0.25em`, no longer read as 0 on Linux.
+  paths vanished, and lengths lost their fractions. Lengths in `em` or `ex`,
+  such as `1em`, no longer read as 0 with glibc, as on Linux, in any locale.
 - The OpenGL ES self-tests no longer parse their SVG: its scene is built as
   NanoSVG parses it, so they check the GPU alone. Under such a locale, both
   failed, and the canvas renderer drew on Linux on any GPU.

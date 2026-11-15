@@ -71,6 +71,13 @@ void _checkNumbers() {
   );
   expect(m.paths.single.color[3], closeTo(0.75, 0.01));
   expect(m.bounds.ux, closeTo(3.5, 1e-4));
+  // A whole length in exes, which glibc's sscanf read as nothing, as it took
+  // the e for an exponent's.
+  m = _mesh(
+    '<rect x="1" y="1" font-size="10" width="1ex" height="3" '
+    'fill="#00ff00"/>',
+  );
+  expect(m.bounds.width, greaterThan(0));
   // A stroke's width.
   m = _mesh(
     '<path d="M10,10 L50,10" fill="none" stroke="#0000ff" '
