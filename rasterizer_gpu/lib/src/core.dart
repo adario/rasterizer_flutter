@@ -316,6 +316,30 @@ class Scene._(
     });
   }
 
+  /// The OpenGL ES self-test's scene: [selfTestSvg]'s, built without parsing
+  /// it, so that the self-test checks the GPU alone.
+  factory Scene.selfTest() {
+    return using((arena) {
+      final ctm = arena<raw.RaTransform>();
+      final handle = raw.ra_scene_self_test(ctm);
+      // The core returns null when it runs out of memory.
+      if (handle == nullptr) {
+        throw OutOfMemoryError();
+      }
+      return Scene._(
+        handle,
+        Transform(
+          ctm.ref.a,
+          ctm.ref.b,
+          ctm.ref.c,
+          ctm.ref.d,
+          ctm.ref.tx,
+          ctm.ref.ty,
+        ),
+      );
+    });
+  }
+
   /// Creates a scene of [draws] of [contours]' paths, the contours' lists one
   /// after the other.
   ///
@@ -465,6 +489,27 @@ class Mesh._(raw.RaMeshData n) {
     });
     if (handle == nullptr) {
       throw ArgumentError('Not parseable SVG data');
+    }
+    return _copied(handle);
+  }
+
+  /// The OpenGL ES self-test's mesh: [selfTestSvg]'s, as [Mesh.fromSvgBytes]
+  /// imports it, but built without parsing it, so that the self-test checks
+  /// the GPU alone.
+  ///
+  /// Throws an [ArgumentError] if [maxSize] isn't a positive finite number.
+  factory Mesh.selfTest({required double maxSize}) {
+    if (!(maxSize > 0) || !maxSize.isFinite) {
+      throw ArgumentError.value(
+        maxSize,
+        'maxSize',
+        'Not a positive finite number',
+      );
+    }
+    final handle = raw.ra_mesh_self_test(maxSize);
+    // The core returns null when it runs out of memory.
+    if (handle == nullptr) {
+      throw OutOfMemoryError();
     }
     return _copied(handle);
   }

@@ -78,3 +78,10 @@ After a change here, `python3 -I ../../tool/make_patch.py <Rasterizer checkout>`
       transform.
     - On a ring of tigers at zooms 0.5 and 1, the core's CPU time, summed over its threads, fell by a quarter to a
       third. The Flame benchmark's tiger mode didn't change measurably.
+11. **Numbers read whatever the locale**, in `nanosvg.h`: opacities, miter limits, lengths with their units, and the
+    viewBox. NanoSVG read them with `sscanf`'s `%f`, which follows the C locale's decimal point. A GTK app sets that
+    locale from the user's, so under one whose decimal point is a comma, such as `en_DK` or `de_DE`, `0.5` read as 0:
+    each translucent path vanished, and lengths lost their fractions. They're now read as path data already was, with
+    NanoSVG's own `nsvg__atof`, through `nsvg__parseFloat`, which otherwise reads as `%f` did, but for one case: an `e`
+    is an exponent only with digits after it. glibc's `%f` took the `e` of a length in `em` or `ex`, such as `1em`, as one,
+    then failed, so the length was 0 in any locale. `test/svg_locale_test.dart` checks both.

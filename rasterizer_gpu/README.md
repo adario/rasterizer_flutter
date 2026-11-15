@@ -438,8 +438,9 @@ everywhere, for scenes and renderers created after the app sets it.
   - `lib/src/paths/` has the scenes of paths: `path_contours.dart`, with the contour sampler copied from Flame, and
     `scene_paths.dart`, the paths and paints a scene is made of. `lib/src/canvas_paths.dart` is what the canvas
     renderer draws: an SVG's paths, or those.
-  - `lib/src/self_test.dart` has the OpenGL ES self-test's scene and the pixels it checks,
-    `lib/src/self_test_cache.dart` the remembered failures, and `lib/src/switching.dart` the scenes and renderers that
+  - `lib/src/self_test.dart` has the OpenGL ES self-test's SVG and the pixels it checks, and `src/ra_self_test.hpp`
+    builds that SVG's shapes without parsing it, so that the self-test checks the GPU alone.
+    `lib/src/self_test_cache.dart` has the remembered failures, and `lib/src/switching.dart` the scenes and renderers that
     switch from the canvas renderer to a GPU renderer.
   - `lib/src/rasterizer_canvas.dart` is `RasterizerCanvas`.
   - `lib/src/core.dart` is the core's FFI API, internal and native only, with the GPU renderer's debug hooks, for the
@@ -448,7 +449,8 @@ everywhere, for scenes and renderers created after the app sets it.
 - `android/` is an Android library with no code, for its manifest.
 - `test/` runs with `flutter test`. Among its tests, `core_test.dart` tests the core through FFI, on generated scenes,
   `mesh_test.dart` the mesh import's triangles, `svg_paths_test.dart` the canvas renderer's SVG import, against the
-  core's, and `path_contours_test.dart` and `path_scene_test.dart` the scenes of paths.
+  core's, `path_contours_test.dart` and `path_scene_test.dart` the scenes of paths, `self_test_scene_test.dart` that the
+  self-test's built scene is its SVG's, and `svg_locale_test.dart` that SVGs read the same whatever the C locale.
 - `example/` is the example app, with the golden tests: see its `README.md` and `TESTING.md`.
 - `tool/compare_frames.py` compares two of the core's frames, as the golden tests record them.
 - `tool/make_patch.py` rewrites `src/core/upstream.patch` from a Rasterizer checkout.
