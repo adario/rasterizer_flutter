@@ -41,7 +41,6 @@ void main() {
         await tester.pump();
       }
       expect(game.isLoaded, isTrue);
-      await settleRenderer(tester, renderer);
       // About two seconds of fire, sweeping from side to side.
       final gesture = await tester.startGesture(tester.getCenter(gameWidget));
       for (var i = 0; i < 120; i++) {

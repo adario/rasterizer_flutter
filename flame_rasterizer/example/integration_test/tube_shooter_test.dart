@@ -15,7 +15,6 @@
 // fall back to the canvas renderer.
 import 'package:flame/components.dart' show PathComponent;
 import 'package:flame/game.dart';
-import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
@@ -35,7 +34,6 @@ const _timeout = Timeout(Duration(minutes: 1));
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-  RasterizerGpu.allowOpenGles = true;
 
   // On a phone, in debug mode, the app's first frames are so slow that the
   // first game's zoom, which lasts a fixed time, has too few of them to count
@@ -113,9 +111,6 @@ Future<void> pumpFor(
 ///
 /// No frame may fall back to the canvas renderer or to `Canvas.drawPath`.
 Future<void> wholeGame(WidgetTester tester, SvgRenderer renderer) async {
-  // Initialize the renderer first: on OpenGL ES, the Renderer knob offers it
-  // only once its self-test has passed.
-  await tester.runAsync(() => RasterizerGpu.of(renderer.gpu).initialize());
   expect(renderer.supported, isTrue);
   await tester.pumpWidget(
     MaterialApp(home: TubeShooterStory(renderer: renderer, glow: true)),
@@ -219,7 +214,6 @@ Future<void> play(
   expect(game.state, TubeState.ready);
   expect(frames, greaterThan(0));
   expect(remade, frames);
-  await settleRenderer(tester, renderer);
   // A zapper's pulse destroys the ship in the zapper's lane, at any depth,
   // and the sweep can cross that lane. No drop would follow, so remove the
   // zappers.

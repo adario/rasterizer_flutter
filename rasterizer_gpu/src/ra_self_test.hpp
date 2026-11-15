@@ -1,10 +1,10 @@
 #pragma once
 //
-//  The OpenGL ES self-test's image: selfTestSvg in lib/src/self_test.dart, built as NanoSVG parses it, without parsing it
+//  The OpenGL ES format probe's image: selfTestSvg in lib/src/self_test.dart, built as NanoSVG parses it, without parsing it
 //
-//  So the self-test checks the GPU renderers alone. Parsed, a parser's bug failed it as if the GPU drew wrongly: under a
-//  locale whose decimal point is a comma, NanoSVG read fill-opacity="0.5" as 0, and the translucent paths vanished.
-//  test/self_test_scene_test.dart checks that this image covers the self-test's pixels with the same paths as the SVG.
+//  So the probe checks the GPU renderer alone. Parsed, a parser's bug would fail it as if the GPU drew wrongly, as under a
+//  locale whose decimal point is a comma, where NanoSVG read fill-opacity="0.5" as 0, and the translucent paths vanished.
+//  test/self_test_scene_test.dart checks that this image covers the probe's pixels with the same paths as the SVG.
 //
 
 #include <math.h>

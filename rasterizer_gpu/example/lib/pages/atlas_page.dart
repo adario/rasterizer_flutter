@@ -6,6 +6,7 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
 import '../layout_size.dart';
 import '../scenes.dart';
+import '../startup_log.dart';
 
 /// The atlas benchmark: [entries] entries of [count] generated SVGs, each
 /// moving and spinning.
@@ -70,6 +71,7 @@ class _AtlasPageState()
         throw ArgumentError.value(widget.runs, 'runs', 'At least 1');
       }
       renderer = await RasterizerRenderer.create(gpu: widget.gpu);
+      StartupLog.end('create');
       if (!mounted) {
         renderer.dispose();
         return;

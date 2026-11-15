@@ -11,8 +11,7 @@
 // a contiguous group of vector components that draws as one image.
 //
 // The game draws with demoGpu: the mesh renderer, or the GPU renderer with
-// BACKEND=atlas. BACKEND=canvas forces the canvas renderer. On OpenGL ES,
-// the GPU renderers draw once their self-test passes.
+// BACKEND=atlas. BACKEND=canvas forces the canvas renderer.
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -225,17 +224,12 @@ void main() {
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
   RasterizerGpu.forceCanvas =
       const String.fromEnvironment('BACKEND') == 'canvas';
-  RasterizerGpu.allowOpenGles = true;
 
   for (final MapEntry(key: name, value: build) in _cases.entries) {
     testWidgets(name, (tester) async {
       final gpu = RasterizerGpu.of(demoGpu);
-      // On OpenGL ES, the renderer's self-test waits for a rasterized frame,
-      // so pump one first.
-      await tester.pumpWidget(const SizedBox());
-      await tester.runAsync(gpu.initialize);
-      // The canvas renderer draws when forced, where demoGpu isn't supported,
-      // as on the web, and on OpenGL ES if demoGpu fails its self-test.
+      // The canvas renderer draws when forced, and where demoGpu isn't
+      // supported, as on the web.
       final canvas = gpu.backend == RasterizerBackend.canvas;
       final atlas = gpu.backend == RasterizerBackend.gpu;
       final svg = RasterizerSvg.fromBytes(utf8.encode(_square), gpu: demoGpu);

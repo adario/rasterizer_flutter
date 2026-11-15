@@ -6,8 +6,7 @@
 // web, CanvasKit dropped the canvas renderer's scenes near the run's clip,
 // such as the last glyph of each of Tube Shooter's HUD lines.
 //
-// Each GPU renderer runs where it's supported: on OpenGL ES, once its
-// self-test has passed.
+// Each GPU renderer runs where it's supported.
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -39,16 +38,11 @@ void main() {
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
 
   setUpAll(() async {
-    RasterizerGpu.allowOpenGles = true;
     runApp(const SizedBox());
-    await RasterizerGpu.initialize();
-    await RasterizerGpu.of(RasterizerBackend.mesh).initialize();
   });
 
   for (final backend in RasterizerBackend.values) {
     webTest('${backend.name}: entries near the edges draw', () async {
-      // Support is known once initialized: on OpenGL ES, once the renderer's
-      // self-test has run.
       if (backend != RasterizerBackend.canvas) {
         final support = RasterizerGpu.of(backend).support;
         if (support != RasterizerSupport.supported) {

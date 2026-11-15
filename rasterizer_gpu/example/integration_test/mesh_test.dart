@@ -6,8 +6,7 @@
 // colors and paint order, instances with their opacities and color
 // transforms, unblended opaque draws, gradients with and without color
 // transforms, fill rules, strokes, 32-bit indices, multisampled and aliased
-// edges, runs' targets, and frames in flight. On OpenGL ES, they run once the
-// mesh renderer's self-test has passed. projective_test.dart checks
+// edges, runs' targets, and frames in flight. projective_test.dart checks
 // perspective.
 import 'dart:convert';
 import 'dart:math' as math;
@@ -100,8 +99,6 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
 
-  // On OpenGL ES, the mesh renderer is supported once its self-test has
-  // passed.
   final mesh = RasterizerGpu.of(RasterizerBackend.mesh);
   var supported = false;
   late final MeshRenderer renderer;
@@ -122,8 +119,6 @@ void main() {
   setUpAll(() async {
     runApp(const SizedBox());
     await binding.waitUntilFirstFrameRasterized;
-    RasterizerGpu.allowOpenGles = true;
-    await mesh.initialize();
     supported = mesh.support == RasterizerSupport.supported;
     if (!supported) {
       return;

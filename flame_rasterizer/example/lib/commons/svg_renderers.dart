@@ -126,8 +126,7 @@ enum SvgRenderer(final String label) {
   /// Whether it draws as its label says, on this device.
   ///
   /// For [rasterizer] and [rasterizerAtlas], it's whether their GPU renderer
-  /// runs. It doesn't on the web, nor without Impeller, nor on OpenGL ES
-  /// until its self-test passes.
+  /// runs. It doesn't on the web, nor without Impeller.
   bool get supported => switch (this) {
     rasterizer || rasterizerAtlas =>
       RasterizerGpu.of(gpu).support == RasterizerSupport.supported,

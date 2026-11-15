@@ -74,16 +74,17 @@ drawing their paths, for 5–10% more raster time.
 
 ## OpenGL ES
 
-The GPU renderers run on OpenGL ES only if the app opts in, and only after a self-test passes. They have only run on
-the Android emulator's OpenGL ES and on Mesa's llvmpipe.
+The GPU renderers draw on OpenGL ES from the first frame, as on Metal and Vulkan, unless the app turns them off. They
+have only run on the Android emulator's OpenGL ES and on Mesa's llvmpipe.
 
-- **The canvas renderer draws first.** Meanwhile, the self-test renders a scene and checks it pixel by pixel, and the
-  renderers switch at their next frame. Awaiting the self-test before `runApp` would hang an app on its splash screen,
-  as Flutter GPU only compiles on OpenGL ES once Flutter has drawn a frame.
-- **The 8 pipelines compile one a frame**, as each compile blocks the UI thread. The longest gap between frames during
-  the self-test is 123–156 ms, against 309–524 ms when they all compile at once (Android emulator, release).
-- **rasterizer_gpu remembers failures**, including a crash or hang twice in a row during a probation of 1800 frames
-  after the switch. So a bad driver costs a user two crashes, not one per launch.
+- **No self-test.** Nothing checks the output or guards against a driver's crashes, so the canvas renderer never draws
+  first and nothing switches. The one check is the format probe: it renders a scene accumulating in r32Float, reads it
+  back alongside the app's frames, and switches the GPU renderer to r16g16b16a16Float if the pixels are wrong.
+- **Each renderer compiles all of its pipelines as it's made**, as each compile blocks the UI thread, so the app
+  hitches once rather than at whichever frames first draw with each: 110 ms for the GPU renderer on the Android
+  emulator, 470 ms on llvmpipe (release builds, no shader cache).
+- **Nothing waits for a frame.** With Flutter 3.50.0, Flutter GPU's calls don't block before the first rasterized frame
+  on OpenGL ES, so renderers can be made before `runApp`.
 
 ## Flame
 

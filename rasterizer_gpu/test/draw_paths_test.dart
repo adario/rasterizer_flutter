@@ -2,9 +2,7 @@
 //   flutter test test/draw_paths_test.dart
 //
 // A canvas scene draws its paths into any canvas, with no frame, as a canvas
-// run draws them. So does a scene that switches to a GPU renderer later,
-// while it draws with the canvas renderer. A GPU scene, or a disposed one, has
-// no paths, so it throws.
+// run draws them. A GPU scene has no paths, so it throws.
 
 import 'dart:convert';
 import 'dart:typed_data';
@@ -12,7 +10,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
-import 'package:rasterizer_gpu/src/switching.dart';
 
 const _size = 40;
 
@@ -37,38 +34,31 @@ Future<Uint8List> _pixels(void Function(ui.Canvas) draw) async {
 
 void main() {
   test('a canvas scene draws its paths as a canvas run does', () async {
-    for (final scene in [
-      RasterizerScene.fromSvg(_bytes, backend: RasterizerBackend.canvas),
-      SwitchingScene.fromSvg(_bytes, RasterizerBackend.gpu, null),
-    ]) {
-      final renderer = await RasterizerRenderer.create(
-        slots: 1,
-        backend: RasterizerBackend.canvas,
-      );
-      final frame = renderer.beginFrame(_size, _size);
-      final run = frame.addRun()..add(scene, 1, 0, 0, 1, 0, 0, opacity: 0.5);
-      frame.render();
-      final expected = await _pixels(run.draw);
-      final pixels = await _pixels(
-        (canvas) => scene.drawPaths(canvas, opacity: 0.5),
-      );
-      expect(pixels.any((v) => v != 0), isTrue);
-      expect(pixels, expected);
-      scene.dispose();
-      renderer.dispose();
-    }
+    final scene = RasterizerScene.fromSvg(
+      _bytes,
+      backend: RasterizerBackend.canvas,
+    );
+    final renderer = await RasterizerRenderer.create(
+      slots: 1,
+      backend: RasterizerBackend.canvas,
+    );
+    final frame = renderer.beginFrame(_size, _size);
+    final run = frame.addRun()..add(scene, 1, 0, 0, 1, 0, 0, opacity: 0.5);
+    frame.render();
+    final expected = await _pixels(run.draw);
+    final pixels = await _pixels(
+      (canvas) => scene.drawPaths(canvas, opacity: 0.5),
+    );
+    expect(pixels.any((v) => v != 0), isTrue);
+    expect(pixels, expected);
+    scene.dispose();
+    renderer.dispose();
   });
 
-  test('a GPU scene, or a disposed one, has none', () {
+  test('a GPU scene has none', () {
     final gpu = RasterizerScene.fromSvg(_bytes, backend: RasterizerBackend.gpu);
     final canvas = ui.Canvas(ui.PictureRecorder());
     expect(() => gpu.drawPaths(canvas), throwsStateError);
     gpu.dispose();
-    final switching = SwitchingScene.fromSvg(
-      _bytes,
-      RasterizerBackend.gpu,
-      null,
-    )..dispose();
-    expect(() => switching.drawPaths(canvas), throwsStateError);
   });
 }

@@ -47,7 +47,6 @@ void main() {
           await tester.pump();
         }
         expect(game.isLoaded, isTrue);
-        await settleRenderer(tester, renderer);
         // Of about two seconds of collisions, the frames drawn while some
         // shapes were tinted.
         var tintedFrames = 0;

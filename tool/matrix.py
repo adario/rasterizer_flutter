@@ -1,9 +1,9 @@
 """The integration matrix, through tool/device_tests.py: on the Android emulator's Vulkan (IMPELLER_BACKEND=vulkan),
 then its OpenGL ES (IMPELLER_BACKEND=opengles), then on macOS, then on web in headless Chrome, with CanvasKit (_js)
 and skwasm (_wasm), flame_rasterizer's limits test first (and on macOS with the canvas renderer too), then the
-self-test, switch, defer, goldens, atlas and Flame check tests; on web, the limits, opacity, edge, goldens and Flame
-check tests, with the canvas renderer. Without arguments, all of them, stopping at the first unexpected failure;
-otherwise the steps named, e.g. gles_selftest vk_flame, with device_tests.py's flags (--keep-going) passed on.
+format probe, defer, goldens, atlas and Flame check tests; on web, the limits, opacity, edge, goldens and Flame check
+tests, with the canvas renderer. Without arguments, all of them, stopping at the first unexpected failure; otherwise
+the steps named, e.g. gles_probe vk_flame, with device_tests.py's flags (--keep-going) passed on.
 EXPECTED lists the tests expected to fail, by step. vk_atlas is left out of `all`: it's where the emulator's Vulkan
 hang lives (not seen in 30 runs on its own since), so name it to run it. The web steps need the chromedriver in the
 repository's build/chromedriver/ (see device_tests.py). Run in the background, and follow with tool/follow.py:
@@ -17,22 +17,21 @@ GOLD = 'integration_test/golden_test.dart --dart-define=BACKEND=gpu'
 LIMITS = 'integration_test/limits_test.dart'
 STEPS = {
     'vk_limits': f'{F}:{VK}:{LIMITS}',
-    'vk_selftest': f'{G}:{VK}:integration_test/self_test_test.dart',
-    'vk_switch': f'{G}:{VK}:integration_test/switch_test.dart',
+    'vk_probe': f'{G}:{VK}:integration_test/format_probe_test.dart',
+    'vk_defer': f'{G}:{VK}:integration_test/defer_test.dart',
     'vk_goldens': f'{G}:{VK}:{GOLD}',
     'vk_flame': f'{F}:{VK}:integration_test/check_test.dart',
     'vk_atlas': f'{G}:{VK}:integration_test/atlas_test.dart',
     'gles_limits': f'{F}:{GLES}:{LIMITS}',
-    'gles_selftest': f'{G}:{GLES}:integration_test/self_test_test.dart',
-    'gles_switch': f'{G}:{GLES}:integration_test/switch_test.dart',
+    'gles_probe': f'{G}:{GLES}:integration_test/format_probe_test.dart',
     'gles_defer': f'{G}:{GLES}:integration_test/defer_test.dart',
     'gles_goldens': f'{G}:{GLES}:{GOLD}',
     'gles_atlas': f'{G}:{GLES}:integration_test/atlas_test.dart',
     'gles_flame': f'{F}:{GLES}:integration_test/check_test.dart',
     'mac_limits': f'{F}::{LIMITS}:macos',
     'mac_limits_canvas': f'{F}::{LIMITS} --dart-define=BACKEND=canvas:macos',
-    'mac_selftest': f'{G}::integration_test/self_test_test.dart:macos',
-    'mac_switch': f'{G}::integration_test/switch_test.dart:macos',
+    'mac_probe': f'{G}::integration_test/format_probe_test.dart:macos',
+    'mac_defer': f'{G}::integration_test/defer_test.dart:macos',
     'mac_goldens': f'{G}::integration_test/golden_test.dart:macos',
     'mac_atlas': f'{G}::integration_test/atlas_test.dart:macos',
     'mac_flame': f'{F}::integration_test/check_test.dart:macos',

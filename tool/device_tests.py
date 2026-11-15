@@ -22,7 +22,7 @@ every step whatever fails.
   loses the browser (`invalid session id`) or times out after 20 minutes, with no test failing.
 Each run's full output goes to the repository's build/test_logs/NAME.log. Run from anywhere, in the background,
 writing its events to a file, and follow it with tool/follow.py:
-  python3 -I tool/device_tests.py gles_selftest:rasterizer_gpu/example:IMPELLER_BACKEND=opengles:integration_test/self_test_test.dart > e.txt
+  python3 -I tool/device_tests.py gles_probe:rasterizer_gpu/example:IMPELLER_BACKEND=opengles:integration_test/format_probe_test.dart > e.txt
 tool/matrix.py runs the usual matrix through it."""
 import base64, json, os, platform, re, signal, subprocess, sys, threading, time
 

@@ -1,4 +1,3 @@
-import 'package:flame_rasterizer_example/commons/renderer_knob.dart';
 import 'package:flutter/widgets.dart';
 import 'package:widgetbook/widgetbook.dart';
 
@@ -45,12 +44,6 @@ class _PersistentExampleState() extends State<_PersistentExample> {
 
   /// The knobs that building [_child] registered.
   Map<String, Knob> _knobs = const {};
-
-  @override
-  void initState() {
-    super.initState();
-    refreshRendererKnob(context);
-  }
 
   @override
   void reassemble() {

@@ -30,9 +30,8 @@ Below, `<device>` is `macos`, an iOS udid or `emulator-5554`.
   each frame, rather than with the mesh renderer, flame_rasterizer's default, which draws them imported once into
   triangles.
 - **`--dart-define=BACKEND=canvas`** draws with rasterizer_gpu's canvas renderer, even where its GPU renderers are
-  supported. It draws each SVG as a picture, or its paths with `--dart-define=CANVAS_PICTURES=false`. On web, and on
-  Android's OpenGL ES, as on the emulator unless built with `IMPELLER_BACKEND=vulkan`, the app picks the canvas renderer
-  by itself.
+  supported. It draws each SVG as a picture, or its paths with `--dart-define=CANVAS_PICTURES=false`. On web, the app
+  picks the canvas renderer by itself.
   - On the Android emulator's Vulkan with the host GPU, the check doesn't work (see rasterizer_gpu's README): with
     Flutter 3.47.9, it hangs, and with Flutter 3.50.0, it fails, as both frames come out black. Use OpenGL ES, or
     start the emulator with `-gpu swiftshader_indirect`.

@@ -34,10 +34,11 @@ The app turns on Flutter GPU as for rasterizer_gpu (see
 - **Linux:** `fl_dart_project_set_enable_flutter_gpu` in the app's runner, `linux/runner/my_application.cc`.
 - **Android:** optionally, the Vulkan key in the app's manifest, which only debug and profile builds read.
 
-On OpenGL ES, which some Android devices and all of Linux use, set `RasterizerGpu.allowOpenGles` before `runApp`. The
-game's vectors then draw with rasterizer_gpu's canvas renderer until the GPU renderer's self-test passes, and with the
-GPU renderer after that. The package remembers a self-test that failed, or one that crashed the game twice in a row,
-during the test or within the GPU renderer's first 1800 frames. Later launches then stay on the canvas renderer.
+On OpenGL ES, which some Android devices and all of Linux use, the GPU renderer draws from the game's first frame, as
+elsewhere. Creating the game's renderer there compiles its shaders, once: for the mesh renderer, 20 ms on the Android
+emulator and 0.2 s with Linux's software renderer (see
+[rasterizer_gpu's README](https://github.com/adario/rasterizer_flutter/blob/main/rasterizer_gpu/README.md#opengl-es)).
+To draw with the canvas renderer there instead, set `RasterizerGpu.allowOpenGles` to false before `runApp`.
 
 Where the GPU renderer isn't supported (`RasterizerGpu.of(RasterizerBackend.mesh).support`), the canvas renderer draws
 instead, and debug and profile builds print a message that says why. The canvas renderer draws each run's paths

@@ -314,8 +314,8 @@ class RasterizerPathComponent({
   /// [maxSize]: one that another component made, or a new one.
   _SharedScene _acquire(RasterizerBackend gpu, List<Paint> paints) {
     final scenes = _scenes[_source] ??= [];
-    // The backend a new import gets: the canvas renderer until a GPU
-    // renderer's self-test passes.
+    // The backend a new import gets: the canvas renderer where the GPU
+    // renderer isn't supported, or with RasterizerGpu.forceCanvas.
     final backend = RasterizerGpu.of(gpu).backend;
     for (final shared in scenes) {
       if (shared.matches(gpu, maxSize, backend, glow, paints)) {

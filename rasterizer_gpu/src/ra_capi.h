@@ -72,8 +72,8 @@ RA_EXPORT RaLayout ra_layout(void);
 RA_EXPORT RaScene *ra_scene_from_svg(const char *path, RaTransform *ctm);
 // The same, from an SVG's bytes, which needn't be null-terminated, for hosts that load them from assets
 RA_EXPORT RaScene *ra_scene_from_svg_data(const char *data, uint64_t length, RaTransform *ctm);
-// The OpenGL ES self-test's scene, as ra_scene_from_svg_data makes it from selfTestSvg, but built without parsing, so that the
-// self-test checks the GPU alone. NULL if it runs out of memory
+// The OpenGL ES format probe's scene, as ra_scene_from_svg_data makes it from selfTestSvg, but built without parsing, so that
+// the probe checks the GPU alone. NULL if it runs out of memory
 RA_EXPORT RaScene *ra_scene_self_test(RaTransform *ctm);
 RA_EXPORT void ra_scene_release(RaScene *scene);
 RA_EXPORT uint64_t ra_scene_count(const RaScene *scene);
@@ -161,9 +161,6 @@ typedef struct {
 // Imports an SVG's bytes, which needn't be null-terminated, into a new mesh, its curves flattened to within 1/4 of a device pixel
 // when its longer side is maxSize device pixels. NULL if it can't be parsed, or maxSize isn't positive
 RA_EXPORT RaMesh *ra_mesh_from_svg_data(const char *data, uint64_t length, float maxSize);
-// The OpenGL ES self-test's mesh, as ra_mesh_from_svg_data imports selfTestSvg, but built without parsing. NULL if it runs out
-// of memory, or maxSize isn't positive
-RA_EXPORT RaMesh *ra_mesh_self_test(float maxSize);
 RA_EXPORT RaMeshData ra_mesh_data(const RaMesh *mesh);
 RA_EXPORT void ra_mesh_release(RaMesh *mesh);
 

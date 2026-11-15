@@ -10,11 +10,8 @@
 // only. The test reads back the frames around each shrink, and compares them
 // with the same frame from a fresh renderer, whose pages never changed size.
 // Reallocating pages back and forth used to garble frames, or hang the GPU
-// on the Android emulator's Vulkan.
-//
-// On OpenGL ES, as on an Android emulator built with
-// IMPELLER_BACKEND=opengles, the test runs once the GPU renderer's self-test
-// passes. test/atlas_pages_test.dart checks the sizing itself.
+// on the Android emulator's Vulkan. test/atlas_pages_test.dart checks the
+// sizing itself.
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -27,13 +24,10 @@ import 'package:rasterizer_gpu_example/goldens.dart';
 import 'package:rasterizer_gpu_example/scenes.dart';
 
 Future<void> main() async {
-  // Fully live, so that frames are drawn: on OpenGL ES, initialize waits for
-  // one, and the test steps frame by frame.
+  // Fully live, so that frames are drawn: the test steps frame by frame.
   IntegrationTestWidgetsFlutterBinding.ensureInitialized().framePolicy =
       LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-  RasterizerGpu.allowOpenGles = true;
   runApp(const SizedBox());
-  await RasterizerGpu.initialize();
   if (RasterizerGpu.support != RasterizerSupport.supported) {
     test(
       'no GPU renderer here',

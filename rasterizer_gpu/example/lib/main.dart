@@ -1,5 +1,3 @@
-import 'dart:async' show Timer, unawaited;
-
 import 'package:material_ui/material_ui.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
@@ -44,9 +42,6 @@ const int kDeferFirstFrame = int.fromEnvironment('DEFER_FIRST_FRAME');
 
 void main() {
   RasterizerGpu.forceCanvas = kBackend == 'canvas';
-  // Opts in to OpenGL ES. There, the canvas renderer draws until the GPU
-  // renderer's self-test passes.
-  RasterizerGpu.allowOpenGles = true;
   StartupLog.begin();
   if (kDeferFirstFrame > 0) {
     WidgetsBinding.instance.deferFirstFrame();
@@ -55,38 +50,13 @@ void main() {
       WidgetsBinding.instance.allowFirstFrame();
     });
   }
-  runApp(const ExampleApp());
-  unawaited(_initialize());
-}
-
-/// Initializes the renderer, then logs its support, the renderer it settled
-/// on, and how long that took.
-Future<void> _initialize() async {
-  final start = DateTime.now();
-  final gpu = RasterizerGpu.of(kGpu);
-  await gpu.initialize();
-  final support = gpu.support;
-  final detail = gpu.supportDetail;
+  final gpu = RasterizerGpu.of(kGpu), detail = gpu.supportDetail;
   debugPrint(
     'RASTERIZER_EXAMPLE support '
-    '${support.name}${detail == null ? '' : ': $detail'}, '
-    'backend ${gpu.backend.name}, initialize '
-    '${DateTime.now().difference(start).inMilliseconds} ms',
+    '${gpu.support.name}${detail == null ? '' : ': $detail'}, '
+    'backend ${gpu.backend.name}',
   );
-  StartupLog.mark('settled on ${gpu.backend.name}');
-  StartupLog.end('initialize');
-  // Marks the end of the probation, the first frames after a switch to the GPU
-  // renderer on OpenGL ES. tool/release_launches.py waits for it to kill the
-  // app.
-  if (gpu.onProbation) {
-    Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (gpu.onProbation) {
-        return;
-      }
-      timer.cancel();
-      StartupLog.mark('probation ended');
-    });
-  }
+  runApp(const ExampleApp());
 }
 
 /// The example app, which shows the page that [kPage] picks.

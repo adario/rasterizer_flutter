@@ -32,14 +32,14 @@ still change.
 |---|---|---|
 | macOS | GPU, on Impeller's Metal | macOS 26.7, M1 Mac |
 | iOS | GPU, on Impeller's Metal | iPhone 11 Pro (A13, iOS 26.7.2); iOS Simulator (iPhone 18 Pro, iOS 27.0) |
-| Android, API 24+, arm64 and x86_64 | GPU on Vulkan; canvas on OpenGL ES unless the app opts in; canvas below API 29, on Skia | Android Emulator: API 37 (arm64, host GPU through gfxstream) on Vulkan, OpenGL ES and Skia; API 28 on Skia |
-| Linux | canvas on OpenGL ES, Linux's only backend, unless the app opts in | arm64 Docker container: Debian trixie, Mesa's llvmpipe on the CPU, on X11 (Xvfb) and on Wayland (weston) |
+| Android, API 24+, arm64 and x86_64 | GPU on Vulkan and OpenGL ES; canvas below API 29, on Skia | Android Emulator: API 37 (arm64, host GPU through gfxstream) on Vulkan, OpenGL ES and Skia; API 28 on Skia |
+| Linux | GPU on OpenGL ES, Linux's only backend | arm64 Docker container: Debian trixie, Mesa's llvmpipe on the CPU, on X11 (Xvfb) and on Wayland (weston) |
 | Web | canvas | Headless Chrome, with CanvasKit and skwasm |
 | Windows | canvas | not built: no machine |
 
 GPU means either GPU renderer: the atlas renderer, rasterizer_gpu's default, or the mesh renderer, flame_rasterizer's.
-Both draw on the same platforms. On OpenGL ES, an app that opts in gets the canvas renderer until the GPU renderer's
-self-test passes.
+Both draw on the same platforms. On OpenGL ES, an app can turn them off, with `RasterizerGpu.allowOpenGles`, for the
+canvas renderer.
 
 On web, these tests ran: the canvas renderer's golden tests, against the `macos` set, and its opacity test;
 flame_rasterizer's limits test and Flame check; and, on CanvasKit only, the example's renderers, collidable and
@@ -88,15 +88,15 @@ The app needs:
   renderers:
   - on 32-bit devices, which get no native code;
   - below API 29, where Flutter renders with Skia;
-  - where Impeller picks OpenGL ES, unless the app sets `RasterizerGpu.allowOpenGles`. Then the canvas renderer draws
-    from the first frame, and the GPU renderer takes over once its self-test passes, a few seconds in.
+  - where Impeller picks OpenGL ES, if the app turns `RasterizerGpu.allowOpenGles` off. It's on by default, and the
+    GPU renderers then draw from the first frame, as on Vulkan.
 
   The app's manifest can ask for Impeller's Vulkan backend, but only debug and profile builds read it: release builds
   use the device's own backend. Asking for a backend also forces Impeller below API 29, where it can't start, so the app
   crashes at launch there.
 - **Linux:** Flutter GPU turned on in the app's runner, with `fl_dart_project_set_enable_flutter_gpu` in
   `linux/runner/my_application.cc`. Release builds honour it too. Flutter's Linux embedder always renders with OpenGL
-  ES, so the canvas renderer draws unless the app sets `RasterizerGpu.allowOpenGles`, as on Android.
+  ES, so the GPU renderers draw there unless the app turns `RasterizerGpu.allowOpenGles` off, as on Android.
 - **Integration tests, from a clean checkout or the pub cache:** one build of the app (`flutter build <platform>`)
   before `flutter test`. Otherwise `flutter test` checks the assets before rasterizer_gpu's build hook has written its
   shader bundle. `flutter run` and `flutter build` don't need it.

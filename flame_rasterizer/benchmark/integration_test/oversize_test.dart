@@ -8,7 +8,7 @@
 // it belongs, rather than the frame throwing.
 //
 // The game draws with demoGpu: the mesh renderer, or the GPU renderer with
-// BACKEND=atlas. On OpenGL ES, it does once the renderer's self-test passes.
+// BACKEND=atlas.
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -35,16 +35,10 @@ class _Game() extends FlameGame with HasRasterizer {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  RasterizerGpu.allowOpenGles = true;
 
   testWidgets('a game wider than its renderer takes draws its vectors', (
     tester,
   ) async {
-    final gpu = RasterizerGpu.of(demoGpu);
-    // On OpenGL ES, the renderer's self-test waits for a rasterized frame, so
-    // pump one first.
-    await tester.pumpWidget(const SizedBox());
-    await tester.runAsync(gpu.initialize);
     final svg = RasterizerSvg.fromBytes(utf8.encode(_square), gpu: demoGpu);
     final game = _Game()
       ..onGameResize(Vector2(_width.toDouble(), _height.toDouble()));

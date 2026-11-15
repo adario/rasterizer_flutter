@@ -27,9 +27,8 @@
 // The canvas renderer's renders are checked against the GPU goldens, with
 // their own tolerance, and never written as goldens. The mesh renderer has
 // its own goldens, mesh_<name>.png, and its renders are checked against the
-// GPU goldens too, with the canvas renderer's tolerance. On OpenGL ES, the
-// GPU and mesh renderers are allowed, and tested if their self-tests pass:
-// build the Android app with IMPELLER_BACKEND=opengles for that.
+// GPU goldens too, with the canvas renderer's tolerance. On OpenGL ES, build
+// the Android app with IMPELLER_BACKEND=opengles.
 //
 // On the web, with the chrome device of the repository's tool/device_tests.py,
 // only the canvas renderer draws, checked against the macos goldens. The log
@@ -43,7 +42,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart'
-    show LiveTestWidgetsFlutterBindingFramePolicy, setUpAll;
+    show LiveTestWidgetsFlutterBindingFramePolicy;
 import 'package:integration_test/integration_test.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 import 'package:rasterizer_gpu_example/goldens.dart';
@@ -51,21 +50,9 @@ import 'package:rasterizer_gpu_example/goldens.dart';
 import 'golden_tests.dart';
 
 Future<void> main() async {
-  // As in apps, initialize runs after runApp. On OpenGL ES, it waits for a
-  // rasterized frame, and the binding draws frames unasked only when fully
-  // live.
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-  RasterizerGpu.allowOpenGles = true;
   runApp(const SizedBox());
-  // On the web, only the canvas renderer draws, so the tests are known
-  // without initialize, which then runs before them.
-  if (kIsWeb) {
-    setUpAll(RasterizerGpu.initialize);
-  } else {
-    await RasterizerGpu.initialize();
-    await RasterizerGpu.of(RasterizerBackend.mesh).initialize();
-  }
   // Looks the report up as the tests run, in case the binding's data is
   // replaced.
   Map<String, dynamic> report(String key, Object Function() empty) =>

@@ -4,21 +4,20 @@ Renders SVG scenes, and scenes of plain `dart:ui` paths (see [Paths](#paths)), w
 same API:
 
 - **The GPU renderer**, also called the atlas renderer, runs Rasterizer's C++ core with Flutter GPU. It draws on
-  Impeller's Metal backend (iOS, macOS) and Vulkan backend (Android). On Impeller's OpenGL ES backend (Android, Linux),
-  it draws only for apps that opt in, once a self-test passes: see [OpenGL ES](#opengl-es). Once per frame, it renders
-  all of the frame's runs of scenes into one atlas image. It then draws each run from its parts' rectangles with
-  `Canvas.drawImageRect`, at the run's place in the app's paint order, so vector content keeps its z-order among other
-  content.
+  Impeller's Metal backend (iOS, macOS), Vulkan backend (Android) and OpenGL ES backend (Android, Linux): see
+  [OpenGL ES](#opengl-es). Once per frame, it renders all of the frame's runs of scenes into one atlas image. It then
+  draws each run from its parts' rectangles with `Canvas.drawImageRect`, at the run's place in the app's paint order,
+  so vector content keeps its z-order among other content.
 - **The mesh renderer**, for games, draws wherever the GPU renderer does. It imports each SVG once into triangles, which
   stay in GPU buffers. Each frame then only writes its entries' transforms, and renders each run into an image of its
   own with instanced draws, 4× multisampled by default. See [The mesh renderer](#the-mesh-renderer).
-- **The canvas renderer** is the fallback everywhere else: on Skia, Windows and web, and on Impeller's OpenGL ES unless
-  the app opted in and the self-test passed. It parses scenes in Dart, and each run draws its scenes' paths with
+- **The canvas renderer** is the fallback everywhere else: on Skia, Windows and web, and on Impeller's OpenGL ES if the
+  app turns `RasterizerGpu.allowOpenGles` off. It parses scenes in Dart, and each run draws its scenes' paths with
   `Canvas.drawPath`, straight into the canvas it's drawn into. See [The canvas renderer](#the-canvas-renderer).
 
 `RasterizerGpu.backend` is the GPU renderer where `RasterizerGpu.support` is `supported`, and the canvas renderer
-otherwise. `RasterizerGpu.of(RasterizerBackend.mesh)` has the same members for the mesh renderer, which has its own
-support, self-test and switch: its `backend` is `mesh` where it's supported, and `canvas` otherwise.
+otherwise. `RasterizerGpu.of(RasterizerBackend.mesh)` has the same members for the mesh renderer: its `backend` is
+`mesh` where it's supported, and `canvas` otherwise.
 
 ## Tested on
 
@@ -35,20 +34,19 @@ On each, the example's golden tests pass with the GPU and canvas renderers:
 
 - The iPhone's set matches macOS's within 1/255, except for the tiger sweep's frame 119, where at most 141 pixels
   differ, by up to 10/255. The emulator's Vulkan and OpenGL ES sets match macOS's within 1/255.
-- On the iPhone and the iOS Simulator, the atlas, self-test and switch tests pass too.
-- In the Linux container, the self-test, switch, defer and atlas tests pass on the GPU renderer, and so does the crash
-  guard, tested with `kill -9`.
+- On macOS, the emulator's Vulkan and OpenGL ES, and in the Linux container, the format probe, defer and atlas tests
+  pass too; on the iPhone and the iOS Simulator, the atlas test does.
 - On web, in headless Chrome with CanvasKit and with skwasm, the canvas renderer's golden tests pass against the
   `macos` set, and so does the opacity test.
 - On Skia (`--no-enable-impeller`, or API 28), on macOS and the emulators, the canvas renderer's golden tests and the
-  switch and opacity tests pass.
+  opacity test pass.
 
 Not tested: other iPhone or iPad GPUs, physical Android devices, Linux on a GPU (Mesa's drivers or NVIDIA's), and
 Windows.
 
-The mesh renderer passes its own tests (`mesh_test`, `projective_test`, the self-test and switch tests, and the opacity
-test) on macOS, on the iOS Simulator, in the Linux container, and on the emulator's Vulkan and OpenGL ES. On the
-emulator's OpenGL ES, its self-test passes 4× multisampled. On the iPhone, its golden, mesh, opacity and projective
+The mesh renderer passes its own tests (`mesh_test`, `projective_test` and the opacity test) on macOS, on the iOS
+Simulator, in the Linux container, and on the emulator's Vulkan and OpenGL ES, and all but the iOS Simulator pass the
+defer test too. On the emulator's OpenGL ES, it draws 4× multisampled. On the iPhone, its golden, mesh, opacity and projective
 tests pass too, and on the iOS Simulator its golden tests pass against the `macos` set. Its goldens are recorded on
 macOS, the iPhone, the emulator, and in the Linux container, where it draws on llvmpipe.
 
@@ -256,69 +254,38 @@ final star = RasterizerScene.fromPaths([
 
 ## OpenGL ES
 
-On Impeller's OpenGL ES backend, `RasterizerGpu.support` is `openGles`, and the canvas renderer draws, unless the app
-opts in before parsing scenes or creating renderers:
+On Impeller's OpenGL ES backend, the GPU renderers draw from the first frame, as on Metal and Vulkan, as
+`RasterizerGpu.allowOpenGles` is on by default. An app that turns it off before parsing scenes or creating renderers
+gets the canvas renderer there instead, and `RasterizerGpu.support` is then `openGles`:
 
 ```dart
 void main() {
-  RasterizerGpu.allowOpenGles = true;    // does nothing off OpenGL ES
+  RasterizerGpu.allowOpenGles = false;    // does nothing off OpenGL ES
   runApp(const MyApp());
 }
 ```
 
-Scenes and renderers made without a backend then draw with the canvas renderer from the first frame. They start
-`RasterizerGpu.initialize`'s self-test, which renders a small scene with the GPU renderer, reads it back, and checks it
-pixel by pixel. If it passes, they all switch to the GPU renderer, each renderer at its next `beginFrame`, and
-`support` becomes `supported`. `await RasterizerGpu.settledBackend` tells when that's done, and which renderer draws.
+`RasterizerGpu.openGles` tells whether Impeller renders with OpenGL ES at all.
 
-- **The switch** can show once, as a faint change at edges, as the two renderers antialias differently. To start on
-  the GPU renderer instead, with no switch but nothing drawn until the self-test is done, await
-  `RasterizerGpu.initialize()` after `runApp`, before making scenes and renderers.
-- **Pacing:** the self-test first waits for the app's first rasterized frame, as Flutter GPU only creates its shaders
-  and pipelines on OpenGL ES once Flutter has drawn a frame. It then compiles the GPU renderer's 8 pipelines, one per
-  frame. Flutter GPU blocks the UI thread while one compiles, for 50–100 ms each on the Android emulator, so the app
-  stutters a little meanwhile rather than freezing for half a second. Before the switch, scenes are parsed for the GPU
-  renderer a few per frame, and keep their SVG's bytes until then.
-- **Splash screens and the background:** the self-test waits for as long as the app defers its first frame, with
-  `RendererBinding.deferFirstFrame`, as flutter_native_splash's `preserve()` does, or with asynchronous `Localizations`.
-  It takes no step while the app isn't resumed, or, on desktop, inactive: a window without the focus, which Flutter
-  still draws. It times out only after 10 s without a rasterized frame, or 20 s without a passing render, counting only
-  time in the foreground with frames allowed. The canvas renderer then keeps drawing. Taking steps in the background
-  would hang the app for good, as Flutter GPU's blocking calls wait on GL work that Flutter only does while it draws
-  frames.
-- **Formats:** the GPU renderer accumulates coverage in r32Float, else in r16g16b16a16Float. If neither passes, the
-  canvas renderer keeps drawing. `RasterizerGpu.supportDetail` says which passed, or why neither did.
-  `RasterizerGpu.openGles` tells whether Impeller renders with OpenGL ES at all.
-- **Opt-in:** the self-test checks the renderer's output, not a driver's crashes or hangs (see the next point). It has
-  only run on the Android Emulator's OpenGL ES, on the Mac's GPU and on its software renderer, and on Mesa's llvmpipe
-  on Linux. Hence the opt-in. In a release build on the emulator, the switch comes 1–3.5 s after launch, much of it
-  spent waiting for the app's first frame. In the Linux container, it comes after 0.5–1.3 s.
-- **Remembered failures:** with `RasterizerGpu.rememberSelfTest`, on by default, rasterizer_gpu remembers a failure.
-  Later launches skip the self-test and draw with the canvas renderer from the start, as without `allowOpenGles`.
-  - A failure is either a failure of the self-test's checks, or the app crashing or hanging twice in a row during the
-    self-test or its probation. The probation lasts from the switch until the GPU renderers have rendered
-    `RasterizerGpu.probationFrames` frames: 1800 by default, about 30 s of drawing, or 0 to end it at the switch. It's
-    there because a driver can pass the self-test, then crash on what the app draws next.
-  - A launch counts as unfinished while it's in the self-test or probation with the app in the foreground. So a bad
-    driver costs a user two crashes, not one per launch, and an app killed in the background doesn't count.
-    `supportDetail` then says where the launches stopped, such as "after the switch to the GPU renderer, within its
-    first 1800 frames, 2 launches in a row (after 10 frames, then after 100 frames)". Debug builds don't count
-    launches, as stopping the app from an IDE kills it in the foreground.
-  - rasterizer_gpu remembers neither timeouts nor passes: a passing device runs the self-test and its probation at each
-    launch. `RasterizerGpu.onProbation` tells whether it's on probation.
-  - The failure is kept in a small file in the app's code cache, which Android clears when the app or the platform is
-    upgraded, so they try again. On Linux, it's in the user's cache, `$XDG_CACHE_HOME` or else `~/.cache`, in a folder
-    named after the app's executable. It holds for one build of the app, identified by its compiled Dart code's time
-    and size: a new build tries again, but Mesa updated on its own doesn't. `RasterizerGpu.forgetSelfTest()` tries
-    again too, from the next launch.
+- **Pipelines:** each renderer compiles all of its pipelines as it's made, as a compile blocks the UI thread, rather
+  than at whichever frame first draws with each. In release builds with no shader cache, the GPU renderer's took about
+  110 ms on the Android emulator and 470 ms on Mesa's llvmpipe; the mesh renderer's took about 20 ms and 190 ms. The
+  first frame that draws vectors comes that much later, once.
+- **Formats:** the GPU renderer accumulates coverage in r32Float, which an OpenGL ES driver may not blend into. The
+  first GPU renderer made starts a format probe: it renders a small scene in r32Float, reads it back through a canvas
+  alongside the app's frames, and checks it pixel by pixel. If that fails, renderers accumulate in r16g16b16a16Float
+  from their next frame. That's at once where an r32Float texture can't be made, else once the probe has read the
+  pixels back, so the first frames may be wrong. `RasterizerGpu.supportDetail` says which format, and what the probe
+  found.
+- **No other checks:** nothing else checks what the renderers draw, or guards against a driver's crashes. A driver that
+  draws wrongly draws wrongly, and one that crashes crashes the app. The GPU renderers have only drawn on the Android
+  Emulator's OpenGL ES, on the Mac's GPU and on its software renderer, and on Mesa's llvmpipe on Linux.
+- **Before `runApp`:** nothing waits for a frame. With Flutter 3.50.0, on the emulator's OpenGL ES and on llvmpipe,
+  release builds included, renderers can be made and render before the app's first frame.
 - **Page size:** atlas pages are at most 4096 px a side on OpenGL ES, as Flutter GPU doesn't tell the device's maximum
   texture size.
-- **The mesh renderer** has a self-test of its own. Scenes and renderers made with `gpu: RasterizerBackend.mesh` start
-  `RasterizerGpu.of(RasterizerBackend.mesh).initialize()`'s, which renders a mesh scene, affine and under a
-  perspective. They switch to the mesh renderer once it passes. Its failures are remembered in a file of their own
-  (`rasterizer_gpu_gles_mesh.json`), its probation counts its own frames, and its `supportDetail` says
-  `OpenGL ES, self-tested, 4× multisampled`, or `aliased`. `allowOpenGles`, `rememberSelfTest`, `probationFrames` and
-  `forceCanvas` apply to both renderers.
+- **The mesh renderer** has no probe: its `supportDetail` says `OpenGL ES, 4× multisampled`, or `aliased`.
+  `allowOpenGles` and `forceCanvas` apply to both renderers.
 
 ## The mesh renderer
 
@@ -438,10 +405,8 @@ everywhere, for scenes and renderers created after the app sets it.
   - `lib/src/paths/` has the scenes of paths: `path_contours.dart`, with the contour sampler copied from Flame, and
     `scene_paths.dart`, the paths and paints a scene is made of. `lib/src/canvas_paths.dart` is what the canvas
     renderer draws: an SVG's paths, or those.
-  - `lib/src/self_test.dart` has the OpenGL ES self-test's SVG and the pixels it checks, and `src/ra_self_test.hpp`
-    builds that SVG's shapes without parsing it, so that the self-test checks the GPU alone.
-    `lib/src/self_test_cache.dart` has the remembered failures, and `lib/src/switching.dart` the scenes and renderers that
-    switch from the canvas renderer to a GPU renderer.
+  - `lib/src/self_test.dart` has the OpenGL ES format probe's SVG and the pixels it checks, and `src/ra_self_test.hpp`
+    builds that SVG's shapes without parsing it, so that the probe checks the GPU alone.
   - `lib/src/rasterizer_canvas.dart` is `RasterizerCanvas`.
   - `lib/src/core.dart` is the core's FFI API, internal and native only, with the GPU renderer's debug hooks, for the
     renderers, the tests and the example. `lib/src/bindings.dart` declares its native functions, and
@@ -450,7 +415,7 @@ everywhere, for scenes and renderers created after the app sets it.
 - `test/` runs with `flutter test`. Among its tests, `core_test.dart` tests the core through FFI, on generated scenes,
   `mesh_test.dart` the mesh import's triangles, `svg_paths_test.dart` the canvas renderer's SVG import, against the
   core's, `path_contours_test.dart` and `path_scene_test.dart` the scenes of paths, `self_test_scene_test.dart` that the
-  self-test's built scene is its SVG's, and `svg_locale_test.dart` that SVGs read the same whatever the C locale.
+  format probe's built scene is its SVG's, and `svg_locale_test.dart` that SVGs read the same whatever the C locale.
 - `example/` is the example app, with the golden tests: see its `README.md` and `TESTING.md`.
 - `tool/compare_frames.py` compares two of the core's frames, as the golden tests record them.
 - `tool/make_patch.py` rewrites `src/core/upstream.patch` from a Rasterizer checkout.

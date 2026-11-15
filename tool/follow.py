@@ -1,6 +1,6 @@
 """Prints the lines of FILE matching PATTERN as they're written, and exits once a line matches END, or after LIMIT seconds
-(590 by default). For the events files of tool/device_tests.py and
-rasterizer_gpu/example/tool/release_launches.py, run in the background; unlike `tail -f`, it exits by itself.
+(590 by default). For the events files of tool/device_tests.py, run in the background; unlike `tail -f`, it exits by
+itself.
   python3 -I tool/follow.py FILE PATTERN END [LIMIT]
 e.g. python3 -I tool/follow.py e.txt 'STALL|PASS|FAIL|exit|FINISHED' FINISHED"""
 import os, re, sys, time

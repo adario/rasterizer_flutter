@@ -78,12 +78,8 @@ class _CheckPageState() extends State<CheckPage> {
   /// saves them.
   Future<void> _run() async {
     try {
-      // Wait for demoGpu's self-test, so that both frames draw with it where
-      // it's supported. On OpenGL ES, the game's scenes and renderer, made
-      // while the self-test ran, switch to it once it completes. The
-      // reference's mesh scenes flatten their curves for the same size as
-      // the game's.
-      await RasterizerGpu.of(demoGpu).initialize();
+      // The reference's mesh scenes flatten their curves for the same size
+      // as the game's.
       final renderer = await RasterizerRenderer.create(gpu: demoGpu);
       final scenes = [
         for (final s in layout.svgs)

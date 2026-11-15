@@ -223,11 +223,6 @@ RaMesh *ra_mesh_from_svg_data(const char *data, uint64_t length, float maxSize) 
         return nullptr;
     return meshFromImage(guarded<NSVGimage *>(nullptr, [&] { return parseSvgData(data, length); }), maxSize);
 }
-RaMesh *ra_mesh_self_test(float maxSize) {
-    if (!(maxSize > 0.f) || !isfinite(maxSize))
-        return nullptr;
-    return meshFromImage(RaSelfTest::image(), maxSize);
-}
 RaMeshData ra_mesh_data(const RaMesh *mesh) {
     bool small = mesh->indices32.empty();
     return RaMeshData{

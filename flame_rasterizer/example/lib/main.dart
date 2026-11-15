@@ -1,4 +1,3 @@
-import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_app.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/stories/collision_detection/collision_detection.dart';
@@ -9,9 +8,6 @@ import 'package:widgetbook/widgetbook.dart';
 
 /// flame_rasterizer's examples, in a Widgetbook, as Flame's are.
 void main() {
-  // On OpenGL ES, the canvas renderer draws until the GPU renderers'
-  // self-tests pass, each its own.
-  RasterizerGpu.allowOpenGles = true;
   runApp(const FlameRasterizerExamples());
 }
 

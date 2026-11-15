@@ -105,14 +105,10 @@ void main() {
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
 
   setUpAll(() async {
-    RasterizerGpu.allowOpenGles = true;
     runApp(const SizedBox());
-    await RasterizerGpu.initialize();
   });
 
   testWidgets("a GPU run's paint gives a layer's pixels", (_) async {
-    // Support is known once initialized: on OpenGL ES, once the self-test
-    // has run.
     if (RasterizerGpu.support != RasterizerSupport.supported) {
       markTestSkipped('support ${RasterizerGpu.support.name}');
       return;
