@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter_gpu/gpu.dart' as gpu;
 
+import '../rasterizer_gpu.dart' show RasterizerPixelSize;
 import 'core.dart' as ra;
 
 /// A mesh's GPU buffers, uploaded once: its vertices, its indices in paint
@@ -75,7 +76,7 @@ class MeshBuffers._(
   /// kPaintWidthLog2 in ra_mesh.glsl.
   static const paintWidthLog2 = 10;
 
-  /// The paints texture: each path's 3 texels, then each stop's 2, as
+  /// Returns the paints texture: each path's 3 texels, then each stop's 2, as
   /// ra_mesh.glsl reads them.
   static gpu.Texture _paints(ra.Mesh mesh) {
     final paths = mesh.paths, stops = mesh.stops;
@@ -226,12 +227,12 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   /// line must be a pixel wide to reach the center of every pixel it crosses.
   double get leastHalfWidth => multisampled ? 0.28 : 0.5;
 
-  /// How many times targets have been allocated.
+  /// How many times it has allocated targets.
   int resizes = 0;
 
   // The multisampled textures, by size. All targets of a size share one, as
   // each is used only within a render pass, and passes run in order.
-  final Map<(int, int), gpu.Texture> _multisampledTextures = {};
+  final Map<RasterizerPixelSize, gpu.Texture> _multisampledTextures = {};
 
   /// Makes [target]'s texture [width] x [height], the size of its run's page.
   ///
@@ -263,7 +264,8 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   void releaseMultisampled(Iterable<MeshTarget> targets) {
     final sizes = {
       for (final t in targets)
-        if (t.texture case final texture?) (texture.width, texture.height),
+        if (t.texture case final texture?)
+          (width: texture.width, height: texture.height),
     };
     _multisampledTextures.removeWhere((size, _) => !sizes.contains(size));
   }
@@ -320,14 +322,15 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
     final texture = target.texture!, w = texture.width, h = texture.height;
     final attachment = multisampled
         ? gpu.ColorAttachment(
-            texture: _multisampledTextures[(w, h)] ??= context.createTexture(
-              gpu.StorageMode.deviceTransient,
-              w,
-              h,
-              format: colorFormat,
-              sampleCount: samples,
-              enableShaderReadUsage: false,
-            ),
+            texture: _multisampledTextures[(width: w, height: h)] ??= context
+                .createTexture(
+                  gpu.StorageMode.deviceTransient,
+                  w,
+                  h,
+                  format: colorFormat,
+                  sampleCount: samples,
+                  enableShaderReadUsage: false,
+                ),
             resolveTexture: texture,
             storeAction: gpu.StoreAction.multisampleResolve,
           )

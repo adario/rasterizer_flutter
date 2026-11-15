@@ -38,7 +38,7 @@ class PlayerComponent({final PlayerSnapshot? from})
   static const maxShots = 8;
 
   /// Its speed while a key is held, in lanes a second: at first, and at most.
-  static const keySpeed = (3.0, 10.0);
+  static const keySpeed = (first: 3.0, most: 10.0);
 
   /// How fast a held key speeds it up to its top [keySpeed], in lanes a
   /// second per second.
@@ -133,7 +133,7 @@ class PlayerComponent({final PlayerSnapshot? from})
     final direction = gameRef.keyDirection;
     if (direction != 0 && gameRef.canMove) {
       _keyTime += dt;
-      final (first, most) = keySpeed;
+      final (:first, :most) = keySpeed;
       final speed = math.min(most, first + keyAcceleration * _keyTime);
       moveBy(direction * speed * dt);
     } else {
@@ -151,7 +151,7 @@ class PlayerComponent({final PlayerSnapshot? from})
     gameRef.keepStroke(drawing);
   }
 
-  /// Its angle at [step] round [tube], unwound as [Tube.headingAt].
+  /// Returns its angle at [step] round [tube], unwound as [Tube.headingAt].
   static double headingOn(Tube tube, int step) => tube.headingAt(
     step ~/ stepsPerLane,
     (step % stepsPerLane + 0.5) / stepsPerLane,

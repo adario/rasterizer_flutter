@@ -12,9 +12,10 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// An SVG that any number of components draw with rasterizer_gpu, in a game
 /// with [HasRasterizer].
 ///
-/// It's imported for the GPU renderer `gpu` where that renderer is supported,
-/// else for the canvas renderer ([RasterizerGpuBackend.backend]). That must
-/// still be the game's renderer when the SVG is drawn, so the game's
+/// [load] and [RasterizerSvg.fromBytes] import it for the GPU renderer `gpu`
+/// where that renderer is supported, else for the canvas renderer
+/// ([RasterizerGpuBackend.backend]). That must still be the game's renderer
+/// when components draw the SVG, so the game's
 /// [HasRasterizer.rasterizerGpu] must be `gpu`. It keeps the SVG's bytes, to
 /// parse its paths for dart:ui if it's drawn into a picture of its own (see
 /// [render]).
@@ -30,15 +31,15 @@ class RasterizerSvg._(
   /// Throws [ArgumentError] if the bytes can't be parsed, or, for the mesh
   /// renderer, if [maxSize] isn't positive.
   ///
-  /// For the mesh renderer, [maxSize] is the largest size, in device pixels,
-  /// at which the SVG's longer side is drawn. The mesh renderer flattens the
+  /// For the mesh renderer, [maxSize] is the largest size, in device pixels, at
+  /// which the game draws the SVG's longer side. The mesh renderer flattens the
   /// curves for that size, to within 1/4 of a pixel. Drawn larger, the curves
   /// show their segments sooner. It defaults to the view's longer side, for a
   /// full-screen SVG. Pass the largest size the game draws the SVG at, such as
-  /// its component's longer side times the camera's largest zoom and the
-  /// device pixel ratio. The triangles are made once, for that size, and
-  /// drawn at every size, with no level of detail. So a larger [maxSize]
-  /// costs the GPU more wherever the SVG is drawn small.
+  /// its component's longer side times the camera's largest zoom and the device
+  /// pixel ratio. The mesh renderer makes the triangles once, for that size,
+  /// and draws them at every size, with no level of detail. So a larger
+  /// [maxSize] costs the GPU more wherever the game draws the SVG small.
   RasterizerSvg.fromBytes(
     Uint8List bytes, {
     RasterizerBackend gpu = RasterizerBackend.mesh,
@@ -52,7 +53,8 @@ class RasterizerSvg._(
          ),
        );
 
-  /// For tests: [RasterizerSvg.fromBytes], imported for [backend].
+  /// For tests: creates an SVG as [RasterizerSvg.fromBytes] does, imported
+  /// for [backend].
   @visibleForTesting
   RasterizerSvg.debugFromBytes(
     Uint8List bytes,
@@ -178,8 +180,8 @@ class RasterizerSvg._(
     });
   }
 
-  /// The SVG imported for the canvas renderer: [scene], or else an import
-  /// made the first time. Null if that import failed.
+  /// Returns the SVG imported for the canvas renderer: [scene], or else an
+  /// import made the first time. Null if that import failed.
   RasterizerScene? _pathScene() {
     if (scene.backend == RasterizerBackend.canvas) {
       return scene;

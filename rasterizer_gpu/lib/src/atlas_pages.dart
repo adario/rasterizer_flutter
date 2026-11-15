@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import '../rasterizer_gpu.dart' show RasterizerRenderer;
+import '../rasterizer_gpu.dart' show RasterizerPixelSize, RasterizerRenderer;
 
 /// The sizes of a renderer's pages, without their textures.
 ///
@@ -19,8 +19,8 @@ import '../rasterizer_gpu.dart' show RasterizerRenderer;
 /// window, as with a rotation or a window resize, it shrinks to that size
 /// whatever it is. [trim] shrinks the pages to the last frame's needs at once.
 ///
-/// A page that no frame needed for [window] frames is released. Pages are
-/// released from the last one down.
+/// It releases a page that no frame needed for [window] frames, from the last
+/// page down.
 class AtlasPages(
   final int maxSize, {
   final int window = 120,
@@ -37,22 +37,23 @@ class AtlasPages(
   // The viewport's size, the window's frames so far, whether the viewport
   // changed during the window, and per page, the largest extents those frames
   // needed. Then the last frame's needs, for [trim].
-  (int, int)? _viewport;
+  RasterizerPixelSize? _viewport;
   int _windowFrames = 0;
   bool _changed = false;
-  final List<(int, int)> _windowNeeds = [];
-  List<(int, int)> _lastNeeds = const [];
+  final List<RasterizerPixelSize> _windowNeeds = [];
+  List<RasterizerPixelSize> _lastNeeds = const [];
 
   /// The number of pages.
   int get length => _widths.length;
 
-  /// Page [p]'s size.
-  (int, int) operator [](int p) => (_widths[p], _heights[p]);
+  /// Returns page [p]'s size.
+  RasterizerPixelSize operator [](int p) =>
+      (width: _widths[p], height: _heights[p]);
 
   /// Grows page [p] to fit [w] x [h], and returns its size.
   ///
   /// [p] equal to [length] adds a new page, at that size.
-  (int, int) fit(int p, int w, int h) {
+  RasterizerPixelSize fit(int p, int w, int h) {
     if (p == length) {
       _widths.add(0);
       _heights.add(0);
@@ -63,7 +64,7 @@ class AtlasPages(
       _heights[p] = math.max(_heights[p], _up(h));
       resizes++;
     }
-    return (_widths[p], _heights[p]);
+    return this[p];
   }
 
   /// Ends a frame for a [width] x [height] viewport, whose runs, packed
@@ -71,9 +72,9 @@ class AtlasPages(
   ///
   /// At the end of a window, this shrinks the pages. It also releases the
   /// pages that no frame needed for [window] frames.
-  void endFrame(int width, int height, List<(int, int)> needs) {
+  void endFrame(int width, int height, List<RasterizerPixelSize> needs) {
     _lastNeeds = needs;
-    final viewport = (width, height);
+    final viewport = (width: width, height: height);
     if (viewport != _viewport) {
       // The first frame's viewport isn't a change, as there was none before.
       if (_viewport != null) {
@@ -84,12 +85,15 @@ class AtlasPages(
       _viewport = viewport;
     }
     for (var p = 0; p < needs.length; p++) {
-      final (w, h) = needs[p];
+      final need = needs[p];
       if (p == _windowNeeds.length) {
-        _windowNeeds.add((w, h));
+        _windowNeeds.add(need);
       } else {
-        final (ww, wh) = _windowNeeds[p];
-        _windowNeeds[p] = (math.max(w, ww), math.max(h, wh));
+        final largest = _windowNeeds[p];
+        _windowNeeds[p] = (
+          width: math.max(need.width, largest.width),
+          height: math.max(need.height, largest.height),
+        );
       }
     }
     if (++_windowFrames == window) {
@@ -119,10 +123,10 @@ class AtlasPages(
   ///
   /// With [rarely], it shrinks only the pages whose new area would be below
   /// [shrinkBelow] of their area.
-  void _shrink(List<(int, int)> needs, {bool rarely = false}) {
+  void _shrink(List<RasterizerPixelSize> needs, {bool rarely = false}) {
     for (var p = 0; p < length && p < needs.length; p++) {
-      final w = math.min(_widths[p], _up(needs[p].$1)),
-          h = math.min(_heights[p], _up(needs[p].$2));
+      final w = math.min(_widths[p], _up(needs[p].width)),
+          h = math.min(_heights[p], _up(needs[p].height));
       if (w == _widths[p] && h == _heights[p]) {
         continue;
       }
@@ -141,6 +145,6 @@ class AtlasPages(
     _idle.removeLast();
   }
 
-  /// [v] rounded up to a multiple of [step], from [step] to [maxSize].
+  /// Returns [v] rounded up to a multiple of [step], from [step] to [maxSize].
   int _up(int v) => ((v + step - 1) ~/ step * step).clamp(step, maxSize);
 }

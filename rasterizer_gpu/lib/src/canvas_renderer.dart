@@ -30,7 +30,7 @@ class CanvasScene._(final CanvasPaths paths) implements RasterizerScene {
     return CanvasScene._(paths);
   }
 
-  /// A scene of plain [paths].
+  /// Creates a scene of plain [paths].
   factory CanvasScene.fromPaths(ScenePaths paths) => CanvasScene._(paths);
 
   /// The paths, recorded once, for [RasterizerGpu.canvasPictures].
@@ -148,7 +148,7 @@ class CanvasFrame._(final CanvasRenderer _renderer) implements RasterizerFrame {
   int get encodeMicros => 0;
 
   @override
-  List<(int, int)> get pageSizes => const [];
+  List<RasterizerPixelSize> get pageSizes => const [];
 
   @override
   RasterizerBackend get backend => RasterizerBackend.canvas;
@@ -381,8 +381,8 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     }
   }
 
-  /// The bounds of a layer drawn with [paint] around the entries, in units of
-  /// [scale] device pixels, or null for no bounds.
+  /// Returns the bounds of a layer drawn with [paint] around the entries, in
+  /// units of [scale] device pixels, or null for no bounds.
   ///
   /// A layer costs its area, so the bounds are what the entries can paint, a
   /// device pixel wider for antialiasing. An entry with a corner behind the
@@ -398,11 +398,11 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
       if (_scenes[i].paintedBounds.isEmpty) {
         continue;
       }
-      final (l, t, r, b) = _paintedInViewport(i);
-      left = min(left, l);
-      top = min(top, t);
-      right = max(right, r);
-      bottom = max(bottom, b);
+      final painted = _paintedInViewport(i);
+      left = min(left, painted.left);
+      top = min(top, painted.top);
+      right = max(right, painted.right);
+      bottom = max(bottom, painted.bottom);
     }
     if (left > right) {
       return ui.Rect.zero;
@@ -415,21 +415,22 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     );
   }
 
-  /// Whether entry [i] paints nothing within a device pixel of the viewport,
-  /// or its bounds are NaN.
+  /// Returns whether entry [i] paints nothing within a device pixel of the
+  /// viewport, or its bounds are NaN.
   bool _missesViewport(int i) {
-    final (left, top, right, bottom) = _paintedInViewport(i);
+    final (:left, :top, :right, :bottom) = _paintedInViewport(i);
     return !(right > -1 &&
         bottom > -1 &&
         left < _frame.width + 1 &&
         top < _frame.height + 1);
   }
 
-  /// The bounds of what entry [i] can paint, in the viewport, as left, top,
-  /// right and bottom.
+  /// Returns the bounds of what entry [i] can paint, in the viewport.
   ///
   /// With a corner behind the eye, they take in the viewport too.
-  (double, double, double, double) _paintedInViewport(int i) {
+  ({double left, double top, double right, double bottom}) _paintedInViewport(
+    int i,
+  ) {
     final s = _scenes[i].paintedBounds;
     final k = 9 * i;
     final a = _ctms[k], b = _ctms[k + 1], c = _ctms[k + 2], d = _ctms[k + 3];
@@ -457,7 +458,7 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
         top = min(top, py);
         bottom = max(bottom, py);
       }
-      return (left, top, right, bottom);
+      return (left: left, top: top, right: right, bottom: bottom);
     }
     // Each corner's x' and y' are sums of a term in x and a term in y, so
     // their extremes are the sums of each term's extremes.
@@ -466,10 +467,10 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     final bx0 = b * s.left, bx1 = b * s.right;
     final dy0 = d * s.top, dy1 = d * s.bottom;
     return (
-      min(ax0, ax1) + min(cy0, cy1) + tx,
-      min(bx0, bx1) + min(dy0, dy1) + ty,
-      max(ax0, ax1) + max(cy0, cy1) + tx,
-      max(bx0, bx1) + max(dy0, dy1) + ty,
+      left: min(ax0, ax1) + min(cy0, cy1) + tx,
+      top: min(bx0, bx1) + min(dy0, dy1) + ty,
+      right: max(ax0, ax1) + max(cy0, cy1) + tx,
+      bottom: max(bx0, bx1) + max(dy0, dy1) + ty,
     );
   }
 }

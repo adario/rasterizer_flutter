@@ -144,14 +144,16 @@ Future<FrameRenders> _render(
   // with its SVG's name.
   if (record != null) {
     for (final MapEntry(:key, :value) in pages.entries) {
-      final (pw, ph) = frame.pageSizes[key];
+      final (width: pw, height: ph) = frame.pageSizes[key];
       final entries = StringBuffer(
         'entries ${svgOf(0)} $pw $ph ${curves ? 1 : 0}\n',
       );
       for (var i = 0; i < frame.entryCount; i++) {
         final core = frame.coreEntry(i);
-        if (core != null && frame.entryRun(i).$2 == key) {
-          entries.writeln([...core.$1, ...core.$2, svgOf(i)].join(' '));
+        if (core != null && frame.entryRun(i).page == key) {
+          entries.writeln(
+            [...core.transform, ...core.clip, svgOf(i)].join(' '),
+          );
         }
       }
       File('$record/golden_${name}_p$key.rgba').writeAsBytesSync(value);

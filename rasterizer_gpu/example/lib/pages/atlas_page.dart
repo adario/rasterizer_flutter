@@ -111,7 +111,7 @@ class _AtlasPageState()
     final n = widget.entries,
         runs = [for (var k = 0; k < widget.runs; k++) frame.addRun()];
     for (var i = 0; i < n; i++) {
-      final (a, b, c, d, tx, ty) = _motion.transform(i, t, px);
+      final (:a, :b, :c, :d, :tx, :ty) = _motion.transform(i, t, px);
       runs[i * widget.runs ~/ n].add(
         _scenes[_motion.svg(i)],
         a,
@@ -171,7 +171,7 @@ class _AtlasPageState()
         'up), ${widget.entries} entries of ${widget.count} SVGs ($paths '
         'paths), ${widget.runs} runs, ${frame.width}×${frame.height} px, '
         '${_renderer!.backend.name}, pages '
-        '${frame.pageSizes.map((s) => '${s.$1}×${s.$2}').join(', ')}: '
+        '${frame.pageSizes.map((s) => '${s.width}×${s.height}').join(', ')}: '
         '${stats('cpu', 0)}; ${stats('upload', 1)}; ${stats('encode', 2)}; '
         '${stats('total', 3)}; ${stats('interval', 4)}; '
         '$missed intervals over 17.5 ms';

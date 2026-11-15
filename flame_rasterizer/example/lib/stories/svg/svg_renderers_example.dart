@@ -77,15 +77,15 @@ abstract class SvgRenderersExample(
   /// Seconds per turn.
   static const _turnTime = 2.0;
 
-  /// The settings that its components were built for, or null before the
-  /// first build.
+  /// The settings it built its components for, or null before the first
+  /// build.
   SvgRenderersSettings? _built;
 
   /// The SVG that its components draw, or null if it couldn't load.
   ExampleSvg? _svg;
 
   /// What [_svg] was loaded for: its name and flame_svg's cache settings.
-  (String, SvgCacheMode, SvgCacheSize)? _svgKey;
+  ({String svg, SvgCacheMode cacheMode, SvgCacheSize cacheSize})? _svgKey;
 
   /// Old SVGs to free once the components that drew them are removed.
   final _retired = <ExampleSvg>[];
@@ -149,7 +149,11 @@ abstract class SvgRenderersExample(
     try {
       while (!isRemoved && _built != _settings) {
         final target = _settings;
-        final key = (target.svg, target.cacheMode, target.cacheSize);
+        final key = (
+          svg: target.svg,
+          cacheMode: target.cacheMode,
+          cacheSize: target.cacheSize,
+        );
         if (key != _svgKey) {
           ExampleSvg? svg;
           String? error;
@@ -161,7 +165,12 @@ abstract class SvgRenderersExample(
             error = "Couldn't load ${target.svg}.svg: $e";
           }
           final settled =
-              (_settings.svg, _settings.cacheMode, _settings.cacheSize) == key;
+              (
+                svg: _settings.svg,
+                cacheMode: _settings.cacheMode,
+                cacheSize: _settings.cacheSize,
+              ) ==
+              key;
           if (isRemoved || !settled) {
             // The game was removed, or the knobs picked another SVG, while
             // this one loaded.
@@ -201,7 +210,7 @@ abstract class SvgRenderersExample(
       stopStatus();
       return;
     }
-    final (angle, rotation) = _rotation();
+    final (:angle, :rotation) = _rotation();
     final master = svg.component(priority: 1)
       ..anchor = Anchor.center
       ..angle = angle
@@ -213,7 +222,7 @@ abstract class SvgRenderersExample(
     final count = settings.count;
     for (var i = 0; i < count; i++) {
       final f = i / count;
-      final (angle, rotation) = _rotation(delay: _turnTime * 0.5 * f);
+      final (:angle, :rotation) = _rotation(delay: _turnTime * 0.5 * f);
       final component =
           svg.component(
               priority: count + 1 - i,
@@ -230,13 +239,12 @@ abstract class SvgRenderersExample(
     startStatus();
   }
 
-  /// A turn every [_turnTime], starting [delay] after the game did.
-  ///
-  /// Returns the angle turned by at the world's [_time], and the effect that
-  /// goes on turning from there.
-  (double, Effect) _rotation({double delay = 0}) => (
-    _turn * (math.max(0.0, _time - delay) / _turnTime % 1),
-    RotateEffect.by(
+  /// Returns how far a turn every [_turnTime], starting [delay] after the game
+  /// did, has turned at the world's [_time], and the effect that goes on
+  /// turning from there.
+  ({double angle, Effect rotation}) _rotation({double delay = 0}) => (
+    angle: _turn * (math.max(0.0, _time - delay) / _turnTime % 1),
+    rotation: RotateEffect.by(
       _turn,
       EffectController(
         duration: _turnTime,

@@ -16,7 +16,7 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 import 'package:rasterizer_gpu/src/meshes.dart' show MeshScene;
 import 'package:rasterizer_gpu/src/paths/scene_paths.dart';
 
-/// The triangles of [m]'s path [path], as 6 coordinates each.
+/// Returns the triangles of [m]'s path [path], as 6 coordinates each.
 Iterable<List<double>> triangles(Mesh m, int path) sync* {
   final p = m.paths[path], v = m.vertices, i = m.indices as List<int>;
   final f = m.vertexFloats;
@@ -27,7 +27,7 @@ Iterable<List<double>> triangles(Mesh m, int path) sync* {
   }
 }
 
-/// The area of [m]'s path [path]'s triangles, summed.
+/// Returns the area of [m]'s path [path]'s triangles, summed.
 double area(Mesh m, [int path = 0]) {
   var sum = 0.0;
   for (final t in triangles(m, path)) {
@@ -37,7 +37,7 @@ double area(Mesh m, [int path = 0]) {
   return sum / 2;
 }
 
-/// A mesh of [draws] of [paths], flattened to [tolerance].
+/// Returns a mesh of [draws] of [paths], flattened to [tolerance].
 Mesh mesh(
   List<ui.Path> paths,
   List<PathDraw> draws, {
@@ -55,10 +55,10 @@ ui.Paint stroke(double width) => ui.Paint()
   ..style = ui.PaintingStyle.stroke
   ..strokeWidth = width;
 
-/// [path] filled in blue, then stroked in red.
-List<(ui.Path, ui.Paint)> paths2(ui.Path path) => [
-  (path, ui.Paint()..color = const ui.Color(0xff0000ff)),
-  (path, stroke(2)..color = const ui.Color(0xffff0000)),
+/// Returns [path] filled in blue, then stroked in red.
+List<RasterizerPaintedPath> paths2(ui.Path path) => [
+  (path: path, paint: ui.Paint()..color = const ui.Color(0xff0000ff)),
+  (path: path, paint: stroke(2)..color = const ui.Color(0xffff0000)),
 ];
 
 void main() {
@@ -126,9 +126,9 @@ void main() {
 
   group('fromPaths', () {
     final paths = [
-      (square, ui.Paint()..color = const ui.Color(0xff3060c0)),
-      (square, stroke(4)..color = const ui.Color(0xff80a0e0)),
-      (line, stroke(10)),
+      (path: square, paint: ui.Paint()..color = const ui.Color(0xff3060c0)),
+      (path: square, paint: stroke(4)..color = const ui.Color(0xff80a0e0)),
+      (path: line, paint: stroke(10)),
     ];
 
     test('throws for a maxSize that is not positive', () {
@@ -149,7 +149,7 @@ void main() {
       for (final backend in RasterizerBackend.values) {
         expect(
           () => RasterizerScene.fromPaths(
-            [(square, stroke(0))],
+            [(path: square, paint: stroke(0))],
             backend: backend,
             maxSize: 512,
           ),
@@ -203,7 +203,7 @@ void main() {
     test('copies the paints', () async {
       final paint = ui.Paint()..color = const ui.Color(0xff00ff00);
       final scene = RasterizerScene.fromPaths(
-        [(square, paint)],
+        [(path: square, paint: paint)],
         backend: RasterizerBackend.canvas,
         maxSize: 512,
       );
@@ -244,9 +244,12 @@ void main() {
       final round = stroke(2)
         ..strokeCap = ui.StrokeCap.round
         ..strokeJoin = ui.StrokeJoin.round;
-      expect(ScenePaths([(zigzag, round)]).tolerance(1600), 0.25 * 2 / 1600);
+      expect(
+        ScenePaths([(path: zigzag, paint: round)]).tolerance(1600),
+        0.25 * 2 / 1600,
+      );
       RasterizerScene.fromPaths(
-        [(zigzag, round)],
+        [(path: zigzag, paint: round)],
         backend: RasterizerBackend.mesh,
         maxSize: 1600,
       ).dispose();
@@ -259,7 +262,7 @@ void main() {
       final spike = ui.Path()
         ..moveTo(16.624696, 40.135567)
         ..lineTo(16.626923, 40.140943);
-      final scenePaths = ScenePaths([(spike, stroke(0.001))]);
+      final scenePaths = ScenePaths([(path: spike, paint: stroke(0.001))]);
       expect(
         scenePaths.tolerance(1600),
         greaterThanOrEqualTo(16 * 40.14 / (1 << 23)),
@@ -267,7 +270,7 @@ void main() {
       final [contours] = scenePaths.contours(1600);
       expect(contours.points, hasLength(4));
       RasterizerScene.fromPaths(
-        [(spike, stroke(0.001))],
+        [(path: spike, paint: stroke(0.001))],
         backend: RasterizerBackend.mesh,
         maxSize: 1600,
       ).dispose();
@@ -275,10 +278,10 @@ void main() {
   });
 
   group('glow', () {
-    final stroked = [(line, stroke(4))];
+    final stroked = [(path: line, paint: stroke(4))];
 
     RasterizerScene scene(
-      List<(ui.Path, ui.Paint)> paths,
+      List<RasterizerPaintedPath> paths,
       RasterizerGlow? glow, {
       RasterizerBackend backend = RasterizerBackend.mesh,
     }) => RasterizerScene.fromPaths(
@@ -333,7 +336,9 @@ void main() {
           epsilon: 1e-3,
         ),
       );
-      final outward = scene([(square, ui.Paint())], const RasterizerGlow(5));
+      final outward = scene([
+        (path: square, paint: ui.Paint()),
+      ], const RasterizerGlow(5));
       expect(outward.pathCount, 2);
       expect(
         outward.bounds,

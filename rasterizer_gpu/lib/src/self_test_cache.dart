@@ -39,7 +39,7 @@ import 'frame_clock.dart' show inForeground;
 const _version = 2;
 
 /// The number of attempts in a row that didn't finish in the foreground,
-/// after which the self-test isn't tried again.
+/// after which later launches skip the self-test.
 ///
 /// It's two, as one may be a user swiping the app away during the self-test.
 const maxUnfinishedAttempts = 2;
@@ -48,11 +48,11 @@ const maxUnfinishedAttempts = 2;
 ///
 /// It's the modification time and size of the app's compiled Dart code,
 /// lib/libapp.so beside the executable. Debug builds have none, so there it's
-/// the executable's. The runner isn't relinked when only Dart changes, so the
-/// executable's own stamp would miss most upgrades. The size counts too, as
-/// reproducible builds may give every file one fixed time (Nix does). A file
-/// from another build counts as none. So an upgrade tries the self-test again,
-/// as Android's clearing of the code cache makes it do.
+/// the executable's. A build doesn't relink the runner when only Dart
+/// changes, so the executable's own stamp would miss most upgrades. The size
+/// counts too, as reproducible builds may give every file one fixed time (Nix
+/// does). A file from another build counts as none. So an upgrade tries the
+/// self-test again, as Android's clearing of the code cache makes it do.
 @visibleForTesting
 final String? appStamp = () {
   if (!Platform.isLinux) {
@@ -183,7 +183,8 @@ class SelfTestCache(
     }
   }
 
-  /// The self-test's failure remembered from an earlier launch, or null.
+  /// Returns the self-test's failure remembered from an earlier launch, or
+  /// null.
   ///
   /// [maxUnfinishedAttempts] unfinished attempts become a failure, which says
   /// where they stopped. This launch's attempt, while it runs, doesn't count.
@@ -269,8 +270,8 @@ class SelfTestCache(
   }
 }
 
-/// Whether an attempt writes its frame count at [frames]: at 1, 10, 100 and
-/// 1000.
+/// Returns whether an attempt writes its frame count at [frames]: at 1, 10, 100
+/// and 1000.
 bool _checkpoint(int frames) =>
     frames == 1 || frames == 10 || frames == 100 || frames == 1000;
 

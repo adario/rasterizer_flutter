@@ -16,7 +16,7 @@ import 'package:test/test.dart';
 
 const viewWidth = 1024.0, viewHeight = 768.0, viewScale = 2.0;
 
-/// A random SVG of [paths] paths, from [seed], drawn like a city map.
+/// Returns a random SVG of [paths] paths, from [seed], drawn like a city map.
 ///
 /// Its viewBox is 4000 by 3000. A gradient band comes first. Then come
 /// stroked roads of lines and curves, curved parks, square blocks with a hole,
@@ -85,17 +85,17 @@ Uint8List mapSvg(int paths, {int seed = 1}) {
   return Uint8List.fromList(out.toString().codeUnits);
 }
 
-/// A scene of [mapSvg] with 300 paths, about as many as the tiger has.
+/// Returns a scene of [mapSvg] with 300 paths, about as many as the tiger has.
 Scene smallScene() => Scene.fromSvgBytes(mapSvg(300));
 
-/// A scene list of [scene] alone, fitted into the view.
+/// Returns a scene list of [scene] alone, fitted into the view.
 SceneList fittedList(Scene scene) {
   final list = SceneList()..addScene(scene, scene.svgTransform);
   list.ctm = const Bounds(0, 0, viewWidth, viewHeight).fit(list.bounds);
   return list;
 }
 
-/// The size of [frame], its sections, and its entries counted by type.
+/// Returns the size of [frame], its sections, and its entries counted by type.
 String summary(Frame frame) {
   final out = StringBuffer()
     ..writeln(
@@ -186,6 +186,9 @@ void checkFrame(Frame frame, Scene scene) {
       clear.getUint8(0);
   expect(argb, frame.params.clearColor);
 }
+
+/// A path of a scene, as one of a list's entries draws it.
+typedef _EntryPath = ({int entry, int path});
 
 void main() {
   test('layout', () {
@@ -390,8 +393,8 @@ void main() {
 
     // The base of each molecule's P16s, by entry and by path in the scene.
     const molecule = 1 << 25, outlines = 1 << 29, pathIndexMask = 0xFFFFF;
-    Map<(int, int), int> bases(Frame frame) {
-      final data = ByteData.sublistView(frame.bytes), out = <(int, int), int>{};
+    Map<_EntryPath, int> bases(Frame frame) {
+      final data = ByteData.sublistView(frame.bytes), out = <_EntryPath, int>{};
       for (final e in frame.entries.where(
         (e) => e.type == EntryType.instances,
       )) {
@@ -401,10 +404,8 @@ void main() {
             continue;
           }
           final path = iz & pathIndexMask;
-          out[(path ~/ scene.count, path % scene.count)] = data.getInt32(
-            at + 20,
-            Endian.little,
-          );
+          out[(entry: path ~/ scene.count, path: path % scene.count)] = data
+              .getInt32(at + 20, Endian.little);
         }
       }
       return out;
@@ -429,10 +430,14 @@ void main() {
     final threeBases = bases(three);
     print('  ${oneBases.length} molecules, frames ${one.size} & ${three.size}');
     expect(oneBases.length, greaterThan(100));
-    for (final MapEntry(key: (entry, path), :value) in threeBases.entries) {
-      expect(value, oneBases[(0, path)], reason: 'entry $entry, path $path');
+    for (final MapEntry(key: (:entry, :path), :value) in threeBases.entries) {
+      expect(
+        value,
+        oneBases[(entry: 0, path: path)],
+        reason: 'entry $entry, path $path',
+      );
     }
-    expect({for (final (entry, _) in threeBases.keys) entry}, {0, 1, 2});
+    expect({for (final (:entry, path: _) in threeBases.keys) entry}, {0, 1, 2});
   });
 
   test('strokes within a power of 2 scale share cached outlines (geometry '
@@ -476,7 +481,7 @@ void main() {
     // scene. A piece holds iz, x0, y0, x2 and y2, then its neighbors' offsets.
     const outlines = 1 << 29, pathIndexMask = 0xFFFFF;
     final data = ByteData.sublistView(frame.bytes);
-    final pieces = <(int, int), List<int>>{};
+    final pieces = <_EntryPath, List<int>>{};
     for (final e in frame.entries.where((e) => e.type == EntryType.instances)) {
       for (var at = e.begin; at < e.end; at += layout.instance) {
         final iz = data.getUint32(at, Endian.little);
@@ -484,18 +489,21 @@ void main() {
           continue;
         }
         final path = iz & pathIndexMask;
-        (pieces[(path ~/ scene.count, path % scene.count)] ??= []).add(at);
+        (pieces[(entry: path ~/ scene.count, path: path % scene.count)] ??= [])
+            .add(at);
       }
     }
     double f(int at, int i) => data.getFloat32(at + 4 + 4 * i, Endian.little);
     int short(int at, int i) => data.getInt16(at + 28 + 2 * i, Endian.little);
 
     for (var path = 0; path < scene.count; path++) {
-      final one = pieces[(0, path)]!, small = pieces[(1, path)]!;
-      final clipped = pieces[(3, path)]!;
+      final one = pieces[(entry: 0, path: path)]!,
+          small = pieces[(entry: 1, path: path)]!;
+      final clipped = pieces[(entry: 3, path: path)]!;
+      final skewed = pieces[(entry: 2, path: path)]!;
       print(
         '  path $path: ${one.length} pieces, '
-        'skewed ${pieces[(2, path)]!.length}, clipped ${clipped.length}',
+        'skewed ${skewed.length}, clipped ${clipped.length}',
       );
       // The 0.8 entry's pieces are the scale 1 entry's, scaled. In device
       // pixels, x is p + 100 and 0.8p + 1200, and y is p + 100 and
@@ -517,7 +525,7 @@ void main() {
       // its own path.
       expect(clipped.length, inExclusiveRange(0, one.length));
       for (var entry = 0; entry < ctms.length; entry++) {
-        final at = pieces[(entry, path)]!;
+        final at = pieces[(entry: entry, path: path)]!;
         for (var j = 0; j < at.length; j++) {
           for (final n in [short(at[j], 0), short(at[j], 1)]) {
             expect(j + n, inInclusiveRange(0, at.length - 1));
@@ -526,7 +534,7 @@ void main() {
       }
     }
     // Unclipped, the closed path's first and last pieces are neighbors.
-    final closed = pieces[(0, 1)]!;
+    final closed = pieces[(entry: 0, path: 1)]!;
     expect(short(closed.first, 0), closed.length - 1);
     expect(short(closed.last, 1), 1 - closed.length);
   });
@@ -598,7 +606,9 @@ void main() {
 
     // Draws the scene at [opacity] into a 200 by 200 view. Returns the
     // rectangles' colors, BGRA, the gradient's strip and the entries' types.
-    (List<int>, List<int>, Set<EntryType>) render(double opacity) {
+    ({List<int> colors, List<int> strip, Set<EntryType> types}) render(
+      double opacity,
+    ) {
       final bytes = entry.asTypedList(SceneList.entrySize).buffer.asByteData();
       bytes.setInt64(0, scene.address, Endian.host);
       for (final (i, v) in [m.a, m.b, m.c, m.d, m.tx, m.ty].indexed) {
@@ -612,20 +622,23 @@ void main() {
       final frame = renderer.render(list, 200, 200, 1, FrameBuffer());
       final b = frame.bytes;
       return (
-        b.sublist(frame.colors, frame.colors + 8),
-        frame.texCount == 0
+        colors: b.sublist(frame.colors, frame.colors + 8),
+        strip: frame.texCount == 0
             ? <int>[]
             : b.sublist(
                 frame.texStrips,
                 frame.texStrips + 4 * layout.colorTextureWidth,
               ),
-        {for (final e in frame.entries) e.type},
+        types: {for (final e in frame.entries) e.type},
       );
     }
 
-    final (opaqueColors, opaqueStrip, opaqueTypes) = render(1);
-    final (fadedColors, fadedStrip, fadedTypes) = render(0.5);
-    final (_, _, hiddenTypes) = render(0);
+    final (colors: opaqueColors, strip: opaqueStrip, types: opaqueTypes) =
+        render(1);
+    final (colors: fadedColors, strip: fadedStrip, types: fadedTypes) = render(
+      0.5,
+    );
+    final hiddenTypes = render(0).types;
     print('  opaque $opaqueColors, $opaqueTypes');
     print('  faded $fadedColors, $fadedTypes');
     print('  hidden $hiddenTypes');
@@ -680,7 +693,9 @@ void main() {
     // Draws the scene with [matrix], or with none if null. Its rows map r,
     // g, b and a. Returns the red rectangle's color, BGRA, the gradient's
     // strip and the entries' types.
-    (List<int>, List<int>, Set<EntryType>) render(List<double>? matrix) {
+    ({List<int> color, List<int> strip, Set<EntryType> types}) render(
+      List<double>? matrix,
+    ) {
       final bytes = entry.asTypedList(SceneList.entrySize).buffer.asByteData();
       bytes.setInt64(0, scene.address, Endian.host);
       for (final (i, v) in [m.a, m.b, m.c, m.d, m.tx, m.ty].indexed) {
@@ -705,14 +720,14 @@ void main() {
       final frame = renderer.render(list, 200, 200, 1, FrameBuffer());
       final b = frame.bytes;
       return (
-        b.sublist(frame.colors, frame.colors + 4),
-        frame.texCount == 0
+        color: b.sublist(frame.colors, frame.colors + 4),
+        strip: frame.texCount == 0
             ? <int>[]
             : b.sublist(
                 frame.texStrips,
                 frame.texStrips + 4 * layout.colorTextureWidth,
               ),
-        {for (final e in frame.entries) e.type},
+        types: {for (final e in frame.entries) e.type},
       );
     }
 
@@ -761,10 +776,10 @@ void main() {
       }
     }
 
-    final (plain, plainStrip, plainTypes) = render(null);
+    final (color: plain, strip: plainStrip, types: plainTypes) = render(null);
     expect(plain, [0, 0, 255, 255]);
     expect(plainTypes, contains(EntryType.opaques));
-    final (same, sameStrip, sameTypes) = render(identity);
+    final (color: same, strip: sameStrip, types: sameTypes) = render(identity);
     expect(same, plain);
     expect(sameStrip, plainStrip);
     expect(sameTypes, plainTypes);
@@ -775,7 +790,7 @@ void main() {
       ('grey', grey, true),
       ('out of range', bright, true),
     ]) {
-      final (color, strip, types) = render(matrix);
+      final (:color, :strip, :types) = render(matrix);
       print('  $name $color, $types');
       expectClose(color, transform(matrix, plain), name);
       expectClose(strip, [
@@ -789,11 +804,11 @@ void main() {
       );
     }
     // Red tinted green at 0.8: 0.2 red, 0.8 green, opaque.
-    expectClose(render(tint).$1, [0, 204, 51, 255], 'tint');
+    expectClose(render(tint).color, [0, 204, 51, 255], 'tint');
     // Clamped: red doubled to 255, green offset below 0.
-    expectClose(render(bright).$1, [0, 0, 255, 255], 'clamped');
+    expectClose(render(bright).color, [0, 0, 255, 255], 'clamped');
 
-    final (_, _, clearTypes) = render(List.filled(16, 0));
+    final clearTypes = render(List.filled(16, 0)).types;
     expect(
       clearTypes.intersection({
         EntryType.opaques,

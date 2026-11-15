@@ -37,40 +37,43 @@ const selfTestSvg = '''
 /// The width and height of [selfTestSvg], in pixels.
 const selfTestSize = 160;
 
-// The paths' colours, not premultiplied, from 0 to 255, with their alpha.
-const _red = (255, 0, 0, 255),
-    _blue = (0, 0, 255, 128),
-    _green = (0, 255, 0, 255),
-    _magenta = (255, 0, 255, 255);
-const _yellow = (255, 255, 0, 128),
-    _cyan = (0, 255, 255, 255),
-    _orange = (255, 165, 0, 204);
+/// A colour, not premultiplied, with each channel from 0 to 255.
+typedef _Colour = ({int red, int green, int blue, int alpha});
+
+// The paths' colours.
+const _Colour _red = (red: 255, green: 0, blue: 0, alpha: 255),
+    _blue = (red: 0, green: 0, blue: 255, alpha: 128),
+    _green = (red: 0, green: 255, blue: 0, alpha: 255),
+    _magenta = (red: 255, green: 0, blue: 255, alpha: 255),
+    _yellow = (red: 255, green: 255, blue: 0, alpha: 128),
+    _cyan = (red: 0, green: 255, blue: 255, alpha: 255),
+    _orange = (red: 255, green: 165, blue: 0, alpha: 204);
 
 /// The pixels to check, each with the paths over it, back to front.
 ///
 /// Each one lies at least 3 pixels from every path's edge, so its colour is
 /// exact, but for rounding. Some still lie near an edge, in the cells where
 /// that edge's coverage accumulates.
-const List<(int, int, List<(int, int, int, int)>)> _probes = [
-  (4, 4, []),
-  (20, 30, [_red]),
-  (60, 30, [_red, _blue]),
-  (80, 23, [_red, _blue]), // B's top edge's cells
-  (80, 70, [_blue]),
-  (80, 97, [_blue]), // B's bottom edge's cells
-  (110, 50, [_red, _blue, _green]), // C hides B
-  (130, 70, [_green]),
-  (36, 100, [_magenta]),
-  (36, 97, [_magenta]), // D's outer edge's cells
-  (36, 112, []), // D's hole, by its inner edge
-  (36, 124, []),
-  (126, 128, [_yellow]), // E's middle, wound twice
-  (126, 119, [_yellow]), // by its inner circle's edge
-  (126, 108, [_yellow]),
-  (150, 150, []),
-  (80, 120, [_cyan]),
-  (80, 146, [_orange]),
-  (80, 139, [_orange]),
+const List<({int x, int y, List<_Colour> layers})> _probes = [
+  (x: 4, y: 4, layers: []),
+  (x: 20, y: 30, layers: [_red]),
+  (x: 60, y: 30, layers: [_red, _blue]),
+  (x: 80, y: 23, layers: [_red, _blue]), // B's top edge's cells
+  (x: 80, y: 70, layers: [_blue]),
+  (x: 80, y: 97, layers: [_blue]), // B's bottom edge's cells
+  (x: 110, y: 50, layers: [_red, _blue, _green]), // C hides B
+  (x: 130, y: 70, layers: [_green]),
+  (x: 36, y: 100, layers: [_magenta]),
+  (x: 36, y: 97, layers: [_magenta]), // D's outer edge's cells
+  (x: 36, y: 112, layers: []), // D's hole, by its inner edge
+  (x: 36, y: 124, layers: []),
+  (x: 126, y: 128, layers: [_yellow]), // E's middle, wound twice
+  (x: 126, y: 119, layers: [_yellow]), // by its inner circle's edge
+  (x: 126, y: 108, layers: [_yellow]),
+  (x: 150, y: 150, layers: []),
+  (x: 80, y: 120, layers: [_cyan]),
+  (x: 80, y: 146, layers: [_orange]),
+  (x: 80, y: 139, layers: [_orange]),
 ];
 
 /// The largest difference allowed in each channel from the expected colour,
@@ -79,9 +82,9 @@ const _tolerance = 3;
 
 /// Checks the scene's render, premultiplied, over transparent.
 ///
-/// [rect] is the part of the scene in [rgba], as left, top, width and height
-/// in the scene's pixels. It lies at [x0], [y0] in [rgba], which has [stride]
-/// bytes per row. The scene's pixels outside [rect] count as transparent.
+/// [rect] is the part of the scene in [rgba], in the scene's pixels. It lies
+/// at [x0], [y0] in [rgba], which has [stride] bytes per row. The scene's
+/// pixels outside [rect] count as transparent.
 ///
 /// Returns null if every probe matches, else a description of the first that
 /// doesn't.
@@ -90,17 +93,17 @@ String? checkSelfTest(
   int stride,
   int x0,
   int y0,
-  (int, int, int, int) rect,
+  ({int left, int top, int width, int height}) rect,
 ) {
-  final (left, top, width, height) = rect;
-  for (final (x, y, layers) in _probes) {
+  final (:left, :top, :width, :height) = rect;
+  for (final (:x, :y, :layers) in _probes) {
     // Source over, premultiplied.
     var r = 0.0, g = 0.0, b = 0.0, a = 0.0;
-    for (final (lr, lg, lb, la) in layers) {
-      final alpha = la / 255;
-      r = lr * alpha + r * (1 - alpha);
-      g = lg * alpha + g * (1 - alpha);
-      b = lb * alpha + b * (1 - alpha);
+    for (final layer in layers) {
+      final alpha = layer.alpha / 255;
+      r = layer.red * alpha + r * (1 - alpha);
+      g = layer.green * alpha + g * (1 - alpha);
+      b = layer.blue * alpha + b * (1 - alpha);
       a = 255 * alpha + a * (1 - alpha);
     }
     final inside =

@@ -13,18 +13,19 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rasterizer_gpu/src/atlas_parts.dart';
 
+/// A rectangle, from its least x and y to its greatest.
+typedef _Box = ({int minX, int minY, int maxX, int maxY});
+
 void main() {
   /// Groups [rects] into parts. Returns each entry's part, as an index, and
   /// each part's rectangle.
-  (List<int>, List<(int, int, int, int)>) group(
-    List<(int, int, int, int)> rects,
-  ) {
+  ({List<int> entryParts, List<_Box> parts}) group(List<_Box> rects) {
     final flat = Int32List(4 * rects.length);
     for (var i = 0; i < rects.length; i++) {
-      final (lx, ly, ux, uy) = rects[i];
+      final (minX: lx, minY: ly, maxX: ux, maxY: uy) = rects[i];
       flat.setAll(4 * i, [lx, ly, ux, uy]);
     }
-    final parts = <(int, int, int, int)>[];
+    final parts = <_Box>[];
     final entryParts = List.filled(rects.length, -1);
     AtlasParts().group(flat, [for (var i = 0; i < rects.length; i++) i], (
       lx,
@@ -32,48 +33,59 @@ void main() {
       ux,
       uy,
     ) {
-      parts.add((lx, ly, ux, uy));
+      parts.add((minX: lx, minY: ly, maxX: ux, maxY: uy));
       return parts.length - 1;
     }, (id, part) => entryParts[id] = part);
-    return (entryParts, parts);
+    return (entryParts: entryParts, parts: parts);
   }
 
-  bool overlap((int, int, int, int) a, (int, int, int, int) b) =>
-      a.$1 < b.$3 && b.$1 < a.$3 && a.$2 < b.$4 && b.$2 < a.$4;
+  bool overlap(_Box a, _Box b) =>
+      a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
 
   test('disjoint entries are parts of their own', () {
-    final (entries, parts) = group([
-      (500, 0, 600, 100),
-      (0, 0, 100, 100),
-      (0, 500, 100, 600),
+    final (entryParts: entries, :parts) = group([
+      (minX: 500, minY: 0, maxX: 600, maxY: 100),
+      (minX: 0, minY: 0, maxX: 100, maxY: 100),
+      (minX: 0, minY: 500, maxX: 100, maxY: 600),
     ]);
     expect(parts.length, 3);
     expect(entries.toSet().length, 3);
     for (var i = 0; i < 3; i++) {
       expect(
         parts[entries[i]],
-        [(500, 0, 600, 100), (0, 0, 100, 100), (0, 500, 100, 600)][i],
+        [
+          (minX: 500, minY: 0, maxX: 600, maxY: 100),
+          (minX: 0, minY: 0, maxX: 100, maxY: 100),
+          (minX: 0, minY: 500, maxX: 100, maxY: 600),
+        ][i],
       );
     }
   });
 
   test('entries that only touch are apart', () {
-    final (entries, parts) = group([(0, 0, 100, 100), (100, 0, 200, 100)]);
+    final (entryParts: entries, :parts) = group([
+      (minX: 0, minY: 0, maxX: 100, maxY: 100),
+      (minX: 100, minY: 0, maxX: 200, maxY: 100),
+    ]);
     expect(parts.length, 2);
     expect(entries[0], isNot(entries[1]));
   });
 
   test('a chain of overlapping entries is one part, their union', () {
-    final (entries, parts) = group([
-      for (var k = 0; k < 10; k++) (50 * k, 10 * k, 50 * k + 60, 10 * k + 30),
+    final (entryParts: entries, :parts) = group([
+      for (var k = 0; k < 10; k++)
+        (minX: 50 * k, minY: 10 * k, maxX: 50 * k + 60, maxY: 10 * k + 30),
     ]);
-    expect(parts, [(0, 0, 510, 120)]);
+    expect(parts, [(minX: 0, minY: 0, maxX: 510, maxY: 120)]);
     expect(entries, everyElement(0));
   });
 
   test('a nested entry is in its container\'s part', () {
-    final (entries, parts) = group([(0, 0, 400, 400), (100, 100, 120, 120)]);
-    expect(parts, [(0, 0, 400, 400)]);
+    final (entryParts: entries, :parts) = group([
+      (minX: 0, minY: 0, maxX: 400, maxY: 400),
+      (minX: 100, minY: 100, maxX: 120, maxY: 120),
+    ]);
+    expect(parts, [(minX: 0, minY: 0, maxX: 400, maxY: 400)]);
     expect(entries, [0, 0]);
   });
 
@@ -81,14 +93,14 @@ void main() {
       'overlaps', () {
     // D joins A and B, which are apart. C is apart from all three, but E
     // overlaps both A and C, so all five make one part.
-    final (entries, parts) = group([
-      (0, 0, 100, 100), // A
-      (200, 0, 300, 100), // B
-      (150, 190, 250, 250), // C
-      (90, 40, 210, 60), // D
-      (0, 95, 160, 200), // E
+    final (entryParts: entries, :parts) = group([
+      (minX: 0, minY: 0, maxX: 100, maxY: 100), // A
+      (minX: 200, minY: 0, maxX: 300, maxY: 100), // B
+      (minX: 150, minY: 190, maxX: 250, maxY: 250), // C
+      (minX: 90, minY: 40, maxX: 210, maxY: 60), // D
+      (minX: 0, minY: 95, maxX: 160, maxY: 200), // E
     ]);
-    expect(parts, [(0, 0, 300, 250)]);
+    expect(parts, [(minX: 0, minY: 0, maxX: 300, maxY: 250)]);
     expect(entries, everyElement(0));
   });
 
@@ -101,22 +113,22 @@ void main() {
           () {
             final x = random.nextInt(2000), y = random.nextInt(1200);
             return (
-              x,
-              y,
-              x + 1 + random.nextInt(300),
-              y + 1 + random.nextInt(300),
+              minX: x,
+              minY: y,
+              maxX: x + 1 + random.nextInt(300),
+              maxY: y + 1 + random.nextInt(300),
             );
           }(),
       ];
-      final (entries, parts) = group(rects);
+      final (entryParts: entries, :parts) = group(rects);
       for (var i = 0; i < n; i++) {
         final p = parts[entries[i]];
         // Each entry is within its part.
         expect(
-          p.$1 <= rects[i].$1 &&
-              p.$2 <= rects[i].$2 &&
-              p.$3 >= rects[i].$3 &&
-              p.$4 >= rects[i].$4,
+          p.minX <= rects[i].minX &&
+              p.minY <= rects[i].minY &&
+              p.maxX >= rects[i].maxX &&
+              p.maxY >= rects[i].maxY,
           isTrue,
         );
         for (var j = i + 1; j < n; j++) {
@@ -133,10 +145,10 @@ void main() {
         ];
         expect(members, isNotEmpty);
         expect(parts[q], (
-          members.map((r) => r.$1).reduce(math.min),
-          members.map((r) => r.$2).reduce(math.min),
-          members.map((r) => r.$3).reduce(math.max),
-          members.map((r) => r.$4).reduce(math.max),
+          minX: members.map((r) => r.minX).reduce(math.min),
+          minY: members.map((r) => r.minY).reduce(math.min),
+          maxX: members.map((r) => r.maxX).reduce(math.max),
+          maxY: members.map((r) => r.maxY).reduce(math.max),
         ));
       }
     }
@@ -148,11 +160,11 @@ void main() {
       for (var i = 0; i < 1000; i++)
         () {
           final x = random.nextInt(400), y = random.nextInt(400);
-          return (x, y, x + 100, y + 100);
+          return (minX: x, minY: y, maxX: x + 100, maxY: y + 100);
         }(),
     ];
     final watch = Stopwatch()..start();
-    final (_, parts) = group(rects);
+    final parts = group(rects).parts;
     expect(parts.length, 1);
     expect(watch.elapsedMilliseconds, lessThan(50));
   });

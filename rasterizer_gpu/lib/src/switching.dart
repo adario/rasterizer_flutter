@@ -21,14 +21,14 @@ import 'paths/scene_paths.dart';
 final _scenes = <WeakReference<SwitchingScene>>[];
 final _renderers = <WeakReference<SwitchingRenderer>>[];
 
-/// The [RasterizerScene] of [scene] for [backend]: [scene] itself, unless it's
-/// a [SwitchingScene].
+/// Returns the [RasterizerScene] of [scene] for [backend]: [scene] itself,
+/// unless it's a [SwitchingScene].
 RasterizerScene resolveScene(
   RasterizerScene scene,
   RasterizerBackend backend,
 ) => scene is SwitchingScene ? scene._sceneFor(backend) : scene;
 
-/// The name of [backend]'s renderer, for errors.
+/// Returns the name of [backend]'s renderer, for errors.
 String rendererName(RasterizerBackend backend) => switch (backend) {
   RasterizerBackend.gpu => 'GPU renderer',
   RasterizerBackend.canvas => 'canvas renderer',
@@ -55,7 +55,7 @@ class SwitchingScene(
     _scenes.add(WeakReference(this));
   }
 
-  /// A scene of an SVG's [bytes], parsed for [gpu] at the switch.
+  /// Creates a scene of an SVG's [bytes], parsed for [gpu] at the switch.
   ///
   /// For the mesh renderer, it imports them for [maxSize].
   factory SwitchingScene.fromSvg(
@@ -70,8 +70,8 @@ class SwitchingScene(
         : native.parseScene(bytes),
   );
 
-  /// A scene of plain [paths], imported for [gpu] at the switch and flattened
-  /// for [maxSize].
+  /// Creates a scene of plain [paths], imported for [gpu] at the switch and
+  /// flattened for [maxSize].
   factory SwitchingScene.fromPaths(
     ScenePaths paths,
     RasterizerBackend gpu,
@@ -99,7 +99,7 @@ class SwitchingScene(
   ///
   /// It then stays out of the switch. [gpu]'s renderers throw this when they
   /// add it, as its parse would have.
-  (Object, StackTrace)? _failure;
+  ({Object error, StackTrace stackTrace})? _failure;
 
   @override
   RasterizerBackend get backend => _switched ? gpu : RasterizerBackend.canvas;
@@ -141,7 +141,7 @@ class SwitchingScene(
         '${rendererName(backend)}',
       );
     }
-    if (_failure case (final error, final stackTrace)) {
+    if (_failure case (:final error, :final stackTrace)) {
       Error.throwWithStackTrace(error, stackTrace);
     }
     if (_gpu == null && _parser == null) {
@@ -317,7 +317,7 @@ Future<void> switchToGpu(RasterizerBackend gpu, void Function() flip) async {
       try {
         s._gpu = s._parse();
       } catch (e, stackTrace) {
-        s._failure = (e, stackTrace);
+        s._failure = (error: e, stackTrace: stackTrace);
       }
     }
     if (later) {
@@ -351,8 +351,9 @@ Future<void> switchToGpu(RasterizerBackend gpu, void Function() flip) async {
 /// Keeps the switching scenes and renderers for the GPU renderer [gpu] on the
 /// canvas renderer.
 ///
-/// It's called after [gpu]'s self-test failed or wasn't run, or its switch
-/// failed. The scenes and renderers drop what was made for [gpu].
+/// [RasterizerGpuBackend] calls it after [gpu]'s self-test failed or wasn't
+/// run, or its switch failed. The scenes and renderers drop what was made for
+/// [gpu].
 void settleOnCanvas(RasterizerBackend gpu) {
   for (final ref in _scenes) {
     final s = ref.target;

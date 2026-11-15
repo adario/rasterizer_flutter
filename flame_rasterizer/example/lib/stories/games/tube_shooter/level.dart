@@ -34,14 +34,14 @@ typedef Level = ({
   /// A climber flips onto a neighbouring lane after a random time within
   /// [flipPeriod], taking [flipTime]. At the rim, it flips toward the ship
   /// every [rimFlipPeriod].
-  (double, double) flipPeriod,
+  Range flipPeriod,
   double flipTime,
   double rimFlipPeriod,
 
   /// A climber fires after a random time within [firePeriod], while fewer
   /// than [maxEnemyShots] shots are in the tube. A shot climbs the tube in
   /// [enemyShotTime].
-  (double, double) firePeriod,
+  Range firePeriod,
   int maxEnemyShots,
   double enemyShotTime,
 
@@ -49,7 +49,7 @@ typedef Level = ({
   /// [zapperFlipPeriod], and at the rim every [zapperRimFlipPeriod]. All the
   /// zappers pulse together every [pulsePeriod], for [pulseTime]. Each one
   /// flashes white for [pulseWarning] before a pulse.
-  (double, double) zapperFlipPeriod,
+  Range zapperFlipPeriod,
   double zapperRimFlipPeriod,
   double pulsePeriod,
   double pulseTime,
@@ -58,10 +58,13 @@ typedef Level = ({
   /// An edge-walker crosses a lane after a random time within [crossPeriod],
   /// taking [crossTime]. At the rim, it crosses toward the ship every
   /// [rimCrossPeriod].
-  (double, double) crossPeriod,
+  Range crossPeriod,
   double crossTime,
   double rimCrossPeriod,
 });
+
+/// The least and the most of a random value, such as a time.
+typedef Range = ({double least, double most});
 
 /// How much faster each round goes than the one before.
 const roundSpeedUp = 1.05;
@@ -144,8 +147,8 @@ final List<Level> levels = [
   ),
 ];
 
-/// A level on [tube], in [color], with those enemies and the numbers that all
-/// levels share.
+/// Returns a level on [tube], in [color], with those enemies and the numbers
+/// that all levels share.
 Level _level(
   Tube tube,
   Color color, {
@@ -170,18 +173,18 @@ Level _level(
   seederTurn: 0.4,
   zapperTime: 10,
   edgeWalkerTime: 9,
-  flipPeriod: (2, 4),
+  flipPeriod: (least: 2, most: 4),
   flipTime: 0.25,
   rimFlipPeriod: 0.8,
-  firePeriod: (3, 5),
+  firePeriod: (least: 3, most: 5),
   maxEnemyShots: 2,
   enemyShotTime: 3,
-  zapperFlipPeriod: (3, 6),
+  zapperFlipPeriod: (least: 3, most: 6),
   zapperRimFlipPeriod: 1.5,
   pulsePeriod: 3,
   pulseTime: 0.6,
   pulseWarning: 0.5,
-  crossPeriod: (1, 2.5),
+  crossPeriod: (least: 1, most: 2.5),
   crossTime: 0.4,
   rimCrossPeriod: 1.2,
 );

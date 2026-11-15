@@ -135,7 +135,7 @@ int _maxDiff(Uint8List a, Uint8List b) {
   return m;
 }
 
-/// [m], to 3 decimals, for comparing.
+/// Returns [m], to 3 decimals, for comparing.
 List<double> _rounded(Float32List m) => [
   for (final v in m) (v * 1000).roundToDouble() / 1000,
 ];

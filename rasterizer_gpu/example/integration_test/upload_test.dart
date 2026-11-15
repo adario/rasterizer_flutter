@@ -70,7 +70,7 @@ Future<void> main() async {
     final frame = renderer.beginFrame(w, h);
     final run = frame.addRun();
     for (var i = 0; i < count; i++) {
-      final (a, b, c, d, tx, ty) = motion.transform(i, time, size);
+      final (:a, :b, :c, :d, :tx, :ty) = motion.transform(i, time, size);
       run.add(svgs[motion.svg(i)], a, b, c, d, tx, ty);
     }
     frame.render();

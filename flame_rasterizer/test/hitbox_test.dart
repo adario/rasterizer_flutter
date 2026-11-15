@@ -59,7 +59,7 @@ class _Shape(RasterizerSvg svg, {required super.position})
   }
 }
 
-/// A game loaded and mounted, as GameWidget does, without a widget.
+/// Returns a game loaded and mounted, as GameWidget does, without a widget.
 Future<_Game> _mounted(List<Component> children) async {
   final game = _Game()..onGameResize(Vector2.all(100));
   // ignore: invalid_use_of_internal_member
@@ -72,7 +72,7 @@ Future<_Game> _mounted(List<Component> children) async {
   return game;
 }
 
-/// The bounds of [hitbox]'s polygons, in the game's coordinates.
+/// Returns the bounds of [hitbox]'s polygons, in the game's coordinates.
 Rect _bounds(PathHitbox hitbox) {
   final vertices = hitbox.globalPolygons().expand((p) => p);
   final xs = vertices.map((v) => v.x);
@@ -308,9 +308,9 @@ void main() {
       // ignore: invalid_use_of_protected_member
       pathHitbox.polygonsPath.getBounds(),
     );
-    List<(Vector2, Vector2)> edges(PathHitbox hitbox) => [
+    List<({Vector2 from, Vector2 to})> edges(PathHitbox hitbox) => [
       for (final edge in hitbox.possibleIntersectionVertices(null))
-        (edge.from.clone(), edge.to.clone()),
+        (from: edge.from.clone(), to: edge.to.clone()),
     ];
     for (final (angle, scale) in [
       (0.0, Vector2(1, 1)),

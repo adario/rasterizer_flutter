@@ -225,7 +225,7 @@ extension BodySnapshots on Body {
 
   /// Puts it where [from] was, moving as it was, if [from] is given.
   ///
-  /// Call it once its shapes are created, before the physics' first step.
+  /// Call it after creating its shapes, before the physics' first step.
   /// Box2D's linear velocity is its center of mass's, which each new shape
   /// moves. So it would go on a little faster or slower if it spins.
   void goOnFrom(BodySnapshot? from) {
@@ -300,7 +300,7 @@ List<List<Vector2>> convexPiecesOf(SvgOutline outline, Vector2 size) {
   ];
 }
 
-/// The larger side of [piece]'s bounding box.
+/// Returns the larger side of [piece]'s bounding box.
 double pieceSide(List<Vector2> piece) {
   final xs = piece.map((v) => v.x);
   final ys = piece.map((v) => v.y);
@@ -334,7 +334,7 @@ List<Vector2> spreadAround(
   double step = 0.1,
   int maxTries = 500,
 }) {
-  final placed = <(Vector2, double)>[];
+  final placed = <({Vector2 position, double radius})>[];
   for (final radius in radii) {
     // Within the bounds, or at their center if the body doesn't fit.
     final inner = bounds.deflate(radius);
@@ -354,7 +354,8 @@ List<Vector2> spreadAround(
       );
       final free =
           placed.every(
-            (other) => other.$1.distanceTo(position) >= other.$2 + radius,
+            (other) =>
+                other.position.distanceTo(position) >= other.radius + radius,
           ) &&
           !_overlapsWorld(world, position, radius);
       if (free) {
@@ -362,9 +363,9 @@ List<Vector2> spreadAround(
       }
       discRadius += step;
     }
-    placed.add((position, radius));
+    placed.add((position: position, radius: radius));
   }
-  return [for (final (position, _) in placed) position];
+  return [for (final (:position, radius: _) in placed) position];
 }
 
 /// Returns a velocity of [speed] meters a second away from [from], for a
@@ -385,14 +386,15 @@ Vector2 awayFrom(
   return velocity..scaleTo(speed);
 }
 
-/// Whether the circle at [center] of [radius] overlaps any shape in [world].
+/// Returns whether the circle at [center] of [radius] overlaps any shape in
+/// [world].
 bool _overlapsWorld(forge2d.World world, Vector2 center, double radius) {
   final extent = Vector2.all(radius);
   final candidates = world.overlapAabb(Aabb(center - extent, center + extent));
   return candidates.any((shape) => _overlapsShape(shape, center, radius));
 }
 
-/// Whether the circle at [center] of [radius] overlaps [shape], whose
+/// Returns whether the circle at [center] of [radius] overlaps [shape], whose
 /// bounding box overlaps the circle's.
 bool _overlapsShape(Shape shape, Vector2 center, double radius) {
   // The circle's center in the body's coordinates.
@@ -423,7 +425,7 @@ bool _overlapsShape(Shape shape, Vector2 center, double radius) {
   }
 }
 
-/// Whether the convex [polygon] contains [point], whatever its winding.
+/// Returns whether the convex [polygon] contains [point], whatever its winding.
 bool _contains(List<Vector2> polygon, Vector2 point) {
   var sign = 0;
   for (var i = 0; i < polygon.length; i++) {
@@ -442,7 +444,7 @@ bool _contains(List<Vector2> polygon, Vector2 point) {
   return true;
 }
 
-/// The distance from [point] to the segment from [a] to [b].
+/// Returns the distance from [point] to the segment from [a] to [b].
 double _distanceToSegment(Vector2 point, Vector2 a, Vector2 b) {
   final ab = b - a;
   final lengthSquared = ab.length2;

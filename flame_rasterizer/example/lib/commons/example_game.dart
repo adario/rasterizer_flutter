@@ -162,8 +162,8 @@ mixin StoryGame<W extends World> on FlameGame<W> {
     }
   }
 
-  /// The mean and the 90th percentile of [micros], in milliseconds, or blank
-  /// before the first frame.
+  /// Returns the mean and the 90th percentile of [micros], in milliseconds, or
+  /// blank before the first frame.
   static String _stats(List<int> micros) {
     if (micros.isEmpty) {
       return '';

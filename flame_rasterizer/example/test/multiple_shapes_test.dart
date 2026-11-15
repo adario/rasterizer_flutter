@@ -16,8 +16,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'pump_while_loading.dart';
 
-/// The Multiple Shapes story with [renderer] and [count] shapes of the kind
-/// [shapes], at [speed]. A seeded random picks the shapes.
+/// Returns the Multiple Shapes story with [renderer] and [count] shapes of the
+/// kind [shapes], at [speed]. A seeded random picks the shapes.
 ///
 /// The story keeps the same game for a new [count]. A new renderer makes a new
 /// game, which goes on from the old one's snapshot.
@@ -41,7 +41,7 @@ Widget story(
   ),
 );
 
-/// The game the pumped story shows.
+/// Returns the game the pumped story shows.
 MultipleShapesExample currentGame(WidgetTester tester) => tester
     .widget<GameWidget<MultipleShapesExample>>(
       find.byWidgetPredicate((w) => w is GameWidget),
@@ -69,11 +69,11 @@ Future<MultipleShapesExample> pumpGame(
   return await loadGame(tester);
 }
 
-/// The color filter that Flame's `tint` sets for [color].
+/// Returns the color filter that Flame's `tint` sets for [color].
 ui.ColorFilter tinted(Color color) =>
     ui.ColorFilter.mode(color, ui.BlendMode.srcATop);
 
-/// The component that draws [shape]'s path.
+/// Returns the component that draws [shape]'s path.
 RasterizerPathComponent pathOf(TintedShape shape) =>
     shape.children.whereType<RasterizerPathComponent>().single;
 

@@ -15,18 +15,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 import 'package:rasterizer_gpu/src/svg_paths/svg_paths.dart';
 
-/// An SVG of [body], 100 by 100 unless [root] sets other attributes.
+/// Returns an SVG of [body], 100 by 100 unless [root] sets other attributes.
 String svg(
   String body, {
   String root = 'width="100" height="100" viewBox="0 0 100 100"',
 }) => '<svg xmlns="http://www.w3.org/2000/svg" $root>$body</svg>';
 
-/// The scenes of [source] for the GPU renderer and for the canvas renderer.
-(RasterizerScene, RasterizerScene) scenes(String source) {
+/// Returns the scenes of [source] for the GPU renderer and for the canvas
+/// renderer.
+({RasterizerScene core, RasterizerScene canvas}) scenes(String source) {
   final bytes = Uint8List.fromList(utf8.encode(source));
   return (
-    RasterizerScene.fromSvg(bytes, backend: RasterizerBackend.gpu),
-    RasterizerScene.fromSvg(bytes, backend: RasterizerBackend.canvas),
+    core: RasterizerScene.fromSvg(bytes, backend: RasterizerBackend.gpu),
+    canvas: RasterizerScene.fromSvg(bytes, backend: RasterizerBackend.canvas),
   );
 }
 
@@ -112,7 +113,7 @@ void main() {
     };
     for (final MapEntry(key: name, value: source) in cases.entries) {
       test(name, () {
-        final (core, canvas) = scenes(source);
+        final (:core, :canvas) = scenes(source);
         expectRect(canvas.viewBox, core.viewBox, reason: 'viewBox');
         expectRect(canvas.bounds, core.bounds, reason: 'bounds');
         expect(canvas.pathCount, core.pathCount);
@@ -121,7 +122,7 @@ void main() {
 
     test('the tiger', () {
       final source = File('example/assets/tiger/tiger.svg').readAsStringSync();
-      final (core, canvas) = scenes(source);
+      final (:core, :canvas) = scenes(source);
       expectRect(canvas.viewBox, core.viewBox, reason: 'viewBox');
       // The core takes its bounds from the control points of NanoSVG's
       // cubics, and SvgPaths from Flutter's paths, so they differ a little.
@@ -144,7 +145,7 @@ void main() {
             '<stop offset="1" stop-color="green"/></linearGradient>',
         painted = '<rect x="20" y="20" width="10" height="10" fill="url(#g)"/>';
     const only = ui.Rect.fromLTRB(50, 50, 60, 60);
-    final cases = <String, (String, ui.Rect)>{
+    final cases = <String, ({String body, ui.Rect bounds})>{
       for (final element in [
         'clipPath id="c"',
         'mask id="m"',
@@ -158,51 +159,56 @@ void main() {
         'foo',
       ])
         '<${element.split(' ').first}>': (
-          '<$element>$ghost</${element.split(' ').first}>$drawn',
-          only,
+          body: '<$element>$ghost</${element.split(' ').first}>$drawn',
+          bounds: only,
         ),
       'a clip in <defs>': (
-        '<defs><clipPath id="c">$ghost</clipPath></defs>$drawn',
-        only,
+        body: '<defs><clipPath id="c">$ghost</clipPath></defs>$drawn',
+        bounds: only,
       ),
       'a gradient in a mask, still used': (
-        '<mask id="m">$gradient$ghost</mask>$painted$drawn',
-        const ui.Rect.fromLTRB(20, 20, 60, 60),
+        body: '<mask id="m">$gradient$ghost</mask>$painted$drawn',
+        bounds: const ui.Rect.fromLTRB(20, 20, 60, 60),
       ),
       'a gradient in an element it doesn\'t handle, not used': (
-        '<foo>$gradient</foo>$painted$drawn',
-        only,
+        body: '<foo>$gradient</foo>$painted$drawn',
+        bounds: only,
       ),
       '<a>, a group whose attributes are inherited': (
-        '<a stroke="red" stroke-width="10">$drawn</a>',
-        const ui.Rect.fromLTRB(45, 45, 65, 65),
+        body: '<a stroke="red" stroke-width="10">$drawn</a>',
+        bounds: const ui.Rect.fromLTRB(45, 45, 65, 65),
       ),
       'a comment\'s clip, as recycle.svg\'s': (
-        '<!-- <clipPath id="c">$ghost</clipPath> -->$drawn',
-        only,
+        body: '<!-- <clipPath id="c">$ghost</clipPath> -->$drawn',
+        bounds: only,
       ),
       'a comment with a > before its shapes': (
-        '<!-- a > b $ghost -->$drawn',
-        only,
+        body: '<!-- a > b $ghost -->$drawn',
+        bounds: only,
       ),
       'CDATA with a > before its shapes': (
-        '<text><![CDATA[ a > b $ghost ]]></text>$drawn',
-        only,
+        body: '<text><![CDATA[ a > b $ghost ]]></text>$drawn',
+        bounds: only,
       ),
       'a group in a clip, which the group around keeps': (
-        '<g transform="translate(5,5)"><clipPath id="c">'
+        body:
+            '<g transform="translate(5,5)"><clipPath id="c">'
             '<g transform="scale(2)">$ghost</g></clipPath>$drawn</g>',
-        const ui.Rect.fromLTRB(55, 55, 65, 65),
+        bounds: const ui.Rect.fromLTRB(55, 55, 65, 65),
       ),
       'a group in <defs>, which the group around keeps': (
-        '<g transform="translate(5,5)"><defs><g>$ghost</g></defs>$drawn</g>',
-        const ui.Rect.fromLTRB(55, 55, 65, 65),
+        body:
+            '<g transform="translate(5,5)"><defs><g>$ghost</g></defs>$drawn</g>',
+        bounds: const ui.Rect.fromLTRB(55, 55, 65, 65),
       ),
-      'self-closing elements without a space': ('<foo/><defs/>$drawn', only),
+      'self-closing elements without a space': (
+        body: '<foo/><defs/>$drawn',
+        bounds: only,
+      ),
     };
-    for (final MapEntry(key: name, value: (body, bounds)) in cases.entries) {
+    for (final MapEntry(key: name, value: (:body, :bounds)) in cases.entries) {
       test(name, () {
-        final (core, canvas) = scenes(svg(body));
+        final (:core, :canvas) = scenes(svg(body));
         expectRect(canvas.bounds, bounds, reason: 'canvas');
         expectRect(core.bounds, bounds, reason: 'core');
         expect(core.pathCount, canvas.pathCount);
@@ -292,7 +298,7 @@ void main() {
   });
 
   test('a stroke of width 0 isn\'t drawn', () {
-    final (core, canvas) = scenes(
+    final (:core, :canvas) = scenes(
       svg(
         '<path d="M10,10 L90,90" fill="none" stroke="black" stroke-width="0"/>',
       ),
@@ -302,7 +308,7 @@ void main() {
   });
 
   test('paths without an area aren\'t filled', () {
-    int draws(String body) => scenes(svg(body)).$2.pathCount;
+    int draws(String body) => scenes(svg(body)).canvas.pathCount;
     // A canvas would paint these fills as hairlines.
     expect(draws('<path d="M10,10 L90,90"/>'), 0);
     expect(draws('<path d="M10,50 L50,50 L90,50 Z"/>'), 0);
@@ -317,7 +323,7 @@ void main() {
 
   test('a canvas scene can\'t be drawn by a GPU run, nor a GPU scene by a '
       'canvas run', () async {
-    final (core, canvas) = scenes(svg('<rect width="10" height="10"/>'));
+    final (:core, :canvas) = scenes(svg('<rect width="10" height="10"/>'));
     final renderer = await RasterizerRenderer.create(
       backend: RasterizerBackend.canvas,
     );

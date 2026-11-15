@@ -22,7 +22,7 @@ class SpikesComponent() extends Component with HasGameRef<TubeShooterExample> {
   int _version = -1;
   bool _changed = false;
 
-  /// The depth of [lane]'s spike's tip, or null if it has none.
+  /// Returns the depth of [lane]'s spike's tip, or null if it has none.
   double? tipOf(int lane) =>
       lengths[lane] > 0 ? Tube.depth - lengths[lane] : null;
 

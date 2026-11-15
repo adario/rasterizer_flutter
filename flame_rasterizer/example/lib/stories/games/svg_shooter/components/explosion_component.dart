@@ -26,8 +26,8 @@ enum ExplosionKind() {
 class ExplosionComponent(final ExplosionKind kind, {super.position})
     extends PositionComponent
     with HasGameRef<SvgShooterExample> {
-  /// The width of an explosion of [kind]: twice that of what blows up, as
-  /// Rogue Shooter's explosions, 50 wide, are twice its enemies' width.
+  /// Returns the width of an explosion of [kind]: twice that of what blows up,
+  /// as Rogue Shooter's explosions, 50 wide, are twice its enemies' width.
   static double acrossOf(ExplosionKind kind) =>
       2 *
       switch (kind) {
@@ -37,7 +37,7 @@ class ExplosionComponent(final ExplosionKind kind, {super.position})
       };
 
   /// The least and the most speed of the particles example's debris.
-  static const _debrisSpeed = (40.0, 300.0);
+  static const _debrisSpeed = (least: 40.0, most: 300.0);
 
   /// The longest life of the particles example's debris, in seconds.
   static const _debrisLife = 1.4;
@@ -48,7 +48,7 @@ class ExplosionComponent(final ExplosionKind kind, {super.position})
   /// How far the fastest debris goes in its longest life, slowed by its drag:
   /// about 116 in the particles example.
   static final _reach =
-      _debrisSpeed.$2 / _drag * (1 - math.exp(-_drag * _debrisLife));
+      _debrisSpeed.most / _drag * (1 - math.exp(-_drag * _debrisLife));
 
   /// The colors of the red explosions, for the player.
   static const _redFlash = [Colors.white, Colors.redAccent];
@@ -90,14 +90,14 @@ class ExplosionComponent(final ExplosionKind kind, {super.position})
   /// particles example's, the emitters don't loop and have no duration: each
   /// is done once its particles are. Each has room for just the particles of
   /// its one burst.
-  static (ParticleEmitter, ParticleEmitter) _emittersOf(
+  static ({ParticleEmitter flash, ParticleEmitter debris}) _emittersOf(
     ExplosionKind kind, {
     required List<Color> flash,
     required List<Color> debris,
   }) {
     final scale = acrossOf(kind) / 2 / _reach;
     return (
-      ParticleEmitter(
+      flash: ParticleEmitter(
         maxParticles: 1,
         bursts: const [EmitterBurst(0, 1)],
         lifespan: (0.25, 0.25),
@@ -106,11 +106,11 @@ class ExplosionComponent(final ExplosionKind kind, {super.position})
         colorOverLife: ColorRamp(flash),
         opacityOverLife: ParticleCurve(1, 0),
       ),
-      ParticleEmitter(
+      debris: ParticleEmitter(
         maxParticles: 250,
         bursts: const [EmitterBurst(0, 250)],
         lifespan: (0.5, _debrisLife),
-        speed: (_debrisSpeed.$1 * scale, _debrisSpeed.$2 * scale),
+        speed: (_debrisSpeed.least * scale, _debrisSpeed.most * scale),
         drag: _drag,
         size: (1.5, 5),
         scaleOverLife: ParticleCurve(1, 0, curve: Curves.easeOut),
@@ -122,7 +122,7 @@ class ExplosionComponent(final ExplosionKind kind, {super.position})
   @override
   Future<void> onLoad() async {
     final renderer = gameRef.explosionRenderer;
-    final (flash, debris) = _emitters[kind]!;
+    final (:flash, :debris) = _emitters[kind]!;
     addAll([
       ParticleEmitterComponent(
         emitter: flash,

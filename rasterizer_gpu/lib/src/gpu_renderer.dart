@@ -147,7 +147,7 @@ class GpuRenderer(
   ///
   /// The core wrote [frame] for a [width] x [height] view in device pixels,
   /// and the target has that size. [shared] holds the depth and accumulation
-  /// textures. The target's texture is reused when [slot] is rendered into
+  /// textures. It reuses the target's texture when it renders into [slot]
   /// again.
   gpu.Texture render(
     ra.Frame frame,
@@ -158,7 +158,7 @@ class GpuRenderer(
   ) {
     final watch = Stopwatch()..start();
     _ensureTargets(slot, shared, width, height);
-    final (data, colors) = _upload(slot, frame);
+    final (:data, :colors) = _upload(slot, frame);
     uploadMicros = watch.elapsedMicroseconds;
     watch.reset();
 
@@ -196,7 +196,7 @@ class GpuRenderer(
     _PassKind? passKind;
     var cleared = false;
     var edgesRead = true;
-    final opaques = <(ra.Entry, int, int)>[];
+    final opaques = <({ra.Entry entry, int segmentsWord, int instancesWord})>[];
 
     // Draws [entry]'s instances with [pipeline]. [fragmentBindings] binds the
     // fragment shader's textures, after the pipeline. A pass's bindings
@@ -308,7 +308,7 @@ class GpuRenderer(
         );
         pass.draw(4);
       }
-      for (final (entry, segmentsWord, instancesWord) in opaques) {
+      for (final (:entry, :segmentsWord, :instancesWord) in opaques) {
         drawOpaques(entry, segmentsWord, instancesWord, _keepColor);
       }
     }
@@ -328,7 +328,11 @@ class GpuRenderer(
         case ra.EntryType.opaques:
           beginPass(_PassKind.drawable);
           drawOpaques(entry, segmentsWord, instancesWord);
-          opaques.add((entry, segmentsWord, instancesWord));
+          opaques.add((
+            entry: entry,
+            segmentsWord: segmentsWord,
+            instancesWord: instancesWord,
+          ));
         case ra.EntryType.quadEdges ||
             ra.EntryType.fastEdges ||
             ra.EntryType.fastMolecules ||
@@ -617,13 +621,16 @@ class GpuRenderer(
   ///
   /// The data texture and its staging buffer grow to 4/3 of the rows a frame
   /// needs. They shrink as the core's buffer does: when they're over 1 MB and
-  /// over 5 times what the frame needs. Only the frame's rows are blitted. The
+  /// over 5 times what the frame needs. It blits only the frame's rows. The
   /// rows past them hold an earlier frame's data, which the shaders never
   /// read, as they read rows by index.
   ///
   /// The colors texture has exactly the frame's rows, as the shaders compute
   /// their coordinates from its height.
-  (gpu.Texture, gpu.Texture) _upload(RenderTargets slot, ra.Frame frame) {
+  ({gpu.Texture data, gpu.Texture colors}) _upload(
+    RenderTargets slot,
+    ra.Frame frame,
+  ) {
     final rows = (frame.size + dataRowBytes - 1) ~/ dataRowBytes;
     final capacity = slot.data?.height ?? 0;
     if (capacity < rows ||
@@ -687,7 +694,7 @@ class GpuRenderer(
         }
       },
     );
-    return (data, colors);
+    return (data: data, colors: colors);
   }
 }
 

@@ -36,7 +36,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'pump_while_loading.dart';
 import 'tube_shooter_whole_game.dart';
 
-/// The game with [renderer], at [zoom] and [speed], starting from
+/// Returns the game with [renderer], at [zoom] and [speed], starting from
 /// [firstLevel], with a seeded random so that runs repeat.
 ///
 /// With [pixelRatio], it sits in a MediaQuery of that device pixel ratio, as
@@ -151,12 +151,12 @@ Future<TubeShooterExample> playing(
   return game;
 }
 
-/// The path components of the tube group: the tube, the ship's lane, and the
-/// spikes and the bolts while there are any.
+/// Returns the path components of the tube group: the tube, the ship's lane,
+/// and the spikes and the bolts while there are any.
 Iterable<PathComponent> tubePathsOf(TubeShooterExample game) =>
     game.tubeGroup.children.whereType<PathComponent>();
 
-/// The explosions of [game].
+/// Returns the explosions of [game].
 Iterable<ExplosionComponent> explosionsOf(TubeShooterExample game) =>
     game.explosionGroup.children.whereType<ExplosionComponent>();
 
@@ -172,7 +172,7 @@ Future<void> fireOnce(WidgetTester tester, TubeShooterExample game) async {
 ///
 /// Returns a star that starts 1.5 from the eye, how far it turned about the
 /// axis, and how far the ship's angle turned.
-Future<(StarComponent, double, double)> walkOpenTube(
+Future<({StarComponent star, double turn, double shipTurn})> walkOpenTube(
   WidgetTester tester,
   Tube tube,
 ) async {
@@ -194,9 +194,9 @@ Future<(StarComponent, double, double)> walkOpenTube(
   game.player.moveBy(100);
   await pumpFrames(tester, 60);
   return (
-    star,
-    star.point.direction - from.direction,
-    PlayerComponent.headingOn(tube, game.player.step) - heading,
+    star: star,
+    turn: star.point.direction - from.direction,
+    shipTurn: PlayerComponent.headingOn(tube, game.player.step) - heading,
   );
 }
 
@@ -631,7 +631,7 @@ void main() {
     await pumpFrames(tester, 30);
     final pixel = game.view.devicePixel;
     for (final star in field.stars) {
-      final (inner, outer) = StarFieldComponent.radii;
+      final (:inner, :outer) = StarFieldComponent.radii;
       expect(star.point.distance, inInclusiveRange(inner, outer));
       expect(
         star.eyeDistance,
@@ -825,7 +825,7 @@ void main() {
 
   testWidgets("along the Floor's straight, neither the ship nor the stars "
       'turn', (tester) async {
-    final (_, turn, shipTurn) = await walkOpenTube(tester, Tubes.floor);
+    final (star: _, :turn, :shipTurn) = await walkOpenTube(tester, Tubes.floor);
     expect(shipTurn, 0);
     expect(turn, 0);
     await tester.pumpWidget(const SizedBox());
@@ -834,7 +834,7 @@ void main() {
   testWidgets("across the Ridge's peak, stars turn against the ship's turn "
       'there, nearer ones more', (tester) async {
     final ridge = Tubes.ridge;
-    final (star, turn, shipTurn) = await walkOpenTube(tester, ridge);
+    final (:star, :turn, :shipTurn) = await walkOpenTube(tester, ridge);
     expect(
       shipTurn,
       closeTo(ridge.headings.last - ridge.headings.first, 1e-9),
@@ -1505,8 +1505,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 16));
 
     /// Returns the climber's place, the tube's path and the view's rim scale.
-    (Vector2, PathComponent, double) fit() =>
-        (climber.position.clone(), tubePathsOf(game).first, game.view.rimScale);
+    ({Vector2 position, PathComponent path, double rimScale}) fit() => (
+      position: climber.position.clone(),
+      path: tubePathsOf(game).first,
+      rimScale: game.view.rimScale,
+    );
 
     /// Expects the climber at its lane's middle and its depth, in the view as
     /// it is now.
@@ -1519,7 +1522,7 @@ void main() {
       expect(climber.position.y, closeTo(middle.dy, 1e-3));
     }
 
-    var (position, path, rimScale) = fit();
+    var (:position, :path, :rimScale) = fit();
     tester.view.physicalSize = tester.view.physicalSize * 1.5;
     addTearDown(tester.view.reset);
     await tester.pump(const Duration(milliseconds: 16));
@@ -1528,7 +1531,7 @@ void main() {
     expect(tubePathsOf(game).first, isNot(same(path)));
     expectPlaced();
 
-    (position, path, rimScale) = fit();
+    (:position, :path, :rimScale) = fit();
     await tester.pumpWidget(
       story(
         SvgRenderer.rasterizer,
@@ -1701,6 +1704,25 @@ void main() {
     ) async {
       await tester.pumpWidget(storyWith(from, speed: 0));
       await tester.pump(const Duration(milliseconds: 16));
+      // Its values other than its lists, to compare as one record.
+      Record scalarsOf(TubeShooterSnapshot s) => (
+        firstLevel: s.firstLevel,
+        levelIndex: s.levelIndex,
+        round: s.round,
+        state: s.state,
+        stateTime: s.stateTime,
+        dyingOnDrop: s.dyingOnDrop,
+        score: s.score,
+        lives: s.lives,
+        purgeReady: s.purgeReady,
+        purgeLeft: s.purgeLeft,
+        sinceSpawn: s.sinceSpawn,
+        pulseClock: s.pulseClock,
+        look: s.look,
+        lookFrom: s.lookFrom,
+        eyeShift: s.eyeShift,
+        player: s.player,
+      );
       final snapshot = game.snapshot;
       var last = game;
       for (final renderer in renderers) {
@@ -1715,45 +1737,7 @@ void main() {
         expect(again.enemies, snapshot.enemies, reason: reason);
         expect(again.shots, snapshot.shots, reason: reason);
         expect(again.enemyShots, snapshot.enemyShots, reason: reason);
-        expect(
-          (
-            again.firstLevel,
-            again.levelIndex,
-            again.round,
-            again.state,
-            again.stateTime,
-            again.dyingOnDrop,
-            again.score,
-            again.lives,
-            again.purgeReady,
-            again.purgeLeft,
-            again.sinceSpawn,
-            again.pulseClock,
-            again.look,
-            again.lookFrom,
-            again.eyeShift,
-            again.player,
-          ),
-          (
-            snapshot.firstLevel,
-            snapshot.levelIndex,
-            snapshot.round,
-            snapshot.state,
-            snapshot.stateTime,
-            snapshot.dyingOnDrop,
-            snapshot.score,
-            snapshot.lives,
-            snapshot.purgeReady,
-            snapshot.purgeLeft,
-            snapshot.sinceSpawn,
-            snapshot.pulseClock,
-            snapshot.look,
-            snapshot.lookFrom,
-            snapshot.eyeShift,
-            snapshot.player,
-          ),
-          reason: reason,
-        );
+        expect(scalarsOf(again), scalarsOf(snapshot), reason: reason);
         expect(explosionsOf(next), isEmpty);
         last = next;
       }

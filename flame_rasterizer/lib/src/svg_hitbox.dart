@@ -42,7 +42,7 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// the bounds' 4 corners, under its and its ancestors' transforms composed
 /// once, rather than all the polygons' vertices, as [PathHitbox] does. The
 /// box is as tight, except while the hitbox is turned by other than right
-/// angles. The polygons are transformed only when the box overlaps another
+/// angles. It transforms the polygons only when the box overlaps another
 /// hitbox's.
 class SvgHitbox(
   /// The SVG outline that the hitbox is made from.
@@ -56,7 +56,7 @@ class SvgHitbox(
 }) extends PathHitbox {
   /// Creates a hitbox from [outline], for a parent of [size].
   ///
-  /// The polygons are sampled every [sampling], and simplified within
+  /// It samples the polygons every [sampling], and simplifies them within
   /// [tolerance], half the sampling by default, both in the units of [size].
   /// [size] defaults to the outline's rect's. See [PathComponent.new], also
   /// for [filter].
@@ -76,9 +76,9 @@ class SvgHitbox(
     this.size.setValues(bounds.width, bounds.height);
   }
 
-  /// Parent units per SVG unit for [size]: the larger of its two scales, so
-  /// that the polygons aren't sampled more coarsely than asked in either
-  /// direction.
+  /// Returns the parent units per SVG unit for [size]: the larger of its two
+  /// scales, so that the polygons aren't sampled more coarsely than asked in
+  /// either direction.
   static double _units(SvgOutline outline, Vector2? size) {
     final rect = outline.rect;
     if (size == null || rect.isEmpty) {
@@ -269,8 +269,8 @@ class SvgHitbox(
     );
   }
 
-  /// [v] moved by a few float32 steps in [direction], as points on a box's
-  /// edges count as outside it.
+  /// Returns [v] moved by a few float32 steps in [direction], as points on a
+  /// box's edges count as outside it.
   ///
   /// PathHitbox adds 1e-15 for the same reason. But the box's vectors are
   /// float32, which round that away at coordinates past about 1e-8.
@@ -294,10 +294,11 @@ class _Shared(SvgOutline outline) {
   final Path path = outline.path.toOrigin;
 
   // Polygons by sampling, tolerance and filter, the most recently used last.
-  final _sampled = <(double, double?, bool), _Polygons>{};
+  final _sampled =
+      <({double sampling, double? tolerance, bool filter}), _Polygons>{};
 
-  /// The polygons sampled every [sampling], within [tolerance], with [filter]
-  /// or not (see [PathComponent.new]).
+  /// Returns the polygons sampled every [sampling], within [tolerance], with
+  /// [filter] or not (see [PathComponent.new]).
   ///
   /// It makes them as PathComponent does, or returns the ones made earlier
   /// for the same values.
@@ -306,7 +307,7 @@ class _Shared(SvgOutline outline) {
     double? tolerance, {
     required bool filter,
   }) {
-    final key = (sampling, tolerance, filter);
+    final key = (sampling: sampling, tolerance: tolerance, filter: filter);
     final kept = _sampled.remove(key);
     if (kept != null) {
       return _sampled[key] = kept;

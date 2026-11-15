@@ -7,12 +7,12 @@
 import 'dart:math' show max;
 import 'dart:ui' as ui;
 
-import '../../rasterizer_gpu.dart' show RasterizerGlow;
+import '../../rasterizer_gpu.dart' show RasterizerGlow, RasterizerPaintedPath;
 import '../canvas_paths.dart';
 import '../svg_paths/svg_paths.dart';
 import 'path_contours.dart';
 
-/// Why the GPU renderers can't draw with [paint], or null if they can.
+/// Returns why the GPU renderers can't draw with [paint], or null if they can.
 ///
 /// They draw a color in sRGB, with [ui.BlendMode.srcOver] and antialiasing,
 /// as a fill or as a stroke of a positive width. [ScenePaths] keeps only those
@@ -76,13 +76,16 @@ class ScenePaths._(
   ///
   /// Throws [ArgumentError] for a paint that the GPU renderers can't draw
   /// ([undrawable]).
-  factory ScenePaths(List<(ui.Path, ui.Paint)> paths, {RasterizerGlow? glow}) {
+  factory ScenePaths(
+    List<RasterizerPaintedPath> paths, {
+    RasterizerGlow? glow,
+  }) {
     final distinct = <ui.Path>[];
     final indices = Map<ui.Path, int>.identity();
     final pathIndices = <int>[];
     final draws = <VectorPath>[];
     ui.Rect? viewBox, bounds, painted;
-    for (final (i, (path, paint)) in paths.indexed) {
+    for (final (i, (:path, :paint)) in paths.indexed) {
       final reason = undrawable(paint);
       if (reason != null) {
         throw ArgumentError.value(
@@ -140,7 +143,9 @@ class ScenePaths._(
   /// while the path lives.
   ///
   /// This takes paths as immutable.
-  static final _contours = Expando<(double, PathContours)>('contours');
+  static final _contours = Expando<({double tolerance, PathContours contours})>(
+    'contours',
+  );
 
   @override
   int get drawCount => draws.length;
@@ -156,7 +161,7 @@ class ScenePaths._(
     }
   }
 
-  /// The tolerance the paths are flattened to, in their units.
+  /// Returns the tolerance to flatten the paths to, in their units.
   ///
   /// It's 1/4 of a device pixel when [viewBox]'s longer side, or the widest
   /// stroke if that's wider, spans [maxSize] device pixels. It's at least 16
@@ -183,7 +188,7 @@ class ScenePaths._(
   /// Float32s hold the contours' points and the meshes' vertices.
   static const _floatSteps = 16 / (1 << 23);
 
-  /// The contours of each of [paths], flattened to the [tolerance] for
+  /// Returns the contours of each of [paths], flattened to the [tolerance] for
   /// [maxSize].
   ///
   /// A path already flattened to the same tolerance, for any scene, reuses
@@ -195,11 +200,11 @@ class ScenePaths._(
 
   static PathContours _contoursOf(ui.Path path, double tolerance) {
     final kept = _contours[path];
-    if (kept != null && kept.$1 == tolerance) {
-      return kept.$2;
+    if (kept != null && kept.tolerance == tolerance) {
+      return kept.contours;
     }
     final contours = PathContours([path], tolerance: tolerance);
-    _contours[path] = (tolerance, contours);
+    _contours[path] = (tolerance: tolerance, contours: contours);
     return contours;
   }
 }

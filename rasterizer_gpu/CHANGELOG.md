@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `RasterizerFrame.pageSizes` holds `RasterizerPixelSize` records, with a
+  named `width` and `height`, instead of positional ones.
+- `RasterizerScene.fromPaths` takes `RasterizerPaintedPath` records, with a
+  named `path` and `paint`, instead of positional ones.
 - With CanvasKit, on the web, the canvas renderer no longer clips to its
   frame, as CanvasKit dropped some scenes drawn near the clip's edge.
 - On Linux's OpenGL ES, the GPU renderers draw a run with a paint as on the

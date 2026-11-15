@@ -40,10 +40,10 @@ class _EntrySpy() implements ui.Canvas {
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
-/// A new frame's run of affine entries, each a translation by [moves].
-CanvasRun _run(List<(double, double)> moves) {
+/// Returns a new frame's run of affine entries, each a translation by [moves].
+CanvasRun _run(List<({double x, double y})> moves) {
   final run = _renderer.beginFrame(_width, _height).addRun();
-  for (final (x, y) in moves) {
+  for (final (:x, :y) in moves) {
     run.add(_scene, 1, 0, 0, 1, x, y);
   }
   return run..place();
@@ -64,14 +64,14 @@ void main() {
   test('entries off the viewport are skipped', () {
     final spy = _EntrySpy();
     _run([
-      (10, 10), // Inside.
-      (-31, 10), // Right edge at -1: skipped.
-      (-30.5, 10), // Right edge at -0.5, within a pixel: drawn.
-      (_width + 1.0, 10), // Left edge at width + 1: skipped.
-      (_width + 0.5, 10), // Left edge at width + 0.5: drawn.
-      (10, -29), // Bottom edge at -1: skipped.
-      (10, _height + 9.0), // Top edge at height + 1: skipped.
-      (-1000, -1000), // Far off.
+      (x: 10, y: 10), // Inside.
+      (x: -31, y: 10), // Right edge at -1: skipped.
+      (x: -30.5, y: 10), // Right edge at -0.5, within a pixel: drawn.
+      (x: _width + 1.0, y: 10), // Left edge at width + 1: skipped.
+      (x: _width + 0.5, y: 10), // Left edge at width + 0.5: drawn.
+      (x: 10, y: -29), // Bottom edge at -1: skipped.
+      (x: 10, y: _height + 9.0), // Top edge at height + 1: skipped.
+      (x: -1000, y: -1000), // Far off.
     ]).draw(spy);
     expect(spy.entries, 3);
   });
@@ -79,7 +79,7 @@ void main() {
   test('a stroke reaching into the viewport keeps its entry', () {
     final spy = _EntrySpy();
     // The square ends at -2, its stroke at 2.
-    _run([(-22, 10)]).draw(spy);
+    _run([(x: -22, y: 10)]).draw(spy);
     expect(spy.entries, 1);
   });
 
@@ -102,7 +102,12 @@ void main() {
   });
 
   test('skipping draws as every entry clipped to the viewport', () async {
-    const moves = [(-22.0, 10.0), (-30.5, 30.0), (90.0, 50.0), (-31.0, 0.0)];
+    const moves = [
+      (x: -22.0, y: 10.0),
+      (x: -30.5, y: 30.0),
+      (x: 90.0, y: 50.0),
+      (x: -31.0, y: 0.0),
+    ];
     final actual = await _pixels(
       (canvas) => _run(moves).draw(canvas, scale: 1),
     );
@@ -110,7 +115,7 @@ void main() {
       canvas.clipRect(
         ui.Rect.fromLTWH(0, 0, _width.toDouble(), _height.toDouble()),
       );
-      for (final (x, y) in moves) {
+      for (final (:x, :y) in moves) {
         canvas
           ..save()
           ..translate(x, y);

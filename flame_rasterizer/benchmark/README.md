@@ -82,8 +82,8 @@ and the 95th percentile, over `FRAMES` frames after 60 frames of warm-up, of:
 - `interval`, the time between the frames' vsyncs, which shows the frame rate.
 
 With rasterizer_gpu, the line ends with the last frame's renderer, runs, entries, and atlas pages or mesh targets, and
-with the renderer's own CPU, upload and encode times. Benchmark runs keep the demo's HUD: its text, laid out again every
-0.5 s, is drawn each frame, after the vectors.
+with the renderer's own CPU, upload and encode times. Benchmark runs keep the demo's HUD, which lays its text out again
+every 0.5 s and draws it each frame, after the vectors.
 
 ## Android and clean checkouts
 

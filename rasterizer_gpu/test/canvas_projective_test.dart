@@ -23,7 +23,7 @@ final _bytes = Uint8List.fromList(
   ),
 );
 
-/// What [draw] draws into a picture, as RGBA.
+/// Returns what [draw] draws into a picture, as RGBA.
 Future<Uint8List> _pixels(void Function(ui.Canvas) draw) async {
   final recorder = ui.PictureRecorder();
   draw(ui.Canvas(recorder));

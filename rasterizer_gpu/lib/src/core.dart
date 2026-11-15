@@ -422,9 +422,9 @@ class const MeshPath({
 
 /// An SVG, or plain paths' polylines, imported once into triangles.
 ///
-/// The triangles are in the paths' coordinates, y down, as a [Scene]'s. Fills
-/// are tessellated with their winding rule. Strokes are outlined with their
-/// joins, caps and dashes. So each path's triangles in [indices] are its
+/// The triangles are in the paths' coordinates, y down, as a [Scene]'s. The
+/// import tessellates fills with their winding rule, and outlines strokes with
+/// their joins, caps and dashes. So each path's triangles in [indices] are its
 /// coverage, and never overlap. Its arrays are copies, so it keeps nothing
 /// native.
 class Mesh._(raw.RaMeshData n) {
@@ -474,8 +474,8 @@ class Mesh._(raw.RaMeshData n) {
   ///
   /// It imports them as [Mesh.fromSvgBytes] imports an SVG's shapes. Round
   /// joins and caps stay within [tolerance] of their arcs, in the paths'
-  /// units. The mesh's [svgBounds] are [viewBox]. Paths with points that
-  /// aren't finite aren't imported.
+  /// units. The mesh's [svgBounds] are [viewBox]. It leaves out paths with
+  /// points that aren't finite.
   ///
   /// With [glow], each path drawn gets a halo, which comes in [paths] before
   /// all the draws' own paths. Each draw gets a core, which comes right after
@@ -688,8 +688,8 @@ class SceneList() implements Finalizable {
   /// Sets the color matrices that the next [setEntries]' entries refer to.
   ///
   /// [matrices] holds [count] 4 x 4 matrices on premultiplied RGBA, 16 floats
-  /// each, row by row. Their rows and columns are r, g, b and a. Each color
-  /// they transform is clamped from 0 to its alpha.
+  /// each, row by row. Their rows and columns are r, g, b and a. The core
+  /// clamps each color they transform from 0 to its alpha.
   void setColorMatrices(Pointer<Float> matrices, int count) =>
       raw.ra_list_set_color_matrices(_live, matrices, count);
 

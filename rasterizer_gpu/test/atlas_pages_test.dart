@@ -9,30 +9,36 @@
 // below 3/4 of their area. The textures that follow these sizes are checked
 // by example/integration_test/atlas_test.dart.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rasterizer_gpu/rasterizer_gpu.dart' show RasterizerPixelSize;
 import 'package:rasterizer_gpu/src/atlas_pages.dart';
 
 void main() {
-  const portrait = (1080, 2400), landscape = (2400, 1080);
+  const RasterizerPixelSize portrait = (width: 1080, height: 2400),
+      landscape = (width: 2400, height: 1080);
 
   /// Plays a frame as the renderer does: grows each page to fit its entry in
   /// [needs], then ends the frame.
-  void frame(AtlasPages pages, (int, int) viewport, List<(int, int)> needs) {
+  void frame(
+    AtlasPages pages,
+    RasterizerPixelSize viewport,
+    List<RasterizerPixelSize> needs,
+  ) {
     for (var p = 0; p < needs.length; p++) {
-      pages.fit(p, needs[p].$1, needs[p].$2);
+      pages.fit(p, needs[p].width, needs[p].height);
     }
-    pages.endFrame(viewport.$1, viewport.$2, needs);
+    pages.endFrame(viewport.width, viewport.height, needs);
   }
 
-  List<(int, int)> sizes(AtlasPages pages) => [
+  List<RasterizerPixelSize> sizes(AtlasPages pages) => [
     for (var p = 0; p < pages.length; p++) pages[p],
   ];
 
   test('pages grow at once, in steps, up to the maximum size', () {
     final pages = AtlasPages(4096);
-    expect(pages.fit(0, 1080, 2400), (1280, 2560));
-    expect(pages.fit(0, 1000, 2000), (1280, 2560));
-    expect(pages.fit(0, 2400, 1080), (2560, 2560));
-    expect(pages.fit(1, 1, 5000), (256, 4096));
+    expect(pages.fit(0, 1080, 2400), (width: 1280, height: 2560));
+    expect(pages.fit(0, 1000, 2000), (width: 1280, height: 2560));
+    expect(pages.fit(0, 2400, 1080), (width: 2560, height: 2560));
+    expect(pages.fit(1, 1, 5000), (width: 256, height: 4096));
     expect(pages.resizes, 3);
   });
 
@@ -41,9 +47,11 @@ void main() {
     // Heavy and light frames alternate every 60 frames, as a game's zoom can
     // make them. Each window holds heavy frames, so the page never shrinks.
     for (var i = 0; i < 1000; i++) {
-      frame(pages, portrait, [(1080, (i ~/ 60).isEven ? 5400 : 1600)]);
+      frame(pages, portrait, [
+        (width: 1080, height: (i ~/ 60).isEven ? 5400 : 1600),
+      ]);
     }
-    expect(sizes(pages), [(1280, 5632)]);
+    expect(sizes(pages), [(width: 1280, height: 5632)]);
     expect(pages.resizes, 1);
   });
 
@@ -54,23 +62,23 @@ void main() {
     for (var i = 0; i < 119; i++) {
       frame(pages, landscape, [landscape]);
     }
-    expect(sizes(pages), [(2560, 2560)]);
+    expect(sizes(pages), [(width: 2560, height: 2560)]);
     // The turn to landscape is a viewport change, so the page shrinks at the
     // window's end.
     frame(pages, landscape, [landscape]);
-    expect(sizes(pages), [(2560, 1280)]);
+    expect(sizes(pages), [(width: 2560, height: 1280)]);
     // Back in portrait, a heavy frame grows the page at once.
     for (var i = 0; i < 119; i++) {
-      frame(pages, portrait, [(1080, i == 50 ? 2400 : 1200)]);
+      frame(pages, portrait, [(width: 1080, height: i == 50 ? 2400 : 1200)]);
     }
-    expect(sizes(pages), [(2560, 2560)]);
-    frame(pages, portrait, [(1080, 1200)]);
-    expect(sizes(pages), [(1280, 2560)]);
+    expect(sizes(pages), [(width: 2560, height: 2560)]);
+    frame(pages, portrait, [(width: 1080, height: 1200)]);
+    expect(sizes(pages), [(width: 1280, height: 2560)]);
     // Without another viewport change, it doesn't shrink again.
     for (var i = 0; i < 500; i++) {
-      frame(pages, portrait, [(1080, 1200)]);
+      frame(pages, portrait, [(width: 1080, height: 1200)]);
     }
-    expect(sizes(pages), [(1280, 2560)]);
+    expect(sizes(pages), [(width: 1280, height: 2560)]);
     expect(pages.resizes, 5);
   });
 
@@ -78,37 +86,37 @@ void main() {
     final pages = AtlasPages(8192);
     frame(pages, landscape, [landscape]);
     for (var i = 0; i < 100; i++) {
-      frame(pages, (1080, 2300), [(1080, 2300)]);
+      frame(pages, (width: 1080, height: 2300), [(width: 1080, height: 2300)]);
     }
     for (var i = 0; i < 119; i++) {
       frame(pages, portrait, [portrait]);
     }
-    expect(sizes(pages), [(2560, 2560)]);
+    expect(sizes(pages), [(width: 2560, height: 2560)]);
     frame(pages, portrait, [portrait]);
-    expect(sizes(pages), [(1280, 2560)]);
+    expect(sizes(pages), [(width: 1280, height: 2560)]);
   });
 
   test('a shrink never grows a page past its size', () {
     final pages = AtlasPages(8192);
-    frame(pages, landscape, [(2400, 1080)]);
+    frame(pages, landscape, [(width: 2400, height: 1080)]);
     for (var i = 0; i < 120; i++) {
-      frame(pages, portrait, [(1080, 2000)]);
+      frame(pages, portrait, [(width: 1080, height: 2000)]);
     }
     // The width shrinks. The height grew at once, at the first portrait frame.
-    expect(sizes(pages), [(1280, 2048)]);
+    expect(sizes(pages), [(width: 1280, height: 2048)]);
   });
 
   test(
     'pages no frame needed for 120 frames are released, from the last one down',
     () {
       final pages = AtlasPages(8192);
-      frame(pages, portrait, [portrait, portrait, (1080, 500)]);
+      frame(pages, portrait, [portrait, portrait, (width: 1080, height: 500)]);
       for (var i = 0; i < 119; i++) {
         frame(pages, portrait, [portrait]);
       }
       expect(pages.length, 3);
       frame(pages, portrait, [portrait]);
-      expect(sizes(pages), [(1280, 2560)]);
+      expect(sizes(pages), [(width: 1280, height: 2560)]);
       final resizes = pages.resizes;
       // A page needed again is a new page, so another reallocation.
       frame(pages, portrait, [portrait, portrait]);
@@ -135,14 +143,17 @@ void main() {
     'trim shrinks pages to the last frame\'s needs and releases the rest',
     () {
       final pages = AtlasPages(8192);
-      frame(pages, portrait, [(1080, 5400), portrait]);
-      frame(pages, portrait, [(1080, 1000)]);
-      expect(sizes(pages), [(1280, 5632), (1280, 2560)]);
+      frame(pages, portrait, [(width: 1080, height: 5400), portrait]);
+      frame(pages, portrait, [(width: 1080, height: 1000)]);
+      expect(sizes(pages), [
+        (width: 1280, height: 5632),
+        (width: 1280, height: 2560),
+      ]);
       pages.trim();
-      expect(sizes(pages), [(1280, 1024)]);
+      expect(sizes(pages), [(width: 1280, height: 1024)]);
       // A heavier frame grows the page again at once.
       frame(pages, portrait, [portrait]);
-      expect(sizes(pages), [(1280, 2560)]);
+      expect(sizes(pages), [(width: 1280, height: 2560)]);
     },
   );
 
@@ -154,74 +165,75 @@ void main() {
   test('without a viewport change, a page shrinks at the end of a window whose '
       'frames needed below half of it, to the largest they needed', () {
     final pages = AtlasPages(8192);
-    frame(pages, portrait, [(1080, 5400)]);
-    expect(sizes(pages), [(1280, 5632)]);
+    frame(pages, portrait, [(width: 1080, height: 5400)]);
+    expect(sizes(pages), [(width: 1280, height: 5632)]);
     // The first window holds the heavy frame, so the page doesn't shrink.
     for (var i = 0; i < 119; i++) {
-      frame(pages, portrait, [(1080, i == 100 ? 2000 : 1000)]);
+      frame(pages, portrait, [(width: 1080, height: i == 100 ? 2000 : 1000)]);
     }
-    expect(sizes(pages), [(1280, 5632)]);
+    expect(sizes(pages), [(width: 1280, height: 5632)]);
     for (var i = 0; i < 120; i++) {
-      frame(pages, portrait, [(1080, i == 100 ? 2000 : 1000)]);
+      frame(pages, portrait, [(width: 1080, height: i == 100 ? 2000 : 1000)]);
     }
-    expect(sizes(pages), [(1280, 2048)]);
+    expect(sizes(pages), [(width: 1280, height: 2048)]);
     // Then it doesn't shrink again while frames need half of it.
     for (var i = 0; i < 600; i++) {
-      frame(pages, portrait, [(1080, 1024)]);
+      frame(pages, portrait, [(width: 1080, height: 1024)]);
     }
-    expect(sizes(pages), [(1280, 2048)]);
+    expect(sizes(pages), [(width: 1280, height: 2048)]);
     // Exactly half isn't below it: 1000 rounds up to 1024. But 700 rounds up
     // to 768, which is, so the page shrinks at the end of the window.
     for (var i = 0; i < 120; i++) {
-      frame(pages, portrait, [(1080, 1000)]);
+      frame(pages, portrait, [(width: 1080, height: 1000)]);
     }
-    expect(sizes(pages), [(1280, 2048)]);
+    expect(sizes(pages), [(width: 1280, height: 2048)]);
     for (var i = 0; i < 119; i++) {
-      frame(pages, portrait, [(1080, 700)]);
+      frame(pages, portrait, [(width: 1080, height: 700)]);
     }
-    expect(sizes(pages), [(1280, 2048)]);
-    frame(pages, portrait, [(1080, 600)]);
-    expect(sizes(pages), [(1280, 768)]);
+    expect(sizes(pages), [(width: 1280, height: 2048)]);
+    frame(pages, portrait, [(width: 1080, height: 600)]);
+    expect(sizes(pages), [(width: 1280, height: 768)]);
     expect(pages.resizes, 3);
   });
 
   test('a page shrinks at most once a window', () {
     final pages = AtlasPages(8192);
-    frame(pages, portrait, [(4000, 4000)]);
+    frame(pages, portrait, [(width: 4000, height: 4000)]);
     // Needs fall frame by frame, yet the page shrinks only at a window's end,
     // to that window's largest need.
     for (var i = 0; i < 240; i++) {
-      frame(pages, portrait, [(4000 - 15 * i, 4000 - 15 * i)]);
+      frame(pages, portrait, [(width: 4000 - 15 * i, height: 4000 - 15 * i)]);
       if (i == 118) {
-        expect(sizes(pages), [(4096, 4096)]);
+        expect(sizes(pages), [(width: 4096, height: 4096)]);
       }
     }
-    expect(sizes(pages), [(2304, 2304)]);
+    expect(sizes(pages), [(width: 2304, height: 2304)]);
     expect(pages.resizes, 2);
   });
 
   test('as the mesh renderer\'s targets, a page in 64 px steps shrinks at the '
       'end of a window whose frames needed below 3/4 of it', () {
     final pages = AtlasPages(8192, step: 64, shrinkBelow: 0.75);
-    const window = (2880, 1620), tube = (1600, 1600);
+    const window = (width: 2880, height: 1620),
+        tube = (width: 1600, height: 1600);
     // A run that first covers the window, as stars around a tube do, then
     // only the tube.
     frame(pages, window, [window]);
-    expect(sizes(pages), [(2880, 1664)]);
+    expect(sizes(pages), [(width: 2880, height: 1664)]);
     for (var i = 0; i < 119; i++) {
       frame(pages, window, [tube]);
     }
-    expect(sizes(pages), [(2880, 1664)]);
+    expect(sizes(pages), [(width: 2880, height: 1664)]);
     // The tube needs 53% of the page: below 3/4, though not below half.
     for (var i = 0; i < 120; i++) {
       frame(pages, window, [tube]);
     }
-    expect(sizes(pages), [(1600, 1600)]);
+    expect(sizes(pages), [(width: 1600, height: 1600)]);
     // Then it doesn't shrink again for 92% of it.
     for (var i = 0; i < 240; i++) {
-      frame(pages, window, [(1500, 1500)]);
+      frame(pages, window, [(width: 1500, height: 1500)]);
     }
-    expect(sizes(pages), [(1600, 1600)]);
+    expect(sizes(pages), [(width: 1600, height: 1600)]);
     expect(pages.resizes, 2);
   });
 }

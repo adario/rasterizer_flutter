@@ -22,7 +22,7 @@ void main() {
   ///
   /// Returns whether the timeout fired within [wait], and whether it fired
   /// by twice the limit after [release] was called.
-  Future<(bool, bool)> timedOut(
+  Future<({bool whileHeld, bool afterRelease})> timedOut(
     void Function() hold,
     void Function() release,
     Duration wait,
@@ -37,7 +37,7 @@ void main() {
     final whileHeld = fired;
     release();
     await Future<void>.delayed(limit * 2);
-    return (whileHeld, fired);
+    return (whileHeld: whileHeld, afterRelease: fired);
   }
 
   test("a future's result and errors pass through", () async {
@@ -61,7 +61,7 @@ void main() {
   });
 
   test("time in the background doesn't count", () async {
-    final (whileHeld, after) = await timedOut(
+    final (:whileHeld, afterRelease: after) = await timedOut(
       () => binding.handleAppLifecycleStateChanged(AppLifecycleState.paused),
       () => binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed),
       limit * 3,
@@ -71,7 +71,7 @@ void main() {
   });
 
   test("time with the first frame deferred doesn't count", () async {
-    final (whileHeld, after) = await timedOut(
+    final (:whileHeld, afterRelease: after) = await timedOut(
       binding.deferFirstFrame,
       binding.allowFirstFrame,
       limit * 3,

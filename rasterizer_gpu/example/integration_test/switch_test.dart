@@ -76,7 +76,8 @@ void main() {
   /// Returns the backends that it drew with, and the times between frames
   /// over 50 ms, by frame. [during] makes another scene a few frames in,
   /// while the self-test runs.
-  Future<(List<RasterizerBackend>, Map<int, int>)> renderUntilSettled(
+  Future<({List<RasterizerBackend> backends, Map<int, int> slowFrames})>
+  renderUntilSettled(
     RasterizerRenderer renderer,
     List<RasterizerScene> scenes, {
     RasterizerScene Function()? during,
@@ -102,7 +103,7 @@ void main() {
         fail('not settled after 3000 frames');
       }
     }
-    return (backends, long);
+    return (backends: backends, slowFrames: long);
   }
 
   if (!RasterizerGpu.openGles) {
@@ -146,7 +147,7 @@ void main() {
     expect(paths, isA<SwitchingScene>());
     expect(renderer.backend, RasterizerBackend.canvas);
     late RasterizerScene madeDuring;
-    final (backends, long) = await renderUntilSettled(renderer, [
+    final (:backends, slowFrames: long) = await renderUntilSettled(renderer, [
       scene,
       paths,
     ], during: () => madeDuring = RasterizerScene.fromSvg(tiger));
@@ -226,7 +227,7 @@ void main() {
     expect(paths, isA<SwitchingScene>());
     expect(renderer, isA<SwitchingRenderer>());
     late RasterizerScene madeDuring;
-    final (backends, _) = await renderUntilSettled(
+    final (:backends, slowFrames: _) = await renderUntilSettled(
       renderer,
       [scene, paths],
       during: () => madeDuring = make(),
@@ -341,7 +342,9 @@ void main() {
       RasterizerGpu.debugFailSelfTest = {'r32Float', 'r16g16b16a16Float'};
       final scene = RasterizerScene.fromSvg(tiger),
           renderer = await RasterizerRenderer.create(slots: 3);
-      final (backends, _) = await renderUntilSettled(renderer, [scene]);
+      final (:backends, slowFrames: _) = await renderUntilSettled(renderer, [
+        scene,
+      ]);
       expect(await RasterizerGpu.settledBackend, RasterizerBackend.canvas);
       expect(backends, everyElement(RasterizerBackend.canvas));
       expect(render(renderer, [scene]).isEmpty, isFalse);

@@ -21,6 +21,10 @@ typedef MultipleShapesSettings = ({
   int count,
 });
 
+/// A shape's pick: the index of its SVG or outline's size, and its width at
+/// a scale of 1.
+typedef ShapePick = ({int sizeIndex, double width});
+
 /// What the example's shapes are.
 enum Shapes(final String label) {
   /// SVGs, drawn as they are.
@@ -173,7 +177,7 @@ abstract class MultipleShapesExample({
 
   /// For each shape, the index in [_sizes] and the width at a scale of 1
   /// picked for it. It holds at least as many as there are shapes.
-  final _picks = <(int, double)>[];
+  final _picks = <ShapePick>[];
 
   /// Whether [onLoad] has laid out the first shapes in rows.
   bool _laidOut = false;
@@ -239,8 +243,8 @@ abstract class MultipleShapesExample({
     final target = _count;
     while (_picks.length < target) {
       _picks.add((
-        random.nextInt(_sizes.length),
-        50 + random.nextDouble() * 100,
+        sizeIndex: random.nextInt(_sizes.length),
+        width: 50 + random.nextDouble() * 100,
       ));
     }
     final scale = _scaleFor(target);
@@ -256,7 +260,7 @@ abstract class MultipleShapesExample({
     for (var i = tintedShapes.length; i < target; i++) {
       final shapeSize = _sizeOf(i, scale);
       final shape = _shape(
-        _picks[i].$1,
+        _picks[i].sizeIndex,
         position: i < rows.length
             ? rows[i] + topLeft
             : arena.freePosition(shapeSize, collidables, random),
@@ -319,15 +323,15 @@ abstract class MultipleShapesExample({
     ];
   }
 
-  /// The size of its [i]th shape at [scale].
+  /// Returns the size of its [i]th shape at [scale].
   Vector2 _sizeOf(int i, double scale) {
-    final (k, width) = _picks[i];
-    final aspect = _sizes[k];
+    final (:sizeIndex, :width) = _picks[i];
+    final aspect = _sizes[sizeIndex];
     return Vector2(width, width * aspect.y / aspect.x)..scale(scale);
   }
 
-  /// The largest scale, up to 1 and in hundredths, at which [target] shapes
-  /// fit in the rows.
+  /// Returns the largest scale, up to 1 and in hundredths, at which [target]
+  /// shapes fit in the rows.
   double _scaleFor(int target) {
     for (var percent = 100; percent > 1; percent--) {
       if (_rows(percent / 100, target).length == target) {
@@ -337,8 +341,8 @@ abstract class MultipleShapesExample({
     return 0.01;
   }
 
-  /// The centers of as many of the first [target] shapes as fit in Flame's
-  /// example's rows at [scale], from the arena's top left corner.
+  /// Returns the centers of as many of the first [target] shapes as fit in
+  /// Flame's example's rows at [scale], from the arena's top left corner.
   ///
   /// The first shape goes after the snowman, taking the snowman's top left
   /// corner as its center. Each other shape goes after the one before, or at

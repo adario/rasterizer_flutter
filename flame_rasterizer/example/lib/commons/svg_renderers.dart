@@ -114,8 +114,8 @@ enum SvgRenderer(final String label) {
     _ => label,
   };
 
-  /// The graphics API that Impeller renders with, where a GPU renderer runs:
-  /// OpenGL ES, else Metal on Apple's platforms and Vulkan elsewhere.
+  /// Returns the graphics API that Impeller renders with, where a GPU renderer
+  /// runs: OpenGL ES, else Metal on Apple's platforms and Vulkan elsewhere.
   static String _gpuApi() => RasterizerGpu.openGles
       ? 'GLES'
       : switch (defaultTargetPlatform) {

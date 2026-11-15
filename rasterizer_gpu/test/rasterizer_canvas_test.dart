@@ -61,11 +61,19 @@ extension on RasterizerScene {
   }
 }
 
+/// What [RasterizerCanvas.drawWithPaint] passes to its callback, and the
+/// canvas's save count there.
+typedef _Passed = ({
+  double opacity,
+  RasterizerColorTransform? transform,
+  int saveCount,
+});
+
 /// Draws [draw] with a [RasterizerCanvas], in a new frame.
 ///
 /// Warps perspective if [warp], else does as the frame's renderer does.
 /// Returns how many runs the canvas made, and the frame's pixels, as RGBA.
-Future<(int, Uint8List)> _frame(
+Future<({int runs, Uint8List pixels})> _frame(
   void Function(RasterizerCanvas) draw, {
   bool warp = false,
 }) async {
@@ -80,13 +88,13 @@ Future<(int, Uint8List)> _frame(
   final image = await recorder.endRecording().toImage(_size, _size);
   final data = await image.toByteData();
   image.dispose();
-  return (canvas.runCount, data!.buffer.asUint8List());
+  return (runs: canvas.runCount, pixels: data!.buffer.asUint8List());
 }
 
-/// How many runs it takes to draw a square with each of [paints], side by
-/// side.
+/// Returns how many runs it takes to draw a square with each of [paints], side
+/// by side.
 Future<int> _runs(List<ui.Paint?> paints) async {
-  final (runs, _) = await _frame((canvas) {
+  final (:runs, pixels: _) = await _frame((canvas) {
     for (final (i, paint) in paints.indexed) {
       _svg.render(canvas..translate(i.toDouble(), 0), 4, overridePaint: paint);
     }
@@ -94,7 +102,7 @@ Future<int> _runs(List<ui.Paint?> paints) async {
   return runs;
 }
 
-/// The pixel at [x], [y] of [pixels], as RGBA.
+/// Returns the pixel at [x], [y] of [pixels], as RGBA.
 List<int> _pixel(Uint8List pixels, int x, int y) {
   final i = 4 * (y * _size + x);
   return pixels.sublist(i, i + 4);
@@ -287,7 +295,7 @@ void main() {
 
   group('drawing', () {
     test('a faded run is drawn faded', () async {
-      final (_, pixels) = await _frame(
+      final (runs: _, :pixels) = await _frame(
         (canvas) =>
             _svg.render(canvas, _size.toDouble(), overridePaint: _faded(0.5)),
       );
@@ -297,7 +305,7 @@ void main() {
     test(
       'a faded scene\'s paths that overlap show through each other',
       () async {
-        final (_, pixels) = await _frame(
+        final (runs: _, :pixels) = await _frame(
           (canvas) => _overlapping.render(
             canvas,
             _size.toDouble(),
@@ -313,7 +321,7 @@ void main() {
     test('a paint whose alpha changes between draws keeps the run, and each '
         'entry its alpha', () async {
       final paint = _faded(0.5);
-      final (runs, pixels) = await _frame((canvas) {
+      final (:runs, :pixels) = await _frame((canvas) {
         _svg.render(canvas, 20, overridePaint: paint);
         paint.color = const ui.Color(0xffffffff);
         _svg.render(canvas..translate(20, 0), 20, overridePaint: paint);
@@ -330,7 +338,7 @@ void main() {
           ui.Color(0xff0000ff),
           ui.BlendMode.srcIn,
         );
-      final (runs, pixels) = await _frame((canvas) {
+      final (:runs, :pixels) = await _frame((canvas) {
         _svg.render(canvas, 20, overridePaint: paint);
         paint.colorFilter = null;
         _svg.render(canvas..translate(20, 0), 20, overridePaint: paint);
@@ -341,7 +349,7 @@ void main() {
     });
 
     test('a faded and tinted run is drawn faded and tinted', () async {
-      final (_, pixels) = await _frame(
+      final (runs: _, :pixels) = await _frame(
         (canvas) => _svg.render(
           canvas,
           _size.toDouble(),
@@ -359,7 +367,7 @@ void main() {
     test(
       'tinted translucent paths that overlap are drawn as in a layer',
       () async {
-        final (runs, pixels) = await _frame(
+        final (:runs, :pixels) = await _frame(
           (canvas) => _translucent.render(
             canvas,
             _size.toDouble(),
@@ -388,7 +396,7 @@ void main() {
     );
 
     test('a tinted run is drawn tinted', () async {
-      final (_, pixels) = await _frame(
+      final (runs: _, :pixels) = await _frame(
         (canvas) => _svg.render(
           canvas,
           _size.toDouble(),
@@ -408,19 +416,27 @@ void main() {
     ///
     /// Returns what it passes to its callback, and the canvas's save count
     /// there, or null if it doesn't call it.
-    (double, RasterizerColorTransform?, int)? passed(ui.Paint? paint) {
+    _Passed? passed(ui.Paint? paint) {
       final canvas = ui.Canvas(ui.PictureRecorder());
-      (double, RasterizerColorTransform?, int)? result;
+      _Passed? result;
       RasterizerCanvas.drawWithPaint(canvas, paint, (opacity, transform) {
-        result = (opacity, transform, canvas.getSaveCount());
+        result = (
+          opacity: opacity,
+          transform: transform,
+          saveCount: canvas.getSaveCount(),
+        );
       });
       expect(canvas.getSaveCount(), 1);
       return result;
     }
 
     test('a default paint fades, with no layer', () {
-      expect(passed(null), (1.0, null, 1));
-      expect(passed(_faded(0.5)), (0.5, null, 1));
+      expect(passed(null), (opacity: 1.0, transform: null, saveCount: 1));
+      expect(passed(_faded(0.5)), (
+        opacity: 0.5,
+        transform: null,
+        saveCount: 1,
+      ));
     });
 
     test('a paint whose alpha is 0 draws nothing', () {
@@ -432,7 +448,11 @@ void main() {
         const ui.Color(0xff00ff00),
         ui.BlendMode.srcATop,
       )!;
-      expect(passed(_faded(0.5)..colorFilter = tint.filter), (0.5, tint, 1));
+      expect(passed(_faded(0.5)..colorFilter = tint.filter), (
+        opacity: 0.5,
+        transform: tint,
+        saveCount: 1,
+      ));
     });
 
     test('other fields apply in a layer', () async {
@@ -441,7 +461,7 @@ void main() {
           ui.Color(0xff0000ff),
           ui.BlendMode.srcIn,
         );
-      expect(passed(paint), (0.5, null, 2));
+      expect(passed(paint), (opacity: 0.5, transform: null, saveCount: 2));
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
       RasterizerCanvas.drawWithPaint(canvas, paint, (opacity, _) {
@@ -461,7 +481,7 @@ void main() {
   group('transforms', () {
     test('a run that ends at scale 0 is still drawn', () async {
       for (final scale in [0.0, 1e-9]) {
-        final (runs, pixels) = await _frame(
+        final (:runs, :pixels) = await _frame(
           (canvas) => _squareThenScaled(canvas, scale, (canvas) {
             _svg.render(canvas, 10);
             canvas.drawRect(const ui.Rect.fromLTWH(0, 0, 10, 10), _blue);
@@ -482,7 +502,7 @@ void main() {
           ui.Color(0xff00ff00),
           ui.BlendMode.srcIn,
         );
-      final (runs, pixels) = await _frame((canvas) {
+      final (:runs, :pixels) = await _frame((canvas) {
         _svg.render(canvas, 10, overridePaint: tinted);
         canvas
           ..save()
@@ -502,7 +522,7 @@ void main() {
     });
 
     test('a clip made at scale 0 doesn\'t clip the run before it', () async {
-      final (_, pixels) = await _frame(
+      final (runs: _, :pixels) = await _frame(
         (canvas) => _squareThenScaled(canvas, 0, (canvas) {
           canvas.clipRect(const ui.Rect.fromLTWH(0, 0, 1, 1));
           _svg.render(canvas, 10);
@@ -512,7 +532,7 @@ void main() {
     });
 
     test('a run that ends under perspective is drawn where it was', () async {
-      final (runs, pixels) = await _frame((canvas) {
+      final (:runs, :pixels) = await _frame((canvas) {
         _svg.render(canvas, 10);
         canvas
           ..save()
@@ -529,7 +549,7 @@ void main() {
     for (final warp in [false, true]) {
       test('an SVG under perspective is drawn where the perspective puts it, '
           '${warp ? 'warped, as a run of its own' : 'in its run'}', () async {
-        final (runs, pixels) = await _frame((canvas) {
+        final (:runs, :pixels) = await _frame((canvas) {
           _svg.render(canvas, 10);
           canvas
             ..save()
@@ -545,7 +565,7 @@ void main() {
 
       test("an SVG under perspective behind the eye isn't drawn"
           "${warp ? ', warped' : ''}", () async {
-        final (_, pixels) = await _frame((canvas) {
+        final (runs: _, :pixels) = await _frame((canvas) {
           canvas
             ..transform(_perspective)
             ..translate(-60, 0);
@@ -566,7 +586,7 @@ void main() {
     });
 
     test('runs still pending at the end are dropped', () async {
-      final (_, pixels) = await _frame((canvas) {
+      final (runs: _, :pixels) = await _frame((canvas) {
         canvas.scale(0);
         _svg.render(canvas, 10);
         canvas.drawRect(const ui.Rect.fromLTWH(0, 0, 10, 10), _blue);

@@ -16,7 +16,7 @@ import 'package:rasterizer_gpu/src/paths/path_contours.dart';
 /// A flattened contour: its points, and whether it's closed.
 typedef Polyline = ({List<ui.Offset> points, bool closed});
 
-/// The polylines of [contours], one list per path.
+/// Returns the polylines of [contours], one list per path.
 List<List<Polyline>> unpack(PathContours contours) {
   final paths = <List<Polyline>>[];
   var contour = 0;
@@ -37,15 +37,16 @@ List<List<Polyline>> unpack(PathContours contours) {
   return paths;
 }
 
-/// The polylines of [path], flattened to [tolerance].
+/// Returns the polylines of [path], flattened to [tolerance].
 List<Polyline> flatten(ui.Path path, double tolerance) =>
     unpack(PathContours([path], tolerance: tolerance)).single;
 
-/// The tolerance for paths [side] units long, drawn at most [maxSize] pixels
-/// long: 1/4 of a pixel, as the mesh renderer uses.
+/// Returns the tolerance for paths [side] units long, drawn at most [maxSize]
+/// pixels long: 1/4 of a pixel, as the mesh renderer uses.
 double toleranceFor(double side, double maxSize) => 0.25 * side / maxSize;
 
-/// The signed area of [polyline], positive if it goes clockwise with y down.
+/// Returns the signed area of [polyline], positive if it goes clockwise with y
+/// down.
 double area(List<ui.Offset> polyline) {
   var sum = 0.0;
   for (var i = 0; i < polyline.length; i++) {
@@ -90,7 +91,7 @@ double distanceToPolyline(ui.Offset p, List<ui.Offset> points, bool closed) {
   return best;
 }
 
-/// How far [path]'s contours and [polylines] get from each other.
+/// Returns how far [path]'s contours and [polylines] get from each other.
 ///
 /// It measures from points every [step] along [path] to the polylines, and
 /// from points along the polylines' segments back to those points.
@@ -116,7 +117,7 @@ double deviation(ui.Path path, List<Polyline> polylines, double step) {
   return worst;
 }
 
-/// A path of [polylines], filled by [fillType].
+/// Returns a path of [polylines], filled by [fillType].
 ui.Path polylinePath(List<Polyline> polylines, ui.PathFillType fillType) {
   final path = ui.Path()..fillType = fillType;
   for (final (:points, :closed) in polylines) {
@@ -125,7 +126,7 @@ ui.Path polylinePath(List<Polyline> polylines, ui.PathFillType fillType) {
   return path;
 }
 
-/// The alpha values of [path], filled at [scale] pixels per unit into a
+/// Returns the alpha values of [path], filled at [scale] pixels per unit into a
 /// square [size] pixels wide.
 Future<Uint8List> fill(ui.Path path, double scale, int size) async {
   final recorder = ui.PictureRecorder();

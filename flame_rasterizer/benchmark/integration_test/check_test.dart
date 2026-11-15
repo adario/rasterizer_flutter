@@ -36,19 +36,19 @@ void main() {
     testWidgets(
       'the Flame frame at time $time matches the one composed directly',
       (tester) async {
-        final result = Completer<(bool, String)>();
+        final result = Completer<({bool pass, String line})>();
         await tester.pumpWidget(
           CheckPage(
             time: time,
             onResult: ({required pass, required line}) =>
-                result.complete((pass, line)),
+                result.complete((pass: pass, line: line)),
           ),
         );
-        final (pass, line) =
+        final (:pass, :line) =
             await tester.runAsync(
               () => result.future.timeout(const Duration(seconds: 60)),
             ) ??
-            (false, 'no result');
+            (pass: false, line: 'no result');
         final gpu = RasterizerGpu.of(demoGpu);
         // ignore: avoid_print
         print(

@@ -84,7 +84,7 @@ mixin DemoContent on FlameGame {
   int _frames = 0;
 
   /// The frames whose timings came, warm-up included. They're the same frames
-  /// as the renders, as both are counted from the game's load on.
+  /// as the renders, as the game counts both from its load on.
   int _timedFrames = 0;
   bool _reported = false;
 
@@ -187,7 +187,7 @@ mixin DemoContent on FlameGame {
     // shared paint. Unless the time is fixed, the faded one fades in and out
     // and the hued one's hue turns.
     final shared = DemoLayout.paintOf(PaintKind.shared);
-    for (final (item, kind) in layout.paintedItems) {
+    for (final (:item, :kind) in layout.paintedItems) {
       final component = vectorComponent(item, 2 * groups + 1);
       switch (kind) {
         case PaintKind.faded:
@@ -244,7 +244,7 @@ mixin DemoContent on FlameGame {
     if (fixedTime == null) {
       time += dt;
     }
-    final (x, y, zoom) = DemoLayout.camera(
+    final (:x, :y, :zoom) = DemoLayout.camera(
       animateZoom ? time : 0,
       canvasSize.x,
       canvasSize.y,
@@ -272,8 +272,8 @@ mixin DemoContent on FlameGame {
     }
   }
 
-  /// The engine's own stats for the HUD and the benchmark's log, each after a
-  /// comma, or nothing.
+  /// Returns the engine's own stats for the HUD and the benchmark's log, each
+  /// after a comma, or nothing.
   String statsText() => '';
 
   @override
@@ -400,7 +400,7 @@ mixin Moves on PositionComponent {
 
   @override
   void update(double dt) {
-    final (x, y, a) = item.at(demo.time);
+    final (:x, :y, angle: a) = item.at(demo.time);
     position.setValues(x, y);
     angle = a;
   }
@@ -431,7 +431,7 @@ class RasterizerDemoGame({
   /// The layout's SVGs, imported once.
   late final List<RasterizerSvg> svgs;
 
-  /// The atlas line logged last, so that only changes are logged.
+  /// The atlas line logged last, so that the game logs only changes.
   String? _atlas;
 
   @override
@@ -472,7 +472,7 @@ class RasterizerDemoGame({
       return;
     }
     final atlas =
-        '${frame.pageSizes.map((s) => '${s.$1}x${s.$2}').join(' ')}, '
+        '${frame.pageSizes.map((s) => '${s.width}x${s.height}').join(' ')}, '
         '${_mb(renderer.atlasBytes)} MB';
     if (atlas == _atlas) {
       return;
@@ -498,7 +498,7 @@ class RasterizerDemoGame({
         : backend.name;
     return ', $name, ${frame.runs.length} runs, ${frame.entryCount} '
         'entries, ${backend == RasterizerBackend.mesh ? 'targets' : 'pages'} '
-        '${frame.pageSizes.map((s) => '${s.$1}x${s.$2}').join(' ')}'
+        '${frame.pageSizes.map((s) => '${s.width}x${s.height}').join(' ')}'
         ' (${_mb(rasterizer!.atlasBytes)} MB), '
         'cpu ${(frame.cpuMicros / 1000).toStringAsFixed(2)} upload '
         '${(frame.uploadMicros / 1000).toStringAsFixed(2)} '

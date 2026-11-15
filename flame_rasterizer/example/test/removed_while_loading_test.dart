@@ -21,41 +21,45 @@ void main() {
 
   // Each game, with how many components its world has before its SVGs load:
   // Collidable Svgs adds its arena first.
-  final games = <String, (FlameGame Function(ValueNotifier<String>), int)>{
-    'Revolute Joint Svgs': (
-      (status) => RevoluteJointSvgsExample.of(
-        (renderer: SvgRenderer.rasterizer, pieces: false),
-        status,
-        random: math.Random(1),
-      ),
-      0,
-    ),
-    'Svg Shooter': (
-      (status) => SvgShooterExample.of(
-        SvgRenderer.rasterizer,
-        status,
-        random: math.Random(1),
-      ),
-      0,
-    ),
-    'Collidable Svgs': (
-      (status) => CollidableSvgsExample.of(
-        (renderer: SvgRenderer.rasterizer, count: 10),
-        status,
-        random: math.Random(1),
-      ),
-      1,
-    ),
-    'Multiple Shapes': (
-      (status) => MultipleShapesExample.of(
-        (renderer: SvgRenderer.rasterizer, shapes: Shapes.svgs, count: 10),
-        status,
-        random: math.Random(1),
-      ),
-      0,
-    ),
-  };
-  for (final MapEntry(key: name, value: (create, before)) in games.entries) {
+  final games =
+      <
+        String,
+        ({FlameGame Function(ValueNotifier<String>) create, int before})
+      >{
+        'Revolute Joint Svgs': (
+          create: (status) => RevoluteJointSvgsExample.of(
+            (renderer: SvgRenderer.rasterizer, pieces: false),
+            status,
+            random: math.Random(1),
+          ),
+          before: 0,
+        ),
+        'Svg Shooter': (
+          create: (status) => SvgShooterExample.of(
+            SvgRenderer.rasterizer,
+            status,
+            random: math.Random(1),
+          ),
+          before: 0,
+        ),
+        'Collidable Svgs': (
+          create: (status) => CollidableSvgsExample.of(
+            (renderer: SvgRenderer.rasterizer, count: 10),
+            status,
+            random: math.Random(1),
+          ),
+          before: 1,
+        ),
+        'Multiple Shapes': (
+          create: (status) => MultipleShapesExample.of(
+            (renderer: SvgRenderer.rasterizer, shapes: Shapes.svgs, count: 10),
+            status,
+            random: math.Random(1),
+          ),
+          before: 0,
+        ),
+      };
+  for (final MapEntry(key: name, value: (:create, :before)) in games.entries) {
     // A knob can make a new game, or the user can pick another story, while
     // a game's SVGs load. The removed game's onLoad then goes on. It mustn't
     // start its status, which would keep the game alive, nor fill its world.

@@ -19,8 +19,8 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// the same frame directly with rasterizer_gpu's API, then compares the two.
 ///
 /// The reference computes its transforms here, from the layout, rather than
-/// through Flame or a canvas. Both frames are read back, compared, and saved
-/// to the temporary directory as flame_check_game.png and
+/// through Flame or a canvas. The check reads both frames back, compares them,
+/// and saves them to the temporary directory as flame_check_game.png and
 /// flame_check_reference.png, except on the web.
 ///
 /// [time] sets the game's time, and so the camera's zoom. [onResult] gets
@@ -307,7 +307,11 @@ class _ReferencePainter(
 ) extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final (cx, cy, zoom) = DemoLayout.camera(time, size.width, size.height);
+    final (x: cx, y: cy, :zoom) = DemoLayout.camera(
+      time,
+      size.width,
+      size.height,
+    );
     final camera =
         _Affine.translate(size.width / 2, size.height / 2) *
         _Affine.scale(zoom, zoom) *
@@ -317,7 +321,7 @@ class _ReferencePainter(
     final clipped = camera * _Affine.translate(clip.left, clip.top);
 
     _Affine svgTransform(_Affine parent, VectorItem item) {
-      final (x, y, angle) = item.at(time);
+      final (:x, :y, :angle) = item.at(time);
       final viewBox = scenes[item.svg].viewBox;
       return parent *
           _Affine.translate(x, y) *
@@ -343,17 +347,17 @@ class _ReferencePainter(
     }
     // One run per paint, except that neighbours sharing a paint share a run,
     // and so do the items whose paints fold.
-    final paintedRuns = <(RasterizerRun, PaintKind)>[];
-    for (final (item, kind) in layout.paintedItems) {
-      final last = paintedRuns.isEmpty ? null : paintedRuns.last.$2;
+    final paintedRuns = <({RasterizerRun run, PaintKind kind})>[];
+    for (final (:item, :kind) in layout.paintedItems) {
+      final last = paintedRuns.isEmpty ? null : paintedRuns.last.kind;
       if (last == null ||
           (DemoLayout.folds(kind)
               ? !DemoLayout.folds(last)
               : kind != PaintKind.shared || last != kind)) {
-        paintedRuns.add((frame.addRun(), kind));
+        paintedRuns.add((run: frame.addRun(), kind: kind));
       }
       final m = device * svgTransform(camera, item);
-      paintedRuns.last.$1.add(
+      paintedRuns.last.run.add(
         scenes[item.svg],
         m.a,
         m.b,
@@ -399,7 +403,7 @@ class _ReferencePainter(
       ..transform(clipped.inverse.matrix4);
     clippedRun.draw(canvas, scale: pixelRatio);
     canvas.restore();
-    for (final (run, kind) in paintedRuns) {
+    for (final (:run, :kind) in paintedRuns) {
       if (DemoLayout.folds(kind)) {
         run.draw(canvas, scale: pixelRatio);
         continue;

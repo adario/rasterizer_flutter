@@ -40,7 +40,7 @@ final _square = Path()..addRect(const Rect.fromLTWH(0, 0, 10, 10));
 
 class _Game() extends FlameGame with HasRasterizer;
 
-/// A game [_size] wide whose world has [components].
+/// Returns a game [_size] wide whose world has [components].
 ///
 /// With [ready], the game has HasRasterizer, and its renderer is ready.
 /// Without, it's a plain FlameGame. The camera looks at the world's origin,
@@ -59,7 +59,7 @@ Future<FlameGame> _game(List<Component> components, {bool ready = true}) async {
   return game;
 }
 
-/// [game]'s frame, as RGBA.
+/// Returns [game]'s frame, as RGBA.
 Future<Uint8List> _render(FlameGame game) async {
   final recorder = PictureRecorder();
   game.render(Canvas(recorder));
@@ -69,7 +69,7 @@ Future<Uint8List> _render(FlameGame game) async {
   return data!.buffer.asUint8List();
 }
 
-/// [draw]'s pixels, drawn into a picture of its own, as RGBA.
+/// Returns [draw]'s pixels, drawn into a picture of its own, as RGBA.
 Future<Uint8List> _picture(void Function(Canvas canvas) draw) async {
   final recorder = PictureRecorder();
   draw(Canvas(recorder));
@@ -79,7 +79,7 @@ Future<Uint8List> _picture(void Function(Canvas canvas) draw) async {
   return data!.buffer.asUint8List();
 }
 
-/// The pixel at [x], [y] of [pixels], as RGBA.
+/// Returns the pixel at [x], [y] of [pixels], as RGBA.
 List<int> _pixel(Uint8List pixels, int x, int y) {
   final i = 4 * (y * _size + x);
   return pixels.sublist(i, i + 4);
@@ -89,7 +89,8 @@ List<int> _pixel(Uint8List pixels, int x, int y) {
 Matcher _near(List<int> expected) =>
     pairwiseCompare(expected, (int e, int a) => (e - a).abs() <= 1, 'near');
 
-/// The square's centre pixel, red, filled with [filter], as dart:ui draws it.
+/// Returns the square's centre pixel, red, filled with [filter], as dart:ui
+/// draws it.
 Future<List<int>> _filteredRed(ColorFilter filter) async {
   final pixels = await _picture(
     (canvas) => canvas.drawRect(
@@ -102,7 +103,8 @@ Future<List<int>> _filteredRed(ColorFilter filter) async {
   return _pixel(pixels, 20, 20);
 }
 
-/// [path], the square by default, centred at [x], 0, filled with [color].
+/// Returns [path], the square by default, centred at [x], 0, filled with
+/// [color].
 RasterizerPathComponent _path({
   Path? path,
   double x = 0,
@@ -120,7 +122,7 @@ RasterizerPathComponent _path({
   glow: glow,
 );
 
-/// The SVG, centred at [x], 0.
+/// Returns the SVG, centred at [x], 0.
 RasterizerSvgComponent _svgAt(double x) => RasterizerSvgComponent(
   svg: _svg,
   position: Vector2(x, 0),
@@ -128,7 +130,7 @@ RasterizerSvgComponent _svgAt(double x) => RasterizerSvgComponent(
   anchor: Anchor.center,
 );
 
-/// How many runs [game]'s last frame had.
+/// Returns how many runs [game]'s last frame had.
 int _runs(FlameGame game) =>
     (game as HasRasterizer).rasterizerFrame!.runs.length;
 

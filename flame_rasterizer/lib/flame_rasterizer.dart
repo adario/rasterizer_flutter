@@ -8,9 +8,9 @@
 /// draw their paths the same way.
 ///
 /// Vector content drawn one item after another makes a run (see
-/// [RasterizerCanvas]). Each run is drawn as one image, at its place in the
-/// paint order. That image is rendered at the device's resolution, under the
-/// camera, perspective included.
+/// [RasterizerCanvas]). The GPU renderers draw each run as one image, at its
+/// place in the paint order. They render that image at the device's
+/// resolution, under the camera, perspective included.
 ///
 /// [HasRasterizer.rasterizerGpu] can pick rasterizer_gpu's atlas renderer
 /// instead ([RasterizerBackend.gpu]), which rasterizes the SVGs into an atlas

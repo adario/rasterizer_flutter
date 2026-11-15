@@ -37,11 +37,11 @@ class SpawnDotComponent(
 
   /// Its wandering speed in the first round, in lanes a second: the least and
   /// the most.
-  static const speeds = (0.5, 1.5);
+  static const speeds = (least: 0.5, most: 1.5);
 
   /// The seconds before it turns back in the first round: the least and the
   /// most.
-  static const turnPeriod = (1.0, 3.0);
+  static const turnPeriod = (least: 1.0, most: 3.0);
 
   /// The seconds it takes to arrive.
   static const arriveTime = 0.3;
@@ -95,7 +95,7 @@ class SpawnDotComponent(
       _turnIn = wander.turnIn;
     } else {
       final random = gameRef.random;
-      final (least, most) = speeds;
+      final (:least, :most) = speeds;
       _speed =
           (least + (most - least) * random.nextDouble()) *
           (random.nextBool() ? 1 : -1);
@@ -106,7 +106,7 @@ class SpawnDotComponent(
   }
 
   double _turnPeriod() {
-    final (least, most) = turnPeriod;
+    final (:least, :most) = turnPeriod;
     return least + (most - least) * gameRef.random.nextDouble();
   }
 

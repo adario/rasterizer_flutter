@@ -14,18 +14,20 @@ import 'dart:ui' as ui;
 import 'package:rasterizer_gpu/src/core.dart';
 import 'package:test/test.dart';
 
-/// An SVG of [body], whose viewBox is 100 by 100 unless [viewBox] sets it.
+/// Returns an SVG of [body], whose viewBox is 100 by 100 unless [viewBox] sets
+/// it.
 Uint8List svg(String body, {String viewBox = '0 0 100 100'}) =>
     Uint8List.fromList(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="$viewBox">$body</svg>'
           .codeUnits,
     );
 
-/// The mesh of an SVG of [body], flattened for [maxSize] pixels.
+/// Returns the mesh of an SVG of [body], flattened for [maxSize] pixels.
 Mesh mesh(String body, {double maxSize = 1000}) =>
     Mesh.fromSvgBytes(svg(body), maxSize: maxSize);
 
-/// The triangles of [m]'s path [path], as x and y for each of 3 corners.
+/// Returns the triangles of [m]'s path [path], as x and y for each of 3
+/// corners.
 Iterable<List<double>> triangles(Mesh m, int path) sync* {
   final p = m.paths[path], v = m.vertices, i = m.indices as List<int>;
   final f = m.vertexFloats;
@@ -36,7 +38,7 @@ Iterable<List<double>> triangles(Mesh m, int path) sync* {
   }
 }
 
-/// The area of the triangles of [m]'s path [path].
+/// Returns the area of the triangles of [m]'s path [path].
 double area(Mesh m, [int path = 0]) {
   var sum = 0.0;
   for (final t in triangles(m, path)) {
@@ -46,9 +48,9 @@ double area(Mesh m, [int path = 0]) {
   return sum / 2;
 }
 
-/// How many of [path]'s triangles hold [x0], [y0].
+/// Returns how many of [path]'s triangles hold [x0], [y0].
 ///
-/// The point is nudged off the diagonals that split rectangles in two.
+/// It nudges the point off the diagonals that split rectangles in two.
 int coverage(Mesh m, double x0, double y0, [int path = 0]) {
   final x = x0 + 1.23e-3, y = y0 + 2.71e-3;
   var count = 0;
@@ -63,8 +65,8 @@ int coverage(Mesh m, double x0, double y0, [int path = 0]) {
   return count;
 }
 
-/// The most triangles of [path] that hold one point of a grid over [m]'s
-/// bounds: 1 when no triangles overlap.
+/// Returns the most triangles of [path] that hold one point of a grid over
+/// [m]'s bounds: 1 when no triangles overlap.
 int maxCoverage(Mesh m, [int path = 0]) {
   var most = 0;
   final b = m.bounds;
@@ -84,11 +86,14 @@ int maxCoverage(Mesh m, [int path = 0]) {
   return most;
 }
 
-/// The point that [t] maps [x], [y] to.
-(double, double) apply(Transform t, double x, double y) =>
-    (t.a * x + t.c * y + t.tx, t.b * x + t.d * y + t.ty);
+/// A point, as x and y.
+typedef Point = ({double x, double y});
 
-/// A path of [d], stroked black, with [attributes].
+/// Returns the point that [t] maps [x], [y] to.
+Point apply(Transform t, double x, double y) =>
+    (x: t.a * x + t.c * y + t.tx, y: t.b * x + t.d * y + t.ty);
+
+/// Returns a path of [d], stroked black, with [attributes].
 String stroke(String d, String attributes) =>
     '<path d="$d" fill="none" stroke="#000" $attributes/>';
 
@@ -123,7 +128,8 @@ void checkWellFormed(Mesh m) {
   }
 }
 
-/// The x, y and offset ux, uy of vertex [k] of [m], a mesh with offsets.
+/// Returns the x, y and offset ux, uy of vertex [k] of [m], a mesh with
+/// offsets.
 ///
 /// A stroke's vertex lies at the point it's built around, plus its offset
 /// times the stroke's half width.
@@ -132,20 +138,20 @@ List<double> offsetVertex(Mesh m, int k) {
   return [v[k * 5], v[k * 5 + 1], v[k * 5 + 3], v[k * 5 + 4]];
 }
 
-/// The vertices [indices] use, each once.
+/// Returns the vertices [indices] use, each once.
 Set<int> used(List<int> indices) => indices.toSet();
 
-/// The point that vertex [k] is built around, for a half width of [hw].
-(double, double) centerOf(Mesh m, int k, double hw) {
+/// Returns the point that vertex [k] is built around, for a half width of [hw].
+Point centerOf(Mesh m, int k, double hw) {
   final [x, y, ux, uy] = offsetVertex(m, k);
-  return (x - ux * hw, y - uy * hw);
+  return (x: x - ux * hw, y: y - uy * hw);
 }
 
-/// Whether [p] is within 1e-3 of one of [points].
-bool near((double, double) p, List<(double, double)> points) =>
-    points.any((q) => (p.$1 - q.$1).abs() < 1e-3 && (p.$2 - q.$2).abs() < 1e-3);
+/// Returns whether [p] is within 1e-3 of one of [points].
+bool near(Point p, List<Point> points) =>
+    points.any((q) => (p.x - q.x).abs() < 1e-3 && (p.y - q.y).abs() < 1e-3);
 
-/// The sum of the areas of [indices]' triangles.
+/// Returns the sum of the areas of [indices]' triangles.
 double areaOf(Mesh m, List<int> indices) {
   final v = m.vertices, f = m.vertexFloats;
   var sum = 0.0;
@@ -159,22 +165,24 @@ double areaOf(Mesh m, List<int> indices) {
   return sum / 2;
 }
 
-/// The vertices of path [p] of [m], a mesh with a glow, as x, y and glow.
-Set<(double, double, double)> glowVertices(Mesh m, int p) {
+/// Returns the vertices of path [p] of [m], a mesh with a glow, as x, y and
+/// glow.
+Set<({double x, double y, double glow})> glowVertices(Mesh m, int p) {
   final i = m.indices as List<int>, v = m.vertices, path = m.paths[p];
   return {
     for (var k = path.indexBegin; k < path.indexBegin + path.indexCount; k++)
-      (v[i[k] * 6], v[i[k] * 6 + 1], v[i[k] * 6 + 5]),
+      (x: v[i[k] * 6], y: v[i[k] * 6 + 1], glow: v[i[k] * 6 + 5]),
   };
 }
 
-/// The points of path [p] of [m] whose glow is 0: the ribbon's outer edge.
-List<(double, double)> ribbonEdge(Mesh m, int p) => [
-  for (final (x, y, glow) in glowVertices(m, p))
-    if (glow == 0) (x, y),
+/// Returns the points of path [p] of [m] whose glow is 0: the ribbon's outer
+/// edge.
+List<Point> ribbonEdge(Mesh m, int p) => [
+  for (final (:x, :y, :glow) in glowVertices(m, p))
+    if (glow == 0) (x: x, y: y),
 ];
 
-/// [m]'s bounds, as a list.
+/// Returns [m]'s bounds, as a list.
 List<double> boundsOf(Mesh m) => [
   m.bounds.lx,
   m.bounds.ly,
@@ -463,14 +471,22 @@ void main() {
       expect(m.vertexCount, 4);
       expect(m.stripIndices, isNull);
       for (var k = 0; k < 4; k++) {
-        expect(near(centerOf(m, k, 5), const [(10, 50), (90, 50)]), isTrue);
+        expect(
+          near(centerOf(m, k, 5), const [(x: 10, y: 50), (x: 90, y: 50)]),
+          isTrue,
+        );
         final [_, _, ux, uy] = offsetVertex(m, k);
         expect([ux.abs(), uy.abs()], [0, 1]);
       }
     });
 
     test("joins' miters and round caps' arcs, around their own points", () {
-      const corners = [(20.0, 20.0), (80.0, 20.0), (80.0, 80.0), (20.0, 80.0)];
+      const corners = [
+        (x: 20.0, y: 20.0),
+        (x: 80.0, y: 20.0),
+        (x: 80.0, y: 80.0),
+        (x: 20.0, y: 80.0),
+      ];
       final square = mesh(
         '<rect x="20" y="20" width="60" height="60" fill="none" stroke="#000" '
         'stroke-width="10"/>',
@@ -489,7 +505,7 @@ void main() {
       var hubs = 0;
       for (var k = 0; k < capped.vertexCount; k++) {
         expect(
-          near(centerOf(capped, k, 5), const [(10, 50), (90, 50)]),
+          near(centerOf(capped, k, 5), const [(x: 10, y: 50), (x: 90, y: 50)]),
           isTrue,
         );
         final [_, _, ux, uy] = offsetVertex(capped, k);
@@ -509,7 +525,7 @@ void main() {
       );
       checkWellFormed(m);
       for (var k = 0; k < m.vertexCount; k++) {
-        final (cx, cy) = centerOf(m, k, 1);
+        final (x: cx, y: cy) = centerOf(m, k, 1);
         expect(cy, closeTo(50, 1e-3));
         expect(cx / 10, closeTo((cx / 10).roundToDouble(), 1e-3));
       }
@@ -526,7 +542,12 @@ void main() {
         expect([ux, uy], [0, 0], reason: 'a union has no offsets');
       }
       expect(used(strip).intersection(used(union)), isEmpty);
-      const ends = [(0.0, 0.0), (100.0, 100.0), (0.0, 100.0), (100.0, 0.0)];
+      const ends = [
+        (x: 0.0, y: 0.0),
+        (x: 100.0, y: 100.0),
+        (x: 0.0, y: 100.0),
+        (x: 100.0, y: 0.0),
+      ];
       for (final k in used(strip)) {
         expect(near(centerOf(m, k, 5), ends), isTrue);
       }
@@ -627,9 +648,9 @@ void main() {
         );
 
     /// A path from [points], open unless [close].
-    ui.Path polyline(List<(double, double)> points, {bool close = false}) {
-      final path = ui.Path()..moveTo(points[0].$1, points[0].$2);
-      for (final (x, y) in points.skip(1)) {
+    ui.Path polyline(List<Point> points, {bool close = false}) {
+      final path = ui.Path()..moveTo(points[0].x, points[0].y);
+      for (final (:x, :y) in points.skip(1)) {
         path.lineTo(x, y);
       }
       if (close) {
@@ -648,16 +669,24 @@ void main() {
       expect(m.paths[0].color, [1, 0, 0, 1]);
       expect(m.paths[0].halfWidth, 0);
       final ribbon = glowVertices(m, 0);
-      expect(ribbon.map((v) => v.$3).toSet(), {0, 1});
-      for (final (x, y, glow) in ribbon) {
+      expect(ribbon.map((v) => v.glow).toSet(), {0, 1});
+      for (final (:x, :y, :glow) in ribbon) {
         if (glow == 1) {
           expect(
-            near((x, y), const [(20, 20), (80, 20), (80, 80), (20, 80)]),
+            near(
+              (x: x, y: y),
+              const [
+                (x: 20, y: 20),
+                (x: 80, y: 20),
+                (x: 80, y: 80),
+                (x: 20, y: 80),
+              ],
+            ),
             isTrue,
           );
         }
       }
-      expect(glowVertices(m, 1).map((v) => v.$3).toSet(), {1});
+      expect(glowVertices(m, 1).map((v) => v.glow).toSet(), {1});
       final i = m.indices as List<int>, v = m.vertices;
       for (var k = 0; k < m.paths[0].indexCount; k++) {
         expect([v[i[k] * 6 + 3], v[i[k] * 6 + 4]], [0, 0], reason: 'offsets');
@@ -670,28 +699,32 @@ void main() {
         ..lineTo(100, 100)
         ..moveTo(0, 100)
         ..lineTo(100, 0);
-      final cases = <(List<ui.Path>, List<PathDraw>, int)>[
-        ([square], const [fill], 1),
-        ([square], const [stroked], 1),
+      final cases = <({List<ui.Path> paths, List<PathDraw> draws, int halos})>[
+        (paths: [square], draws: const [fill], halos: 1),
+        (paths: [square], draws: const [stroked], halos: 1),
         (
-          [square, line],
-          const [
+          paths: [square, line],
+          draws: const [
             PathDraw(path: 1, color: blue, strokeWidth: 4),
             fill,
             PathDraw(path: 0, color: red, hairline: true),
           ],
-          2,
+          halos: 2,
         ),
-        ([x], const [PathDraw(path: 0, color: red, strokeWidth: 10)], 1),
+        (
+          paths: [x],
+          draws: const [PathDraw(path: 0, color: red, strokeWidth: 10)],
+          halos: 1,
+        ),
       ];
-      for (final (paths, draws, halos) in cases) {
+      for (final (:paths, :draws, :halos) in cases) {
         final plain = glowing(paths, draws, null);
         final lit = glowing(paths, draws, radius10);
         checkWellFormed(lit);
         // Past the halos, only a core has a glow other than 1.
         final own = [
           for (var p = halos; p < lit.paths.length; p++)
-            if (glowVertices(lit, p).every((v) => v.$3 == 1)) p,
+            if (glowVertices(lit, p).every((v) => v.glow == 1)) p,
         ];
         expect(own, hasLength(plain.paths.length));
         final f = plain.vertexFloats;
@@ -813,7 +846,7 @@ void main() {
       for (final degrees in const [0.0, 30.0, 60.0, 90.0]) {
         final a = degrees * math.pi / 180;
         expect(
-          near((80 + 10 * math.cos(a), 20 - 10 * math.sin(a)), edge),
+          near((x: 80 + 10 * math.cos(a), y: 20 - 10 * math.sin(a)), edge),
           isTrue,
         );
       }
@@ -825,9 +858,9 @@ void main() {
         return glowing(
           [
             polyline([
-              (0, 50),
-              (50, 50),
-              (50 + 50 * math.cos(a), 50 + 50 * math.sin(a)),
+              (x: 0, y: 50),
+              (x: 50, y: 50),
+              (x: 50 + 50 * math.cos(a), y: 50 + 50 * math.sin(a)),
             ]),
           ],
           const [stroked],
@@ -843,26 +876,26 @@ void main() {
 
     test('an inner corner is mitered while within half of each segment', () {
       ui.Path corner(double second) =>
-          polyline([(0, 50), (50, 50), (50, 50 + second)]);
-      List<(double, double)> edge(double second) =>
+          polyline([(x: 0, y: 50), (x: 50, y: 50), (x: 50, y: 50 + second)]);
+      List<Point> edge(double second) =>
           ribbonEdge(glowing([corner(second)], const [stroked], radius10), 0);
       // At a right angle, the inner miter 10 out lies 10 along each segment.
       for (final fits in [40.0, 20.0]) {
-        expect(near((40, 60), edge(fits)), isTrue);
-        expect(near((50, 60), edge(fits)), isFalse);
-        expect(near((40, 50), edge(fits)), isFalse);
+        expect(near((x: 40, y: 60), edge(fits)), isTrue);
+        expect(near((x: 50, y: 60), edge(fits)), isFalse);
+        expect(near((x: 40, y: 50), edge(fits)), isFalse);
       }
-      expect(near((40, 60), edge(19)), isFalse);
-      expect(near((50, 60), edge(19)), isTrue);
-      expect(near((40, 50), edge(19)), isTrue);
+      expect(near((x: 40, y: 60), edge(19)), isFalse);
+      expect(near((x: 50, y: 60), edge(19)), isTrue);
+      expect(near((x: 40, y: 50), edge(19)), isTrue);
     });
 
     test('a fill glows outward, whatever its winding', () {
       final reversed = polyline(const [
-        (20, 20),
-        (20, 80),
-        (80, 80),
-        (80, 20),
+        (x: 20, y: 20),
+        (x: 20, y: 80),
+        (x: 80, y: 80),
+        (x: 80, y: 20),
       ], close: true);
       for (final path in [square, reversed]) {
         final m = glowing([path], const [fill], radius10);
@@ -888,7 +921,12 @@ void main() {
     });
 
     test('a fill closes open contours, also those back at their start', () {
-      const points = [(20.0, 20.0), (80.0, 20.0), (80.0, 80.0), (20.0, 80.0)];
+      const points = <Point>[
+        (x: 20, y: 20),
+        (x: 80, y: 20),
+        (x: 80, y: 80),
+        (x: 20, y: 80),
+      ];
       for (final open in [
         points,
         [...points, points[0]],
@@ -903,7 +941,7 @@ void main() {
     test('a contour of no area has no outside, and one of 2 points none', () {
       for (final path in [
         line,
-        polyline(const [(10, 50), (50, 50), (90, 50)]),
+        polyline(const [(x: 10, y: 50), (x: 50, y: 50), (x: 90, y: 50)]),
       ]) {
         final m = glowing([path], const [fill], radius10);
         expect(m.paths, isEmpty);
@@ -913,7 +951,7 @@ void main() {
     test('a turn back is a half disc ahead, once', () {
       final m = glowing(
         [
-          polyline(const [(10, 50), (90, 50), (30, 50)]),
+          polyline(const [(x: 10, y: 50), (x: 90, y: 50), (x: 30, y: 50)]),
         ],
         const [stroked],
         radius10,
@@ -948,7 +986,12 @@ void main() {
       test("a fill's is that many times the shorter edge at each point", () {
         final m = glowing(
           [
-            polyline(const [(0, 0), (100, 1), (100, 3), (0, 4)], close: true),
+            polyline(const [
+              (x: 0, y: 0),
+              (x: 100, y: 1),
+              (x: 100, y: 3),
+              (x: 0, y: 4),
+            ], close: true),
           ],
           const [fill],
           three,
@@ -979,7 +1022,7 @@ void main() {
       final m = glowing([line], const [stroked], radius10);
       // The stroke's edge, a half width of 1 from the polyline, lies 9/10 of
       // the way in from the ribbon's outer edge, whose glow is 0.
-      final glows = glowVertices(m, 0).map((v) => v.$3).toSet();
+      final glows = glowVertices(m, 0).map((v) => v.glow).toSet();
       expect(glows, hasLength(2));
       expect(glows.reduce(math.max), closeTo(10 / 9, 1e-6));
       expect(glows.reduce(math.min), 0);
@@ -988,19 +1031,24 @@ void main() {
     test("a stroke's quads have no fans, even where a miter lengthens one", () {
       final m = glowing(
         [
-          polyline(const [(0, 50), (50, 50), (50, 90)]),
+          polyline(const [(x: 0, y: 50), (x: 50, y: 50), (x: 50, y: 90)]),
         ],
         const [stroked],
         radius10,
       );
       // Its vertices lie only on the polyline and on the outer edge.
-      expect(glowVertices(m, 0).map((v) => v.$3).toSet(), hasLength(2));
+      expect(glowVertices(m, 0).map((v) => v.glow).toSet(), hasLength(2));
     });
 
     test('a quad that tapers is a fan around its centre, of its mean glow', () {
       final m = glowing(
         [
-          polyline(const [(0, 0), (100, 1), (100, 3), (0, 4)], close: true),
+          polyline(const [
+            (x: 0, y: 0),
+            (x: 100, y: 1),
+            (x: 100, y: 3),
+            (x: 0, y: 4),
+          ], close: true),
         ],
         const [fill],
         const Glow(radius: 3, inWidths: true),
@@ -1008,13 +1056,13 @@ void main() {
       checkWellFormed(m);
       // The 2 long sides, whose radius tapers from 12 at the wide end to 6
       // at the narrow one.
-      final centres = glowVertices(m, 0).where((v) => v.$3 == 0.5);
+      final centres = glowVertices(m, 0).where((v) => v.glow == 0.5);
       expect(centres, hasLength(2));
       expect(
         glowVertices(
           glowing([line], const [stroked], radius10),
           0,
-        ).where((v) => v.$3 == 0.5),
+        ).where((v) => v.glow == 0.5),
         isEmpty,
         reason: "a stroke's radius doesn't change",
       );
@@ -1041,8 +1089,8 @@ void main() {
         expect(m.paths[2].paint, MeshPaint.color);
         expect(m.paths[2].halfWidth, 0);
         final core = glowVertices(m, 2);
-        expect(core.map((v) => v.$3).toSet(), {1, 2});
-        for (final (_, y, glow) in core) {
+        expect(core.map((v) => v.glow).toSet(), {1, 2});
+        for (final (x: _, :y, :glow) in core) {
           if (glow == 2) {
             expect(y, 50);
           }
@@ -1082,11 +1130,11 @@ void main() {
         );
         checkWellFormed(m);
         expect(m.paths, hasLength(2 + 2 * 2));
-        expect(glowVertices(m, 2).map((v) => v.$3).toSet(), {1});
-        expect(glowVertices(m, 3).map((v) => v.$3).toSet(), {1, 2});
+        expect(glowVertices(m, 2).map((v) => v.glow).toSet(), {1});
+        expect(glowVertices(m, 3).map((v) => v.glow).toSet(), {1, 2});
         expect(m.paths[3].color, [1, 0, 0, 1]);
-        expect(glowVertices(m, 4).map((v) => v.$3).toSet(), {1});
-        expect(glowVertices(m, 5).map((v) => v.$3).toSet(), {1, 2});
+        expect(glowVertices(m, 4).map((v) => v.glow).toSet(), {1});
+        expect(glowVertices(m, 5).map((v) => v.glow).toSet(), {1, 2});
         expect(m.paths[5].color, [0, 0, 1, 1]);
       });
 
@@ -1127,7 +1175,7 @@ void main() {
         expect(m.paths[2].color, [1, 0, 0, 1]);
         final core = glowVertices(m, 2);
         expect(core, hasLength(4 + 1));
-        for (final (x, y, glow) in core) {
+        for (final (:x, :y, :glow) in core) {
           expect((x, y), glow == 2 ? (50, 50) : isNot((50, 50)));
         }
         expect(area(m, 2), closeTo(60 * 60, 1e-2));
@@ -1135,8 +1183,18 @@ void main() {
 
       test('a thin fill peaks along its middle, whatever its winding', () {
         for (final points in const [
-          [(0.0, 0.0), (100.0, 0.0), (100.0, 4.0), (0.0, 4.0)],
-          [(0.0, 0.0), (0.0, 4.0), (100.0, 4.0), (100.0, 0.0)],
+          [
+            (x: 0.0, y: 0.0),
+            (x: 100.0, y: 0.0),
+            (x: 100.0, y: 4.0),
+            (x: 0.0, y: 4.0),
+          ],
+          [
+            (x: 0.0, y: 0.0),
+            (x: 0.0, y: 4.0),
+            (x: 100.0, y: 4.0),
+            (x: 100.0, y: 0.0),
+          ],
         ]) {
           final m = glowing(
             [polyline(points, close: true)],
@@ -1144,12 +1202,12 @@ void main() {
             widths,
           );
           final peaks = [
-            for (final (x, y, glow) in glowVertices(m, 2))
-              if (glow == 2) (x, y),
+            for (final (:x, :y, :glow) in glowVertices(m, 2))
+              if (glow == 2) (x: x, y: y),
           ];
           expect(peaks, hasLength(2));
-          expect(near((2, 2), peaks), isTrue);
-          expect(near((98, 2), peaks), isTrue);
+          expect(near((x: 2, y: 2), peaks), isTrue);
+          expect(near((x: 98, y: 2), peaks), isTrue);
         }
       });
 
@@ -1157,9 +1215,9 @@ void main() {
         final m = glowing([square], const [fill, stroked], widths);
         checkWellFormed(m);
         expect(m.paths, hasLength(4), reason: 'halo, fill, stroke, its core');
-        expect(glowVertices(m, 1).map((v) => v.$3).toSet(), {1});
-        expect(glowVertices(m, 2).map((v) => v.$3).toSet(), {1});
-        expect(glowVertices(m, 3).map((v) => v.$3).toSet(), {1, 2});
+        expect(glowVertices(m, 1).map((v) => v.glow).toSet(), {1});
+        expect(glowVertices(m, 2).map((v) => v.glow).toSet(), {1});
+        expect(glowVertices(m, 3).map((v) => v.glow).toSet(), {1, 2});
       });
 
       test('nested contours have none, unlike ones side by side', () {
@@ -1178,12 +1236,12 @@ void main() {
 
       test('contours that are nested only by their bounds have one', () {
         final path = polyline(const [
-          (0, 0),
-          (100, 0),
-          (100, 10),
-          (10, 10),
-          (10, 100),
-          (0, 100),
+          (x: 0, y: 0),
+          (x: 100, y: 0),
+          (x: 100, y: 10),
+          (x: 10, y: 10),
+          (x: 10, y: 100),
+          (x: 0, y: 100),
         ], close: true)..addRect(const ui.Rect.fromLTRB(50, 50, 60, 60));
         final m = glowing([path], const [fill], widths);
         expect(m.paths, hasLength(3));
@@ -1209,7 +1267,7 @@ void main() {
         (100.0, 0.0, 1.0),
         (50.0, 77.0, 0.5),
       ]) {
-        expect(apply(p.gradient, x, y).$2, closeTo(t, 1e-5));
+        expect(apply(p.gradient, x, y).y, closeTo(t, 1e-5));
       }
       expect(p.stopCount, 2);
       final s = m.stops.sublist(p.stopBegin * 5, (p.stopBegin + 2) * 5);
@@ -1224,8 +1282,8 @@ void main() {
       );
       final p = m.paths.single;
       expect(p.paint, MeshPaint.radialGradient);
-      final (x, y) = apply(p.gradient, 75, 50);
-      final (cx, cy) = apply(p.gradient, 50, 50);
+      final (:x, :y) = apply(p.gradient, 75, 50);
+      final (x: cx, y: cy) = apply(p.gradient, 50, 50);
       expect(math.sqrt(x * x + y * y), closeTo(1, 1e-5));
       expect(math.sqrt(cx * cx + cy * cy), closeTo(0, 1e-5));
     });

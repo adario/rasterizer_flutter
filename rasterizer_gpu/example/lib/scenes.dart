@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:rasterizer_gpu/rasterizer_gpu.dart' show RasterizerPaintedPath;
+
 import 'affine.dart';
 
 /// Returns a scale by [s] about the point [f], with y pointing down.
@@ -222,7 +224,7 @@ const thinStrokesSvg = '''
 /// and a stroke. There's a `Path.combine`, curves, joins and caps, and
 /// translucent overlaps. There are no bevel joins, which the GPU renderer
 /// draws as miters, nor miters past its fixed limit.
-List<(Path, Paint)> goldenPaths() {
+List<RasterizerPaintedPath> goldenPaths() {
   Paint fill(int color) => Paint()..color = Color(color);
   Paint stroke(int color, double width) => Paint()
     ..color = Color(color)
@@ -281,38 +283,41 @@ List<(Path, Paint)> goldenPaths() {
     ], true);
   return [
     (
-      Path()
+      path: Path()
         ..addOval(Rect.fromCircle(center: const Offset(130, 140), radius: 90)),
-      fill(0xff3060c0),
+      paint: fill(0xff3060c0),
     ),
-    (rrect, fill(0xfff0c040)),
-    (rrect, stroke(0xffa07010, 10)),
-    (star(const Offset(600, 145), 95), fill(0xffd02020)),
+    (path: rrect, paint: fill(0xfff0c040)),
+    (path: rrect, paint: stroke(0xffa07010, 10)),
+    (path: star(const Offset(600, 145), 95), paint: fill(0xffd02020)),
     (
-      star(const Offset(830, 145), 95)..fillType = PathFillType.evenOdd,
-      fill(0xff20a040),
+      path: star(const Offset(830, 145), 95)..fillType = PathFillType.evenOdd,
+      paint: fill(0xff20a040),
     ),
     (
-      Path()
+      path: Path()
         ..addOval(Rect.fromCircle(center: const Offset(130, 380), radius: 90))
         ..addPath(reversedCircle(const Offset(130, 380), 45), Offset.zero),
-      fill(0xff2040e0),
+      paint: fill(0xff2040e0),
     ),
-    (arc, fill(0xffe08020)),
-    (arc, stroke(0xff202020, 12)..strokeCap = StrokeCap.round),
-    (cut, fill(0xff8040c0)),
-    (wave, stroke(0xff20a0a0, 16)..strokeCap = StrokeCap.square),
-    (zigzag, stroke(0xffd02020, 18)),
-    (triangle, stroke(0xff2040e0, 14)..strokeJoin = StrokeJoin.round),
+    (path: arc, paint: fill(0xffe08020)),
+    (path: arc, paint: stroke(0xff202020, 12)..strokeCap = StrokeCap.round),
+    (path: cut, paint: fill(0xff8040c0)),
+    (path: wave, paint: stroke(0xff20a0a0, 16)..strokeCap = StrokeCap.square),
+    (path: zigzag, paint: stroke(0xffd02020, 18)),
     (
-      Path()
+      path: triangle,
+      paint: stroke(0xff2040e0, 14)..strokeJoin = StrokeJoin.round,
+    ),
+    (
+      path: Path()
         ..addOval(Rect.fromCircle(center: const Offset(600, 640), radius: 70)),
-      fill(0x80d02020),
+      paint: fill(0x80d02020),
     ),
     (
-      Path()
+      path: Path()
         ..addOval(Rect.fromCircle(center: const Offset(670, 640), radius: 70)),
-      fill(0x802040e0),
+      paint: fill(0x802040e0),
     ),
   ];
 }
@@ -321,7 +326,7 @@ List<(Path, Paint)> goldenPaths() {
 /// 0.05 units wide: a body and two wheels.
 ///
 /// The paths golden draws it on [goldenPaths]' page at 40 pixels a unit.
-List<(Path, Paint)> goldenSmallPaths() {
+List<RasterizerPaintedPath> goldenSmallPaths() {
   final body = Path()
     ..addRRect(
       RRect.fromRectAndRadius(
@@ -333,15 +338,15 @@ List<(Path, Paint)> goldenSmallPaths() {
     ..addOval(Rect.fromCircle(center: const Offset(0.7, 1.2), radius: 0.4))
     ..addOval(Rect.fromCircle(center: const Offset(2.3, 1.2), radius: 0.4));
   return [
-    (body, Paint()..color = const Color(0xff606060)),
+    (path: body, paint: Paint()..color = const Color(0xff606060)),
     (
-      body,
-      Paint()
+      path: body,
+      paint: Paint()
         ..color = const Color(0xff000000)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.05,
     ),
-    (wheels, Paint()..color = const Color(0xff202020)),
+    (path: wheels, paint: Paint()..color = const Color(0xff202020)),
   ];
 }
 
@@ -420,40 +425,50 @@ class AtlasMotion({final int svgCount = 50, required final int entries}) {
     _motion = [
       for (var i = 0; i < entries; i++)
         (
-          random.nextInt(svgCount),
-          random.nextDouble(),
-          random.nextDouble(),
-          0.4 + 1.2 * random.nextDouble(),
-          random.nextDouble() * 2 * math.pi,
-          random.nextDouble() * 2 - 1,
+          svg: random.nextInt(svgCount),
+          x: random.nextDouble(),
+          y: random.nextDouble(),
+          scale: 0.4 + 1.2 * random.nextDouble(),
+          angle: random.nextDouble() * 2 * math.pi,
+          spin: random.nextDouble() * 2 - 1,
         ),
     ];
   }
 
   /// Each entry's SVG index, starting x and y as fractions of the viewport,
   /// scale, starting angle and spin.
-  late final List<(int, double, double, double, double, double)> _motion;
+  late final List<
+    ({int svg, double x, double y, double scale, double angle, double spin})
+  >
+  _motion;
 
   /// Returns the index of entry [i]'s SVG.
-  int svg(int i) => _motion[i].$1;
+  int svg(int i) => _motion[i].svg;
 
   /// Returns entry [i]'s affine transform at time [t], in device pixels for
   /// a viewport of [px].
   ///
   /// It spins and scales the SVG's 100 x 100 view box about its centre, and
   /// moves it across the viewport.
-  (double, double, double, double, double, double) transform(
+  ({double a, double b, double c, double d, double tx, double ty}) transform(
     int i,
     double t,
     Size px,
   ) {
-    final (_, x0, y0, scale, angle, spin) = _motion[i];
+    final (svg: _, x: x0, y: y0, :scale, :angle, :spin) = _motion[i];
     final s = scale * px.shortestSide / 12,
         a = angle + spin * t,
         cs = s / 100 * math.cos(a),
         sn = s / 100 * math.sin(a);
     final x = (x0 + 0.05 * t * spin) % 1.0 * px.width,
         y = (y0 + 0.03 * t) % 1.0 * px.height;
-    return (cs, sn, -sn, cs, x - 50 * cs + 50 * sn, y - 50 * sn - 50 * cs);
+    return (
+      a: cs,
+      b: sn,
+      c: -sn,
+      d: cs,
+      tx: x - 50 * cs + 50 * sn,
+      ty: y - 50 * sn - 50 * cs,
+    );
   }
 }

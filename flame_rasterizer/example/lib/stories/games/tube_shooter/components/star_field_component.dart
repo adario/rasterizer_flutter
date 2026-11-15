@@ -36,7 +36,7 @@ class StarFieldComponent()
   static const count = 200;
   static const far = 10.0;
   static const bright = 4.0;
-  static const radii = (1.2, 5.0);
+  static const radii = (inner: 1.2, outer: 5.0);
   static const fadeTime = 0.3;
 
   /// The slowest the stars come in the first round, in tube units a second: a
@@ -113,14 +113,15 @@ class StarFieldComponent()
     stars.clear();
   }
 
-  /// How bright a star [distance] from the eye is, given the fade.
+  /// Returns how bright a star [distance] from the eye is, given the fade.
   double _brightnessAt(double distance) =>
       _fade * ((far - distance) / (far - bright)).clamp(0.0, 1.0);
 
-  /// A random place across the axis for a star, spread evenly over the area.
+  /// Returns a random place across the axis for a star, spread evenly over the
+  /// area.
   Offset _point() {
     final random = gameRef.random;
-    final (inner, outer) = radii;
+    final (:inner, :outer) = radii;
     final radius = math.sqrt(
       inner * inner + (outer * outer - inner * inner) * random.nextDouble(),
     );
@@ -154,9 +155,9 @@ class StarFieldComponent()
     return _turned - turned;
   }
 
-  /// How far a star that turns as much as the ship turns for each lane that
-  /// the ship moves round closed [tube]: against the way its lanes go round
-  /// the axis.
+  /// Returns how far a star that turns as much as the ship turns for each lane
+  /// that the ship moves round closed [tube]: against the way its lanes go
+  /// round the axis.
   static double _turnPerLaneOn(Tube tube) {
     var sweep = 0.0;
     for (var lane = 0; lane < tube.laneCount; lane++) {

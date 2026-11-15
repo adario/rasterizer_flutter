@@ -111,7 +111,7 @@ class VectorTextComponent({
     _laidOut = _text;
   }
 
-  /// A component of [glyph] at index [i].
+  /// Returns a component of [glyph] at index [i].
   Component _glyphComponent(int i, Path glyph) {
     final bounds = glyph.getBounds();
     return gameRef.pathComponent(

@@ -84,13 +84,13 @@ void main() {
 
         /// Renders [entries] as the frame's only run. Returns its pixels, as
         /// premultiplied RGBA, and the frame's entry count.
-        Future<(Uint8List, int)> render(
-          List<(RasterizerScene, double)> entries,
+        Future<({Uint8List pixels, int entryCount})> render(
+          List<({RasterizerScene scene, double opacity})> entries,
         ) async {
           final frame = renderer.beginFrame(size, size);
           final run = frame.addRun();
           const s = size / 100;
-          for (final (scene, opacity) in entries) {
+          for (final (:scene, :opacity) in entries) {
             run.add(scene, s, 0, 0, s, 0, 0, opacity: opacity);
           }
           frame.render();
@@ -101,16 +101,23 @@ void main() {
           final data = await image.toByteData();
           picture.dispose();
           image.dispose();
-          return (Uint8List.sublistView(data!), frame.entryCount);
+          return (
+            pixels: Uint8List.sublistView(data!),
+            entryCount: frame.entryCount,
+          );
         }
 
-        final (b, _) = await render([(bottom, 1)]);
-        final (t, _) = await render([(top, 1)]);
+        final (pixels: b, entryCount: _) = await render([
+          (scene: bottom, opacity: 1),
+        ]);
+        final (pixels: t, entryCount: _) = await render([
+          (scene: top, opacity: 1),
+        ]);
         for (final (ob, ot) in [(1.0, 1.0), (0.5, 0.8), (0.3, 0.3)]) {
-          final (faded, count) = await render([
-            (bottom, ob),
-            (top, ot),
-            (top, 0),
+          final (pixels: faded, entryCount: count) = await render([
+            (scene: bottom, opacity: ob),
+            (scene: top, opacity: ot),
+            (scene: top, opacity: 0),
           ]);
           expect(count, 2, reason: "an entry whose opacity is 0 isn't added");
           var maxDiff = 0, over2 = 0;

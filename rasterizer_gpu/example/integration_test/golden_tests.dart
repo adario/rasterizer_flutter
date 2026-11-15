@@ -15,11 +15,11 @@ const tigerAsset = 'assets/tiger/tiger.svg';
 /// checks of its atlas against itself.
 ///
 /// [backends] defaults to the GPU and mesh renderers where they're supported,
-/// and the canvas renderer. The canvas renderer's renders are checked against
-/// the GPU renderer's goldens, with their own tolerance, and only for the
-/// cases it draws the same ([GoldenCase.canvas]). The mesh renderer has its
-/// own goldens ([GoldenCase.mesh]), prefixed with `mesh_`. Its renders are
-/// also checked against the GPU renderer's goldens where there are some
+/// and the canvas renderer. The tests check the canvas renderer's renders
+/// against the GPU renderer's goldens, with their own tolerance, and only for
+/// the cases it draws the same ([GoldenCase.canvas]). The mesh renderer has
+/// its own goldens ([GoldenCase.mesh]), prefixed with `mesh_`. The tests also
+/// check its renders against the GPU renderer's goldens where there are some
 /// ([GoldenCase.meshAsGpu]), with the canvas renderer's tolerance.
 ///
 /// [golden] loads a golden's PNG, or returns null if there's none. [write]
@@ -196,8 +196,8 @@ void _defineTests(
 // ignore: avoid_print
 void _print(String line) => print('  $line');
 
-/// The folder where a device run writes its images, for tool/pull_goldens.py
-/// to copy.
+/// Returns the folder where a device run writes its images, for
+/// tool/pull_goldens.py to copy.
 ///
 /// It's a folder of the app's own, as on Linux the system's temporary folder
 /// is shared. Each run deletes it first.

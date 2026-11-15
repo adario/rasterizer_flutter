@@ -89,7 +89,7 @@ class MeshScene(ra.Mesh mesh) implements RasterizerScene {
 /// The mesh renderer: it renders each run into its own target.
 ///
 /// The targets come from a pool per frame in flight. So a frame's images stay
-/// valid for [slots] frames, until its targets are rendered into again.
+/// valid for [slots] frames, until it renders into its targets again.
 /// Targets have the samples per pixel asked for, 1 or 4, where offscreen MSAA
 /// is supported, else 1.
 ///
@@ -97,8 +97,8 @@ class MeshScene(ra.Mesh mesh) implements RasterizerScene {
 /// multisampled texture. They're sized as atlas pages are, one page per run
 /// ([AtlasPages]). They grow at once. They shrink at the end of a window of
 /// 120 frames that all needed below [shrinkBelow] of their area, or after a
-/// viewport change. A run's targets that no frame needed for a window are
-/// released.
+/// viewport change. It releases a run's targets that no frame needed for a
+/// window.
 class MeshRenderer(
   gpu.ShaderLibrary library,
   @override final int slots,
@@ -183,7 +183,7 @@ class MeshRenderer(
   /// At the end of a window, the targets' sizes shrink. It releases the
   /// targets of runs that no frame had for a window, and the multisampled
   /// textures of sizes that no target has any more.
-  void _endFrame(int width, int height, List<(int, int)> needs) {
+  void _endFrame(int width, int height, List<RasterizerPixelSize> needs) {
     _sizes.endFrame(width, height, needs);
     var released = _gpu.resizes != _resizes;
     _resizes = _gpu.resizes;
@@ -252,7 +252,7 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
   final List<MeshRun> _placed = [];
 
   // The sizes those runs needed, which their pages follow.
-  List<(int, int)> _needs = [];
+  List<RasterizerPixelSize> _needs = [];
 
   // The entries, in the order they were added: their scenes, transforms (9
   // values each, a b c d tx ty g h i), opacities and color transforms.
@@ -269,7 +269,7 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
 
   /// The sizes of the runs' targets.
   @override
-  final List<(int, int)> pageSizes = [];
+  final List<RasterizerPixelSize> pageSizes = [];
 
   @override
   RasterizerBackend get backend => RasterizerBackend.mesh;
@@ -474,9 +474,13 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       targets.add(MeshTarget());
     }
     final target = run._target = targets[index];
-    final (pageWidth, pageHeight) = renderer._sizes.fit(index, w, h);
+    final (width: pageWidth, height: pageHeight) = renderer._sizes.fit(
+      index,
+      w,
+      h,
+    );
     renderer._gpu.fit(target, pageWidth, pageHeight);
-    _needs.add((w, h));
+    _needs.add((width: w, height: h));
     _placed.add(run);
     run
       .._x = lx
@@ -517,7 +521,7 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     var k = 0;
     for (final run in _placed) {
       final texture = run._target!.texture!;
-      pageSizes.add((texture.width, texture.height));
+      pageSizes.add((width: texture.width, height: texture.height));
       for (final i in run._entries) {
         _write(k++, i, run._x.toDouble(), run._y.toDouble());
       }
@@ -615,7 +619,7 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     }
   }
 
-  /// Whether the instance records at [a] and [b] have the same color
+  /// Returns whether the instance records at [a] and [b] have the same color
   /// transform rows, scaled by their opacity.
   bool _sameRows(int a, int b) {
     final r = _records,
@@ -629,8 +633,8 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     return true;
   }
 
-  /// Whether entry [i] keeps its scene's alpha: its opacity is 1, and its
-  /// color transform's alpha row, if any, is 0, 0, 0, 1.
+  /// Returns whether entry [i] keeps its scene's alpha: its opacity is 1, and
+  /// its color transform's alpha row, if any, is 0, 0, 0, 1.
   bool _keepsAlpha(int i) {
     final c = _colorTransforms[i]?.values;
     return _opacities[i] == 1 &&

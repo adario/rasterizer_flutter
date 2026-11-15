@@ -36,7 +36,7 @@ final _overlapping = _bytes(
   '<rect width="5" height="10" fill="#ff0000"/></svg>',
 );
 
-/// What [draw] draws into a picture, as RGBA.
+/// Returns what [draw] draws into a picture, as RGBA.
 Future<Uint8List> _picture(void Function(Canvas) draw) async {
   final recorder = PictureRecorder();
   draw(Canvas(recorder));

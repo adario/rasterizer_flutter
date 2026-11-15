@@ -30,13 +30,13 @@ import 'scenes.dart';
 /// renders instead. The core is Rasterizer's C++ library, which the GPU
 /// renderer draws with.
 ///
-/// The canvas renderer is checked against the same goldens, with the looser
-/// tolerance of [GoldenDiff.passesCanvas], as it antialiases differently.
-/// The mesh renderer, whose edges are multisampled, has its own goldens,
-/// `mesh_<name>.png` in the same folders. Its renders are also checked
-/// against the GPU renderer's goldens with the canvas renderer's tolerance,
-/// so that a golden it records can't hide a wrong shape or colour. Strokes
-/// thinner than a pixel are the exception: see [GoldenCase.meshAsGpu].
+/// The golden tests check the canvas renderer against the same goldens, with
+/// the looser tolerance of [GoldenDiff.passesCanvas], as it antialiases
+/// differently. The mesh renderer, whose edges are multisampled, has its own
+/// goldens, `mesh_<name>.png` in the same folders. The tests also check its
+/// renders against the GPU renderer's goldens with the canvas renderer's
+/// tolerance, so that a golden it records can't hide a wrong shape or colour.
+/// Strokes thinner than a pixel are the exception: see [GoldenCase.meshAsGpu].
 const goldenWidth = 1024, goldenHeight = 768;
 
 /// The folder of this platform's golden set.
@@ -54,7 +54,8 @@ const goldenWidth = 1024, goldenHeight = 768;
 ///   CPU renderer, which tool/linux's image picks with GALLIUM_DRIVER.
 ///   linux: Linux on a GPU, which has no goldens yet either.
 /// - macos on the web too: only the canvas renderer draws there, and it
-///   never writes goldens, so its renders are checked against the macos set.
+///   never writes goldens, so the tests check its renders against the macos
+///   set.
 String get goldenSet => kIsWeb
     ? 'macos'
     : Platform.isAndroid
@@ -73,7 +74,8 @@ String get goldenSet => kIsWeb
     ? 'ios'
     : 'macos';
 
-/// Whether this Android device is an emulator, from its system properties.
+/// Returns whether this Android device is an emulator, from its system
+/// properties.
 ///
 /// On the emulator's images, `ro.boot.qemu` is 1, and `ro.hardware` is
 /// ranchu or goldfish.
@@ -127,7 +129,7 @@ class GoldenImage(
 
   /// Decodes a [png] file, as written by [toPng].
   static GoldenImage fromPng(String name, Uint8List png) {
-    final (w, h, rgba) = decodePng(png);
+    final (width: w, height: h, :rgba) = decodePng(png);
     return GoldenImage(name, w, h, rgba);
   }
 }
@@ -213,7 +215,7 @@ class GoldenDiff(GoldenImage a, GoldenImage b) {
   static const blockSize = 4;
   late final int blockCount =
       (_a.width ~/ blockSize) * (_a.height ~/ blockSize);
-  late final (int, int, int) _blocks = () {
+  late final ({int largest, int over32, int over64}) _blocks = () {
     const n = blockSize;
     final x = _a.rgba, y = _b.rgba, w = _a.width;
     var largest = 0, over32 = 0, over64 = 0;
@@ -247,18 +249,18 @@ class GoldenDiff(GoldenImage a, GoldenImage b) {
         }
       }
     }
-    return (largest, over32, over64);
+    return (largest: largest, over32: over32, over64: over64);
   }();
-  int get blockLargest => _blocks.$1;
-  int get blocksOver32 => _blocks.$2;
-  int get blocksOver64 => _blocks.$3;
+  int get blockLargest => _blocks.largest;
+  int get blocksOver32 => _blocks.over32;
+  int get blocksOver64 => _blocks.over64;
 
   @override
   String toString() =>
       '$differing of $pixels pixels differ, $over2 by over 2/255, $over8 by over 8/255, $over64 by over '
       '64/255, largest $largest/255, mean ${mean.toStringAsFixed(3)}/255';
 
-  /// As [toString], with the blocks' differences too.
+  /// Returns what [toString] does, with the blocks' differences too.
   String toCanvasString() =>
       '$this; blocks: largest $blockLargest/255, $blocksOver32 of $blockCount over 32/255, $blocksOver64 over 64/255';
 
@@ -512,8 +514,8 @@ class GoldenRenders._(
     }) => RasterizerScene.fromPaths(
       [
         (
-          ui.Path()..addPolygon(points, closed),
-          ui.Paint()
+          path: ui.Path()..addPolygon(points, closed),
+          paint: ui.Paint()
             ..color = ui.Color(color)
             ..style = ui.PaintingStyle.stroke
             ..strokeWidth = 4 / unit,
@@ -567,7 +569,7 @@ class GoldenRenders._(
         closed: false,
       ),
       RasterizerScene.fromPaths(
-        [(tube, ui.Paint()..color = const ui.Color(0xFFA78BFA))],
+        [(path: tube, paint: ui.Paint()..color = const ui.Color(0xFFA78BFA))],
         backend: RasterizerBackend.mesh,
         maxSize: tube.getBounds().longestSide,
         glow: const RasterizerGlow.widths(2),
@@ -622,7 +624,7 @@ class GoldenRenders._(
       if (alone != null && k != alone) {
         continue;
       }
-      final (a, b, c, d, tx, ty) = motion.transform(i, t, _size);
+      final (:a, :b, :c, :d, :tx, :ty) = motion.transform(i, t, _size);
       added[alone == null ? k : 0].add(svgs[motion.svg(i)], a, b, c, d, tx, ty);
       entries.add(i);
     }

@@ -47,7 +47,7 @@ const _entries = [
 
 final _renderer = CanvasRenderer(1);
 
-/// A new frame's run of [_entries], and of an entry whose opacity is 0.
+/// Returns a new frame's run of [_entries], and of an entry whose opacity is 0.
 CanvasRun _run() {
   final run = _renderer.beginFrame(_width, _height).addRun();
   for (final e in _entries) {

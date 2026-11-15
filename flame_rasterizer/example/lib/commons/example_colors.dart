@@ -19,6 +19,6 @@ abstract final class ExampleColors() {
     Color(0xFFA78BFA),
   ];
 
-  /// The color of the body at [index], cycling through [dynamics].
+  /// Returns the color of the body at [index], cycling through [dynamics].
   static Color dynamicColor(int index) => dynamics[index % dynamics.length];
 }

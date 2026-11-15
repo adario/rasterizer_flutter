@@ -15,7 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'pump_while_loading.dart';
 
-/// The Svg Renderers story with [renderer] and [svg].
+/// Returns the Svg Renderers story with [renderer] and [svg].
 Widget story(
   SvgRenderer renderer,
   String svg, {
@@ -57,7 +57,7 @@ Future<SvgRenderersExample> pumpGame(
   return game;
 }
 
-/// The game that the story shows.
+/// Returns the game that the story shows.
 SvgRenderersExample currentGame(WidgetTester tester) => tester
     .widget<GameWidget<SvgRenderersExample>>(
       find.byWidgetPredicate((w) => w is GameWidget),

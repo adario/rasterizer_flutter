@@ -13,8 +13,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'pump_while_loading.dart';
 import 'slow_bundle.dart';
 
-/// The Collidable Svgs story with [renderer] and [count] SVGs, picked with a
-/// seeded random, at [speed].
+/// Returns the Collidable Svgs story with [renderer] and [count] SVGs, picked
+/// with a seeded random, at [speed].
 ///
 /// A new count changes the same game. A new renderer makes a new game, which
 /// goes on from the old one's snapshot.

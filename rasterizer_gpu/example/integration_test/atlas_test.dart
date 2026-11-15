@@ -45,7 +45,8 @@ Future<void> main() async {
     return;
   }
 
-  const portrait = (720, 1600), landscape = (1600, 720);
+  const RasterizerPixelSize portrait = (width: 720, height: 1600),
+      landscape = (width: 1600, height: 720);
   const phase = 150,
       alternate = 60,
       window = 120,
@@ -70,22 +71,22 @@ Future<void> main() async {
   /// Renders a frame of [runs] runs of [perRun] entries each, for [viewport].
   ///
   /// With [place], each run is placed on the atlas as it ends, as games do.
-  /// Otherwise, the frame packs them all as it renders. With [trim], a trim
-  /// is asked for while the frame is built.
+  /// Otherwise, the frame packs them all as it renders. With [trim], it asks
+  /// for a trim while it builds the frame.
   RasterizerFrame frame(
     RasterizerRenderer renderer,
-    (int, int) viewport,
+    RasterizerPixelSize viewport,
     int runs, {
     required bool place,
     bool trim = false,
   }) {
-    final (w, h) = viewport;
+    final (width: w, height: h) = viewport;
     final size = ui.Size(w.toDouble(), h.toDouble());
     final frame = renderer.beginFrame(w, h);
     for (var k = 0; k < runs; k++) {
       final run = frame.addRun();
       for (var i = k * perRun; i < (k + 1) * perRun; i++) {
-        final (a, b, c, d, tx, ty) = motion.transform(i, time, size);
+        final (:a, :b, :c, :d, :tx, :ty) = motion.transform(i, time, size);
         run.add(svgs[motion.svg(i)], a, b, c, d, tx, ty);
       }
       if (place) {
@@ -139,7 +140,7 @@ Future<void> main() async {
   Future<List<String>> check(
     String at,
     RasterizerFrame subject,
-    (int, int) viewport,
+    RasterizerPixelSize viewport,
     int runs,
   ) async {
     final actual = await runImages(subject);
@@ -236,7 +237,7 @@ Future<void> main() async {
               bytes.add(renderer.atlasBytes);
               // ignore: avoid_print
               print(
-                '  phase $p, ${viewport.$1}x${viewport.$2}: pages '
+                '  phase $p, ${viewport.width}x${viewport.height}: pages '
                 '${subject.pageSizes} (last frame), '
                 '${mb(renderer.atlasBytes)}, '
                 '${renderer.atlasResizes} resizes',

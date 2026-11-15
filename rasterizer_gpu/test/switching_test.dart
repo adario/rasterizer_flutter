@@ -142,7 +142,9 @@ void main() {
         ..style = ui.PaintingStyle.stroke
         ..strokeWidth = 4;
       final scene = SwitchingScene.fromPaths(
-        ScenePaths([(line, stroke)], glow: const RasterizerGlow(6)),
+        ScenePaths([
+          (path: line, paint: stroke),
+        ], glow: const RasterizerGlow(6)),
         RasterizerBackend.mesh,
         512,
       );

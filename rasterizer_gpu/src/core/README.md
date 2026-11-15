@@ -25,8 +25,9 @@ After a change here, `python3 -I ../../tool/make_patch.py <Rasterizer checkout>`
      the device's edges to cut them off.
 3. **The viewBox**: NanoSVG keeps the SVG's viewBox in `NSVGimage::viewBox`, rather than dropping it. The core parses
    without units, so the paths stay in the viewBox's coordinates, and `RasterizerScene.viewBox` needs it.
-4. **Bounding box gradients**, in `nsvg__createGradient`: gradients whose `gradientUnits` are `objectBoundingBox`,
-   SVG's default, are laid out in the unit square, then mapped to the shape's bounds, as SVG says. Upstream's NanoSVG:
+4. **Bounding box gradients**, in `nsvg__createGradient`: NanoSVG lays out gradients whose `gradientUnits` are
+   `objectBoundingBox`, SVG's default, in the unit square, then maps them to the shape's bounds, as SVG says. Upstream's
+   NanoSVG:
    - read their plain numbers as user units, so `x2="1"` was 1 user unit rather than the shape's width, and painted
      most such shapes in their last stop's colour;
    - applied their `gradientTransform` after the bounds rather than before;
@@ -40,39 +41,39 @@ After a change here, `python3 -I ../../tool/make_patch.py <Rasterizer checkout>`
    the alpha of each of the scene's draws, as Flame's `HasPaint` opacity does a component's paths.
    - A draw's colour is premultiplied with its alpha times the opacity. A gradient's strip, already premultiplied, has
      all of its components scaled by the opacity as it's copied into the frame.
-   - Only draws whose opacity is 1 can be opaque, as opaque draws are drawn before what's beneath them.
-   - A scene whose opacity is 0 is skipped, as if its draws were invisible.
+   - Only draws whose opacity is 1 can be opaque, as the core draws opaque draws before what's beneath them.
+   - The core skips a scene whose opacity is 0, as if its draws were invisible.
 7. **Elements skipped as vector_graphics_compiler skips them**, in `nanosvg.h`, so that both renderers draw the same
    shapes. NanoSVG drew the shapes of clips, masks and the elements it doesn't know, in SVG's default black.
-   - Comments and CDATA sections are skipped: a `>` in them ended a tag early, and the elements after it were parsed.
-   - `clipPath`, `mask`, `pattern` and `symbol` are definitions, as `defs` is: their shapes are skipped, and their
-     gradients parsed. Definitions nest, and a `g` in one doesn't pop its parent's attributes at its end.
-   - Elements that vector_graphics_compiler doesn't handle are skipped with their content, gradients included:
+   - NanoSVG skips comments and CDATA sections: a `>` in them ended a tag early, and the elements after it were parsed.
+   - `clipPath`, `mask`, `pattern` and `symbol` are definitions, as `defs` is: NanoSVG skips their shapes, and parses
+     their gradients. Definitions nest, and a `g` in one doesn't pop its parent's attributes at its end.
+   - NanoSVG skips the elements that vector_graphics_compiler doesn't handle, with their content, gradients included:
      `clippath` (SVG is case-sensitive), `marker`, `switch`, `style`, and any other name.
    - `a` is a group, whose attributes its content inherits.
    - A self-closing tag's name ends at its `/`, as in `<defs/>`, which was otherwise a start without an end.
 8. **Entry colour transform**: `Ra::SceneList::colorMatrices` holds either nothing or one `Ra::ColorMatrix` per scene:
    a 4 × 4 matrix on premultiplied RGBA. It transforms each of the scene's draws' colours, as a colour filter that keeps
    alpha, such as Flame's `tint`, would transform its composited pixels.
-   - A draw's colour is transformed after its premultiplication and opacity. A gradient's strip is transformed texel by
-     texel as it's copied into the frame. Each transformed colour is clamped from 0 to its alpha.
-   - Only draws whose matrix keeps alpha can be opaque. A scene whose matrix clears alpha is skipped, as one whose
-     opacity is 0 is.
-9. **P16s once per scene** (geometry cache, part 1): a scene's P16s, the geometry of its small fills, are written to
-   the frame once, at its first entry's base, and its other entries share them. `Ra::Buffer::p16bases` keeps that base
-   for each entry. Upstream wrote them for each entry, so a list that drew one scene many times copied and uploaded them
-   each time. In the frame of a ring of 101 tigers, those copies of the tiger's 55 KB were a quarter to a third of the
-   frame.
+   - The core transforms a draw's colour after its premultiplication and opacity, and a gradient's strip texel by texel
+     as it copies it into the frame. It clamps each transformed colour from 0 to its alpha.
+   - Only draws whose matrix keeps alpha can be opaque. The core skips a scene whose matrix clears alpha, as it does
+     one whose opacity is 0.
+9. **P16s once per scene** (geometry cache, part 1): the core writes a scene's P16s, the geometry of its small fills, to
+   the frame once, at the scene's first entry's base, and its other entries share them. `Ra::Buffer::p16bases` keeps
+   that base for each entry. Upstream wrote them for each entry, so a list that drew one scene many times copied and
+   uploaded them each time. In the frame of a ring of 101 tigers, those copies of the tiger's 55 KB were a quarter to a
+   third of the frame.
 10. **Cached stroke outlines** (geometry cache, part 2): `Ra::Scene::outlines(k)` caches its strokes' `Outliner` pieces,
     in scene space at scale 2^k, built once. `Context::writeCachedOutlines` transforms them into the frame's outline
     instances, rather than outlining each stroke every frame.
     - `Ra::Buffer::prepare`, now given the frame's scale, picks each entry's set: the power of 2 at or above its scale.
       Only cubics' piece counts depend on the scale, rising with its cube root. So they're drawn at least as precisely,
       with up to about 7.5% more pieces.
-    - Only entries drawn with a similarity transform use them, as the `Outliner` splits curves by angle, which skews
-      and unequal scales don't keep. Only unclipped strokes use them, as the `Outliner` splits clipped ones at the clip,
-      which whole pieces don't draw as precisely at high zooms. Strokes of one-line subpaths are written directly, as
-      upstream writes them.
+    - Only entries drawn with a similarity transform use them, as the `Outliner` splits curves by angle, which skews and
+      unequal scales don't keep. Only unclipped strokes use them, as the `Outliner` splits clipped ones at the clip,
+      which whole pieces don't draw as precisely at high zooms. The core writes strokes of one-line subpaths directly,
+      as upstream does.
     - A scene's `prepare()` clears them, as does an `update()` that makes a fill a stroke or changes a stroke's
       transform.
     - On a ring of tigers at zooms 0.5 and 1, the core's CPU time, summed over its threads, fell by a quarter to a

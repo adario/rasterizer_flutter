@@ -14,7 +14,7 @@ The repository has two packages:
     so that each frame only sends their transforms;
   - the canvas renderer draws with `dart:ui` wherever Flutter GPU can't, web included.
 - **[flame_rasterizer](flame_rasterizer)** adds Flame components drawn by rasterizer_gpu, with the mesh renderer by
-  default. Each contiguous run of vector components is drawn as one image, sharp at any camera zoom.
+  default. rasterizer_gpu draws each contiguous run of vector components as one image, sharp at any camera zoom.
 
 Each package has an example app:
 
@@ -147,9 +147,9 @@ From the root, `melos analyze` and `melos format-check` check the workspace's fi
   by Yann Collet: BSD 2-clause. Both as copied into Rasterizer's core.
 - [libtess2](https://github.com/memononen/libtess2), Mikko Mononen's version of SGI's GLU tessellator, for the mesh
   renderer: SGI Free Software License B, version 2.0.
-- [Flame](https://github.com/flame-engine/flame), by Blue Fire: MIT. Its contour sampler is copied, for paths. The
-  canvas renderer's `SvgPaths` is based on a class this repository's author wrote for flame_svg, which Flame didn't
-  merge.
+- [Flame](https://github.com/flame-engine/flame), by Blue Fire: MIT. rasterizer_gpu copies its contour sampler, for
+  paths. The canvas renderer's `SvgPaths` is based on a class this repository's author wrote for flame_svg, which Flame
+  didn't merge.
 - Three of the SVGs in flame_rasterizer's example and rasterizer_gpu's tests, from [SVG Repo](https://www.svgrepo.com):
   CC0 1.0.
 - The Ghostscript tiger, rasterizer_gpu's example's test SVG: AGPL-3.0-or-later, separately licensed test data, not part

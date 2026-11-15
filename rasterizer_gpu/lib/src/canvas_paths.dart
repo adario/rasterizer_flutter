@@ -1,11 +1,11 @@
 import 'dart:ui' as ui;
 
-/// [paint]'s miter limit.
+/// Returns [paint]'s miter limit.
 ///
 /// dart:ui's setter stores the limit less its default, 4, and its getter
 /// returns what's stored (Flutter 3.47). So a new paint's limit reads 0, and
-/// copying the getter's value to another paint takes 4 off its limit. The
-/// offset is measured once, on a paint whose limit is known, in case Flutter
+/// copying the getter's value to another paint takes 4 off its limit. It
+/// measures the offset once, on a paint whose limit it sets, in case Flutter
 /// fixes this.
 double miterLimitOf(ui.Paint paint) =>
     paint.strokeMiterLimit + _miterLimitOffset;

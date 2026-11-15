@@ -41,7 +41,7 @@ Uint8List encodePng(int width, int height, Uint8List rgba) {
 
 /// Decodes an 8-bit RGBA, non-interlaced PNG, as [encodePng] writes. Returns
 /// its width, its height and its raw bytes.
-(int, int, Uint8List) decodePng(Uint8List png) {
+({int width, int height, Uint8List rgba}) decodePng(Uint8List png) {
   final data = ByteData.sublistView(png);
   var offset = 8, width = 0, height = 0;
   final idat = BytesBuilder(copy: false);
@@ -82,7 +82,7 @@ Uint8List encodePng(int width, int height, Uint8List rgba) {
       };
     }
   }
-  return (width, height, rgba);
+  return (width: width, height: height, rgba: rgba);
 }
 
 /// PNG's Paeth predictor: of the pixels to the left ([a]), above ([b]) and
@@ -99,7 +99,7 @@ int _paeth(int a, int b, int c) {
       : c;
 }
 
-/// [v]'s 4 bytes, big-endian, as PNG stores integers.
+/// Returns [v]'s 4 bytes, big-endian, as PNG stores integers.
 List<int> _u32(int v) => [
   v >> 24 & 0xFF,
   v >> 16 & 0xFF,
@@ -115,7 +115,7 @@ final _crcTable = List<int>.generate(256, (n) {
   return c;
 });
 
-/// The CRC-32 of [bytes], which ends each PNG chunk.
+/// Returns the CRC-32 of [bytes], which ends each PNG chunk.
 int _crc(List<int> bytes) {
   var c = 0xFFFFFFFF;
   for (final b in bytes) {

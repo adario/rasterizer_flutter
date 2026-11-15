@@ -16,6 +16,15 @@ part 'revolute_joint_svgs_snapshot.dart';
 /// The values of the example's knobs, except Zoom, Speed and the cache knobs.
 typedef RevoluteJointSvgsSettings = ({SvgRenderer renderer, bool pieces});
 
+/// An SVG's size, and its convex pieces at that size.
+typedef _SizedPieces = ({Vector2 size, List<List<Vector2>> pieces});
+
+/// A body to drop: its bounding radius, and a function that creates it.
+typedef _NewBody = ({
+  double radius,
+  BodyComponent Function(Vector2 position, Vector2 velocity) create,
+});
+
 /// Flame's Forge2D revolute joint example, as flame_path_shapes extends it,
 /// with SVGs: see [description].
 ///
@@ -99,7 +108,8 @@ abstract class RevoluteJointSvgsExample({
   /// The larger side of the smallest SVGs, in meters.
   ///
   /// The SVGs come in [_sides] sizes, from 3 to 3.5 meters by tenths, as in
-  /// flame_path_shapes. So each SVG's pieces are worked out once per size.
+  /// flame_path_shapes. So [_sizeAndPieces] works out each SVG's pieces once
+  /// per size.
   static const _minSide = 3.0;
 
   /// How many sizes the SVGs come in.
@@ -142,7 +152,7 @@ abstract class RevoluteJointSvgsExample({
   final _svgs = <String, ExampleSvg>{};
 
   /// Each SVG's size and convex pieces, by its name and its size's index.
-  final _pieces = <(String, int), (Vector2, List<List<Vector2>>)>{};
+  final _pieces = <({String name, int side}), _SizedPieces>{};
 
   /// The index of the next body's color: the bodies take the colors in turn.
   int _tint = 0;
@@ -204,18 +214,18 @@ abstract class RevoluteJointSvgsExample({
     // Half balls and half SVGs, alternating, each with its bounding radius
     // and a function that creates it.
     final ballsFirst = random.nextBool();
-    final bodies = <(double, BodyComponent Function(Vector2, Vector2))>[
+    final bodies = <_NewBody>[
       for (var i = 0; i < dropped; i++)
         if (i.isEven == ballsFirst) _randomBall() else _randomSvg(),
     ];
     final positions = spreadAround(
       tap,
-      [for (final (radius, _) in bodies) radius],
+      [for (final (:radius, create: _) in bodies) radius],
       bounds: _arena.deflate(Wall.width),
       world: world.physicsWorld,
       random: random,
     );
-    for (final (i, (_, create)) in bodies.indexed) {
+    for (final (i, (radius: _, :create)) in bodies.indexed) {
       final position = positions[i];
       final body = create(
         position,
@@ -233,14 +243,14 @@ abstract class RevoluteJointSvgsExample({
 
   /// Picks a ball of random radius, in the next color. Returns its radius,
   /// and a function that creates it with a position and a velocity.
-  (double, BodyComponent Function(Vector2, Vector2)) _randomBall() {
+  _NewBody _randomBall() {
     final radius =
         _minBallRadius +
         random.nextDouble() * (_maxBallRadius - _minBallRadius);
     final color = ExampleColors.dynamicColor(_tint++);
     return (
-      radius,
-      (position, velocity) =>
+      radius: radius,
+      create: (position, velocity) =>
           Ball(position, velocity, radius: radius, color: color),
     );
   }
@@ -248,15 +258,15 @@ abstract class RevoluteJointSvgsExample({
   /// Picks a random SVG, at a random size and angle, in the next color.
   /// Returns its bounding radius, and a function that creates its body with a
   /// position and a velocity.
-  (double, BodyComponent Function(Vector2, Vector2)) _randomSvg() {
+  _NewBody _randomSvg() {
     final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
     final side = random.nextInt(_sides);
-    final (size, _) = _sizeAndPieces(name, side);
+    final (:size, pieces: _) = _sizeAndPieces(name, side);
     final color = ExampleColors.dynamicColor(_tint++);
     final angle = random.nextDouble() * 2 * math.pi;
     return (
-      size.length / 2,
-      (position, velocity) =>
+      radius: size.length / 2,
+      create: (position, velocity) =>
           _svgBody(name, side, position, velocity, angle: angle, color: color),
     );
   }
@@ -273,7 +283,7 @@ abstract class RevoluteJointSvgsExample({
     required Color color,
     BodySnapshot? from,
   }) {
-    final (size, pieces) = _sizeAndPieces(name, side);
+    final (:size, :pieces) = _sizeAndPieces(name, side);
     return SvgBody(
       _svgs[name]!,
       size,
@@ -288,15 +298,17 @@ abstract class RevoluteJointSvgsExample({
     );
   }
 
-  /// The size and convex pieces of the SVG [name] at its [side]th size,
+  /// Returns the size and convex pieces of the SVG [name] at its [side]th size,
   /// worked out once.
-  (Vector2, List<List<Vector2>>) _sizeAndPieces(String name, int side) =>
-      _pieces[(name, side)] ??= () {
-        final svg = _svgs[name]!;
-        final s = (_minSide + side / 10) / math.max(svg.size.x, svg.size.y);
-        final size = svg.size * s;
-        return (size, convexPiecesOf(svg.outline, size));
-      }();
+  _SizedPieces _sizeAndPieces(
+    String name,
+    int side,
+  ) => _pieces[(name: name, side: side)] ??= () {
+    final svg = _svgs[name]!;
+    final s = (_minSide + side / 10) / math.max(svg.size.x, svg.size.y);
+    final size = svg.size * s;
+    return (size: size, pieces: convexPiecesOf(svg.outline, size));
+  }();
 
   /// Moves the walls to the game's new edges, and removes the bodies they
   /// leave outside, which would fall forever.

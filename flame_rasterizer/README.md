@@ -5,9 +5,9 @@ Flame components that draw SVGs and paths with
 
 A game with `HasRasterizer` draws its SVGs and paths with rasterizer_gpu's mesh renderer by default. The mesh renderer
 imports each SVG or path once, into triangles that stay on the GPU. Each frame then only sends the components'
-transforms, so its CPU work doesn't depend on the SVGs' paths. Each contiguous run of vector components is drawn as one
-image, at its place in the paint order. That image is rendered at the device's resolution, under the camera's
-transform, so vectors stay sharp at any zoom.
+transforms, so its CPU work doesn't depend on the SVGs' paths. The renderer draws each contiguous run of vector
+components as one image, at its place in the paint order. It renders that image at the device's resolution, under the
+camera's transform, so vectors stay sharp at any zoom.
 
 Two apps show the package, each with its own README:
 
@@ -89,7 +89,7 @@ class MyGame extends FlameGame with HasRasterizer {
   - `rasterizerCurves`, true by default, has the atlas renderer draw curves as quadratics rather than line segments.
 - **`SvgHitbox(svg.outline, size: size)`** is a Flame `PathHitbox` in the shape of the SVG's paths, for collisions that
   follow them rather than the SVG's rectangle. Add it to the `RasterizerSvgComponent`. The hitbox stretches to the
-  component's size, as the SVG is drawn, also when that size changes.
+  component's size, as the SVG does, also when that size changes.
   - `svg.outline`, rasterizer_gpu's `SvgOutline`, holds the SVG's paths. The first time it's read, it parses them in
     Dart, whatever the renderer.
   - Filled paths collide over their area. Stroked-only paths collide along their middle, and their open contours not at
@@ -120,15 +120,15 @@ class MyGame extends FlameGame with HasRasterizer {
   paint layer, such as `RasterizerPathComponent(path: star, paintLayers: [fill, outline], scale: Vector2.all(2))`. The
   first time it's drawn, it imports its path, with its paint layers, for the game's renderer. Its polygons and
   `containsPoint` are `PathComponent`'s.
-  - Its `maxSize` is the largest size, in device pixels, at which its path's longer side is drawn, as for
+  - Its `maxSize` is the largest size, in device pixels, at which the game draws its path's longer side, as for
     `RasterizerSvg.load`: the path's longer side times its scale, the camera's largest zoom and the device pixel ratio.
   - Its path must not change: the GPU renderers flatten it once (see rasterizer_gpu's README, Paths).
   - Components made with the same `Path` object share an import while they draw it for the same renderer, with the
     same `maxSize`, glow and paint layers. Without paint layers, their paints must also match in the fields that draw
     as a layer's. So make a shape's components from one path, size them with `scale`, and they cost one import.
   - Its paint layers are the content, as an SVG's paths are. Changing one imports the path again, without flattening
-    it again. A layer's own color filter, if `RasterizerColorTransform` made it, is drawn into the layer's color.
-  - Its `paint` is drawn over the layers, as a `RasterizerSvgComponent`'s is over its SVG. `OpacityEffect`,
+    it again. It applies a layer's own color filter, if `RasterizerColorTransform` made it, to the layer's color.
+  - It draws its `paint` over the layers, as a `RasterizerSvgComponent` does over its SVG. `OpacityEffect`,
     `ColorEffect`, `HueEffect` and `tint` fade and filter each layer in the run, with no new import, so faded and
     tinted components share runs and imports. The paint's other fields apply to an image, which starts a run.
   - Without paint layers, its paint does both jobs. Its color's RGB, style, strokes, antialiasing and shader are the
@@ -142,16 +142,16 @@ class MyGame extends FlameGame with HasRasterizer {
   - While the GPU renderers can't draw a layer (rasterizer_gpu's `RasterizerScene.canDraw`), such as one with another
     color filter, a shader, or a hairline stroke, the component draws its layers with `Canvas.drawPath`, as Flame's
     does, with its `paint` over them. That ends the run.
-- **Runs** split only where something else is drawn between vector components, such as a sprite, text, or a path
+- **Runs** split only where the game draws something else between vector components, such as a sprite, text, or a path
   component drawn with `Canvas.drawPath`. A clip or a layer (`saveLayer`) between them splits them too, and so do paints
   that differ by more than opacity, tint and hue. Transforms don't split runs. So give vector components a priority
   above the canvas-drawn components they don't overlap, such as SVG bodies above a `Forge2DGame`'s balls and walls. They
   then draw in one run, rather than in one each where the tree's order puts other bodies between them (see the
   example's Revolute Joint Svgs).
 - **With the mesh renderer,** each run costs a render pass, and a target the size of its components' bounds on screen.
-  Consecutive components that show the same SVG make one instanced draw. A target that no frame needed for 120 frames
-  is released. A target whose run needed less than 3/4 of it for 120 frames shrinks to what the run needed, and so
-  does any target after a viewport change.
+  Consecutive components that show the same SVG make one instanced draw. The renderer releases a target that no frame
+  needed for 120 frames. A target whose run needed less than 3/4 of it for 120 frames shrinks to what the run needed,
+  and so does any target after a viewport change.
 - **With the atlas renderer,** each run costs a rectangle of the atlas, the size of its components' bounds on screen.
   The whole frame costs one render per atlas page, usually one. Atlas pages grow at once to what a frame needs. They
   shrink after 120 frames that all needed less than half of them, or after a rotation or a window resize.
@@ -164,10 +164,10 @@ While the game draws its tree, `HasRasterizer` wraps the game's canvas in a `Ras
 nothing into it. Instead, each adds an entry to the current run, with the canvas's transform at that point. That
 transform already includes Flame's component, parent and camera transforms, perspective included.
 
-Anything else drawn ends the run first. The run is then placed, in its own target with the mesh renderer, or in the
-atlas with the atlas renderer (rasterizer_gpu's `RasterizerRun.place`). Its image is drawn into the real canvas, before
-the other draw. Clips, layers, and the restores that undo them end runs too, as a run's image is drawn under the canvas
-state at its end.
+Anything else drawn ends the run first. The `RasterizerCanvas` then places the run, in its own target with the mesh
+renderer, or in the atlas with the atlas renderer (rasterizer_gpu's `RasterizerRun.place`), and draws its image into the
+real canvas, before the other draw. Clips, layers, and the restores that undo them end runs too, as the
+`RasterizerCanvas` draws a run's image under the canvas state at the run's end.
 
 After the tree, the mixin renders the frame once, before Flutter rasterizes the picture that draws the runs' images.
 With the canvas renderer, each run draws its entries into the real canvas when it ends, and there's nothing to render.

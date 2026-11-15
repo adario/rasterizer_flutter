@@ -10,7 +10,8 @@ import 'svg_paths.dart';
 // Based on the file of the same name that this package's author wrote for
 // flame_svg, along with SvgPaths. Flame didn't merge it.
 
-/// [color] as a dart:ui color, with [opacity] multiplied into its alpha.
+/// Returns [color] as a dart:ui color, with [opacity] multiplied into its
+/// alpha.
 ui.Color _color(Color color, double opacity) {
   final c = ui.Color(color.value);
   return opacity == 1 ? c : c.withValues(alpha: c.a * opacity);
@@ -81,7 +82,8 @@ extension TileModeConverter on TileMode {
 
 /// Converts vector_graphics_compiler's gradients to dart:ui's.
 extension GradientConverter on Gradient {
-  /// This gradient as a dart:ui one, with [opacity] multiplied into its colors.
+  /// Returns this gradient as a dart:ui one, with [opacity] multiplied into its
+  /// colors.
   ///
   /// Returns null if it has no colors, as SVG then paints nothing with it, or
   /// if it's neither linear nor radial. Its bounds must already be applied, as
@@ -130,15 +132,15 @@ extension GradientConverter on Gradient {
 
 /// Converts vector_graphics_compiler's paints to dart:ui's.
 extension PaintConverter on Paint {
-  /// This paint's fill and stroke as dart:ui paints, with [opacity] multiplied
-  /// into their colors.
+  /// Returns this paint's fill and stroke as dart:ui paints, with [opacity]
+  /// multiplied into their colors.
   VectorPaint toVectorPaint([double opacity = 1]) => VectorPaint(
     fill: toFilledUiPaint(opacity),
     stroke: toStrokedUiPaint(opacity),
   );
 
-  /// This paint's stroke as a dart:ui paint, with [opacity] multiplied into
-  /// its color.
+  /// Returns this paint's stroke as a dart:ui paint, with [opacity] multiplied
+  /// into its color.
   ///
   /// Returns null if the stroke paints nothing: if there's none, if its width
   /// is 0, or if its gradient has no colors. A stroke with no width, or a
@@ -177,8 +179,8 @@ extension PaintConverter on Paint {
     return p;
   }
 
-  /// This paint's fill as a dart:ui paint, with [opacity] multiplied into its
-  /// color.
+  /// Returns this paint's fill as a dart:ui paint, with [opacity] multiplied
+  /// into its color.
   ///
   /// Returns null if the fill paints nothing: if there's none, or if its
   /// gradient has no colors.
@@ -201,7 +203,7 @@ extension PaintConverter on Paint {
 
 /// Converts vector_graphics_compiler's paths to dart:ui's.
 extension PathConverter on Path {
-  /// This path as a dart:ui path.
+  /// Returns this path as a dart:ui path.
   ui.Path toUiPath() {
     final p = ui.Path()
       ..fillType = fillType == PathFillType.evenOdd

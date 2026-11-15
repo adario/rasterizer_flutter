@@ -72,8 +72,8 @@ class FallbackWatch(
     }
   }
 
-  /// Whether [component] is under a hidden ancestor, so that it doesn't draw
-  /// at all.
+  /// Returns whether [component] is under a hidden ancestor, so that it doesn't
+  /// draw at all.
   static bool _isHidden(Component component) => component.ancestors().any(
     (ancestor) => ancestor is HasVisibility && !ancestor.isVisible,
   );

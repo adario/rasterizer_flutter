@@ -14,7 +14,7 @@ Future<void> settleRenderer(WidgetTester tester, SvgRenderer renderer) async {
   }
 }
 
-/// The start of the status of a game with [renderer].
+/// Returns the start of the status of a game with [renderer].
 ///
 /// With flame_rasterizer's GPU renderers, it names the renderer asked for,
 /// with its graphics API, wherever that's supported, so that a fallback to

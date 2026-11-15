@@ -20,8 +20,8 @@ class Tube(
   final List<Offset> points, {
   final bool isOpen = false,
 }) {
-  /// A closed regular polygon of [sides] sides, with [lanes] lanes a side and
-  /// its first corner at angle [first].
+  /// Creates a closed regular polygon of [sides] sides, with [lanes] lanes a
+  /// side and its first corner at angle [first].
   factory Tube.polygon(String name, int sides, int lanes, double first) {
     final turn = 2 * math.pi / sides;
     return Tube(
@@ -32,9 +32,9 @@ class Tube(
     );
   }
 
-  /// A closed star of [tips] tips, with [lanes] lanes an edge. Its inner
-  /// corners are [ratio] as far from the axis as its tips, the first inner
-  /// one at angle [first].
+  /// Creates a closed star of [tips] tips, with [lanes] lanes an edge. Its
+  /// inner corners are [ratio] as far from the axis as its tips, the first
+  /// inner one at angle [first].
   factory Tube.star(
     String name,
     int tips,
@@ -52,15 +52,16 @@ class Tube(
     );
   }
 
-  /// An open arc of [lanes] lanes, 1 from the axis, from angle [start] through
-  /// [sweep].
+  /// Creates an open arc of [lanes] lanes, 1 from the axis, from angle [start]
+  /// through [sweep].
   factory Tube.arc(String name, double start, double sweep, int lanes) =>
       Tube(name, [
         for (var i = 0; i <= lanes; i++)
           Offset.fromDirection(start - sweep * i / lanes),
       ], isOpen: true);
 
-  /// An open outline through [corners], with [lanes] lanes between each two.
+  /// Creates an open outline through [corners], with [lanes] lanes between each
+  /// two.
   factory Tube.polyline(String name, List<Offset> corners, int lanes) =>
       Tube(name, [
         for (var k = 0; k + 1 < corners.length; k++)
@@ -96,8 +97,8 @@ class Tube(
     return headings;
   }();
 
-  /// The angle of a shape [along] [lane], from 0 at its first point to 1 at
-  /// its second, unwound as [headings].
+  /// Returns the angle of a shape [along] [lane], from 0 at its first point to
+  /// 1 at its second, unwound as [headings].
   ///
   /// Within a quarter lane of a corner, it turns between the angles of the
   /// two lanes there, halfway at the corner.
@@ -133,21 +134,22 @@ class Tube(
             .center
       : Offset.zero;
 
-  /// The point that ends [lane].
+  /// Returns the point that ends [lane].
   int pointAfter(int lane) => isOpen ? lane + 1 : (lane + 1) % laneCount;
 
-  /// The lane on [side], 1 or -1, of [lane], or null past an open tube's end.
+  /// Returns the lane on [side], 1 or -1, of [lane], or null past an open
+  /// tube's end.
   int? neighbour(int lane, int side) => _within(lane + side, laneCount);
 
-  /// The point on [side], 1 or -1, of [point], or null past an open tube's
-  /// end.
+  /// Returns the point on [side], 1 or -1, of [point], or null past an open
+  /// tube's end.
   int? pointBeside(int point, int side) => _within(point + side, points.length);
 
-  /// The point that lane [from] and its neighbour [to] share.
+  /// Returns the point that lane [from] and its neighbour [to] share.
   int cornerOf(int from, int to) => to == pointAfter(from) ? to : from;
 
-  /// The angle a shape in lane [from] turns by, about the corner it shares
-  /// with lane [to], to flip onto [to] through the inside of the tube.
+  /// Returns the angle a shape in lane [from] turns by, about the corner it
+  /// shares with lane [to], to flip onto [to] through the inside of the tube.
   ///
   /// The angle is half a turn along a side, less round a convex corner, and
   /// more round a concave one. The shape lands half a turn off [to]'s angle.
@@ -166,8 +168,8 @@ class Tube(
         : angle - 2 * math.pi;
   }
 
-  /// [index] wrapped round a closed tube's [count], or null outside an open
-  /// tube's.
+  /// Returns [index] wrapped round a closed tube's [count], or null outside an
+  /// open tube's.
   int? _within(int index, int count) {
     if (!isOpen) {
       return index % count;
@@ -188,11 +190,11 @@ class Tube(
     return lane;
   }
 
-  /// [angle] within half a turn of 0, the short way round.
+  /// Returns [angle] within half a turn of 0, the short way round.
   static double _shortTurn(double angle) =>
       angle - 2 * math.pi * (angle / (2 * math.pi)).roundToDouble();
 
-  /// [offset] turned by [angle], clockwise on screen.
+  /// Returns [offset] turned by [angle], clockwise on screen.
   static Offset rotate(Offset offset, double angle) {
     final cos = math.cos(angle);
     final sin = math.sin(angle);
@@ -202,14 +204,14 @@ class Tube(
     );
   }
 
-  /// [from], and the points after it that split the way to [to] into [lanes]
-  /// lanes.
+  /// Returns [from], and the points after it that split the way to [to] into
+  /// [lanes] lanes.
   static List<Offset> _split(Offset from, Offset to, int lanes) => [
     for (var i = 0; i < lanes; i++) Offset.lerp(from, to, i / lanes)!,
   ];
 
-  /// The points of a closed outline through [corners], with [lanes] lanes an
-  /// edge, scaled to reach 1 from the axis, across or down.
+  /// Returns the points of a closed outline through [corners], with [lanes]
+  /// lanes an edge, scaled to reach 1 from the axis, across or down.
   static List<Offset> _closed(List<Offset> corners, int lanes) {
     final points = [
       for (var k = 0; k < corners.length; k++)
@@ -275,8 +277,8 @@ class TubeView() {
   /// play, in device pixels.
   static const rimPixels = 4.0;
 
-  /// The closest to the eye that lines are drawn, in tube units; the view
-  /// clips anything closer.
+  /// The closest to the eye that the view draws lines, in tube units; it clips
+  /// anything closer.
   static const near = 0.2 * Tube.eye;
 
   /// The tube it projects.
@@ -329,23 +331,23 @@ class TubeView() {
   /// the view's paths again.
   void invalidate() => _version++;
 
-  /// How far from the eye [depth] is, in tube units.
+  /// Returns how far from the eye [depth] is, in tube units.
   double distanceOf(double depth) => Tube.eye + depth - _eyeShift;
 
-  /// The world units that a tube unit at [depth] takes.
+  /// Returns the world units that a tube unit at [depth] takes.
   double scaleAt(double depth) => scaleOf(distanceOf(depth));
 
-  /// The world units that a tube unit [distance] from the eye takes.
+  /// Returns the world units that a tube unit [distance] from the eye takes.
   double scaleOf(double distance) => _rimScale * Tube.eye / distance;
 
-  /// Where an outline [point] at [depth] lands in the world.
+  /// Returns where an outline [point] at [depth] lands in the world.
   Offset project(Offset point, double depth) => point * scaleAt(depth);
 
-  /// The width of a line at [depth]: [rimPixels] device pixels at the rim in
-  /// play, and never under one device pixel.
+  /// Returns the width of a line at [depth]: [rimPixels] device pixels at the
+  /// rim in play, and never under one device pixel.
   double lineWidthAt(double depth) => lineWidthOf(distanceOf(depth));
 
-  /// The width of a line [distance] from the eye, as for [lineWidthAt].
+  /// Returns the width of a line [distance] from the eye, as for [lineWidthAt].
   double lineWidthOf(double distance) =>
       math.max(_devicePixel, rimPixels * _devicePixel * Tube.eye / distance);
 
@@ -355,7 +357,8 @@ class TubeView() {
   double get shapeStroke =>
       rimPixels * _devicePixel / (tube.laneWidth * _rimScale);
 
-  /// The tube's lines, as filled quads: its spokes, its rim and its far end.
+  /// Returns the tube's lines, as filled quads: its spokes, its rim and its far
+  /// end.
   Path tubePath() {
     final path = Path();
     for (final point in tube.points) {
@@ -370,7 +373,7 @@ class TubeView() {
     return path;
   }
 
-  /// The 4 lines round [lane], as quads like [tubePath]'s.
+  /// Returns the 4 lines round [lane], as quads like [tubePath]'s.
   Path lanePath(int lane) {
     final point = tube.points[lane];
     final next = tube.points[tube.pointAfter(lane)];
@@ -382,8 +385,8 @@ class TubeView() {
     return path;
   }
 
-  /// The spikes of [lengths], each reaching from the far end toward the rim,
-  /// as lines like [tubePath]'s.
+  /// Returns the spikes of [lengths], each reaching from the far end toward the
+  /// rim, as lines like [tubePath]'s.
   Path spikesPath(List<double> lengths) {
     final path = Path();
     for (var i = 0; i < tube.laneCount; i++) {
@@ -403,9 +406,12 @@ class TubeView() {
   ///
   /// Each bolt zigzags, with a segment every [boltStep] at most, and corners
   /// at random places across the middle third of its lane.
-  Path boltsPath(Iterable<(int, double)> bolts, math.Random random) {
+  Path boltsPath(
+    Iterable<({int lane, double depth})> bolts,
+    math.Random random,
+  ) {
     final path = Path();
-    for (final (lane, depth) in bolts) {
+    for (final (:lane, :depth) in bolts) {
       final middle = tube.middles[lane];
       final across =
           (tube.points[tube.pointAfter(lane)] - tube.points[lane]) / 6;
@@ -424,8 +430,8 @@ class TubeView() {
     return path;
   }
 
-  /// How far the lines are moved right and down: a sixteenth of a device
-  /// pixel.
+  /// How far [_addLine] moves the lines right and down: a sixteenth of a
+  /// device pixel.
   ///
   /// With 4x MSAA, an edge's coverage changes a quarter of a pixel at a time,
   /// as it crosses rows of samples a quarter of a pixel apart. A tapering line
@@ -438,8 +444,8 @@ class TubeView() {
   /// as a quad.
   ///
   /// Each end is [lineWidthAt] its depth wide, and extends by half that
-  /// width, so that lines meeting at a corner close it. The line is clipped
-  /// closer than [near], and moved by [_lineOffset].
+  /// width, so that lines meeting at a corner close it. It clips the line
+  /// closer than [near], and moves it by [_lineOffset].
   void _addLine(
     Path path,
     Offset from,

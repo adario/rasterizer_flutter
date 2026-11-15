@@ -11,7 +11,7 @@ typedef MovingSnapshot = ({
 /// What a game for another renderer goes on from: the shapes picked, and
 /// where the snowman and the shapes are and how they move.
 typedef MultipleShapesSnapshot = ({
-  List<(int, double)> picks,
+  List<ShapePick> picks,
   MovingSnapshot snowman,
   List<MovingSnapshot> shapes,
 });

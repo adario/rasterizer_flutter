@@ -11,8 +11,8 @@ typedef LaneSnapshot = ({int lane, double depth, double previousDepth});
 /// Something in a [lane] of the tube, at a [depth], drawn as [shape] in
 /// [color].
 ///
-/// It moves by its transform alone (see [place]), so its path is never
-/// imported again.
+/// It moves by its transform alone (see [place]), so it never imports its
+/// path again.
 abstract class LaneComponent(
   final Path shape,
   final Color color, {

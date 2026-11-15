@@ -6,6 +6,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/l
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/seeder_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/splitter_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/zapper_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
@@ -105,12 +106,13 @@ abstract class EnemyComponent(
   /// Whether a shot in its lane can destroy it.
   bool get canBeShot => true;
 
-  /// Whether it destroys the ship now, with the ship in [shipLane] on the rim.
+  /// Returns whether it destroys the ship now, with the ship in [shipLane] on
+  /// the rim.
   bool destroysShip(int shipLane) => false;
 
-  /// A random time within [range].
-  double between((double, double) range) =>
-      range.$1 + (range.$2 - range.$1) * gameRef.random.nextDouble();
+  /// Returns a random time within [range].
+  double between(Range range) =>
+      range.least + (range.most - range.least) * gameRef.random.nextDouble();
 
   /// The lane it counts as in, for hits: halfway through a flip, it's the
   /// lane it flips to.

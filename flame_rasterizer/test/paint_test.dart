@@ -32,7 +32,9 @@ late RasterizerRenderer _renderer;
 /// Draws [draw] into a [RasterizerCanvas] over a new frame.
 ///
 /// Returns how many runs it made, and the frame's pixels, as RGBA.
-Future<(int, Uint8List)> _frame(void Function(RasterizerCanvas) draw) async {
+Future<({int runCount, Uint8List pixels})> _frame(
+  void Function(RasterizerCanvas) draw,
+) async {
   final recorder = PictureRecorder();
   final frame = _renderer.beginFrame(_size, _size);
   final canvas = RasterizerCanvas()..begin(Canvas(recorder), frame, 1);
@@ -42,10 +44,10 @@ Future<(int, Uint8List)> _frame(void Function(RasterizerCanvas) draw) async {
   final image = await recorder.endRecording().toImage(_size, _size);
   final data = await image.toByteData();
   image.dispose();
-  return (canvas.runCount, data!.buffer.asUint8List());
+  return (runCount: canvas.runCount, pixels: data!.buffer.asUint8List());
 }
 
-/// The pixel at [x], [y] of [pixels], as RGBA.
+/// Returns the pixel at [x], [y] of [pixels], as RGBA.
 List<int> _pixel(Uint8List pixels, int x, int y) {
   final i = 4 * (y * _size + x);
   return pixels.sublist(i, i + 4);
@@ -74,7 +76,9 @@ void main() {
   });
 
   group('RasterizerSvgComponent', () {
-    Future<(FlameGame, RasterizerSvgComponent)> mounted([Paint? paint]) async {
+    Future<({FlameGame game, RasterizerSvgComponent component})> mounted([
+      Paint? paint,
+    ]) async {
       final component = RasterizerSvgComponent(
         svg: _svg,
         size: Vector2.all(_size.toDouble()),
@@ -89,21 +93,21 @@ void main() {
       game.update(0);
       game.world.add(component);
       await game.ready();
-      return (game, component);
+      return (game: game, component: component);
     }
 
     Future<List<int>> centre(RasterizerSvgComponent component) async {
-      final (_, pixels) = await _frame(component.renderTree);
+      final (runCount: _, :pixels) = await _frame(component.renderTree);
       return _pixel(pixels, 20, 20);
     }
 
     test('draws with its paint', () async {
-      final (_, component) = await mounted(_faded(0.25));
+      final (game: _, :component) = await mounted(_faded(0.25));
       expect((await centre(component))[3], closeTo(64, 1));
     });
 
     test('an OpacityEffect fades it', () async {
-      final (game, component) = await mounted();
+      final (:game, :component) = await mounted();
       expect((await centre(component))[3], 255);
       component.add(OpacityEffect.to(0.5, EffectController(duration: 1)));
       await game.ready();
@@ -113,7 +117,7 @@ void main() {
     });
 
     test('a ColorEffect tints it', () async {
-      final (game, component) = await mounted();
+      final (:game, :component) = await mounted();
       component.add(
         ColorEffect(
           const Color(0xff0000ff),
@@ -126,7 +130,7 @@ void main() {
     });
 
     test('components tinted and hued by effects share a run', () async {
-      final (game, a) = await mounted();
+      final (:game, component: a) = await mounted();
       final b = RasterizerSvgComponent(svg: _svg, size: Vector2.all(10));
       final c = RasterizerSvgComponent(svg: _svg, size: Vector2.all(10));
       game.world.addAll([b, c]);
@@ -149,7 +153,7 @@ void main() {
       await game.ready();
       game.update(0.5);
       expect(c.paint.colorFilter, isNotNull);
-      final (runs, _) = await _frame((canvas) {
+      final (runCount: runs, pixels: _) = await _frame((canvas) {
         for (final component in [a, b, c]) {
           component.renderTree(canvas);
         }
@@ -158,7 +162,7 @@ void main() {
     });
 
     test('a HueEffect shifts its hue', () async {
-      final (game, component) = await mounted();
+      final (:game, :component) = await mounted();
       component.add(HueEffect.to(2.0943951, EffectController(duration: 1)));
       await game.ready();
       game.update(1);

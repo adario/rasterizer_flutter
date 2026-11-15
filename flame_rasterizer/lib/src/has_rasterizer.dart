@@ -29,10 +29,10 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// draw with the canvas renderer until the GPU renderer's self-test passes,
 /// then with the GPU renderer ([RasterizerGpuBackend.initialize]).
 ///
-/// A game larger than the renderer takes ([RasterizerRenderer.maxViewportSize]
-/// a side), such as a window over 4096 device pixels wide on OpenGL ES, has
-/// its vectors rendered at a lower resolution, to fit. Their images are then
-/// scaled up, a little softer.
+/// For a game larger than the renderer takes
+/// ([RasterizerRenderer.maxViewportSize] a side), such as a window over 4096
+/// device pixels wide on OpenGL ES, the renderer draws the vectors at a lower
+/// resolution, to fit, and their images scale up, a little softer.
 ///
 /// It works on a [FlameGame] with any world [W], such as a `Forge2DGame`.
 /// Dart infers [W] from the game's class, so `with HasRasterizer` is enough.
@@ -61,10 +61,10 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
 
   /// The mesh renderer's samples per pixel, 4 or 1.
   ///
-  /// It's [RasterizerRenderer.create]'s `meshSamples`. With 4, edges are
-  /// antialiased where offscreen MSAA is supported. With 1, they're aliased,
-  /// which costs the GPU less. The game reads it once, when it creates the
-  /// renderer.
+  /// It's [RasterizerRenderer.create]'s `meshSamples`. With 4, the renderer
+  /// antialiases edges where offscreen MSAA is supported. With 1, edges are
+  /// aliased, which costs the GPU less. The game reads it once, when it
+  /// creates the renderer.
   int get rasterizerMeshSamples => 4;
 
   /// Whether the atlas renderer draws curves as quadratics, else as line

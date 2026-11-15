@@ -64,13 +64,13 @@ on Metal, but its antialiasing differs from the app's in about 2% of pixels.
   - It flattens each SVG's curves for the largest size a case draws it at, its `maxSize`: the tiger's for the sweep's
     20× zoom. It fits the tiger by the GPU scene's bounds, the core's, which are looser than its triangles', so both
     renderers draw the same frames.
-  - Its renders are checked against its own goldens with the GPU renderer's tolerance. They're also checked against
-    the GPU goldens with the canvas renderer's tolerance, so that a golden it records can't hide a wrong shape or
+  - It checks its renders against its own goldens with the GPU renderer's tolerance, and against the GPU goldens with
+    the canvas renderer's tolerance, so that a golden it records can't hide a wrong shape or
     colour. When its goldens were first recorded, at most 32 of 49,152 blocks differed from the GPU goldens by over
     32/255, and 17 by over 64/255.
   - The exceptions are frames that show the tiger's outlines, about 0.14 of a pixel wide at its fit. The mesh renderer
     widens them to its least width, while the GPU renderer draws them as faint lines, so the two differ by more than
-    the tolerance. The tiger's fitted frame, its sweep's frames 90 and 150, and the grid's frames but 59 are checked
+    the tolerance. It checks the tiger's fitted frame, its sweep's frames 90 and 150, and the grid's frames but 59
     against the mesh goldens only.
   - It writes its failures as `mesh_<name>.png`, and the diffs of those against the GPU goldens as
     `mesh_<name>_vs_gpu_diff.png`.
@@ -136,7 +136,7 @@ On OpenGL ES (`IMPELLER_BACKEND=opengles` on the emulator), the tests check:
   switch, and render as a plain GPU renderer does;
 - the same of the mesh renderer's own self-test, in its own file;
 - that the self-test waits while the app is in the background, and that the first-frame wait lasts as long as the
-  first frame is deferred, past their timeouts.
+  app defers its first frame, past their timeouts.
 
 Elsewhere, they check the self-test itself, and that nothing switches. `self_test_test` and `switch_test` also check
 what the self-test remembers across launches (`RasterizerGpu.rememberSelfTest`), and `self_test_test` its probation

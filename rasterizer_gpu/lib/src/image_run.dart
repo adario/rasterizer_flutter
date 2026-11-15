@@ -78,7 +78,8 @@ abstract class ImageRun() extends RasterizerRun {
     }
   }
 
-  /// The union of its parts' destinations, in units of [scale] device pixels.
+  /// Returns the union of its parts' destinations, in units of [scale] device
+  /// pixels.
   ui.Rect _bounds(double scale) {
     var r = parts.first.destination;
     for (final part in parts.skip(1)) {
@@ -87,7 +88,7 @@ abstract class ImageRun() extends RasterizerRun {
     return _scaled(r, scale);
   }
 
-  /// [r], from device pixels to units of [scale] device pixels.
+  /// Returns [r], from device pixels to units of [scale] device pixels.
   static ui.Rect _scaled(ui.Rect r, double scale) => scale == 1
       ? r
       : ui.Rect.fromLTRB(

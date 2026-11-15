@@ -23,8 +23,8 @@ abstract final class TubeFont() {
   /// The strokes' width, an eighth of the cap height.
   static const stroke = capHeight / 8;
 
-  /// The glyph of [char], or null for a space. A lowercase letter gets its
-  /// capital's glyph.
+  /// Returns the glyph of [char], or null for a space. A lowercase letter gets
+  /// its capital's glyph.
   ///
   /// Throws an [ArgumentError] for a character without a glyph.
   static Path? glyph(String char) {
@@ -39,7 +39,7 @@ abstract final class TubeFont() {
     return glyph;
   }
 
-  /// The width of [text], from its first glyph's left edge to its last
+  /// Returns the width of [text], from its first glyph's left edge to its last
   /// glyph's right edge, not counting the strokes' ends.
   static double widthOf(String text) =>
       text.isEmpty ? 0 : text.length * advance - (advance - width);

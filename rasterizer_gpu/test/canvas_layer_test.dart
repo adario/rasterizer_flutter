@@ -39,7 +39,7 @@ const _entries = [
 
 final _renderer = CanvasRenderer(1);
 
-/// A new frame's run of [_entries].
+/// Returns a new frame's run of [_entries].
 CanvasRun _run() {
   final run = _renderer.beginFrame(_width, _height).addRun();
   for (final e in _entries) {

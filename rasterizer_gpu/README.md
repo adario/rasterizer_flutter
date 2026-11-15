@@ -121,10 +121,10 @@ foreground.draw(canvas, scale: devicePixelRatio);
 ```
 
 - **Entries:** an entry's transform maps its SVG's coordinates, y down, to the viewport's device pixels. Entries in one
-  run overlap in the order they were added. Runs are drawn separately.
+  run overlap in the order the app added them. Runs are drawn separately.
 - **Opacity:** `add` and `addMatrix` take an `opacity`, 1 by default. It scales the alpha of each of the entry's paths,
   gradients included, so the SVG's overlapping paths show through each other. Entries with different opacities share a
-  run. An entry whose opacity is 0 isn't added.
+  run. `add` and `addMatrix` skip an entry whose opacity is 0.
 - **Color transforms:** `add` and `addMatrix` also take a `colorTransform`, a color filter applied to each of the
   entry's paths. It gives the same pixels as a layer with that filter around the entry, but entries with different
   ones share a run.
@@ -146,21 +146,21 @@ foreground.draw(canvas, scale: devicePixelRatio);
   layer in two cases: for an image or mask filter (which is unbounded), and for a blend mode that changes what's under
   transparent pixels, such as `srcIn`, across several parts. A color filter that colors
   transparent pixels, such as a `srcOver` mode, colors each part's rectangle rather than the run's bounds.
-- **Slots:** a frame's images are valid until `slots` frames later, when their textures are rendered into again.
-- **Parts:** a run is drawn from its parts (`run.parts`). Entries whose bounds, grown by a 2 px margin, overlap in a
-  chain share a part, made of their bounds within the viewport. Entries apart are in separate parts. So a run of
-  entries scattered over the screen takes only their area of the atlas, and a run that covers the screen takes a
-  screen's. Parts are packed on shelves about as wide as their area is square. Pages are up to 8192 px a side, or 4096
-  on OpenGL ES. Parts that don't fit spill onto further pages, each another render.
-- **Page sizes:** pages grow at once to a frame's needs. Every 120 frames, each page shrinks to the largest those frames
-  needed, if that's below half its area. If the viewport changed size in those frames, as with a rotation or a window
-  resize, it shrinks to that whatever it is. So a page shrinks at most once in 120 frames, and pages that no frame
-  needed for 120 frames are released. Steady scenes and games rarely reallocate them, and a turned phone or a resized
-  window gives back what the larger size took. With 3 `slots`, each page holds about 21 bytes a pixel, or 20 on OpenGL
-  ES. `renderer.atlasBytes` gives the estimate, from the textures' formats. `renderer.trimAtlas()` shrinks pages to the
-  last frame's needs and releases the rest at once. Call it when the app knows its frames got lighter, such as at a
-  level change.
-- **Disposing:** don't dispose of a scene between `add` and `render`, nor before a canvas run that draws it is drawn.
+- **Slots:** a frame's images are valid until `slots` frames later, when the renderer renders into their textures again.
+- **Parts:** the GPU renderer draws a run from its parts (`run.parts`). Entries whose bounds, grown by a 2 px margin,
+  overlap in a chain share a part, made of their bounds within the viewport. Entries apart are in separate parts. So a
+  run of entries scattered over the screen takes only their area of the atlas, and a run that covers the screen takes a
+  screen's. The renderer packs parts on shelves about as wide as their area is square. Pages are up to 8192 px a side,
+  or 4096 on OpenGL ES. Parts that don't fit spill onto further pages, each another render.
+- **Page sizes:** pages grow at once to a frame's needs. Every 120 frames, each page shrinks to the largest those
+  frames needed, if that's below half its area. If the viewport changed size in those frames, as with a rotation or a
+  window resize, it shrinks to that whatever it is. So a page shrinks at most once in 120 frames, and the renderer
+  releases pages that no frame needed for 120 frames. Steady scenes and games rarely reallocate them, and a turned phone
+  or a resized window gives back what the larger size took. With 3 `slots`, each page holds about 21 bytes a pixel, or
+  20 on OpenGL ES. `renderer.atlasBytes` gives the estimate, from the textures' formats. `renderer.trimAtlas()` shrinks
+  pages to the last frame's needs and releases the rest at once. Call it when the app knows its frames got lighter, such
+  as at a level change.
+- **Disposing:** don't dispose of a scene between `add` and `render`, nor before drawing a canvas run that draws it.
 - **Backends:** a scene is parsed for one backend, and only that backend's renderers can draw it. `fromSvg` and
   `create` both default to `RasterizerGpu.backend`. Both take a `backend`, or a `gpu` whose choice they default to
   instead. With `gpu: RasterizerBackend.mesh`, that's the mesh renderer where it's supported, else the canvas renderer.
@@ -175,12 +175,12 @@ foreground.draw(canvas, scale: devicePixelRatio);
   neither a viewBox nor a size.
 - **Drawing a scene directly:** `scene.drawPaths(canvas)` draws a canvas scene's paths into any canvas, such as a
   picture's, under any transform, with no frame or renderer. It throws for scenes of the other backends.
-- **Outlines:** `SvgOutline.fromSvg(bytes)` gives an SVG's paths as one `dart:ui` `Path`, for hitboxes. It's parsed in
-  Dart whatever the backend, in the SVG's coordinates. Filled paths have their contours closed, and stroked-only ones
-  stay as they are. Its `rect` is the rectangle it's drawn from, as a scene's is.
+- **Outlines:** `SvgOutline.fromSvg(bytes)` gives an SVG's paths as one `dart:ui` `Path`, for hitboxes. `fromSvg`
+  parses the SVG in Dart whatever the backend, and gives the path in the SVG's coordinates. Filled paths have their
+  contours closed, and stroked-only ones stay as they are. Its `rect` is the rectangle it's drawn from, as a scene's is.
 
 To draw runs while painting, before the frame has rendered, as when each run must be drawn as it ends, place each run as
-it ends, then render the frame before the painting is rasterized:
+it ends, then render the frame before Flutter rasterizes the painting:
 
 ```dart
 final frame = renderer.beginFrame(widthPx, heightPx);
@@ -196,9 +196,9 @@ same pages. A part that doesn't fit on a page goes to the next one, which is ano
 frame sized is at least the viewport's size, until the next 120 frames shrink it.
 
 `RasterizerCanvas` does this for a whole painting. It wraps a canvas for one frame: scenes drawn one after another with
-`drawScene` make up a run, and everything else is drawn straight into the wrapped canvas. A run ends when anything else
-is drawn, when the clip changes, or when a scene is drawn with another paint. Transforms don't end runs, as each entry
-has its own. flame_rasterizer's `HasRasterizer` draws a game through it.
+`drawScene` make up a run, and it draws everything else straight into the wrapped canvas. A run ends when
+`RasterizerCanvas` draws anything else, when the clip changes, or when it draws a scene with another paint. Transforms
+don't end runs, as each entry has its own. flame_rasterizer's `HasRasterizer` draws a game through it.
 
 ```dart
 final frame = renderer.beginFrame(widthPx, heightPx);
@@ -217,8 +217,8 @@ It's drawn as an SVG's scene is, with the same entries and runs:
 
 ```dart
 final star = RasterizerScene.fromPaths([
-  (path, Paint()..color = const Color(0xffffc107)),
-  (path, Paint()..color = const Color(0xffff6f00)..style = PaintingStyle.stroke..strokeWidth = 4),
+  (path: path, paint: Paint()..color = const Color(0xffffc107)),
+  (path: path, paint: Paint()..color = const Color(0xffff6f00)..style = PaintingStyle.stroke..strokeWidth = 4),
 ], maxSize: 128 * devicePixelRatio);
 ```
 
@@ -242,7 +242,7 @@ final star = RasterizerScene.fromPaths([
   stroke of positive width, in an sRGB color, with `BlendMode.srcOver` and antialiasing. The paint can't have a shader,
   a color, mask or image filter, or `invertColors`. A hairline, of width 0, is a device pixel wide under any transform,
   so it can't be imported once. `fromPaths` throws for a paint the GPU renderers can't draw, whatever the backend, so
-  that a scene draws the same with each. Draw those with a `Canvas`. The paints' fields are copied.
+  that a scene draws the same with each. Draw those with a `Canvas`. `fromPaths` copies the paints' fields.
 - **Strokes** are drawn as an SVG's are: the GPU renderer's have its fixed miter limit, and it draws bevel joins as
   miters. Contours of no length are left out, as `computeMetrics` leaves them out, so a dot drawn as a line of no
   length with round caps isn't drawn.
@@ -274,17 +274,17 @@ pixel by pixel. If it passes, they all switch to the GPU renderer, each renderer
   the GPU renderer instead, with no switch but nothing drawn until the self-test is done, await
   `RasterizerGpu.initialize()` after `runApp`, before making scenes and renderers.
 - **Pacing:** the self-test first waits for the app's first rasterized frame, as Flutter GPU only creates its shaders
-  and pipelines on OpenGL ES once a frame has been drawn. It then compiles the GPU renderer's 8 pipelines, one per
+  and pipelines on OpenGL ES once Flutter has drawn a frame. It then compiles the GPU renderer's 8 pipelines, one per
   frame. Flutter GPU blocks the UI thread while one compiles, for 50–100 ms each on the Android emulator, so the app
   stutters a little meanwhile rather than freezing for half a second. Before the switch, scenes are parsed for the GPU
   renderer a few per frame, and keep their SVG's bytes until then.
 - **Splash screens and the background:** the self-test waits for as long as the app defers its first frame, with
-  `RendererBinding.deferFirstFrame`, as flutter_native_splash's `preserve()` does, or with asynchronous
-  `Localizations`. It takes no step while the app isn't resumed, or, on desktop, inactive: a window without the focus,
-  which is still drawn. It times out only after 10 s without a rasterized frame, or 20 s without a passing render,
-  counting only time in the foreground with frames allowed. The canvas renderer then keeps drawing. Taking steps in the
-  background would hang the app for good, as Flutter GPU's blocking calls wait on GL work that's only done while frames
-  are drawn.
+  `RendererBinding.deferFirstFrame`, as flutter_native_splash's `preserve()` does, or with asynchronous `Localizations`.
+  It takes no step while the app isn't resumed, or, on desktop, inactive: a window without the focus, which Flutter
+  still draws. It times out only after 10 s without a rasterized frame, or 20 s without a passing render, counting only
+  time in the foreground with frames allowed. The canvas renderer then keeps drawing. Taking steps in the background
+  would hang the app for good, as Flutter GPU's blocking calls wait on GL work that Flutter only does while it draws
+  frames.
 - **Formats:** the GPU renderer accumulates coverage in r32Float, else in r16g16b16a16Float. If neither passes, the
   canvas renderer keeps drawing. `RasterizerGpu.supportDetail` says which passed, or why neither did.
   `RasterizerGpu.openGles` tells whether Impeller renders with OpenGL ES at all.
@@ -292,8 +292,8 @@ pixel by pixel. If it passes, they all switch to the GPU renderer, each renderer
   only run on the Android Emulator's OpenGL ES, on the Mac's GPU and on its software renderer, and on Mesa's llvmpipe
   on Linux. Hence the opt-in. In a release build on the emulator, the switch comes 1–3.5 s after launch, much of it
   spent waiting for the app's first frame. In the Linux container, it comes after 0.5–1.3 s.
-- **Remembered failures:** with `RasterizerGpu.rememberSelfTest`, on by default, a failure is remembered. Later
-  launches skip the self-test and draw with the canvas renderer from the start, as without `allowOpenGles`.
+- **Remembered failures:** with `RasterizerGpu.rememberSelfTest`, on by default, rasterizer_gpu remembers a failure.
+  Later launches skip the self-test and draw with the canvas renderer from the start, as without `allowOpenGles`.
   - A failure is either a failure of the self-test's checks, or the app crashing or hanging twice in a row during the
     self-test or its probation. The probation lasts from the switch until the GPU renderers have rendered
     `RasterizerGpu.probationFrames` frames: 1800 by default, about 30 s of drawing, or 0 to end it at the switch. It's
@@ -303,7 +303,7 @@ pixel by pixel. If it passes, they all switch to the GPU renderer, each renderer
     `supportDetail` then says where the launches stopped, such as "after the switch to the GPU renderer, within its
     first 1800 frames, 2 launches in a row (after 10 frames, then after 100 frames)". Debug builds don't count
     launches, as stopping the app from an IDE kills it in the foreground.
-  - Timeouts aren't remembered, and neither are passes: a passing device runs the self-test and its probation at each
+  - rasterizer_gpu remembers neither timeouts nor passes: a passing device runs the self-test and its probation at each
     launch. `RasterizerGpu.onProbation` tells whether it's on probation.
   - The failure is kept in a small file in the app's code cache, which Android clears when the app or the platform is
     upgraded, so they try again. On Linux, it's in the user's cache, `$XDG_CACHE_HOME` or else `~/.cache`, in a folder
@@ -321,36 +321,38 @@ pixel by pixel. If it passes, they all switch to the GPU renderer, each renderer
 
 ## The mesh renderer
 
-`RasterizerBackend.mesh` is for games, whose SVGs keep their geometry once loaded, and are drawn under new transforms:
+`RasterizerBackend.mesh` is for games, whose SVGs keep their geometry once loaded, and which draw them under new
+transforms:
 
 ```dart
 final renderer = await RasterizerRenderer.create(gpu: RasterizerBackend.mesh);
 final coin = RasterizerScene.fromSvg(bytes, gpu: RasterizerBackend.mesh, maxSize: 256 * devicePixelRatio);
 ```
 
-- **Import, once per SVG** (`src/ra_mesh.hpp`): NanoSVG parses the SVG, skipping what the GPU renderer skips. Its
-  curves are flattened once, to within 1/4 of a device pixel at `maxSize`. libtess2 triangulates its fills with their
-  winding rule. Strokes are outlined as strips of triangles, with SVG's joins, caps, miter limits and dashes. A stroke
-  whose strip overlaps itself, at a sharp turn or a crossing, is merged by libtess2 instead, so that it covers each
-  pixel once. The triangles, and a texture of the paths' paints, are uploaded at the scene's first draw, and stay on
-  the GPU until the scene is disposed of. A scene of paths is imported the same way, from its paths' polylines (see
-  [Paths](#paths)).
+- **Import, once per SVG** (`src/ra_mesh.hpp`): NanoSVG parses the SVG, skipping what the GPU renderer skips. The import
+  flattens the SVG's curves once, to within 1/4 of a device pixel at `maxSize`. libtess2 triangulates the fills with
+  their winding rule. The import outlines strokes as strips of triangles, with SVG's joins, caps, miter limits and
+  dashes. Where a stroke's strip overlaps itself, at a sharp turn or a crossing, libtess2 merges it instead, so that it
+  covers each pixel once. The renderer uploads the triangles, and a texture of the paths' paints, at the scene's first
+  draw, and they stay on the GPU until the app disposes of the scene. `fromPaths` imports a scene of paths the same way,
+  from its paths' polylines (see [Paths](#paths)).
 - **`maxSize`** is the most that the SVG's longer side is drawn at, in device pixels. Pass the largest size it's drawn
-  at, such as its component's size times the camera's largest zoom and the device pixel ratio. Its triangles are made
-  for that size, and drawn at every size, with no level of detail. Drawn larger, curves show their segments. Drawn much
-  smaller, each pixel pays for many triangles: on the Mac, 100 tigers at the example's zoom 0.25 cost the GPU 11.6 ms
-  a frame, against 15.0 at zoom 1, with 16 times fewer pixels.
+  at, such as its component's size times the camera's largest zoom and the device pixel ratio. The import makes its
+  triangles for that size, and the renderer draws them at every size, with no level of detail. Drawn larger, curves show
+  their segments. Drawn much smaller, each pixel pays for many triangles: on the Mac, 100 tigers at the example's zoom
+  0.25 cost the GPU 11.6 ms a frame, against 15.0 at zoom 1, with 16 times fewer pixels.
 - **Each frame:** an entry is a record of its transform, perspective included, and of its color transform scaled by its
   opacity. Consecutive entries of the same scene make one instanced draw.
   - Each run is rendered into a target of its own: its entries' bounds, rounded out to pixels and clipped to the
     viewport, sized in 64 px steps so that moving entries keep their target. It's then drawn as the GPU renderer's runs
     are.
-  - Targets are pooled per frame in flight, with a run's target the same size in all of them, so that they share one
-    multisampled texture. They're sized as atlas pages are: they grow at once, and shrink every 120 frames to the
-    largest those frames needed, if that's below 3/4 of their area, or after a viewport change. They're released after
-    120 frames unused, shrink to the last frame's needs with `trimAtlas()`, and are reported by `atlasBytes` and
-    `pageSizes`.
-  - A mesh whose paints are all opaque, drawn opaque, isn't blended, so Apple's GPUs shade only its topmost fragments.
+  - The renderer pools targets per frame in flight, with a run's target the same size in all of them, so that they
+    share one multisampled texture. They're sized as atlas pages are: they grow at once, and shrink every 120 frames to
+    the largest those frames needed, if that's below 3/4 of their area, or after a viewport change. The renderer
+    releases them after 120 frames unused, `trimAtlas()` shrinks them to the last frame's needs, and `atlasBytes` and
+    `pageSizes` report them.
+  - The renderer doesn't blend a mesh whose paints are all opaque, drawn opaque, so Apple's GPUs shade only its topmost
+    fragments.
 - **Samples:** `RasterizerRenderer.create(meshSamples:)`, 4 by default, multisamples the targets where Flutter GPU
   supports offscreen MSAA, else they're aliased. 1 makes them aliased everywhere, for less GPU time where many SVGs
   overlap: 23–40% less for a game's SVGs at zoom 1.
@@ -364,16 +366,16 @@ final coin = RasterizerScene.fromSvg(bytes, gpu: RasterizerBackend.mesh, maxSize
   - `bounds` are its triangles', tighter than the core's and the canvas renderer's: the tiger's are 474.2 × 490.0,
     against 478.5 × 506.9. So an SVG fitted by its bounds is placed differently by each renderer, while `viewBox` is the
     same.
-  - Strokes are drawn as SVG says, where the GPU renderer's aren't. The core draws bevel joins as miters, and ignores
-    `stroke-miterlimit` for a fixed limit of its own. It also blends a translucent stroke twice where it crosses or
-    overlaps itself, though not at its joins: a loop, a star's crossings, a path that turns back, a circle stroked
-    wider than its radius. That happens whether the SVG makes the stroke translucent or an entry's opacity fades it.
-    Fixing those would be in the core, `src/core/`.
+  - The mesh renderer draws strokes as SVG says, where the GPU renderer doesn't. The core draws bevel joins as miters,
+    and ignores `stroke-miterlimit` for a fixed limit of its own. It also blends a translucent stroke twice where it
+    crosses or overlaps itself, though not at its joins: a loop, a star's crossings, a path that turns back, a circle
+    stroked wider than its radius. That happens whether the SVG makes the stroke translucent or an entry's opacity fades
+    it. Fixing those would be in the core, `src/core/`.
 
 ## The canvas renderer
 
 Where the GPU renderer isn't supported, `RasterizerGpu.backend` is `canvas`. `RasterizerGpu.forceCanvas = true` picks it
-everywhere, for scenes and renderers created after it's set.
+everywhere, for scenes and renderers created after the app sets it.
 
 - **Parsing:** [vector_graphics_compiler](https://pub.dev/packages/vector_graphics_compiler) parses SVGs in Dart, so on
   web too, through a trimmed copy of `SvgPaths`, a class written for flame_svg (`lib/src/svg_paths/`). Its scenes have
@@ -385,23 +387,23 @@ everywhere, for scenes and renderers created after it's set.
   saved 1 ms of a frame's UI thread on macOS, and 2 ms of 7.5 on the web's main thread, with CanvasKit. Without the
   clip, it skips them only if the run's paint has no image or mask filter, which could spread them into the viewport.
   There's no atlas, no image, and nothing to render, so a frame's timings and `pageSizes` are empty, and a run has no
-  `parts`. A canvas run draws its entries as they are when it's drawn, so only until the next `beginFrame`. Each scene
-  is recorded once as a `Picture`, and drawn with `drawPicture`, which halved the UI thread's time in a benchmark.
-  `RasterizerGpu.canvasPictures = false` draws its paths instead.
+  `parts`. A canvas run draws its entries as they are when it's drawn, so only until the next `beginFrame`. The renderer
+  records each scene once as a `Picture`, and draws it with `drawPicture`, which halved the UI thread's time in a
+  benchmark. `RasterizerGpu.canvasPictures = false` draws its paths instead.
 - **What it draws, as the core does:** paths, filled and stroked, with caps, joins, miter limits and dashes, even-odd
   fills, and linear and radial gradients.
-  - Opacity is multiplied into each path's paint, as the core does, rather than drawn as a layer. Clips, masks,
-    patterns, text and images aren't imported.
-  - Consecutive paths with the same paint, whose bounds don't overlap, are merged into one, which keeps the paint
+  - It multiplies opacity into each path's paint, as the core does, rather than drawing a layer. Its import skips
+    clips, masks, patterns, text and images.
+  - It merges consecutive paths with the same paint, whose bounds don't overlap, into one, which keeps the paint
     order.
-  - Paths without an area, such as a line with SVG's default fill, aren't filled, as SVG and the core don't fill them,
-    where a canvas would paint a hairline.
+  - It doesn't fill paths without an area, such as a line with SVG's default fill, as SVG and the core don't fill
+    them, where a canvas would paint a hairline.
   - An entry's opacity scales each paint's alpha as its paths are drawn, and its color transform's filter goes on each
     paint. Entries with an opacity below 1 or a color transform draw their paths rather than their picture.
 - **How it differs from the GPU renderer**, as measured by the golden tests:
   - Antialiasing: Impeller's, with 4× MSAA on macOS, iOS and Android, against the core's exact coverage, so edge pixels
     differ by up to about 100/255.
-  - Curves are always drawn as curves. `curves: false` only applies to the GPU renderer.
+  - It always draws curves as curves. `curves: false` only applies to the GPU renderer.
   - Sharp miter joins: the canvas draws SVG's miters, up to the miter limit, where the core's joins differ.
   - Diagonal or rotated linear gradients in `objectBoundingBox` units, SVG's default, on shapes that aren't square:
     vector_graphics_compiler maps the gradient's two ends to the shape's bounds, so its colour bands stay perpendicular
@@ -416,8 +418,9 @@ everywhere, for scenes and renderers created after it's set.
 
 ## Layout
 
-- `hook/build.dart` builds the shader bundle into `build/shaderbundles/`, and the core into a code asset. The bundle is
-  listed as an asset, and loaded as `packages/rasterizer_gpu/build/shaderbundles/rasterizer.shaderbundle`.
+- `hook/build.dart` builds the shader bundle into `build/shaderbundles/`, and the core into a code asset.
+  `pubspec.yaml` lists the bundle as an asset, and the package loads it as
+  `packages/rasterizer_gpu/build/shaderbundles/rasterizer.shaderbundle`.
 - `src/core/` is the Rasterizer core: a patched copy of [Rasterizer](https://github.com/mindbrix/Rasterizer)'s, MIT
   licensed, edited here. Its `README.md` lists the patches.
 - `src/ra_mesh.hpp` is the mesh renderer's import, with `ra_mesh_*` in the C API (`src/ra_capi.h`). `src/libtess2/` is

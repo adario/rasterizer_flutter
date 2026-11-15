@@ -60,7 +60,7 @@ class _SvgPageState()
 
   /// The entry count and size in bytes of the core's last frame, with the
   /// GPU renderer: see [watchCoreFrames].
-  (int, int)? _lastFrame;
+  ({int entries, int bytes})? _lastFrame;
   Size? _size;
   double _ratio = 1;
 
@@ -106,7 +106,7 @@ class _SvgPageState()
       );
       watchCoreFrames(
         renderer,
-        (entries, bytes) => _lastFrame = (entries, bytes),
+        (entries, bytes) => _lastFrame = (entries: entries, bytes: bytes),
       );
       final bytes = await rootBundle.load(widget.asset);
       if (!mounted) {
@@ -142,8 +142,8 @@ class _SvgPageState()
     }
   }
 
-  /// The largest size that [svg]'s view box is drawn at, in device pixels:
-  /// the SVG's bounds fitted to the window, then zoomed in 20x.
+  /// Returns the largest size that [svg]'s view box is drawn at, in device
+  /// pixels: the SVG's bounds fitted to the window, then zoomed in 20x.
   double _maxSize(Uint8List svg) {
     final probe = RasterizerScene.fromSvg(
       svg,
@@ -206,10 +206,10 @@ class _SvgPageState()
       final core = _lastFrame;
       // Log the atlas when it changes: its pages' sizes this frame, and the
       // memory that they take.
+      final pages = frame.pageSizes.map((s) => '${s.width}×${s.height}');
       final atlas = frame.pageSizes.isEmpty
           ? null
-          : '${frame.pageSizes.map((s) => '${s.$1}×${s.$2}').join(', ')}, '
-                '${_mb(renderer.atlasBytes)} MB';
+          : '${pages.join(', ')}, ${_mb(renderer.atlasBytes)} MB';
       if (atlas != _atlas) {
         _atlas = atlas;
         if (atlas != null) {
@@ -223,7 +223,8 @@ class _SvgPageState()
           '${widget.asset}'
           '${widget.grid > 1 ? ' ${widget.grid}×${widget.grid}' : ''}: '
           '${scene.pathCount * widget.grid * widget.grid} draws, '
-          '${core == null ? '' : '${core.$1} entries, ${core.$2} bytes, '}'
+          '${core == null ? '' : '${core.entries} entries, '
+                    '${core.bytes} bytes, '}'
           '$width×$height px, ${renderer.backend.name}, '
           '${atlas == null ? '' : 'atlas $atlas, '}'
           'useCurves ${widget.useCurves}. '

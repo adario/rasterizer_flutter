@@ -34,8 +34,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'pump_while_loading.dart';
 import 'slow_bundle.dart';
 
-/// The Svg Shooter story with [renderer], at [zoom] and [speed]. A seeded
-/// random makes the game repeat from run to run.
+/// Returns the Svg Shooter story with [renderer], at [zoom] and [speed]. A
+/// seeded random makes the game repeat from run to run.
 Widget story(SvgRenderer renderer, {double zoom = 1, double speed = 1}) =>
     MaterialApp(
       home: GameStory<SvgShooterExample, SvgShooterSnapshot>(
@@ -78,15 +78,15 @@ Future<SvgShooterExample> pumpGame(
   return game;
 }
 
-/// The enemies of [game].
+/// Returns the enemies of [game].
 Iterable<EnemyComponent> enemiesOf(SvgShooterExample game) =>
     game.enemyGroup.children.whereType<EnemyComponent>();
 
-/// The missiles of [game].
+/// Returns the missiles of [game].
 Iterable<MissileComponent> missilesOf(SvgShooterExample game) =>
     game.missileGroup.children.whereType<MissileComponent>();
 
-/// The health text, the first of [game]'s texts at the bottom right.
+/// Returns the health text, the first of [game]'s texts at the bottom right.
 String healthTextOf(SvgShooterExample game) =>
     game.camera.viewport.children.whereType<BottomRightText>().first.text;
 
@@ -120,7 +120,7 @@ void expectFirstWave(SvgShooterExample game, {double seconds = 0.016}) {
   }
 }
 
-/// The paint of [component]'s SVG: its first child with a paint.
+/// Returns the paint of [component]'s SVG: its first child with a paint.
 Paint svgPaintOf(PositionComponent component) =>
     component.children.whereType<HasPaint>().first.paint;
 

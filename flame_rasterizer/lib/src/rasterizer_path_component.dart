@@ -38,11 +38,11 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// The GPU renderers flatten its path once into polylines, within 1/4 of a
 /// device pixel when its longer side is drawn [maxSize] device pixels long,
 /// the most it's drawn at (see [RasterizerScene.fromPaths]). So the path
-/// must not change. Each time the component is drawn, it compares its paint
+/// must not change. Each time it draws, the component compares its paint
 /// layers with those of its import, which costs little. When they differ, it
 /// imports the path again, as for an edited SVG, from the path's contours,
-/// which aren't flattened again. A layer's own color filter made by
-/// [RasterizerColorTransform] is drawn into the layer's color. While the GPU
+/// which it doesn't flatten again. It applies a layer's own color filter made
+/// by [RasterizerColorTransform] to the layer's color. While the GPU
 /// renderers can't draw a layer ([RasterizerScene.canDraw]), such as one
 /// with another color filter, or a hairline stroke, the component draws with
 /// [Canvas.drawPath]. That ends the run, as other canvas draws do.
@@ -93,8 +93,8 @@ class RasterizerPathComponent({
     }
   }
 
-  /// The largest size, in device pixels, at which its path's longer side is
-  /// drawn, which its import is made for.
+  /// The largest size, in device pixels, at which it draws its path's longer
+  /// side, the size it imports the path for.
   ///
   /// It defaults to [RasterizerSvg.defaultMaxSize], the view's longer side.
   /// Pass the largest size the game draws the path at, as for
@@ -247,8 +247,8 @@ class RasterizerPathComponent({
     return _copies;
   }
 
-  /// Its import for its paint layers and [glow] as they are now. It imports
-  /// the path again if they changed.
+  /// Returns its import for its paint layers and [glow] as they are now. It
+  /// imports the path again if they changed.
   ///
   /// Null outside a game with [HasRasterizer], or if a layer can't be
   /// imported.
@@ -284,8 +284,8 @@ class RasterizerPathComponent({
     return _shared?.scene;
   }
 
-  /// The layer that [paint] draws as, without paint layers: its fields except
-  /// those that apply over the import, with its color opaque.
+  /// Returns the layer that [paint] draws as, without paint layers: its fields
+  /// except those that apply over the import, with its color opaque.
   static Paint _layerOf(Paint paint) => Paint.from(paint)
     ..color = paint.color.withValues(alpha: 1)
     ..blendMode = BlendMode.srcOver
@@ -294,8 +294,9 @@ class RasterizerPathComponent({
     ..maskFilter = null
     ..invertColors = false;
 
-  /// [layer], or, if its color filter is one that [RasterizerColorTransform]
-  /// made, a copy without the filter whose color is filtered instead.
+  /// Returns [layer], or, if its color filter is one that
+  /// [RasterizerColorTransform] made, a copy without the filter, its color
+  /// filtered instead.
   static Paint _filtered(Paint layer) {
     final filter = layer.colorFilter;
     final transform = filter == null
@@ -309,7 +310,7 @@ class RasterizerPathComponent({
       ..color = transform.apply(layer.color);
   }
 
-  /// The import of its path with [paints] and [glow], for [gpu] and
+  /// Returns the import of its path with [paints] and [glow], for [gpu] and
   /// [maxSize]: one that another component made, or a new one.
   _SharedScene _acquire(RasterizerBackend gpu, List<Paint> paints) {
     final scenes = _scenes[_source] ??= [];
@@ -328,7 +329,7 @@ class RasterizerPathComponent({
       glow,
       [for (final p in paints) _PaintFields(p)],
       RasterizerScene.fromPaths(
-        [for (final p in paints) (_source, p)],
+        [for (final p in paints) (path: _source, paint: p)],
         gpu: gpu,
         maxSize: maxSize,
         glow: glow,
@@ -368,7 +369,8 @@ class RasterizerPathComponent({
 
   /// Stops using its import, and frees now what no other component uses.
   ///
-  /// It's called outside a frame, as the component or its game is removed.
+  /// [onRemove] and [releasePathScenes] call it outside a frame, as the
+  /// component or its game is removed.
   /// Drawn again, the component imports its path again.
   void _releaseAll() {
     _release(now: true);
@@ -406,8 +408,8 @@ class _SharedScene(
 ) {
   int users = 1;
 
-  /// Whether it's the import for [gpu], [maxSize], [glow] and [paints], now
-  /// that [gpu]'s imports are for [backend].
+  /// Returns whether it's the import for [gpu], [maxSize], [glow] and [paints],
+  /// now that [gpu]'s imports are for [backend].
   bool matches(
     RasterizerBackend gpu,
     double maxSize,
@@ -431,8 +433,9 @@ class _SharedScene(
   }
 }
 
-/// The fields of a paint that a path's import is made from, or that decide
-/// whether it can be made ([RasterizerScene.canDraw]), as they were then.
+/// The fields of a paint that a [RasterizerPathComponent] imports its path
+/// with, or that decide whether it can import it ([RasterizerScene.canDraw]),
+/// as they were then.
 ///
 /// With [layerOnly], [matches] compares only the fields that a
 /// [RasterizerPathComponent]'s paint, without paint layers, draws as a
@@ -456,7 +459,7 @@ class _PaintFields(Paint paint, {final bool layerOnly = false}) {
   final MaskFilter? _maskFilter = paint.maskFilter;
   final ImageFilter? _imageFilter = paint.imageFilter;
 
-  /// Whether [paint]'s fields are these.
+  /// Returns whether [paint]'s fields are these.
   bool matches(Paint paint) {
     final color = paint.color;
     if (!(layerOnly

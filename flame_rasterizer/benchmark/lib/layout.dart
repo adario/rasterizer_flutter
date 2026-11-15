@@ -73,7 +73,7 @@ class DemoLayout({
       if (painted)
         for (final kind in paintedKinds)
           (
-            VectorItem(
+            item: VectorItem(
               svg: r.nextInt(n),
               group: groups + 1,
               x: (r.nextDouble() - 0.5) * worldWidth * 0.6,
@@ -83,7 +83,7 @@ class DemoLayout({
               spin: (r.nextDouble() - 0.5) * 2,
               phase: r.nextDouble() * 2 * math.pi,
             ),
-            kind,
+            kind: kind,
           ),
     ];
   }
@@ -108,7 +108,8 @@ class DemoLayout({
   /// paint's tint, as it recognises only the filters it made itself.
   int get paintedRuns => paintedItems.isEmpty ? 0 : 3;
 
-  /// Whether the paint of a [kind] of painted item folds into its entry.
+  /// Returns whether the paint of a [kind] of painted item folds into its
+  /// entry.
   ///
   /// Opacities fold, and so do the tints and hues that
   /// `RasterizerSvgComponent` makes with [RasterizerColorTransform].
@@ -117,8 +118,8 @@ class DemoLayout({
       kind == PaintKind.tinted ||
       kind == PaintKind.hued;
 
-  /// The color transform that a [kind] of painted item's entry takes, if any,
-  /// as `RasterizerSvgComponent`'s `tint` and `hue` make it.
+  /// Returns the color transform that a [kind] of painted item's entry takes,
+  /// if any, as `RasterizerSvgComponent`'s `tint` and `hue` make it.
   static RasterizerColorTransform? transformOf(PaintKind kind) =>
       switch (kind) {
         PaintKind.tinted => RasterizerColorTransform.mode(
@@ -149,8 +150,8 @@ class DemoLayout({
   /// The shared paint's tint.
   static const sharedTint = Color(0xFF40C4FF);
 
-  /// The paint that a [kind] of painted item draws with, for the check's
-  /// reference.
+  /// Returns the paint that a [kind] of painted item draws with, for the
+  /// check's reference.
   ///
   /// The game sets its components' paints with `HasPaint`'s API instead,
   /// except for the shared paint, which it uses as it is.
@@ -191,7 +192,7 @@ class DemoLayout({
   late final List<VectorItem> clippedItems;
 
   /// The painted items, each with its kind of paint.
-  late final List<(VectorItem, PaintKind)> paintedItems;
+  late final List<({VectorItem item, PaintKind kind})> paintedItems;
 
   /// The separators, one after each group but the last.
   late final List<SeparatorItem> separators;
@@ -199,21 +200,21 @@ class DemoLayout({
   /// How many groups the items come in.
   int get groups => separators.length + 1;
 
-  /// The camera at time [t], for a viewport [width] by [height]: the world
-  /// position at the viewport's centre, and the zoom.
+  /// Returns the camera at time [t], for a viewport [width] by [height]: the
+  /// world position at the viewport's centre, and the zoom.
   ///
   /// The camera drifts, and zooms between 0.5 and 1.7 times the zoom that
   /// fits the area the items start in.
-  static (double, double, double) camera(
+  static ({double x, double y, double zoom}) camera(
     double t,
     double width,
     double height,
   ) {
     final fit = math.min(width / worldWidth, height / worldHeight);
     return (
-      120 * math.cos(t * 0.21),
-      80 * math.sin(t * 0.17),
-      fit * (1.1 + 0.6 * math.sin(t * 0.3)),
+      x: 120 * math.cos(t * 0.21),
+      y: 80 * math.sin(t * 0.17),
+      zoom: fit * (1.1 + 0.6 * math.sin(t * 0.3)),
     );
   }
 }
@@ -243,11 +244,11 @@ class VectorItem({
   required final double spin,
   required final double phase,
 }) {
-  /// Its position and angle at time [t].
-  (double, double, double) at(double t) => (
-    x + 60 * math.sin(t * 0.7 + phase),
-    y + 40 * math.cos(t * 0.9 + phase),
-    angle + spin * t,
+  /// Returns its position and angle at time [t].
+  ({double x, double y, double angle}) at(double t) => (
+    x: x + 60 * math.sin(t * 0.7 + phase),
+    y: y + 40 * math.cos(t * 0.9 + phase),
+    angle: angle + spin * t,
   );
 }
 

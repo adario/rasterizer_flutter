@@ -10,7 +10,7 @@ const _label = 'Renderer';
 /// also the order of the first choice.
 const _gpus = [SvgRenderer.rasterizer, SvgRenderer.rasterizerAtlas];
 
-/// The Renderer knob: a dropdown of the [SvgRenderer]s.
+/// Returns the Renderer knob: a dropdown of the [SvgRenderer]s.
 ///
 /// A GPU entry is inactive where its renderer isn't [SvgRenderer.supported]:
 /// on the web, without Impeller, and on OpenGL ES until its self-test passes
@@ -33,26 +33,27 @@ SvgRenderer rendererKnob(BuildContext context, {bool svgs = true}) {
       : renderer;
 }
 
-/// The Renderer knob's first choice: the first active entry of [_gpus], else
-/// Canvas.
+/// Returns the Renderer knob's first choice: the first active entry of [_gpus],
+/// else Canvas.
 SvgRenderer _firstChoice() => _gpus.firstWhere(
   (renderer) => renderer.supported,
   orElse: () => SvgRenderer.rasterizerCanvas,
 );
 
-/// The Zoom knob: the camera's zoom, from 0.25 to 5, on a continuous slider.
+/// Returns the Zoom knob: the camera's zoom, from 0.25 to 5, on a continuous
+/// slider.
 double zoomKnob(BuildContext context) => context.knobs.onKnobAdded(
   _SliderKnob(label: 'Zoom', initialValue: 1, min: 0.25, max: 5),
 )!;
 
-/// The Speed knob: the game's speed, from 0, which stands still, to 2, on a
-/// continuous slider.
+/// Returns the Speed knob: the game's speed, from 0, which stands still, to 2,
+/// on a continuous slider.
 double speedKnob(BuildContext context) => context.knobs.onKnobAdded(
   _SliderKnob(label: 'Speed', initialValue: 1, min: 0, max: 2),
 )!;
 
-/// An integer slider knob from [min] to [max], in [divisions] steps, like
-/// Widgetbook's. Like [zoomKnob], it shows its value in tabular figures.
+/// Returns an integer slider knob from [min] to [max], in [divisions] steps,
+/// like Widgetbook's. Like [zoomKnob], it shows its value in tabular figures.
 int intSliderKnob(
   BuildContext context, {
   required String label,
@@ -70,7 +71,7 @@ int intSliderKnob(
   ),
 )!;
 
-/// The Cache mode and Cache size knobs, which set flame_svg's cache.
+/// Returns the Cache mode and Cache size knobs, which set flame_svg's cache.
 ///
 /// They show only while [shown], which the examples set with Flame SVG.
 /// Otherwise this returns flame_svg's defaults. Widgetbook registers the
@@ -155,7 +156,7 @@ class _RendererField({
   this
     : super(values: SvgRenderer.values, labelBuilder: (value) => value.label);
 
-  /// What the entry for [renderer] shows.
+  /// Returns what the entry for [renderer] shows.
   String _text(SvgRenderer renderer) =>
       renderer == SvgRenderer.flameSvg && !svgs ? 'Flame' : renderer.text;
 

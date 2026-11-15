@@ -30,7 +30,7 @@ class _RenderLayoutSize(
   var void Function(Size size, double ratio) onLayout,
 ) extends RenderProxyBox {
   /// The size and ratio that it last passed to [onLayout].
-  (Size, double)? _reported;
+  ({Size size, double ratio})? _reported;
 
   double get ratio => _ratio;
   set ratio(double value) {
@@ -44,8 +44,8 @@ class _RenderLayoutSize(
   void performLayout() {
     size = constraints.biggest;
     child?.layout(BoxConstraints.tight(size));
-    if (_reported != (size, _ratio)) {
-      _reported = (size, _ratio);
+    if (_reported != (size: size, ratio: _ratio)) {
+      _reported = (size: size, ratio: _ratio);
       onLayout(size, _ratio);
     }
   }

@@ -29,7 +29,7 @@ class BoltsComponent() extends Component with HasGameRef<TubeShooterExample> {
     final bolts = [
       for (final enemy in game.enemies)
         if (enemy is ZapperComponent && enemy.isZapping)
-          (enemy.lane, enemy.depth),
+          (lane: enemy.lane, depth: enemy.depth),
     ];
     if (bolts.isEmpty) {
       _bolts = game.replacePath(_bolts, null, TubeColors.bolts);

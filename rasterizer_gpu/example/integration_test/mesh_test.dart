@@ -27,12 +27,12 @@ import 'package:rasterizer_gpu/src/meshes.dart' show MeshRenderer, MeshScene;
 /// The viewport's width and height, in pixels.
 const size = 64;
 
-/// An SVG document of [body], with a square viewBox [side] wide.
+/// Returns an SVG document of [body], with a square viewBox [side] wide.
 String svg(String body, {int side = size}) =>
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 $side $side">'
     '$body</svg>';
 
-/// A mesh scene of [svg], disposed after the test.
+/// Returns a mesh scene of [svg], disposed after the test.
 RasterizerScene scene(String svg) {
   final scene = RasterizerScene.fromSvg(
     utf8.encode(svg),
@@ -43,7 +43,7 @@ RasterizerScene scene(String svg) {
   return scene;
 }
 
-/// What [draw] draws, read back as premultiplied RGBA.
+/// Returns what [draw] draws, read back as premultiplied RGBA.
 Future<Pixels> readBack(void Function(ui.Canvas canvas) draw) async {
   final recorder = ui.PictureRecorder();
   draw(ui.Canvas(recorder));
@@ -57,7 +57,7 @@ Future<Pixels> readBack(void Function(ui.Canvas canvas) draw) async {
 
 /// The pixels of a [size] by [size] image, as premultiplied RGBA bytes.
 class Pixels(final Uint8List bytes) {
-  /// The RGBA of the pixel at [x], [y].
+  /// Returns the RGBA of the pixel at [x], [y].
   List<int> at(int x, int y) {
     final i = 4 * (y * size + x);
     return bytes.sublist(i, i + 4);
@@ -84,8 +84,8 @@ typedef Entry = ({
   RasterizerColorTransform? color,
 });
 
-/// An [Entry] of [scene], by default at the origin, opaque and with no color
-/// transform.
+/// Returns an [Entry] of [scene], by default at the origin, opaque and with no
+/// color transform.
 Entry entry(
   RasterizerScene scene, {
   double x = 0,

@@ -855,7 +855,7 @@ abstract class TubeShooterExample({
     }
   }
 
-  /// Whether [a] and [b], in the same lane, meet: within [hitWindow] in
+  /// Returns whether [a] and [b], in the same lane, meet: within [hitWindow] in
   /// depth, or passing each other since their last update.
   static bool _meet(LaneComponent a, LaneComponent b) {
     final now = a.depth - b.depth;
@@ -892,8 +892,8 @@ abstract class TubeShooterExample({
     _play(Sound.enemyFire);
   }
 
-  /// Which way an enemy at the rim in [lane] goes toward the ship: 1 or -1,
-  /// or 0 in the ship's lane.
+  /// Returns which way an enemy at the rim in [lane] goes toward the ship: 1 or
+  /// -1, or 0 in the ship's lane.
   int towardShip(int lane) {
     final tube = view.tube;
     final ahead = player.lane - lane;
@@ -1186,9 +1186,10 @@ abstract class TubeShooterExample({
     }
   }
 
-  /// At READY, any key but a modifier starts the round. Otherwise, Enter
-  /// purges, or starts a new game once it's over. The keys that move the ship
-  /// or fire count as held while down, and the others are ignored.
+  /// Handles a key: at READY, any key but a modifier starts the round.
+  /// Otherwise, Enter purges, or starts a new game once it's over. The keys
+  /// that move the ship or fire count as held while down, and it ignores the
+  /// others.
   @override
   KeyEventResult onKeyEvent(
     KeyEvent event,
@@ -1267,8 +1268,8 @@ class RasterizerTubeShooterExample({
     glow: glow,
   );
 
-  /// Also gives [drawing] the shapes' glow. If the Glow knob changed, this
-  /// imports the shape again.
+  /// Keeps [drawing]'s stroke, and gives it the shapes' glow too. If the Glow
+  /// knob changed, it imports the shape again.
   @override
   void keepStroke(PathComponent drawing) {
     super.keepStroke(drawing);

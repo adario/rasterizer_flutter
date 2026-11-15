@@ -54,7 +54,7 @@ gpu.PixelFormat accumulationFormat = gpu.PixelFormat.r32Float;
 /// The data texture is 4096 wide, so the self-test checks that size.
 int maxPageSize = RasterizerRenderer.maxAtlasSize;
 
-/// Whether Flutter GPU can render here, for both GPU renderers.
+/// Returns whether Flutter GPU can render here, for both GPU renderers.
 ///
 /// On OpenGL ES, it returns [RasterizerSupport.openGles]: the renderers draw
 /// only once their self-tests pass.
@@ -316,7 +316,12 @@ Future<String?> _checkRun(RasterizerRun run) async {
     4 * image.width,
     s.left.toInt(),
     s.top.toInt(),
-    (d.left.toInt(), d.top.toInt(), d.width.toInt(), d.height.toInt()),
+    (
+      left: d.left.toInt(),
+      top: d.top.toInt(),
+      width: d.width.toInt(),
+      height: d.height.toInt(),
+    ),
   );
 }
 
@@ -373,7 +378,7 @@ RasterizerScene importPathMeshScene(ScenePaths paths, double maxSize) =>
       ),
     );
 
-/// [glow] for the core, with its color in sRGB.
+/// Returns [glow] for the core, with its color in sRGB.
 ra.Glow? _glow(RasterizerGlow? glow) => glow == null
     ? null
     : ra.Glow(
@@ -387,7 +392,7 @@ ra.Glow? _glow(RasterizerGlow? glow) => glow == null
 
 ra.Bounds _bounds(ui.Rect r) => ra.Bounds(r.left, r.top, r.right, r.bottom);
 
-/// [paths]' draws for the core: a stroke or a fill each.
+/// Returns [paths]' draws for the core: a stroke or a fill each.
 List<ra.PathDraw> _pathDraws(ScenePaths paths) => [
   for (final (i, draw) in paths.draws.indexed)
     if (draw.paint.stroke case final stroke?)
@@ -435,8 +440,8 @@ Future<void> _inForeground() async {
 
 /// One run of a self-test.
 ///
-/// A run that timed out is stopped, so it doesn't go on beside the next run
-/// and compete with it for frames.
+/// The self-test stops a run that timed out, so it doesn't go on beside the
+/// next run and compete with it for frames.
 class _SelfTestRun() {
   /// Whether the run timed out, and so was stopped.
   bool stopped = false;
@@ -489,8 +494,8 @@ class AtlasScene(final ra.Scene scene) implements RasterizerScene {
 /// run then draws as images, from its parts' rectangles there.
 ///
 /// It keeps [slots] frames in flight, each with its own atlas textures. So a
-/// frame's images stay valid until [slots] frames later, when its textures
-/// are rendered into again.
+/// frame's images stay valid until [slots] frames later, when it renders into
+/// its textures again.
 class AtlasRenderer._(
   gpu.ShaderLibrary library,
   @override final int slots,
@@ -517,7 +522,7 @@ class AtlasRenderer._(
   // After a frame whose runs were placed as they ended: the page extents its
   // runs would need, packed together. The next frame's pages grow to these
   // first, as runs placed as they end go onto pages that already exist.
-  List<(int, int)> _planned = const [];
+  List<RasterizerPixelSize> _planned = const [];
 
   @override
   int get maxViewportSize => maxPageSize;
@@ -655,7 +660,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   // For placing runs as they end: how many were placed, the sizes and images
   // of the pages used so far, and the shelf being filled.
   int _placedCount = 0;
-  final List<(int, int)> _placedSizes = [];
+  final List<RasterizerPixelSize> _placedSizes = [];
   final List<ui.Image> _placedImages = [];
   int _placePage = 0, _placeX = 0, _placeY = 0, _placeShelf = 0;
 
@@ -698,7 +703,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   int cpuMicros = 0, uploadMicros = 0, encodeMicros = 0;
 
   @override
-  final List<(int, int)> pageSizes = [];
+  final List<RasterizerPixelSize> pageSizes = [];
 
   @override
   int get width => _width;
@@ -727,7 +732,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     _placedImages.clear();
     final planned = renderer._planned;
     for (var p = 0; p < planned.length && p < renderer._sizes.length; p++) {
-      renderer._sizes.fit(p, planned[p].$1, planned[p].$2);
+      renderer._sizes.fit(p, planned[p].width, planned[p].height);
     }
     renderer._planned = const [];
   }
@@ -860,15 +865,15 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     pageSizes.clear();
 
     final slot = renderer._slotPages[_slot];
-    final List<(int, int)> sizes;
-    List<(int, int)>? pageExtents;
+    final List<RasterizerPixelSize> sizes;
+    List<RasterizerPixelSize>? pageExtents;
     if (_placedCount == 0) {
       // No run was placed as it ended: packs them all together, onto pages
       // sized to fit.
       final extents = pageExtents = _pack(assign: true);
       sizes = [
         for (var p = 0; p < extents.length; p++)
-          renderer._sizes.fit(p, extents[p].$1, extents[p].$2),
+          renderer._sizes.fit(p, extents[p].width, extents[p].height),
       ];
       renderer._keepPages();
     } else {
@@ -885,8 +890,8 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     renderer._gpu.beginFrame();
     final images = <ui.Image>[];
     for (var p = 0; p < sizes.length; p++) {
-      final (tw, th) = sizes[p];
-      pageSizes.add((tw, th));
+      final (width: tw, height: th) = sizes[p];
+      pageSizes.add(sizes[p]);
       _writeEntries(p, th);
       renderer._list.params = ra.Params(useCurves: _curves, clearColor: 0);
       if (renderer.debugFreshFrameBuffers) {
@@ -968,7 +973,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
 
   void _setPart(int i, int q) => _entryParts[i] = q;
 
-  /// [run]'s parts, tallest first, the order they're placed in.
+  /// Returns [run]'s parts, tallest first, the order they're placed in.
   List<int> _tallestFirst(AtlasRun run) {
     final start = run._partStart;
     final parts = [for (var q = start; q < start + run._partCount; q++) q];
@@ -981,13 +986,13 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   /// Packs the runs' parts onto shelves, and returns the pages' extents.
   ///
   /// Parts go in run order, each run's tallest first. When a page is full, a
-  /// new one starts. With [assign], the parts are placed where they're packed.
+  /// new one starts. With [assign], it places the parts where it packs them.
   ///
   /// A shelf is about as wide as the side of a square with the parts' area,
   /// rounded up to [RasterizerRenderer.atlasStep], and at least as wide as the
   /// widest part. So a page's area is about the parts', rather than as wide
   /// as the viewport.
-  List<(int, int)> _pack({required bool assign}) {
+  List<RasterizerPixelSize> _pack({required bool assign}) {
     final maxSize = maxPageSize;
     var area = 0, widest = 0;
     for (final run in runs) {
@@ -1004,7 +1009,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     final side = (math.sqrt(area).ceil() + step - 1) ~/ step * step;
     final shelfWidth = math.max(widest, math.min(side, maxSize));
     var page = 0, x = 0, y = 0, shelfHeight = 0, pageWidth = 0, pageHeight = 0;
-    final pageExtents = <(int, int)>[];
+    final pageExtents = <RasterizerPixelSize>[];
     for (final run in runs) {
       for (final q in _tallestFirst(run)) {
         final w = _parts[7 * q + 5], h = _parts[7 * q + 6];
@@ -1014,7 +1019,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
           shelfHeight = 0;
         }
         if (y > 0 && y + h > maxSize) {
-          pageExtents.add((pageWidth, pageHeight));
+          pageExtents.add((width: pageWidth, height: pageHeight));
           page++;
           x = y = shelfHeight = pageWidth = pageHeight = 0;
         }
@@ -1037,7 +1042,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
       }
     }
     if (pageWidth > 0) {
-      pageExtents.add((pageWidth, pageHeight));
+      pageExtents.add((width: pageWidth, height: pageHeight));
     }
     return pageExtents;
   }
@@ -1056,7 +1061,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     for (final q in _tallestFirst(run)) {
       final w = _parts[7 * q + 5], h = _parts[7 * q + 6];
       while (true) {
-        final (tw, th) = _placedPage(_placePage, w, h);
+        final (width: tw, height: th) = _placedPage(_placePage, w, h);
         var x = _placeX, y = _placeY, shelf = _placeShelf;
         if (x > 0 && x + w > tw) {
           x = 0;
@@ -1080,11 +1085,11 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     run._setParts(_placedImages);
   }
 
-  /// Page [p]'s size this frame, fixed once the page is used.
+  /// Returns page [p]'s size this frame, fixed once the page is used.
   ///
   /// When the frame first uses the page, this grows it to fit a [w] x [h]
   /// part, and hands out its image.
-  (int, int) _placedPage(int p, int w, int h) {
+  RasterizerPixelSize _placedPage(int p, int w, int h) {
     if (p < _placedSizes.length) {
       return _placedSizes[p];
     }
@@ -1103,8 +1108,8 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
         renderer._gpu.target(
           targets.targets,
           renderer._shared[p],
-          size.$1,
-          size.$2,
+          size.width,
+          size.height,
         ),
       ),
     );
@@ -1205,18 +1210,18 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     _renderer._list.setEntries(_native, n);
   }
 
-  /// The transform the core draws entry [i] with, and its device clip, as the
-  /// last [render] wrote them, rounded to floats.
+  /// Returns the transform the core draws entry [i] with, and its device clip,
+  /// as the last [render] wrote them, rounded to floats.
   ///
   /// The transform is a b c d tx ty in device space, and the clip lx ly ux uy.
   /// Null before [render], or for an entry in no part. For tools that render
   /// the same list natively.
-  (List<double>, List<double>)? coreEntry(int i) {
+  ({List<double> transform, List<double> clip})? coreEntry(int i) {
     final q = _entryParts[i];
     if (!_rendered || q < 0 || _parts[7 * q] < 0) {
       return null;
     }
-    final th = pageSizes[_parts[7 * q]].$2;
+    final th = pageSizes[_parts[7 * q]].height;
     final ax = _parts[7 * q + 1], ay = _parts[7 * q + 2];
     final vx = _parts[7 * q + 3], vy = _parts[7 * q + 4];
     final w = _parts[7 * q + 5], h = _parts[7 * q + 6];
@@ -1235,15 +1240,15 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
       (ax + w).toDouble(),
       (th - ay).toDouble(),
     ]);
-    return (f.toList(), clip.toList());
+    return (transform: f.toList(), clip: clip.toList());
   }
 
-  /// Entry [i]'s run index and page, after [render].
+  /// Returns entry [i]'s run index and page, after [render].
   ///
   /// The page is -1 if the entry is on none.
-  (int, int) entryRun(int i) {
+  ({int run, int page}) entryRun(int i) {
     final q = _entryParts[i];
-    return (_entryRuns[i], q < 0 ? -1 : _parts[7 * q]);
+    return (run: _entryRuns[i], page: q < 0 ? -1 : _parts[7 * q]);
   }
 
   bool get _open => _width > 0 && !_rendered;
@@ -1346,7 +1351,8 @@ class AtlasRun._(final AtlasFrame _frame, @override final int index)
     RasterizerColorTransform? colorTransform,
   }) => _frame._add(this, scene, a, b, c, d, tx, ty, opacity, colorTransform);
 
-  /// [add], for affine transforms only: g and h must be 0.
+  /// Adds [scene] as [add] does, for affine transforms only: g and h must be
+  /// 0.
   ///
   /// w is then the constant i, which divides the rest.
   @override
@@ -1394,7 +1400,8 @@ class _PageTargets() {
   gpu.Texture? _texture;
   ui.Image? _image;
 
-  /// The image of [texture], made again only when the texture changed.
+  /// Returns the image of [texture], making it again only when the texture
+  /// changed.
   ui.Image image(gpu.Texture texture) {
     if (!identical(texture, _texture)) {
       _texture = texture;

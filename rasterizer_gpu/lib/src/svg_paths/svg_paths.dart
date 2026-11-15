@@ -97,18 +97,18 @@ class SvgPaths(
 
   /// Parses [source] into [paths], [origin], [viewBox] and the bounds.
   void _import(String source) {
-    final (svg, viewBoxOrigin) = _prepared(source);
-    final instructions = parseWithoutOptimizers(svg);
-    origin = viewBoxOrigin;
+    final prepared = _prepared(source);
+    final instructions = parseWithoutOptimizers(prepared.svg);
+    origin = prepared.origin;
     viewBox = origin & ui.Size(instructions.width, instructions.height);
 
     // The converted paints, by paint ID and opacity, and the converted paths,
     // by path ID and paint. vector_graphics_compiler shares a path among the
     // draws with the same path data, so each converts once.
-    final paints = <(int, double), VectorPaint>{};
+    final paints = <({int paintId, double opacity}), VectorPaint>{};
     // The same paints without their fills, for paths without an area.
     final unfilled = <VectorPaint, VectorPaint>{};
-    final converted = <(int, VectorPaint), VectorPath>{};
+    final converted = <({int pathId, VectorPaint paint}), VectorPath>{};
 
     // The consecutive paths to merge, added to [paths] when the run ends.
     // Merging only consecutive paths keeps the SVG's paint order. Merging only
@@ -199,7 +199,8 @@ class SvgPaths(
         endRun();
         continue;
       }
-      var paint = paints[(paintId, opacity)] ??= instructions.paints[paintId]
+      var paint = paints[(paintId: paintId, opacity: opacity)] ??= instructions
+          .paints[paintId]
           .toVectorPaint(opacity);
       if (paint.isFilled && !instructions.paths[pathId].hasArea) {
         paint = unfilled[paint] ??= VectorPaint(stroke: paint.stroke);
@@ -209,7 +210,7 @@ class SvgPaths(
       if (!paint.isFilled && !paint.isStroked) {
         continue;
       }
-      final path = converted[(pathId, paint)] ??= VectorPath(
+      final path = converted[(pathId: pathId, paint: paint)] ??= VectorPath(
         instructions.paths[pathId].toUiPath(),
         paint,
       );
@@ -254,11 +255,11 @@ class SvgPaths(
         : painted.shift(origin);
   }
 
-  /// The bounds of [path] with its stroke, if any, for merging.
+  /// Returns the bounds of [path] with its stroke, if any, for merging.
   static ui.Rect _paintedBounds(VectorPath path) =>
       paintedBoundsOf(path.path.getBounds(), path.paint.stroke);
 
-  /// A path's [bounds], grown to take in its [stroke], if any.
+  /// Returns a path's [bounds], grown to take in its [stroke], if any.
   ///
   /// A miter join can reach the miter limit times half the stroke's width.
   /// Other joins and caps reach less than twice its width.
@@ -272,8 +273,8 @@ class SvgPaths(
     return bounds.inflate(stroke.strokeWidth * reach);
   }
 
-  /// [svg], edited so that vector_graphics_compiler parses it into the core's
-  /// paths, and the root `<svg>`'s viewBox origin.
+  /// Returns [svg], edited so that vector_graphics_compiler parses it into the
+  /// core's paths, and the root `<svg>`'s viewBox origin.
   ///
   /// vector_graphics_compiler parses that origin the same way, but only to
   /// move the paths by it. The edits:
@@ -287,8 +288,8 @@ class SvgPaths(
   /// - Clip-path attributes go, in `style` too, as NanoSVG ignores them.
   ///   vector_graphics_compiler would draw a group once per clip path, where a
   ///   `<clipPath>` mixes clip rules.
-  static (String, ui.Offset) _prepared(String svg) {
-    final edits = <(int, int, String)>[];
+  static ({String svg, ui.Offset origin}) _prepared(String svg) {
+    final edits = <({int start, int stop, String tag})>[];
     ui.Offset? origin;
     // Parse past the root only if the SVG has clip paths, as parsing all of it
     // costs about a quarter of an import.
@@ -335,25 +336,25 @@ class SvgPaths(
             .replaceAll(_clipPathStyle, '');
       }
       if (tag != null) {
-        edits.add((start, stop, tag));
+        edits.add((start: start, stop: stop, tag: tag));
       }
       if (!clips) {
         break;
       }
     }
     if (edits.isEmpty) {
-      return (svg, origin ?? ui.Offset.zero);
+      return (svg: svg, origin: origin ?? ui.Offset.zero);
     }
     final prepared = StringBuffer();
     var from = 0;
-    for (final (start, stop, tag) in edits) {
+    for (final (:start, :stop, :tag) in edits) {
       prepared
         ..write(svg.substring(from, start))
         ..write(tag);
       from = stop;
     }
     prepared.write(svg.substring(from));
-    return (prepared.toString(), origin ?? ui.Offset.zero);
+    return (svg: prepared.toString(), origin: origin ?? ui.Offset.zero);
   }
 
   // Searched with a RegExp, as String.contains took longer than the rest of
@@ -398,7 +399,7 @@ class VectorPath(final ui.Path path, final VectorPaint paint) {
   /// Draws [path] with [paint], its alpha scaled by [opacity] and its color
   /// filtered by [colorFilter].
   ///
-  /// The paint color's alpha scales a gradient's too. The paint is restored
+  /// The paint color's alpha scales a gradient's too. It restores the paint
   /// afterwards, as the canvas reads it when it draws.
   void _drawPath(
     ui.Canvas canvas,

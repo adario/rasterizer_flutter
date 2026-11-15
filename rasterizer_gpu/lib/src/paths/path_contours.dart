@@ -24,7 +24,7 @@ import 'dart:ui' show Offset, Path, PathMetric, Tangent;
 /// a sampler walks them along their tangents. Each contour keeps its
 /// direction, so holes stay holes with either fill type. It also keeps its
 /// corners, located exactly. An open contour stays open, as a stroke needs,
-/// and a fill closes it. Contours without a length are left out, as
+/// and a fill closes it. Contours without a length drop out, as
 /// [Path.computeMetrics] skips them.
 final class PathContours._(
   /// The polylines' points, x then y, contour after contour, in the paths'
@@ -58,7 +58,7 @@ final class PathContours._(
     for (final path in paths) {
       var contours = 0;
       for (final metric in path.computeMetrics()) {
-        final (polyline, isClosed) = _flatten(metric, tolerance);
+        final (:polyline, :isClosed) = _flatten(metric, tolerance);
         if (polyline.length < 2) {
           continue;
         }
@@ -89,16 +89,19 @@ const _samplingPerTolerance = 4;
 /// step.
 const _maxSteps = 1 << 20;
 
-/// [metric]'s contour as a polyline within [tolerance] of it, and whether
-/// it's closed.
+/// Returns [metric]'s contour as a polyline within [tolerance] of it, and
+/// whether it's closed.
 ///
 /// The sampler keeps the contour within a sixth of [tolerance] of its samples.
 /// The polyline then keeps the corners, and only the samples it needs to stay
 /// within [tolerance].
-(List<Offset>, bool) _flatten(PathMetric metric, double tolerance) {
+({List<Offset> polyline, bool isClosed}) _flatten(
+  PathMetric metric,
+  double tolerance,
+) {
   final length = metric.length;
   if (!length.isFinite || length <= 0) {
-    return (const [], false);
+    return (polyline: const [], isClosed: false);
   }
   final sampling = _samplingPerTolerance * tolerance;
   // A closed contour takes at least three steps, so it stays a polygon however
@@ -113,7 +116,7 @@ const _maxSteps = 1 << 20;
     closed: sampler.isClosed,
     tolerance: tolerance,
   );
-  return (points, sampler.isClosed);
+  return (polyline: points, isClosed: sampler.isClosed);
 }
 
 /// Removes the [points] that lie within [tolerance] of the edge that replaces
@@ -122,8 +125,8 @@ const _maxSteps = 1 << 20;
 /// This needs fewer points than splitting at the farthest point, which halves
 /// stretches that would fit in one and a half edges.
 ///
-/// [anchors] holds the ascending indices of the points to keep. Each stretch
-/// between two anchors is simplified on its own, the one that wraps around a
+/// [anchors] holds the ascending indices of the points to keep. It simplifies
+/// each stretch between two anchors on its own, the one that wraps around a
 /// [closed] contour's end included. An open contour also keeps its ends. A
 /// closed one with fewer than two anchors keeps its anchor, or its first
 /// point, and the point farthest from it.
@@ -177,8 +180,8 @@ List<Offset> _simplify(
   ];
 }
 
-/// The farthest index after [from], up to [to], whose edge from [from] keeps
-/// the points between them within the tolerance.
+/// Returns the farthest index after [from], up to [to], whose edge from [from]
+/// keeps the points between them within the tolerance.
 ///
 /// It doubles the stride until an edge fails, then bisects, so it may miss a
 /// farther index that fits. Indices past the end of [points] wrap around, for
@@ -205,8 +208,8 @@ int _reach(List<Offset> points, int from, int to, double toleranceSquared) {
   return reached;
 }
 
-/// Whether the points between [from] and [to] all lie within the tolerance of
-/// the edge between them.
+/// Returns whether the points between [from] and [to] all lie within the
+/// tolerance of the edge between them.
 bool _fits(List<Offset> points, int from, int to, double toleranceSquared) {
   final count = points.length;
   final start = points[from % count];
@@ -233,8 +236,8 @@ int _farthestFrom(List<Offset> points, int origin) {
   return farthest;
 }
 
-/// The squared distance from [point] to the closest point on the line segment
-/// between [from] and [to].
+/// Returns the squared distance from [point] to the closest point on the line
+/// segment between [from] and [to].
 double _distanceToSegmentSquared(Offset point, Offset from, Offset to) {
   final segmentX = to.dx - from.dx;
   final segmentY = to.dy - from.dy;
@@ -391,8 +394,7 @@ class _ContourSampler(
   /// different tangents, so a corner if they differ.
   ///
   /// Only a contour whose metric is closed counts as closed. One that ends
-  /// where it starts without being closed is drawn open, so it keeps both
-  /// ends.
+  /// where it starts without being closed stays open, so it keeps both ends.
   void _close(Tangent first, Tangent last) {
     isClosed = points.length > 1 && _metric.isClosed;
     if (!isClosed) {
@@ -431,8 +433,8 @@ class _ContourSampler(
     }
   }
 
-  /// How far the contour between the two samples bends away from the chord
-  /// between them, as a share of [_maxDeviation].
+  /// Returns how far the contour between the two samples bends away from the
+  /// chord between them, as a share of [_maxDeviation].
   ///
   /// The stretch is flat enough when this is at most 1. It's infinite when a
   /// tangent points back along the chord.

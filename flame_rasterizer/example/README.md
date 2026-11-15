@@ -101,7 +101,7 @@ After flame_path_shapes' `CollidableSvgPathsExample`. SVGs picked at random, as 
 size of the game at a zoom of 1. Their hitboxes are flame_rasterizer's `SvgHitbox`es, in the shape of their paths,
 whatever draws them. Two SVGs that collide swap their velocities, and one that hits a wall bounces off it.
 
-Collisions are checked once a frame, after the moves. So on a long frame, a small, fast SVG can cross a wall without
+Flame checks collisions once a frame, after the moves. So on a long frame, a small, fast SVG can cross a wall without
 touching it. One whose centre went past a wall comes back to it, moving away from it.
 
 Its knobs pick:
@@ -113,7 +113,7 @@ Its knobs pick:
 - **Speed**: as above.
 - **Cache mode** and **Cache size**: as above.
 
-The status bar adds the collisions so far. Hitboxes aren't drawn.
+The status bar adds the collisions so far. The game doesn't draw hitboxes.
 
 ## Collision Detection ▸ Multiple Shapes
 
@@ -131,10 +131,10 @@ Its knobs pick:
   Flame SVG with Flame's `PathComponent`. The shapes of one SVG share one path, sized by their components' scale, so
   with flame_rasterizer they share one scene, tinted or not. New shapes make a new game, as a new renderer does.
 - **Shape Number**: 2 to 50, 15 by default, not counting the snowman, in the running game. As in Collidable Svgs, new
-  shapes come in where there's room, or the last ones go. The rows' widths, gap and height share one scale: the
-  largest, up to 1, at which the rows hold that many shapes. It's 1 up to about 20 shapes in a 1280×692 game, and 0.62
-  at 50. In the emulator's 411×851, it's 0.66 at 15 and 0.40 at 50. All the shapes are resized to it. The snowman keeps
-  the size it has in Flame's example.
+  shapes come in where there's room, or the last ones go. The rows' widths, gap and height share one scale: the largest,
+  up to 1, at which the rows hold that many shapes. It's 1 up to about 20 shapes in a 1280×692 game, and 0.62 at 50. In
+  the emulator's 411×851, it's 0.66 at 15 and 0.40 at 50. The game resizes all the shapes to it. The snowman keeps the
+  size it has in Flame's example.
 - **Zoom** and **Speed**: as in Collidable Svgs.
 - **Cache mode** and **Cache size**: as in Collidable Svgs, with SVGs only, as paths use no flame_svg cache.
 
@@ -154,10 +154,10 @@ After flame_path_shapes' `RevoluteJointWithMotorExample`, which extends Flame's 
 at a zoom of 1. Each tap drops 15 bodies, half balls and half SVGs picked at random as above, 3 to 3.5 m at their
 longer side. They fall through the funnel into the wheel.
 
-The SVG bodies collide as the convex pieces of their outlines, made once for each SVG and size
-(`commons/forge2d.dart`). An `SvgHitbox` of the SVG's `outline`, sampled every 0.1 m, gives polygons, and Flame's
-`convexPieces` cuts them into polygons of at most 8 vertices, as Box2D takes them. Pieces under 0.1 m across, about a
-pixel, are left out, as flame_forge2d warns about them: a few of robot's and spaceship's at their smallest sizes.
+The SVG bodies collide as the convex pieces of their outlines, made once for each SVG and size (`commons/forge2d.dart`).
+An `SvgHitbox` of the SVG's `outline`, sampled every 0.1 m, gives polygons, and Flame's `convexPieces` cuts them into
+polygons of at most 8 vertices, as Box2D takes them. The example leaves out pieces under 0.1 m across, about a pixel, as
+flame_forge2d warns about them: a few of robot's and spaceship's at their smallest sizes.
 
 Its knobs pick:
 
@@ -204,7 +204,7 @@ of 1.
   - Robots fall straight down at 135 a second, 10% slower than the original's 150. They swing as pendulums around their
     centres, hitboxes included: from upright to one side, then to the other, and back, 2 s a swing. Each swings by a
     whole number of degrees from 5 to 15, picked at random.
-  - Spaceships and rockets are tilted by a whole number of degrees from −15 to 15, and fly where they point, at 135 a
+  - Spaceships and rockets tilt by a whole number of degrees from −15 to 15, and fly where they point, at 135 a
     second give or take 10%, both picked at random. They fly until they're out of the bottom or a side.
   - A game starts with a first wave, as if the waves had been coming for a while. Its rows go from the top down to 20%
     of the game's height, well above the player, and the robots' swings are as far along as their fall.
@@ -286,9 +286,9 @@ Inspired by Atari's Tempest (1981): a tube shooter with a tube, enemies, colours
   and it and an enemy shot destroy each other. On a spike, it takes 6% of the spike's length off. Scores: a climber
   100, a splitter 150, a seeder 50, a zapper 200, an edge-walker 250, and a hit on a spike 2.
 - **Losing the ship.** An enemy shot or a climber at the rim in the ship's lane, a pulse in its lane, or an edge-walker
-  at the rim crossing its lane or on one of its edges destroys the ship. It blows up and fades out, and a life is lost.
-  The enemies in the tube go back to the far end of their lanes, as dots, and the ship comes back 1.5 s later. After
-  its 3 lives, Game Over shows and the game stands still, until a tap, or Enter, starts a new one.
+  at the rim crossing its lane or on one of its edges destroys the ship. It blows up and fades out, and the player loses
+  a life. The enemies in the tube go back to the far end of their lanes, as dots, and the ship comes back 1.5 s later.
+  After its 3 lives, Game Over shows and the game stands still, until a tap, or Enter, starts a new one.
 - **READY.** At the end of each zoom, and once a lost ship is back, READY shows in the middle and nothing comes. A tap,
   counted only once READY is up, or any key but a modifier alone, begins the level. It does nothing else: no shot, no
   move of the ship, no purge.
@@ -351,14 +351,14 @@ Its knobs pick:
 - **Renderer**: GPU (mesh), GPU (atlas) and Canvas draw with `RasterizerPathComponent`s, Flame with Flame's
   `PathComponent`s. Flame is the Flame SVG entry of the other use cases. On web, the GPU entries are inactive, as
   Flutter GPU isn't available there, and the canvas renderer draws the paths.
-- **Level**: the level a new game starts at, by its number and its tube's name, so that any tube can be seen without
-  playing up to it.
+- **Level**: the level a new game starts at, by its number and its tube's name, so that the player can see any tube
+  without playing up to it.
 - **Drifting stars**: on by default. On, the stars stay between the zoom and the drop. Off, they only show on those,
   and the mesh renderer's targets, which the stars spread over the window, can shrink in play. It changes the running
   game.
 - **Glow**: shown with GPU (mesh) only, the one renderer that draws glows, and off by default. It makes the lines glow,
   thinner with depth, as they are: the shapes' glows 3 times as wide as their lines, and those of the tube, the ship's
-  lane, the spikes and the bolts 2 times. It changes the running game, whose lines are imported again.
+  lane, the spikes and the bolts 2 times. It changes the running game, which imports its lines again.
 - **Sound**: on by default. It changes the running game, which loads its sounds the first time it's on. Tests build
   the game with its sounds off.
 - **Zoom**: the camera's zoom on the tube, whose lines keep their widths in device pixels, as the game makes its paths
@@ -435,8 +435,8 @@ The integration tests, in `integration_test/`, run on a device, with
 - `tube_shooter_test.dart`: after a warm-up, Tube Shooter with the mesh renderer on three tubes: the octagon, closed,
   the horseshoe, open, and the star, concave. Each runs with its glow on and off, six games in all, through its zoom,
   two seconds of fire sweeping round the rim, without zappers, and its drop, with their stars. flame_rasterizer draws
-  the paths in one run, and the tube's path is made again each frame of the zoom and the drop. Then, except on web, it
-  plays a whole game with each GPU renderer, none of whose frames may fall back to the canvas renderer or
+  the paths in one run, and the game makes the tube's path again each frame of the zoom and the drop. Then, except on
+  web, it plays a whole game with each GPU renderer, none of whose frames may fall back to the canvas renderer or
   `Canvas.drawPath`.
 
 Each test but `knobs_test.dart` prints a `RASTERIZER_EXAMPLE` line per game, with its status, and Svg Shooter's and

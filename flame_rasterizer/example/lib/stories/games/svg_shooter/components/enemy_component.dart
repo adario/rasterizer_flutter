@@ -55,7 +55,7 @@ class EnemyComponent(
 
   /// The least and the most that a swing turns, either way, in whole
   /// degrees.
-  static const swingDegrees = (5, 15);
+  static const swingDegrees = (least: 5, most: 15);
 
   /// Seconds that a swing takes, from upright to one side, then to the other
   /// side, and back.
@@ -115,7 +115,7 @@ class EnemyComponent(
     const colors = ExampleColors.dynamics;
     final color = colors[random.nextInt(colors.length)];
     if (kind.swings) {
-      final (least, most) = swingDegrees;
+      final (:least, :most) = swingDegrees;
       final degrees = least + random.nextInt(most - least + 1);
       return (
         color: color,

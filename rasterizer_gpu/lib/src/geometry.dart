@@ -18,7 +18,7 @@ class const Transform(
   const Transform.scale(double s) : this(s, 0, 0, s, 0, 0);
   const Transform.translation(double tx, double ty) : this(1, 0, 0, 1, tx, ty);
 
-  /// The transform that applies this one, then [t].
+  /// Returns the transform that applies this one, then [t].
   ///
   /// It matches the core's `Ra::Transform::concat`.
   Transform concat(Transform t) => Transform(
@@ -46,7 +46,7 @@ class const Bounds(
   bool get isNull => lx == _fltMax && ly == _fltMax;
   bool get isRect => ux > lx && uy > ly;
 
-  /// The transform that fits [inner] into these bounds.
+  /// Returns the transform that fits [inner] into these bounds.
   ///
   /// It centers [inner] and keeps its aspect ratio, as the core's
   /// `Ra::Bounds::fitTransform` does.
