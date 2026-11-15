@@ -8,9 +8,10 @@ llvmpipe on a virtual display). Commands:
                          `flutter create` generated or recorded goldens; it adds and updates files, never deletes
   clean                  remove the container's copy, build outputs and pub cache (the volumes), not the image
 Add --vnc to run or shell to view the virtual display from the Mac: vnc://localhost:5901 (Screen Sharing), password
-rasterizer; --no-sync to keep the container's copy as it is, e.g. with runners `flutter create` generated there. The
-checkout is mounted read-only and copied into a volume, without build/, .dart_tool/ or .git, so the container's package
-config and hook outputs don't clash with the Mac's. E.g.
+rasterizer; --wayland to run apps on Wayland, in weston on the virtual display, rather than on X11; --no-sync to keep
+the container's copy as it is, e.g. with runners `flutter create` generated there. The checkout is mounted read-only and
+copied into a volume, without build/, .dart_tool/ or .git, so the container's package config and hook outputs don't
+clash with the Mac's. E.g.
   python3 -I tool/linux/linux.py run -C rasterizer_gpu/example flutter build linux"""
 import os, subprocess, sys
 
@@ -28,13 +29,15 @@ def docker(*args):
     return subprocess.call(['docker', *args])
 
 
-def run(cmd, d='.', vnc=False, interactive=False, sync=True):
+def run(cmd, d='.', vnc=False, wayland=False, interactive=False, sync=True):
     args = ['run', '--rm', '-v', f'{ROOT}:/src:ro']
     for name, path in VOLUMES.items():
         args += ['-v', f'{name}:{path}']
     if vnc:
         # Only on the Mac's loopback; 5901, as the Mac's own Screen Sharing service may have 5900
         args += ['-e', 'VNC=1', '-p', '127.0.0.1:5901:5900']
+    if wayland:
+        args += ['-e', 'WAYLAND=1']
     if interactive:
         args.append('-it')
     # The shell starts in / so that rsync can replace /work's contents, then goes to DIR. Excluded paths are kept in
@@ -58,17 +61,17 @@ def main(argv):
     if not argv:
         sys.exit(__doc__)
     command, rest = argv[0], argv[1:]
-    vnc, sync = '--vnc' in rest, '--no-sync' not in rest
-    rest = [a for a in rest if a not in ('--vnc', '--no-sync')]
+    vnc, wayland, sync = '--vnc' in rest, '--wayland' in rest, '--no-sync' not in rest
+    rest = [a for a in rest if a not in ('--vnc', '--wayland', '--no-sync')]
     d = '.'
     if rest[:1] == ['-C']:
         d, rest = rest[1], rest[2:]
     if command == 'build':
         return docker('build', '-t', IMAGE, *rest, TOOL)
     if command == 'run' and rest:
-        return run(rest, d, vnc, sync=sync)
+        return run(rest, d, vnc, wayland, sync=sync)
     if command == 'shell':
-        return run(['bash'], d, vnc, interactive=sys.stdin.isatty(), sync=sync)
+        return run(['bash'], d, vnc, wayland, interactive=sys.stdin.isatty(), sync=sync)
     if command == 'doctor':
         return run(['sh', '-c', 'flutter doctor -v; eglinfo -B 2>&1 | grep -i -m4 "renderer\\|version"; '
                                 'glxinfo -B | grep -i "renderer\\|version"'])

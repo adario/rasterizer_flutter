@@ -28,7 +28,8 @@ support, self-test and switch: its `backend` is `mesh` where it's supported, and
 - The Android Emulator (API 37, arm64, with the Mac's GPU through gfxstream), on Impeller's Vulkan and OpenGL ES
   backends and on Skia; and API 28, where Flutter renders with Skia.
 - Linux arm64 in a Docker container (the repository's `tool/linux/`): Debian trixie, with Mesa's llvmpipe, which renders
-  on the CPU, on Xvfb. It uses Impeller's OpenGL ES backend, the only one Flutter's Linux embedder has.
+  on the CPU, on X11 (Xvfb) and on Wayland (weston). It uses Impeller's OpenGL ES backend, the only one Flutter's Linux
+  embedder has.
 
 On each, the example's golden tests pass with the GPU and canvas renderers:
 

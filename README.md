@@ -33,7 +33,7 @@ still change.
 | macOS | GPU, on Impeller's Metal | macOS 26.7, M1 Mac |
 | iOS | GPU, on Impeller's Metal | iPhone 11 Pro (A13, iOS 26.7.2); iOS Simulator (iPhone 18 Pro, iOS 27.0) |
 | Android, API 24+, arm64 and x86_64 | GPU on Vulkan; canvas on OpenGL ES unless the app opts in; canvas below API 29, on Skia | Android Emulator: API 37 (arm64, host GPU through gfxstream) on Vulkan, OpenGL ES and Skia; API 28 on Skia |
-| Linux | canvas on OpenGL ES, Linux's only backend, unless the app opts in | arm64 Docker container: Debian trixie, Mesa's llvmpipe on the CPU, Xvfb |
+| Linux | canvas on OpenGL ES, Linux's only backend, unless the app opts in | arm64 Docker container: Debian trixie, Mesa's llvmpipe on the CPU, on X11 (Xvfb) and on Wayland (weston) |
 | Web | canvas | Headless Chrome, with CanvasKit and skwasm |
 | Windows | canvas | not built: no machine |
 

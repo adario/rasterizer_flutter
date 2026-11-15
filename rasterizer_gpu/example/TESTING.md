@@ -172,6 +172,9 @@ Impeller's OpenGL ES, on Mesa's llvmpipe. For example:
 python3 -I tool/linux/linux.py run -C rasterizer_gpu/example flutter test integration_test/self_test_test.dart -d linux
 ```
 
+They run on X11, unless `--wayland` follows `run`: then on Wayland, in weston, where Flutter draws into a subsurface,
+as on most Linux desktops.
+
 The self-test's file is then in the container's `~/.cache`, which a run doesn't keep. To keep it across launches, as
 the crash guard's kill tests need, set `XDG_CACHE_HOME` into `build/`. The app's `linux/` runner was generated in the
 container, as the Mac's Flutter doesn't build for Linux, and turns Flutter GPU on in `linux/runner/my_application.cc`.
