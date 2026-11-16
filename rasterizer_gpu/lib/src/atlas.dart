@@ -220,8 +220,15 @@ Future<String?> _renderProbe(
 ) {
   // Built without parsing, so that a parser's bug doesn't fail the GPU.
   final scene = AtlasScene(ra.Scene.selfTest());
-  // Two frames in flight, so the first frame's image lasts until it's read.
-  final renderer = AtlasRenderer._(library, 2, format);
+  final AtlasRenderer renderer;
+  try {
+    // Two frames in flight, so the first frame's image lasts until it's
+    // read.
+    renderer = AtlasRenderer._(library, 2, format);
+  } catch (_) {
+    scene.dispose();
+    rethrow;
+  }
   final parts = <({bool curves, RasterizerRunPart? part})>[];
   try {
     for (final curves in [true, false]) {
