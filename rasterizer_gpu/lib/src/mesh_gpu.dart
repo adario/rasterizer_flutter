@@ -420,9 +420,11 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   /// Draws once with each of its pipelines into a scratch target, which
   /// compiles those not compiled yet.
   ///
-  /// On OpenGL ES, a pipeline compiles at its first draw, which blocks the UI
-  /// thread. So the mesh renderer compiles them all as it's made there,
-  /// rather than at whichever frame first draws each.
+  /// On OpenGL ES, a pipeline compiles at its first draw, which stalls the UI
+  /// thread as the renderer is made, and the raster thread at the next frame.
+  /// On Mesa's llvmpipe, that took 170 ms, then 820 ms, in release builds with
+  /// no shader cache. So the mesh renderer compiles them all as it's made
+  /// there, rather than at whichever frame first draws each.
   void warmUp() {
     gpu.BufferView view(TypedData data) {
       final buffer = context.createDeviceBufferWithCopy(

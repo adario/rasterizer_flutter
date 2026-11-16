@@ -83,9 +83,10 @@ have only run on the Android emulator's OpenGL ES and on Mesa's llvmpipe.
   renders a scene accumulating in r32Float, reads it back alongside the app's frames, and switches the GPU renderer to
   r16g16b16a16Float if the pixels are wrong. It then checks r16g16b16a16Float too, but only reports a failure: falling
   back to the canvas renderer that late would need scenes to switch.
-- **Each renderer compiles all of its pipelines as it's made**, as each compile blocks the UI thread, so the app
-  hitches once rather than at whichever frames first draw with each: 110 ms for the GPU renderer on the Android
-  emulator, 470 ms on llvmpipe (release builds, no shader cache).
+- **Each renderer compiles all of its pipelines as it's made**, as each compile stalls the thread that runs it, so the
+  app hitches once rather than at whichever frames first draw with each. On OpenGL ES, part of it runs on the UI thread
+  as the renderer is made, the rest on the raster thread at the next frame. For the GPU renderer, that's 110 ms on the
+  Android emulator, and 450 ms then 85 ms on llvmpipe (release builds, no shader cache).
 - **Nothing waits for a frame.** With Flutter 3.50.0, Flutter GPU's calls don't block before the first rasterized frame
   on OpenGL ES, so renderers can be made before `runApp`.
 
