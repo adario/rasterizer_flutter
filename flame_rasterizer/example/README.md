@@ -5,6 +5,11 @@
 `flutter run -d <macos | chrome | an iPhone | emulator-5554 | linux>`. On an iPhone, pick your development team in Xcode
 first (Runner ▸ Signing & Capabilities), as the project has none.
 
+On Linux, the app's sounds go through flame_audio's audioplayers_linux, which builds against GStreamer. On Debian or
+Ubuntu, install its headers first: `sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev`. Playing the
+sounds also needs `gstreamer1.0-plugins-base` and `gstreamer1.0-plugins-good`, for its WAV parser, which most desktops
+have already. The repository's Linux container (`tool/linux/`) installs all four.
+
 The example runs on Flame's main: flame 2.0.0-dev, flame_svg 3.0.0-dev and flame_forge2d 0.21.0-dev, through the
 workspace's dependency overrides (the root `pubspec.yaml`), as Flame's examples do. On web, flame_rasterizer draws with
 the canvas renderer.
