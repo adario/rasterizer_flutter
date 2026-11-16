@@ -181,6 +181,28 @@ void main() {
       }
     });
 
+    test(
+      'a probe forgotten before it fails leaves the format as it is',
+      () async {
+        RasterizerGpu.debugResetSupport();
+        RasterizerGpu.debugFailFormatProbe = {'r32Float pixels'};
+        try {
+          final renderer = await RasterizerRenderer.create(slots: 1);
+          final probe = RasterizerGpu.debugFormatProbe;
+          RasterizerGpu.debugResetSupport();
+          expect(await probe, 'r32Float: forced to fail');
+          expect(
+            RasterizerGpu.supportDetail,
+            'OpenGL ES, accumulating in r32Float, not checked yet',
+          );
+          renderer.dispose();
+        } finally {
+          RasterizerGpu.debugFailFormatProbe = {};
+          RasterizerGpu.debugResetSupport();
+        }
+      },
+    );
+
     test('where both formats fail, the GPU renderer still draws, and its '
         'detail says so', () async {
       RasterizerGpu.debugResetSupport();

@@ -64,8 +64,13 @@ String get formatDetail =>
 String get meshDetail =>
     gpu.gpuContext.doesSupportOffscreenMSAA ? '4× multisampled' : 'aliased';
 
+/// How many times [resetFormatProbe] ran, so that a probe it forgot doesn't
+/// write its result after.
+int _probeResets = 0;
+
 /// Forgets the format probe and its result, for RasterizerGpu's tests.
 void resetFormatProbe() {
+  _probeResets++;
   accumulationFormat = gpu.PixelFormat.r32Float;
   formatProbe = _formatFailure = _fallbackFailure = null;
   _formatChecked = false;
@@ -154,28 +159,32 @@ Future<String?> probeFormat(
   gpu.ShaderLibrary library,
   Set<String> fail, {
   bool apply = true,
-}) => _then(_probe(library, gpu.PixelFormat.r32Float, fail), (failure) {
-  if (failure == null) {
-    if (apply) {
-      _formatChecked = true;
+}) {
+  final resets = _probeResets;
+  bool applies() => apply && resets == _probeResets;
+  return _then(_probe(library, gpu.PixelFormat.r32Float, fail), (failure) {
+    if (failure == null) {
+      if (applies()) {
+        _formatChecked = true;
+      }
+      return null;
     }
-    return null;
-  }
-  if (apply) {
-    _formatFailure = failure;
-    accumulationFormat = gpu.PixelFormat.r16g16b16a16Float;
-  }
-  return _then(_probe(library, gpu.PixelFormat.r16g16b16a16Float, fail), (
-    fallback,
-  ) {
-    if (apply) {
-      _fallbackFailure = fallback;
-      _formatChecked = true;
+    if (applies()) {
+      _formatFailure = failure;
+      accumulationFormat = gpu.PixelFormat.r16g16b16a16Float;
     }
-    return 'r32Float: $failure'
-        '${fallback == null ? '' : '; r16g16b16a16Float: $fallback'}';
+    return _then(_probe(library, gpu.PixelFormat.r16g16b16a16Float, fail), (
+      fallback,
+    ) {
+      if (applies()) {
+        _fallbackFailure = fallback;
+        _formatChecked = true;
+      }
+      return 'r32Float: $failure'
+          '${fallback == null ? '' : '; r16g16b16a16Float: $fallback'}';
+    });
   });
-});
+}
 
 /// Runs [then] on [result]: at once if it's a value, else once it completes.
 Future<String?> _then(
