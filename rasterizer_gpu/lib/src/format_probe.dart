@@ -5,10 +5,10 @@ import 'dart:typed_data';
 
 /// A 160 x 160 SVG for the OpenGL ES format probe.
 ///
-/// The probe doesn't parse it: `src/ra_self_test.hpp` builds its shapes as
+/// The probe doesn't parse it: `src/ra_probe_scene.hpp` builds its shapes as
 /// NanoSVG parses them, so that a parser's bug can't fail the GPU renderer.
 /// A change here needs the same change there, which
-/// `test/self_test_scene_test.dart` checks.
+/// `test/probe_scene_test.dart` checks.
 ///
 /// Drawn by the GPU renderer, its paths make each kind of entry that the core
 /// writes for SVGs: opaques (the opaque paths' inner cells), instances, fast
@@ -25,7 +25,7 @@ import 'dart:typed_data';
 ///   direction, filled non-zero, wind its middle twice, which must draw once.
 /// - F and G: a small cyan square, and a small orange circle at 80% opacity.
 ///   They make molecules.
-const selfTestSvg = '''
+const probeSvg = '''
 <svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
   <rect x="8" y="8" width="144" height="48" fill="#ff0000"/>
   <circle cx="80" cy="60" r="40" fill="#0000ff" fill-opacity="0.5"/>
@@ -39,8 +39,8 @@ const selfTestSvg = '''
 </svg>
 ''';
 
-/// The width and height of [selfTestSvg], in pixels.
-const selfTestSize = 160;
+/// The width and height of [probeSvg], in pixels.
+const probeSize = 160;
 
 /// A colour, not premultiplied, with each channel from 0 to 255.
 typedef _Colour = ({int red, int green, int blue, int alpha});
@@ -81,8 +81,8 @@ const List<({int x, int y, List<_Colour> layers})> _probes = [
   (x: 80, y: 139, layers: [_orange]),
 ];
 
-/// The pixels that [checkSelfTest] checks.
-Iterable<({int x, int y})> get selfTestPixels =>
+/// The pixels that [checkProbePixels] checks.
+Iterable<({int x, int y})> get probePixels =>
     _probes.map((p) => (x: p.x, y: p.y));
 
 /// The largest difference allowed in each channel from the expected colour,
@@ -97,7 +97,7 @@ const _tolerance = 3;
 ///
 /// Returns null if every probe matches, else a description of the first that
 /// doesn't.
-String? checkSelfTest(
+String? checkProbePixels(
   Uint8List rgba,
   int stride,
   int x0,

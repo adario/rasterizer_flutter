@@ -17,7 +17,7 @@ import 'gpu_renderer.dart';
 import 'image_run.dart';
 import 'meshes.dart';
 import 'paths/scene_paths.dart';
-import 'self_test.dart';
+import 'format_probe.dart';
 
 // The GPU renderer, and the entry points of both GPU renderers: the core,
 // through FFI, and Flutter GPU. rasterizer_gpu.dart imports this file where
@@ -141,8 +141,8 @@ RasterizerSupport checkSupport(int textureWidth) {
 /// coverage in r32Float, else in r16g16b16a16Float, and completes with null
 /// if r32Float passed, else with why each format failed.
 ///
-/// It renders [selfTestSvg]'s scene with curves and without, built without
-/// parsing it (`src/ra_self_test.hpp`), so that it checks the GPU alone: a
+/// It renders [probeSvg]'s scene with curves and without, built without
+/// parsing it (`src/ra_probe_scene.hpp`), so that it checks the GPU alone: a
 /// parser's bug would fail it as if the GPU drew wrongly. It renders before
 /// it returns, then reads the pixels back through a canvas, alongside the
 /// app's frames. With [apply], an r32Float failure makes
@@ -217,7 +217,7 @@ FutureOr<String?> _probe(
   }
 }
 
-/// Renders [selfTestSvg]'s scene accumulating in [format], with curves and
+/// Renders [probeSvg]'s scene accumulating in [format], with curves and
 /// without, and returns a future of the failure, or of null if its pixels
 /// are as expected.
 ///
@@ -228,7 +228,7 @@ Future<String?> _renderProbe(
   gpu.PixelFormat format,
 ) {
   // Built without parsing, so that a parser's bug doesn't fail the GPU.
-  final scene = AtlasScene(ra.Scene.selfTest());
+  final scene = AtlasScene(ra.Scene.probe());
   final AtlasRenderer renderer;
   try {
     // Two frames in flight, so the first frame's image lasts until it's
@@ -241,11 +241,7 @@ Future<String?> _renderProbe(
   final parts = <({bool curves, RasterizerRunPart? part})>[];
   try {
     for (final curves in [true, false]) {
-      final frame = renderer.beginFrame(
-        selfTestSize,
-        selfTestSize,
-        curves: curves,
-      );
+      final frame = renderer.beginFrame(probeSize, probeSize, curves: curves);
       final run = frame.addRun()..add(scene, 1, 0, 0, 1, 0, 0);
       frame.render();
       parts.add((curves: curves, part: run.parts.firstOrNull));
@@ -273,7 +269,7 @@ Future<String?> _renderProbe(
 
 /// Reads [part]'s image back through a canvas, and checks it.
 ///
-/// Returns null if its pixels are [selfTestSvg]'s, else the failure.
+/// Returns null if its pixels are [probeSvg]'s, else the failure.
 Future<String?> _checkPart(RasterizerRunPart? part) async {
   if (part == null) {
     return 'nothing rendered';
@@ -302,7 +298,7 @@ Future<String?> _checkPart(RasterizerRunPart? part) async {
     return 'no readback';
   }
   final s = part.source, d = part.destination;
-  return checkSelfTest(
+  return checkProbePixels(
     Uint8List.sublistView(data),
     4 * image.width,
     s.left.toInt(),

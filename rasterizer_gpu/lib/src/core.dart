@@ -19,7 +19,7 @@ import 'paths/path_contours.dart';
 export 'geometry.dart';
 export 'atlas.dart' show AtlasFrame, AtlasRenderer, AtlasRun, AtlasScene;
 export 'paths/path_contours.dart' show PathContours;
-export 'self_test.dart' show selfTestSize, selfTestSvg;
+export 'format_probe.dart' show probeSize, probeSvg;
 
 extension on Transform {
   raw.RaTransform _toNative() => Struct.create<raw.RaTransform>()
@@ -315,12 +315,12 @@ class Scene._(
     });
   }
 
-  /// The OpenGL ES format probe's scene: [selfTestSvg]'s, built without
+  /// The OpenGL ES format probe's scene: [probeSvg]'s, built without
   /// parsing it, so that the probe checks the GPU alone.
-  factory Scene.selfTest() {
+  factory Scene.probe() {
     return using((arena) {
       final ctm = arena<raw.RaTransform>();
-      final handle = raw.ra_scene_self_test(ctm);
+      final handle = raw.ra_scene_probe(ctm);
       // The core returns null when it runs out of memory.
       if (handle == nullptr) {
         throw OutOfMemoryError();

@@ -72,9 +72,9 @@ RA_EXPORT RaLayout ra_layout(void);
 RA_EXPORT RaScene *ra_scene_from_svg(const char *path, RaTransform *ctm);
 // The same, from an SVG's bytes, which needn't be null-terminated, for hosts that load them from assets
 RA_EXPORT RaScene *ra_scene_from_svg_data(const char *data, uint64_t length, RaTransform *ctm);
-// The OpenGL ES format probe's scene, as ra_scene_from_svg_data makes it from selfTestSvg, but built without parsing, so that
+// The OpenGL ES format probe's scene, as ra_scene_from_svg_data makes it from probeSvg, but built without parsing, so that
 // the probe checks the GPU alone. NULL if it runs out of memory
-RA_EXPORT RaScene *ra_scene_self_test(RaTransform *ctm);
+RA_EXPORT RaScene *ra_scene_probe(RaTransform *ctm);
 RA_EXPORT void ra_scene_release(RaScene *scene);
 RA_EXPORT uint64_t ra_scene_count(const RaScene *scene);
 RA_EXPORT RaBounds ra_scene_bounds(const RaScene *scene);

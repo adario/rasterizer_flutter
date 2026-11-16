@@ -52,11 +52,7 @@ void main() {
         if (e.count > 0) e.type,
     ]);
     for (final curves in [true, false]) {
-      final frame = renderer.beginFrame(
-        selfTestSize,
-        selfTestSize,
-        curves: curves,
-      );
+      final frame = renderer.beginFrame(probeSize, probeSize, curves: curves);
       frame.addRun().add(scene, 1, 0, 0, 1, 0, 0);
       frame.render();
     }

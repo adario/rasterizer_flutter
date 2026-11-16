@@ -8,7 +8,7 @@
 #include "ra_frame.hpp"
 #include "ra_mesh.hpp"
 #include "ra_paths.hpp"
-#include "ra_self_test.hpp"
+#include "ra_probe_scene.hpp"
 #include "RasterizerSVG.hpp"
 
 struct RaScene { Ra::SceneRef scene; RaBounds svgBounds = { 0.f, 0.f, 0.f, 0.f }; };
@@ -96,8 +96,8 @@ RaScene *ra_scene_from_svg(const char *path, RaTransform *ctm) {
 RaScene *ra_scene_from_svg_data(const char *data, uint64_t length, RaTransform *ctm) {
     return sceneFromImage(guarded<NSVGimage *>(nullptr, [&] { return parseSvgData(data, length); }), ctm);
 }
-RaScene *ra_scene_self_test(RaTransform *ctm) {
-    return sceneFromImage(RaSelfTest::image(), ctm);
+RaScene *ra_scene_probe(RaTransform *ctm) {
+    return sceneFromImage(RaProbeScene::image(), ctm);
 }
 void ra_scene_release(RaScene *scene) {
     delete scene;

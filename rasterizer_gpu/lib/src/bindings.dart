@@ -143,7 +143,7 @@ external Pointer<RaSceneHandle> ra_scene_from_svg_data(
 );
 
 @Native<Pointer<RaSceneHandle> Function(Pointer<RaTransform>)>()
-external Pointer<RaSceneHandle> ra_scene_self_test(Pointer<RaTransform> ctm);
+external Pointer<RaSceneHandle> ra_scene_probe(Pointer<RaTransform> ctm);
 
 @Native<Void Function(Pointer<RaSceneHandle>)>()
 external void ra_scene_release(Pointer<RaSceneHandle> scene);
