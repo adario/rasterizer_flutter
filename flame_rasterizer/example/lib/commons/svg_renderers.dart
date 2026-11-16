@@ -229,6 +229,17 @@ mixin ExampleRasterizer<W extends World> on StoryGame<W>, HasRasterizer<W> {
   @override
   RasterizerBackend get rasterizerGpu => renderer.gpu;
 
+  /// Loads the game while its renderer is created, and completes once both
+  /// are done, so that the story's spinner shows until then.
+  ///
+  /// On OpenGL ES, creating the renderer compiles its shaders. Without the
+  /// wait, the game would start meanwhile: its first frame would create the
+  /// renderer and stall, and its SVGs would show only once it's ready.
+  @override
+  Future<void> onLoad() async {
+    await Future.wait([Future.sync(super.onLoad), rasterizerReady]);
+  }
+
   /// The renderer's entry. With the canvas renderer, it says whether the knob
   /// forced it, or else why the GPU renderer doesn't run.
   @override

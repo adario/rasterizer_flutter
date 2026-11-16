@@ -25,8 +25,10 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// [rasterizerGpu] where that's supported, else the canvas renderer, the same
 /// choice as for the [RasterizerSvg]s' imports. Until the renderer is ready,
 /// vector content drawn into the game's canvas draws nothing. On OpenGL ES,
-/// creating a GPU renderer compiles its shaders, a hitch of up to half a
-/// second ([RasterizerGpu.allowOpenGles]).
+/// creating a GPU renderer compiles its shaders, which takes up to a second
+/// ([RasterizerGpu.allowOpenGles]). [rasterizerReady] completes after, so a
+/// game that awaits it in `onLoad` shows `GameWidget`'s `loadingBuilder`
+/// meanwhile.
 ///
 /// For a game larger than the renderer takes
 /// ([RasterizerRenderer.maxViewportSize] a side), such as a window over 4096
@@ -83,7 +85,8 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
   RasterizerFrame? get rasterizerFrame => _lastFrame;
   RasterizerFrame? _lastFrame;
 
-  /// Completes with the renderer.
+  /// Completes with the renderer, once it can draw: on OpenGL ES, once its
+  /// shaders have compiled.
   ///
   /// If the game is removed meanwhile, it completes with a renderer that's
   /// already disposed of. While [rasterizerSlots] or [rasterizerMeshSamples]

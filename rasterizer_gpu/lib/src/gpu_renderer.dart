@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_gpu/gpu.dart' as gpu;
@@ -401,27 +402,33 @@ class GpuRenderer(
   }
 
   /// Draws once with each pipeline state that [render] draws with, into
-  /// scratch textures, which compiles those not compiled yet.
+  /// scratch textures, which compiles those not compiled yet, and completes
+  /// once the GPU has run the draws.
   ///
   /// The states are: clear, opaques without and with blending, the four kinds
   /// of edges and molecules, and instances. Each compiles when it first draws,
   /// which stalls the thread that runs the draw. On OpenGL ES, that's partly
-  /// the UI thread, as the renderer is made, and partly the raster thread, at
-  /// the next frame. The states took 110 ms on the Android emulator. On
-  /// Mesa's llvmpipe, they took 450 ms on the UI thread, then 85 ms at the
-  /// next frame, in release builds with no shader cache. So the GPU renderer
-  /// compiles them all as it's made there, rather than at whichever frame
-  /// first draws each.
-  void warmUp() {
+  /// the UI thread, as the renderer is made, and partly the raster thread,
+  /// after. The states took 110 ms on the UI thread on the Android emulator,
+  /// then 50-90 ms on the raster thread. On Mesa's llvmpipe, they took 550
+  /// ms, then 150 ms, in release builds with no shader cache. These times
+  /// include the format probe's render, which the first renderer starts. So
+  /// the GPU renderer compiles them all as it's made there, rather than at
+  /// whichever frame first draws each.
+  Future<void> warmUp() {
+    final done = Completer<void>();
     for (var step = 0; step < 8; step++) {
-      _warmUp(step);
+      // Command buffers run in order, so the last one runs after the others.
+      _warmUp(step, step == 7 ? (_) => done.complete() : null);
     }
+    return done.future;
   }
 
-  /// Draws with pipeline state [step] of [warmUp]'s 8.
+  /// Draws with pipeline state [step] of [warmUp]'s 8, and calls [completed]
+  /// once the GPU has run the draw.
   ///
   /// Each step must set the same states that [render] sets for that draw.
-  void _warmUp(int step) {
+  void _warmUp(int step, [void Function(bool success)? completed]) {
     final slot = _warmSlot ??= RenderTargets(),
         shared = _warmShared ??= SharedTargets();
     _ensureTargets(slot, shared, 4, 4);
@@ -474,7 +481,7 @@ class GpuRenderer(
         hostBuffer.emplace(ByteData(16)),
       );
       pass.draw(4);
-      commandBuffer.submit();
+      commandBuffer.submit(completionCallback: completed);
       return;
     }
     final (pipeline, vertex) = switch (step) {
@@ -528,7 +535,7 @@ class GpuRenderer(
       hostBuffer.emplace(ByteData(64)),
     );
     pass.draw(4, instanceCount: 1);
-    commandBuffer.submit();
+    commandBuffer.submit(completionCallback: completed);
   }
 
   RenderTargets? _warmSlot;

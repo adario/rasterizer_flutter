@@ -161,8 +161,8 @@ class MeshRenderer(
   }
 
   /// Compiles its pipelines now, rather than at the frames that first draw
-  /// with each ([MeshGpu.warmUp]).
-  void warmUp() => _gpu.warmUp();
+  /// with each, and completes once the GPU has run them ([MeshGpu.warmUp]).
+  Future<void> warmUp() => _gpu.warmUp();
 
   @override
   void trimAtlas() {

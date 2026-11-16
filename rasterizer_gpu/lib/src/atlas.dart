@@ -335,8 +335,8 @@ RasterizerScene parseScene(Uint8List bytes) =>
 ///
 /// RasterizerRenderer.create only calls this where the renderer is supported.
 /// On OpenGL ES, the first one starts the format probe, with [fail] as
-/// [probeFormat]'s, and each compiles its pipelines as it's made
-/// ([GpuRenderer.warmUp]).
+/// [probeFormat]'s, and each compiles its pipelines as it's made, and
+/// completes once the GPU has run them ([GpuRenderer.warmUp]).
 Future<RasterizerRenderer> createRenderer(int slots, Set<String> fail) async {
   final library = await _library();
   if (openGles) {
@@ -344,7 +344,7 @@ Future<RasterizerRenderer> createRenderer(int slots, Set<String> fail) async {
   }
   final renderer = AtlasRenderer._(library, slots);
   if (openGles) {
-    renderer._gpu.warmUp();
+    await renderer._gpu.warmUp();
   }
   return renderer;
 }
@@ -419,11 +419,12 @@ List<ra.PathDraw> _pathDraws(ScenePaths paths) => [
 ///
 /// Its targets have [samples] per pixel where offscreen MSAA is supported.
 /// It's only called where the renderer is supported, as [createRenderer] is.
-/// On OpenGL ES, it compiles its pipelines as it's made ([MeshGpu.warmUp]).
+/// On OpenGL ES, it compiles its pipelines as it's made, and completes once
+/// the GPU has run them ([MeshGpu.warmUp]).
 Future<RasterizerRenderer> createMeshRenderer(int slots, int samples) async {
   final renderer = MeshRenderer(await _library(), slots, samples);
   if (openGles) {
-    renderer.warmUp();
+    await renderer.warmUp();
   }
   return renderer;
 }

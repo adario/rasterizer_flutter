@@ -11,6 +11,9 @@
   it then checks too. Where Flutter GPU can't make textures 4096 pixels wide,
   support is the new `RasterizerSupport.smallTextures`, and the canvas
   renderer draws.
+- On OpenGL ES, `RasterizerRenderer.create` completes once the renderer's
+  pipelines have compiled on the raster thread too, so its first frame no
+  longer pays for them, and an app can show a loader until then.
 - **Breaking:** removed with the self-tests: `RasterizerGpu.initialize`,
   `initialized`, `settledBackend`, `rememberSelfTest`, `probationFrames`,
   `onProbation`, `forgetSelfTest` and `debugCountAttempts`, and the same

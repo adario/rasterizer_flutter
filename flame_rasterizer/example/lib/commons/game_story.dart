@@ -12,7 +12,8 @@ import 'package:flutter/foundation.dart';
 /// [speed] changes the same game, as do the knobs that [update] passes to
 /// it. Give this widget a key made of whatever else needs a new game, which
 /// starts afresh. The game has the keyboard focus at the start, and a
-/// pointer down on it takes the focus back from the knobs.
+/// pointer down on it takes the focus back from the knobs. A spinner shows
+/// until the game has loaded.
 class const GameStory<G extends StoryGame, S extends Object>({
   /// The renderer that the game draws with.
   required final SvgRenderer renderer,
@@ -99,6 +100,10 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
                 key: ObjectKey(_game),
                 game: _game,
                 focusNode: _focusNode,
+                // Until the game has loaded, which for flame_rasterizer's
+                // games includes their renderer (ExampleRasterizer.onLoad).
+                loadingBuilder: (_) =>
+                    const Center(child: CircularProgressIndicator()),
               ),
             ),
           ),

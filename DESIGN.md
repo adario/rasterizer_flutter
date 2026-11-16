@@ -85,8 +85,10 @@ have only run on the Android emulator's OpenGL ES and on Mesa's llvmpipe.
   back to the canvas renderer that late would need scenes to switch.
 - **Each renderer compiles all of its pipelines as it's made**, as each compile stalls the thread that runs it, so the
   app hitches once rather than at whichever frames first draw with each. On OpenGL ES, part of it runs on the UI thread
-  as the renderer is made, the rest on the raster thread at the next frame. For the GPU renderer, that's 110 ms on the
-  Android emulator, and 450 ms then 85 ms on llvmpipe (release builds, no shader cache).
+  as the renderer is made, the rest on the raster thread right after, and making the renderer completes once both have
+  run, so that an app can show a loader meanwhile, and its first frame doesn't pay for them. For the GPU renderer,
+  that's 110 ms then 50-90 ms on the Android emulator, and 550 ms then 150 ms on llvmpipe (release builds, no shader
+  cache).
 - **Nothing waits for a frame.** With Flutter 3.50.0, Flutter GPU's calls don't block before the first rasterized frame
   on OpenGL ES, so renderers can be made before `runApp`.
 

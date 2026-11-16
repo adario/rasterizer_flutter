@@ -269,9 +269,11 @@ void main() {
 
 - **Pipelines:** each renderer compiles all of its pipelines as it's made, rather than at whichever frame first draws
   with each, as a compile stalls the thread that runs it. Part of it runs on the UI thread as the renderer is made, the
-  rest on the raster thread at the next frame. In release builds with no shader cache, on Mesa's llvmpipe, the GPU
-  renderer's took about 450 ms, then 85 ms, and the mesh renderer's 170 ms, then 820 ms. On the Android emulator, they
-  took about 110 ms and 20 ms. So making a renderer, and the frame after, take that much longer, once.
+  rest on the raster thread right after, and `RasterizerRenderer.create` completes once both are done. In release
+  builds with no shader cache, on Mesa's llvmpipe, the GPU renderer's took about 550 ms, then 150 ms, and the mesh
+  renderer's 230 ms, then 870 ms. On the Android emulator, the GPU renderer's took about 110 ms and 50-90 ms, and the
+  mesh renderer's 60 ms and 30 ms. So making a renderer takes that much longer, once, and its first frame doesn't: an
+  app can show a loader until it's made.
 - **Formats:** the GPU renderer accumulates coverage in r32Float, which an OpenGL ES driver may not blend into. The
   first GPU renderer made starts a format probe: it renders a small scene in r32Float, reads it back through a canvas
   alongside the app's frames, and checks it pixel by pixel. If that fails, renderers accumulate in r16g16b16a16Float
