@@ -129,10 +129,11 @@ checks that the pages shrink back, are released when unused, and are trimmed.
 
 On OpenGL ES (`IMPELLER_BACKEND=opengles` on the emulator), `format_probe_test` checks that the first GPU renderer
 runs the format probe once, that it passes accumulating in `r32Float`, that a failed probe makes the renderers
-accumulate in `r16g16b16a16Float` and draw right, and that without `RasterizerGpu.allowOpenGles` the canvas renderer
-draws. Elsewhere, it checks that the probe passes when run on its own, and that no renderer runs it. Everywhere,
-`defer_test` defers the app's first frame past 10 s, creates both GPU renderers and renders with them before it, and
-checks their pixels once the frame comes.
+accumulate in `r16g16b16a16Float` and draw right, that a failure in both formats leaves the GPU renderer drawing and
+says so, and that the canvas renderer draws where textures can't be as wide as the renderers need, and without
+`RasterizerGpu.allowOpenGles`. Elsewhere, it checks that the probe passes when run on its own, and that no renderer
+runs it. Everywhere, `defer_test` defers the app's first frame past 10 s, creates both GPU renderers and renders with
+them before it, and checks their pixels once the frame comes.
 
 To run them all, with the goldens, on the emulator's Vulkan and OpenGL ES, on macOS and on web, run
 `python3 -I tool/matrix.py > matrix.txt` from the repository's root, in the background. Follow it with

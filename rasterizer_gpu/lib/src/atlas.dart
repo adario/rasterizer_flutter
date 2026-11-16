@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:math' as math;
 import 'dart:io' show Platform;
@@ -22,7 +23,8 @@ import 'self_test.dart';
 // through FFI, and Flutter GPU. rasterizer_gpu.dart imports this file where
 // dart:ffi is available, else gpu_stub.dart, which has the same functions.
 
-/// Flutter GPU's error, when checkSupport found no context.
+/// Flutter GPU's error, when checkSupport found no context, or textures too
+/// small.
 String? contextError;
 
 /// Whether Impeller renders with OpenGL ES, as checkSupport found.
@@ -37,8 +39,12 @@ gpu.PixelFormat accumulationFormat = gpu.PixelFormat.r32Float;
 /// The OpenGL ES format probe that the first GPU renderer started, if any.
 Future<String?>? formatProbe;
 
-/// The format probe's failure, or null.
+/// The format probe's failure in r32Float, or null.
 String? _formatFailure;
+
+/// The format probe's failure in r16g16b16a16Float, after r32Float failed,
+/// or null.
+String? _fallbackFailure;
 
 /// Whether the format probe has decided.
 bool _formatChecked = false;
@@ -46,11 +52,12 @@ bool _formatChecked = false;
 /// What the OpenGL ES format probe found, for RasterizerGpu.supportDetail.
 String get formatDetail =>
     'accumulating in ${accumulationFormat.name}'
-    '${_formatFailure != null
-        ? ', as r32Float failed: $_formatFailure'
-        : _formatChecked
-        ? ', checked'
-        : ', not checked yet'}';
+    '${_formatFailure != null ? ', as r32Float failed: $_formatFailure' : ''}'
+    '${!_formatChecked
+        ? ', not checked yet'
+        : _fallbackFailure != null
+        ? ', and r16g16b16a16Float failed too: $_fallbackFailure'
+        : ', checked'}';
 
 /// How the mesh renderer's targets are sampled, for
 /// RasterizerGpu.supportDetail.
@@ -60,7 +67,7 @@ String get meshDetail =>
 /// Forgets the format probe and its result, for RasterizerGpu's tests.
 void resetFormatProbe() {
   accumulationFormat = gpu.PixelFormat.r32Float;
-  formatProbe = _formatFailure = null;
+  formatProbe = _formatFailure = _fallbackFailure = null;
   _formatChecked = false;
 }
 
@@ -74,8 +81,10 @@ int maxPageSize = RasterizerRenderer.maxAtlasSize;
 /// Returns whether Flutter GPU can render here, for both GPU renderers.
 ///
 /// On OpenGL ES, it returns [RasterizerSupport.openGles]: the renderers draw
-/// there only with RasterizerGpu.allowOpenGles.
-RasterizerSupport checkSupport() {
+/// there only with RasterizerGpu.allowOpenGles. There, it first makes a
+/// texture [textureWidth] pixels wide, which is [maxPageSize] but for tests,
+/// and returns [RasterizerSupport.smallTextures] if Flutter GPU can't.
+RasterizerSupport checkSupport(int textureWidth) {
   if (!Platform.isMacOS &&
       !Platform.isIOS &&
       !Platform.isAndroid &&
@@ -104,68 +113,96 @@ RasterizerSupport checkSupport() {
   if (!context.doesSupportFramebufferRenderMipmap) {
     openGles = true;
     maxPageSize = 4096;
+    // Impeller refuses a texture larger than the device allows, so creating
+    // it throws. It's the data texture's format.
+    try {
+      context.createTexture(
+        gpu.StorageMode.devicePrivate,
+        textureWidth,
+        1,
+        format: gpu.PixelFormat.r32g32b32a32Float,
+        enableRenderTargetUsage: false,
+      );
+    } catch (e) {
+      contextError = '$e';
+      return RasterizerSupport.smallTextures;
+    }
     return RasterizerSupport.openGles;
   }
   return RasterizerSupport.supported;
 }
 
 /// The format probe: checks that the GPU renderer draws right accumulating
-/// coverage in r32Float, and completes with null if it does, else with why
-/// not.
+/// coverage in r32Float, else in r16g16b16a16Float, and completes with null
+/// if r32Float passed, else with why each format failed.
 ///
 /// It renders [selfTestSvg]'s scene with curves and without, built without
 /// parsing it (`src/ra_self_test.hpp`), so that it checks the GPU alone: a
 /// parser's bug would fail it as if the GPU drew wrongly. It renders before
 /// it returns, then reads the pixels back through a canvas, alongside the
-/// app's frames. With [apply], a failure makes [accumulationFormat]
-/// r16g16b16a16Float, which renderers switch to at their next frame. That's
-/// at once if rendering throws, as creating an r32Float texture does where
-/// the format isn't supported. Otherwise it's once the pixels are read back,
-/// so the frames rendered meanwhile may be wrong. For tests, [fail] names
-/// formats to treat as failing, which fails at once too. It runs wherever the
-/// renderer can, as tests check it on Metal and Vulkan too.
+/// app's frames. With [apply], an r32Float failure makes
+/// [accumulationFormat] r16g16b16a16Float, which renderers switch to at their
+/// next frame. That's at once if rendering throws, as creating an r32Float
+/// texture does where the format isn't supported. Otherwise it's once the
+/// pixels are read back, so the frames rendered meanwhile may be wrong. The
+/// probe then checks r16g16b16a16Float the same way. If that fails too, the
+/// renderers keep drawing, wrongly, and only RasterizerGpu.supportDetail
+/// says so. For tests, [fail] names formats to treat as failing, which fails
+/// at once too. It runs wherever the renderer can, as tests check it on
+/// Metal and Vulkan too.
 Future<String?> probeFormat(
   gpu.ShaderLibrary library,
   Set<String> fail, {
   bool apply = true,
-}) {
-  void decide(String? failure) {
-    if (!apply) {
-      return;
+}) => _then(_probe(library, gpu.PixelFormat.r32Float, fail), (failure) {
+  if (failure == null) {
+    if (apply) {
+      _formatChecked = true;
     }
-    _formatChecked = true;
+    return null;
+  }
+  if (apply) {
     _formatFailure = failure;
-    if (failure != null) {
-      accumulationFormat = gpu.PixelFormat.r16g16b16a16Float;
-    }
+    accumulationFormat = gpu.PixelFormat.r16g16b16a16Float;
   }
+  return _then(_probe(library, gpu.PixelFormat.r16g16b16a16Float, fail), (
+    fallback,
+  ) {
+    if (apply) {
+      _fallbackFailure = fallback;
+      _formatChecked = true;
+    }
+    return 'r32Float: $failure'
+        '${fallback == null ? '' : '; r16g16b16a16Float: $fallback'}';
+  });
+});
 
-  const format = gpu.PixelFormat.r32Float;
-  String? thrown;
-  Future<String?>? pixels;
+/// Runs [then] on [result]: at once if it's a value, else once it completes.
+Future<String?> _then(
+  FutureOr<String?> result,
+  FutureOr<String?> Function(String? failure) then,
+) => result is Future<String?>
+    ? result.then(then)
+    : Future.sync(() => then(result));
+
+/// Probes [format]: returns its failure at once if [fail] names it or
+/// rendering throws, else a future of its pixels' failure, or of null.
+FutureOr<String?> _probe(
+  gpu.ShaderLibrary library,
+  gpu.PixelFormat format,
+  Set<String> fail,
+) {
   if (fail.contains(format.name)) {
-    thrown = 'forced to fail';
-  } else {
-    try {
-      pixels = _renderProbe(library, format);
-    } catch (e) {
-      thrown = '$e';
-    }
+    return 'forced to fail';
   }
-  if (pixels == null) {
-    decide(thrown);
-    return Future.value(thrown);
+  try {
+    return _renderProbe(
+      library,
+      format,
+    ).then((failure) => failure, onError: (Object e) => '$e');
+  } catch (e) {
+    return '$e';
   }
-  return pixels.then(
-    (failure) {
-      decide(failure);
-      return failure;
-    },
-    onError: (Object e) {
-      decide('$e');
-      return '$e';
-    },
-  );
 }
 
 /// Renders [selfTestSvg]'s scene accumulating in [format], with curves and

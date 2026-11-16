@@ -8,7 +8,8 @@ import 'paths/scene_paths.dart';
 
 String? contextError;
 
-RasterizerSupport checkSupport() => RasterizerSupport.unsupportedPlatform;
+RasterizerSupport checkSupport(int textureWidth) =>
+    RasterizerSupport.unsupportedPlatform;
 
 bool openGles = false;
 

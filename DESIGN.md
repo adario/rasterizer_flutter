@@ -78,8 +78,11 @@ The GPU renderers draw on OpenGL ES from the first frame, as on Metal and Vulkan
 have only run on the Android emulator's OpenGL ES and on Mesa's llvmpipe.
 
 - **No self-test.** Nothing checks the output or guards against a driver's crashes, so the canvas renderer never draws
-  first and nothing switches. The one check is the format probe: it renders a scene accumulating in r32Float, reads it
-  back alongside the app's frames, and switches the GPU renderer to r16g16b16a16Float if the pixels are wrong.
+  first and nothing switches. There are two checks. Support makes a texture 4096 px wide, as wide as the renderers'
+  get, and leaves OpenGL ES to the canvas renderer if it can't: it's decided before any scene is made. The format probe
+  renders a scene accumulating in r32Float, reads it back alongside the app's frames, and switches the GPU renderer to
+  r16g16b16a16Float if the pixels are wrong. It then checks r16g16b16a16Float too, but only reports a failure: falling
+  back to the canvas renderer that late would need scenes to switch.
 - **Each renderer compiles all of its pipelines as it's made**, as each compile blocks the UI thread, so the app
   hitches once rather than at whichever frames first draw with each: 110 ms for the GPU renderer on the Android
   emulator, 470 ms on llvmpipe (release builds, no shader cache).

@@ -7,13 +7,17 @@
   switch. `RasterizerGpu.allowOpenGles` is on by default: turned off, the
   canvas renderer draws there. Each renderer compiles its pipelines as it's
   made. A format probe checks that the GPU renderer draws right accumulating
-  in r32Float, and makes it accumulate in r16g16b16a16Float otherwise.
+  in r32Float, and makes it accumulate in r16g16b16a16Float otherwise, which
+  it then checks too. Where Flutter GPU can't make textures 4096 pixels wide,
+  support is the new `RasterizerSupport.smallTextures`, and the canvas
+  renderer draws.
 - **Breaking:** removed with the self-tests: `RasterizerGpu.initialize`,
   `initialized`, `settledBackend`, `rememberSelfTest`, `probationFrames`,
   `onProbation`, `forgetSelfTest` and `debugCountAttempts`, and the same
   members of `RasterizerGpuBackend`. `debugFailFormatProbe`,
   `debugFormatProbe` and `debugProbeFormat` replace `debugFailSelfTest` and
-  `debugSelfTest`. The files of remembered failures are no longer read.
+  `debugSelfTest`, and `debugCheckedTextureWidth` is new. The files of
+  remembered failures are no longer read.
 - `RasterizerFrame.pageSizes` holds `RasterizerPixelSize` records, with a
   named `width` and `height`, instead of positional ones.
 - `RasterizerScene.fromPaths` takes `RasterizerPaintedPath` records, with a

@@ -4,9 +4,11 @@
 //
 // On OpenGL ES, as on an Android emulator built with
 // IMPELLER_BACKEND=opengles, the first GPU renderer created runs the probe,
-// and a failure switches the renderers to r16g16b16a16Float. Elsewhere, no
-// renderer runs it, so the test runs it on its own, as it must pass there
-// too. defer_test.dart checks that the renderers draw before the first frame.
+// and a failure switches the renderers to r16g16b16a16Float, which it then
+// checks too. There, support also checks that textures can be 4096 pixels
+// wide. Elsewhere, no renderer runs the probe, so the test runs it on its
+// own, as it must pass there too. defer_test.dart checks that the renderers
+// draw before the first frame.
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -77,7 +79,15 @@ void main() {
     expect(await RasterizerGpu.debugProbeFormat(), isNull);
     RasterizerGpu.debugFailFormatProbe = {'r32Float'};
     try {
-      expect(await RasterizerGpu.debugProbeFormat(), 'forced to fail');
+      expect(
+        await RasterizerGpu.debugProbeFormat(),
+        'r32Float: forced to fail',
+      );
+      RasterizerGpu.debugFailFormatProbe = {'r32Float', 'r16g16b16a16Float'};
+      expect(
+        await RasterizerGpu.debugProbeFormat(),
+        'r32Float: forced to fail; r16g16b16a16Float: forced to fail',
+      );
     } finally {
       RasterizerGpu.debugFailFormatProbe = {};
     }
@@ -114,11 +124,14 @@ void main() {
       try {
         final renderer = await RasterizerRenderer.create(slots: 1);
         expect(renderer.backend, RasterizerBackend.gpu);
-        expect(await RasterizerGpu.debugFormatProbe, 'forced to fail');
+        expect(
+          await RasterizerGpu.debugFormatProbe,
+          'r32Float: forced to fail',
+        );
         expect(
           RasterizerGpu.supportDetail,
           'OpenGL ES, accumulating in r16g16b16a16Float, as r32Float failed: '
-          'forced to fail',
+          'forced to fail, checked',
         );
         final scene = probeScene();
         expect(await checkProbe(renderProbe(renderer, scene)), isNull);
@@ -126,6 +139,51 @@ void main() {
         renderer.dispose();
       } finally {
         RasterizerGpu.debugFailFormatProbe = {};
+        RasterizerGpu.debugResetSupport();
+      }
+    });
+
+    test('where both formats fail, the GPU renderer still draws, and its '
+        'detail says so', () async {
+      RasterizerGpu.debugResetSupport();
+      RasterizerGpu.debugFailFormatProbe = {'r32Float', 'r16g16b16a16Float'};
+      try {
+        final renderer = await RasterizerRenderer.create(slots: 1);
+        expect(renderer.backend, RasterizerBackend.gpu);
+        expect(
+          await RasterizerGpu.debugFormatProbe,
+          'r32Float: forced to fail; r16g16b16a16Float: forced to fail',
+        );
+        expect(
+          RasterizerGpu.supportDetail,
+          'OpenGL ES, accumulating in r16g16b16a16Float, as r32Float failed: '
+          'forced to fail, and r16g16b16a16Float failed too: forced to fail',
+        );
+        renderer.dispose();
+      } finally {
+        RasterizerGpu.debugFailFormatProbe = {};
+        RasterizerGpu.debugResetSupport();
+      }
+    });
+
+    test('where textures are too small, the GPU renderers are unsupported, '
+        'and the canvas renderer draws', () async {
+      // Wider than any device allows, so Flutter GPU refuses it.
+      RasterizerGpu.debugCheckedTextureWidth = 1 << 20;
+      RasterizerGpu.debugResetSupport();
+      try {
+        for (final gpu in [RasterizerBackend.gpu, RasterizerBackend.mesh]) {
+          final state = RasterizerGpu.of(gpu);
+          expect(state.support, RasterizerSupport.smallTextures);
+          expect(state.backend, RasterizerBackend.canvas);
+          expect(state.supportDetail, isNotNull);
+          final renderer = await RasterizerRenderer.create(slots: 1, gpu: gpu);
+          expect(renderer.backend, RasterizerBackend.canvas);
+          renderer.dispose();
+        }
+        expect(RasterizerGpu.openGles, isTrue);
+      } finally {
+        RasterizerGpu.debugCheckedTextureWidth = 4096;
         RasterizerGpu.debugResetSupport();
       }
     });

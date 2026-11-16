@@ -75,6 +75,10 @@ enum RasterizerSupport() {
   /// app's Android manifest asks for Vulkan anyway. Only debug and profile
   /// builds read it: release builds ignore it.
   openGles,
+
+  /// Impeller renders with OpenGL ES, but can't make textures 4096 pixels
+  /// wide, as both GPU renderers need. OpenGL ES only guarantees 2048.
+  smallTextures,
 }
 
 /// Which renderer parses and draws scenes.
@@ -138,7 +142,7 @@ abstract final class RasterizerGpu() {
   /// It's checked once. Off Impeller, getting Flutter GPU's context throws, so
   /// the check looks at whether Impeller is on first.
   static RasterizerSupport get _context =>
-      _contextSupport ??= native.checkSupport();
+      _contextSupport ??= native.checkSupport(debugCheckedTextureWidth);
   static RasterizerSupport? _contextSupport;
 
   /// The GPU renderer's [RasterizerGpuBackend.support].
@@ -166,10 +170,15 @@ abstract final class RasterizerGpu() {
   ///   draws right while accumulating coverage in r32Float. Where it doesn't,
   ///   the renderer accumulates in r16g16b16a16Float instead: at once where
   ///   r32Float textures can't be made, else once the probe has read its
-  ///   pixels back, so its first frames may be wrong.
-  ///   [RasterizerGpuBackend.supportDetail] says what the probe found.
+  ///   pixels back, so its first frames may be wrong. The probe then checks
+  ///   r16g16b16a16Float too. [RasterizerGpuBackend.supportDetail] says what
+  ///   the probe found.
   ///
-  /// Nothing else is checked. A driver that draws wrongly draws wrongly, with
+  /// Support checks one more thing: that textures can be 4096 pixels wide, as
+  /// the GPU renderers need. OpenGL ES only guarantees 2048. Where they can't,
+  /// support is [RasterizerSupport.smallTextures], and the canvas renderer
+  /// draws. Nothing else is checked. A driver that draws wrongly, in either
+  /// format, draws wrongly, with
   /// no fallback to the canvas renderer, and one that crashes crashes the app.
   /// Both GPU renderers have only been tried on the Android emulator's OpenGL
   /// ES and on Mesa's llvmpipe on Linux, not on a device's own driver. Turn it
@@ -183,6 +192,14 @@ abstract final class RasterizerGpu() {
   /// as `r32Float`. A format in it fails at once.
   @visibleForTesting
   static Set<String> debugFailFormatProbe = {};
+
+  /// For tests: how wide a texture support checks that Flutter GPU can make
+  /// on OpenGL ES.
+  ///
+  /// It's 4096, the widest the GPU renderers' textures get there. Wider than
+  /// the device allows, support is [RasterizerSupport.smallTextures].
+  @visibleForTesting
+  static int debugCheckedTextureWidth = 4096;
 
   /// For tests: the OpenGL ES format probe that the first GPU renderer made
   /// started, if any.
@@ -255,12 +272,14 @@ final class RasterizerGpuBackend._(
   /// More about [support].
   ///
   /// It's Flutter GPU's error when [support] is
-  /// [RasterizerSupport.noFlutterGpu]. On OpenGL ES, it says how the renderer
-  /// draws there: for the GPU renderer, the format it accumulates coverage in
-  /// and what the format probe found ([RasterizerGpu.allowOpenGles]), and for
-  /// the mesh renderer, whether its targets are multisampled.
+  /// [RasterizerSupport.noFlutterGpu] or [RasterizerSupport.smallTextures].
+  /// On OpenGL ES, it says how the renderer draws there: for the GPU
+  /// renderer, the format it accumulates coverage in and what the format probe
+  /// found ([RasterizerGpu.allowOpenGles]), and for the mesh renderer, whether
+  /// its targets are multisampled.
   String? get supportDetail => switch (RasterizerGpu._context) {
-    RasterizerSupport.noFlutterGpu => native.contextError,
+    RasterizerSupport.noFlutterGpu ||
+    RasterizerSupport.smallTextures => native.contextError,
     RasterizerSupport.openGles when !RasterizerGpu.allowOpenGles =>
       'OpenGL ES: set RasterizerGpu.allowOpenGles',
     RasterizerSupport.openGles =>

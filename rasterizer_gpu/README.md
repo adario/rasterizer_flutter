@@ -275,15 +275,16 @@ void main() {
   first GPU renderer made starts a format probe: it renders a small scene in r32Float, reads it back through a canvas
   alongside the app's frames, and checks it pixel by pixel. If that fails, renderers accumulate in r16g16b16a16Float
   from their next frame. That's at once where an r32Float texture can't be made, else once the probe has read the
-  pixels back, so the first frames may be wrong. `RasterizerGpu.supportDetail` says which format, and what the probe
-  found.
+  pixels back, so the first frames may be wrong. The probe then checks r16g16b16a16Float the same way. If that fails
+  too, the renderers keep drawing, wrongly. `RasterizerGpu.supportDetail` says which format, and what the probe found.
 - **No other checks:** nothing else checks what the renderers draw, or guards against a driver's crashes. A driver that
   draws wrongly draws wrongly, and one that crashes crashes the app. The GPU renderers have only drawn on the Android
   Emulator's OpenGL ES, on the Mac's GPU and on its software renderer, and on Mesa's llvmpipe on Linux.
 - **Before `runApp`:** nothing waits for a frame. With Flutter 3.50.0, on the emulator's OpenGL ES and on llvmpipe,
   release builds included, renderers can be made and render before the app's first frame.
 - **Page size:** atlas pages are at most 4096 px a side on OpenGL ES, as Flutter GPU doesn't tell the device's maximum
-  texture size.
+  texture size. OpenGL ES only guarantees 2048, so support first makes a texture 4096 px wide. Where Flutter GPU can't,
+  support is `RasterizerSupport.smallTextures`, and the canvas renderer draws.
 - **The mesh renderer** has no probe: its `supportDetail` says `OpenGL ES, 4× multisampled`, or `aliased`.
   `allowOpenGles` and `forceCanvas` apply to both renderers.
 
