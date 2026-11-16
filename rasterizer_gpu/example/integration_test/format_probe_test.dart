@@ -52,11 +52,7 @@ void main() {
         if (e.count > 0) e.type,
     ]);
     for (final curves in [true, false]) {
-      final frame = renderer.beginFrame(
-        selfTestSize,
-        selfTestSize,
-        curves: curves,
-      );
+      final frame = renderer.beginFrame(probeSize, probeSize, curves: curves);
       frame.addRun().add(scene, 1, 0, 0, 1, 0, 0);
       frame.render();
     }
@@ -87,6 +83,11 @@ void main() {
       expect(
         await RasterizerGpu.debugProbeFormat(),
         'r32Float: forced to fail; r16g16b16a16Float: forced to fail',
+      );
+      RasterizerGpu.debugFailFormatProbe = {'r32Float pixels'};
+      expect(
+        await RasterizerGpu.debugProbeFormat(),
+        'r32Float: forced to fail',
       );
     } finally {
       RasterizerGpu.debugFailFormatProbe = {};
@@ -142,6 +143,61 @@ void main() {
         RasterizerGpu.debugResetSupport();
       }
     });
+
+    test('a renderer made before the probe fails on its pixels switches to '
+        'r16g16b16a16Float at its next frame, and draws right', () async {
+      RasterizerGpu.debugResetSupport();
+      RasterizerGpu.debugFailFormatProbe = {'r32Float pixels'};
+      try {
+        final renderer =
+            await RasterizerRenderer.create(slots: 1) as ra.AtlasRenderer;
+        final scene = probeScene();
+        // The probe reads its pixels back after the app's next frame, so it
+        // hasn't failed yet.
+        expect(RasterizerGpu.supportDetail, endsWith('not checked yet'));
+        expect(await checkProbe(renderProbe(renderer, scene)), isNull);
+        expect(renderer.debugAccumulationFormat?.name, 'r32Float');
+        expect(
+          await RasterizerGpu.debugFormatProbe,
+          'r32Float: forced to fail',
+        );
+        expect(
+          RasterizerGpu.supportDetail,
+          'OpenGL ES, accumulating in r16g16b16a16Float, as r32Float failed: '
+          'forced to fail, checked',
+        );
+        expect(renderer.debugAccumulationFormat?.name, 'r32Float');
+        expect(await checkProbe(renderProbe(renderer, scene)), isNull);
+        expect(renderer.debugAccumulationFormat?.name, 'r16g16b16a16Float');
+        scene.dispose();
+        renderer.dispose();
+      } finally {
+        RasterizerGpu.debugFailFormatProbe = {};
+        RasterizerGpu.debugResetSupport();
+      }
+    });
+
+    test(
+      'a probe forgotten before it fails leaves the format as it is',
+      () async {
+        RasterizerGpu.debugResetSupport();
+        RasterizerGpu.debugFailFormatProbe = {'r32Float pixels'};
+        try {
+          final renderer = await RasterizerRenderer.create(slots: 1);
+          final probe = RasterizerGpu.debugFormatProbe;
+          RasterizerGpu.debugResetSupport();
+          expect(await probe, 'r32Float: forced to fail');
+          expect(
+            RasterizerGpu.supportDetail,
+            'OpenGL ES, accumulating in r32Float, not checked yet',
+          );
+          renderer.dispose();
+        } finally {
+          RasterizerGpu.debugFailFormatProbe = {};
+          RasterizerGpu.debugResetSupport();
+        }
+      },
+    );
 
     test('where both formats fail, the GPU renderer still draws, and its '
         'detail says so', () async {

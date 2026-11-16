@@ -420,9 +420,11 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   /// Draws once with each of its pipelines into a scratch target, which
   /// compiles those not compiled yet.
   ///
-  /// On OpenGL ES, a pipeline compiles at its first draw, which blocks the UI
-  /// thread. So the mesh renderer compiles them all as it's made there,
-  /// rather than at whichever frame first draws each.
+  /// On OpenGL ES, a pipeline compiles at its first draw, which stalls the UI
+  /// thread as the renderer is made, and the raster thread at the next frame.
+  /// On Mesa's llvmpipe, that took 170 ms, then 820 ms, in release builds with
+  /// no shader cache. So the mesh renderer compiles them all as it's made
+  /// there, rather than at whichever frame first draws each.
   void warmUp() {
     gpu.BufferView view(TypedData data) {
       final buffer = context.createDeviceBufferWithCopy(
@@ -437,13 +439,15 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
 
     // One triangle of zeros, with room for a glow's vertices, the widest.
     final vertices = view(Float32List(18)), indices = view(Uint16List(4));
+    // One path's 3 texels, as a mesh's paints texture holds. Mesa's llvmpipe
+    // compiles shaders again for textures whose sizes are powers of two.
     final paints = context.createTexture(
       gpu.StorageMode.devicePrivate,
-      4,
+      3,
       1,
       format: gpu.PixelFormat.r32g32b32a32Float,
       enableRenderTargetUsage: false,
-    )..overwrite(ByteData(4 * 16));
+    )..overwrite(ByteData(3 * 16));
     MeshBuffers mesh({bool stroked = false, bool glow = false}) =>
         MeshBuffers._(
           vertices,
@@ -473,6 +477,10 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
     final transform = Float32List(16);
     for (final stroked in [false, true]) {
       draw(mesh(stroked: stroked), 0, 1, blend: true);
+      // Opaque meshes draw without blending, which some drivers, llvmpipe's
+      // among them, compile shaders again for. Few have gradients with a
+      // color transform, so those compile at their first frame.
+      draw(mesh(stroked: stroked), 0, 1, blend: false);
       draw(
         mesh(stroked: stroked),
         0,

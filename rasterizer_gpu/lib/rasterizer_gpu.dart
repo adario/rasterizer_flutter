@@ -162,10 +162,11 @@ abstract final class RasterizerGpu() {
   ///
   /// It's on by default. They then draw there from the first frame, as on
   /// Metal and Vulkan, but for two steps:
-  /// - each renderer compiles its pipelines as it's made, which blocks the UI
-  ///   thread. The GPU renderer's took about 0.1 s on the Android emulator,
-  ///   and 0.5 s on Mesa's llvmpipe, in release builds with no shader cache.
-  ///   The mesh renderer's took about 20 ms and 0.2 s.
+  /// - each renderer compiles its pipelines as it's made, which stalls the UI
+  ///   thread then, and the raster thread at the next frame. In release
+  ///   builds with no shader cache, on Mesa's llvmpipe, the GPU renderer's
+  ///   took about 0.45 s and 85 ms, and the mesh renderer's 0.17 s and 0.82 s.
+  ///   On the Android emulator, they took about 0.1 s and 20 ms.
   /// - the first GPU renderer made starts a format probe, which checks that it
   ///   draws right while accumulating coverage in r32Float. Where it doesn't,
   ///   the renderer accumulates in r16g16b16a16Float instead: at once where
@@ -189,7 +190,9 @@ abstract final class RasterizerGpu() {
   /// For tests: what the format probe treats as failing.
   ///
   /// It holds accumulation formats, by Flutter GPU's PixelFormat names, such
-  /// as `r32Float`. A format in it fails at once.
+  /// as `r32Float`. A format in it fails at once. One followed by ` pixels`,
+  /// such as `r32Float pixels`, fails once its pixels are read back, as a
+  /// driver that draws it wrongly does.
   @visibleForTesting
   static Set<String> debugFailFormatProbe = {};
 

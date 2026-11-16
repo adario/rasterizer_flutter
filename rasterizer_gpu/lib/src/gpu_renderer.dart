@@ -404,11 +404,14 @@ class GpuRenderer(
   /// scratch textures, which compiles those not compiled yet.
   ///
   /// The states are: clear, opaques without and with blending, the four kinds
-  /// of edges and molecules, and instances. Each compiles when it first draws.
-  /// On OpenGL ES, that blocks the UI thread: the states took 110 ms in all
-  /// on the Android emulator, and 470 ms on Mesa's llvmpipe, in release
-  /// builds with no shader cache. So the GPU renderer compiles them all as
-  /// it's made there, rather than at whichever frame first draws each.
+  /// of edges and molecules, and instances. Each compiles when it first draws,
+  /// which stalls the thread that runs the draw. On OpenGL ES, that's partly
+  /// the UI thread, as the renderer is made, and partly the raster thread, at
+  /// the next frame. The states took 110 ms on the Android emulator. On
+  /// Mesa's llvmpipe, they took 450 ms on the UI thread, then 85 ms at the
+  /// next frame, in release builds with no shader cache. So the GPU renderer
+  /// compiles them all as it's made there, rather than at whichever frame
+  /// first draws each.
   void warmUp() {
     for (var step = 0; step < 8; step++) {
       _warmUp(step);

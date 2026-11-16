@@ -17,7 +17,11 @@
   members of `RasterizerGpuBackend`. `debugFailFormatProbe`,
   `debugFormatProbe` and `debugProbeFormat` replace `debugFailSelfTest` and
   `debugSelfTest`, and `debugCheckedTextureWidth` is new. The files of
-  remembered failures are no longer read.
+  remembered failures are no longer read, nor deleted. On Linux, they can be
+  deleted by hand: `rasterizer_gpu_gles.json` and
+  `rasterizer_gpu_gles_mesh.json`, in `$XDG_CACHE_HOME/<executable>/`, or
+  `~/.cache/<executable>/`. Android clears them, in the code cache, when the
+  app is updated.
 - `RasterizerFrame.pageSizes` holds `RasterizerPixelSize` records, with a
   named `width` and `height`, instead of positional ones.
 - `RasterizerScene.fromPaths` takes `RasterizerPaintedPath` records, with a

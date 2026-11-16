@@ -267,10 +267,11 @@ void main() {
 
 `RasterizerGpu.openGles` tells whether Impeller renders with OpenGL ES at all.
 
-- **Pipelines:** each renderer compiles all of its pipelines as it's made, as a compile blocks the UI thread, rather
-  than at whichever frame first draws with each. In release builds with no shader cache, the GPU renderer's took about
-  110 ms on the Android emulator and 470 ms on Mesa's llvmpipe; the mesh renderer's took about 20 ms and 190 ms. The
-  first frame that draws vectors comes that much later, once.
+- **Pipelines:** each renderer compiles all of its pipelines as it's made, rather than at whichever frame first draws
+  with each, as a compile stalls the thread that runs it. Part of it runs on the UI thread as the renderer is made, the
+  rest on the raster thread at the next frame. In release builds with no shader cache, on Mesa's llvmpipe, the GPU
+  renderer's took about 450 ms, then 85 ms, and the mesh renderer's 170 ms, then 820 ms. On the Android emulator, they
+  took about 110 ms and 20 ms. So making a renderer, and the frame after, take that much longer, once.
 - **Formats:** the GPU renderer accumulates coverage in r32Float, which an OpenGL ES driver may not blend into. The
   first GPU renderer made starts a format probe: it renders a small scene in r32Float, reads it back through a canvas
   alongside the app's frames, and checks it pixel by pixel. If that fails, renderers accumulate in r16g16b16a16Float
@@ -406,8 +407,8 @@ everywhere, for scenes and renderers created after the app sets it.
   - `lib/src/paths/` has the scenes of paths: `path_contours.dart`, with the contour sampler copied from Flame, and
     `scene_paths.dart`, the paths and paints a scene is made of. `lib/src/canvas_paths.dart` is what the canvas
     renderer draws: an SVG's paths, or those.
-  - `lib/src/self_test.dart` has the OpenGL ES format probe's SVG and the pixels it checks, and `src/ra_self_test.hpp`
-    builds that SVG's shapes without parsing it, so that the probe checks the GPU alone.
+  - `lib/src/format_probe.dart` has the OpenGL ES format probe's SVG and the pixels it checks, and
+    `src/ra_probe_scene.hpp` builds that SVG's shapes without parsing it, so that the probe checks the GPU alone.
   - `lib/src/rasterizer_canvas.dart` is `RasterizerCanvas`.
   - `lib/src/core.dart` is the core's FFI API, internal and native only, with the GPU renderer's debug hooks, for the
     renderers, the tests and the example. `lib/src/bindings.dart` declares its native functions, and
@@ -415,7 +416,7 @@ everywhere, for scenes and renderers created after the app sets it.
 - `android/` is an Android library with no code, for its manifest.
 - `test/` runs with `flutter test`. Among its tests, `core_test.dart` tests the core through FFI, on generated scenes,
   `mesh_test.dart` the mesh import's triangles, `svg_paths_test.dart` the canvas renderer's SVG import, against the
-  core's, `path_contours_test.dart` and `path_scene_test.dart` the scenes of paths, `self_test_scene_test.dart` that the
+  core's, `path_contours_test.dart` and `path_scene_test.dart` the scenes of paths, `probe_scene_test.dart` that the
   format probe's built scene is its SVG's, and `svg_locale_test.dart` that SVGs read the same whatever the C locale.
 - `example/` is the example app, with the golden tests: see its `README.md` and `TESTING.md`.
 - `tool/compare_frames.py` compares two of the core's frames, as the golden tests record them.

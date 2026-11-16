@@ -35,8 +35,8 @@ The app turns on Flutter GPU as for rasterizer_gpu (see
 - **Android:** optionally, the Vulkan key in the app's manifest, which only debug and profile builds read.
 
 On OpenGL ES, which some Android devices and all of Linux use, the GPU renderer draws from the game's first frame, as
-elsewhere. Creating the game's renderer there compiles its shaders, once: for the mesh renderer, 20 ms on the Android
-emulator and 0.2 s with Linux's software renderer (see
+elsewhere. Creating the game's renderer there compiles its shaders, once, which also slows the frame after: for the
+mesh renderer, 20 ms on the Android emulator and 1 s with Linux's software renderer (see
 [rasterizer_gpu's README](https://github.com/adario/rasterizer_flutter/blob/main/rasterizer_gpu/README.md#opengl-es)).
 To draw with the canvas renderer there instead, set `RasterizerGpu.allowOpenGles` to false before `runApp`.
 

@@ -1,16 +1,16 @@
 // Checks the OpenGL ES format probe's scene, from this package's folder:
-//   flutter test test/self_test_scene_test.dart
+//   flutter test test/probe_scene_test.dart
 //
-// The probe doesn't parse selfTestSvg: src/ra_self_test.hpp builds its
+// The probe doesn't parse probeSvg: src/ra_probe_scene.hpp builds its
 // shapes, so that a parser's bug can't fail the probe. The scene must still
-// be selfTestSvg's. And at each pixel that the probe checks, the SVG's paths
+// be probeSvg's. And at each pixel that the probe checks, the SVG's paths
 // over it, composited as the GPU does, must give the colour that the check
 // expects.
 
 import 'dart:typed_data';
 
 import 'package:rasterizer_gpu/src/core.dart';
-import 'package:rasterizer_gpu/src/self_test.dart';
+import 'package:rasterizer_gpu/src/format_probe.dart';
 import 'package:test/test.dart';
 
 /// Returns whether one of [m]'s path [path]'s triangles holds [x], [y].
@@ -35,8 +35,8 @@ bool _covers(Mesh m, int path, double x, double y) {
 /// composited source over, as the GPU renderers draw them. Other pixels are
 /// transparent.
 Uint8List _render(Mesh m) {
-  final rgba = Uint8List(4 * selfTestSize * selfTestSize);
-  for (final (:x, :y) in selfTestPixels) {
+  final rgba = Uint8List(4 * probeSize * probeSize);
+  for (final (:x, :y) in probePixels) {
     final c = [0.0, 0.0, 0.0, 0.0];
     for (var path = 0; path < m.paths.length; path++) {
       if (_covers(m, path, x + 0.5, y + 0.5)) {
@@ -46,7 +46,7 @@ Uint8List _render(Mesh m) {
         }
       }
     }
-    final i = 4 * (y * selfTestSize + x);
+    final i = 4 * (y * probeSize + x);
     for (var k = 0; k < 4; k++) {
       rgba[i + k] = (c[k] * 255).round();
     }
@@ -54,17 +54,17 @@ Uint8List _render(Mesh m) {
   return rgba;
 }
 
-String? _check(Mesh m) => checkSelfTest(_render(m), 4 * selfTestSize, 0, 0, (
+String? _check(Mesh m) => checkProbePixels(_render(m), 4 * probeSize, 0, 0, (
   left: 0,
   top: 0,
-  width: selfTestSize,
-  height: selfTestSize,
+  width: probeSize,
+  height: probeSize,
 ));
 
 void main() {
-  final size = selfTestSize.toDouble();
+  final size = probeSize.toDouble();
   final parsedMesh = Mesh.fromSvgBytes(
-    Uint8List.fromList(selfTestSvg.codeUnits),
+    Uint8List.fromList(probeSvg.codeUnits),
     maxSize: size,
   );
 
@@ -73,8 +73,8 @@ void main() {
   });
 
   test("the built scene is the parsed SVG's", () {
-    final built = Scene.selfTest(),
-        parsed = Scene.fromSvgBytes(Uint8List.fromList(selfTestSvg.codeUnits));
+    final built = Scene.probe(),
+        parsed = Scene.fromSvgBytes(Uint8List.fromList(probeSvg.codeUnits));
     addTearDown(built.dispose);
     addTearDown(parsed.dispose);
     expect(built.count, parsed.count);
