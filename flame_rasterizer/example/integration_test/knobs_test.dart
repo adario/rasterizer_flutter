@@ -16,12 +16,9 @@ import 'package:integration_test/integration_test.dart';
 import 'package:widgetbook/widgetbook.dart' show FieldCodec;
 
 void main() {
-  // Fully live, so that frames draw while the tests await: on OpenGL ES, the
-  // self-tests wait for frames. As in the example's main, OpenGL ES is
-  // allowed, so the self-tests run there.
+  // Fully live, so that frames draw while the tests await.
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-  RasterizerGpu.allowOpenGles = true;
 
   testWidgets('the Svg menu reaches its last SVG', (tester) async {
     // Not pumpAndSettle, which never settles while the game animates.
@@ -69,29 +66,15 @@ void main() {
 
   testWidgets("the Renderer knob's GPU entries are active where their "
       'renderers are supported', (tester) async {
-    // On OpenGL ES, a GPU entry is active once its renderer's self-test passes.
     Future<void> settle() async {
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
     }
 
-    // Whether GPU (mesh) is supported as the Renderer knob is first built,
-    // when it picks its entry. On OpenGL ES, the self-test can pass during
-    // the settle.
-    final atFirst = SvgRenderer.rasterizer.supported;
     await tester.pumpWidget(
       const FlameRasterizerExamples(initialRoute: '/?path=svg/svg-renderers'),
     );
-    await settle();
-    await tester.runAsync(() async {
-      for (final renderer in [
-        SvgRenderer.rasterizer,
-        SvgRenderer.rasterizerAtlas,
-      ]) {
-        await RasterizerGpu.of(renderer.gpu).initialize();
-      }
-    });
     await settle();
     if (find.text('Renderer').evaluate().isEmpty) {
       await tester.tap(find.text('Knobs'));
@@ -104,8 +87,7 @@ void main() {
     print(
       '  RASTERIZER_EXAMPLE knobs: mesh '
       '${RasterizerGpu.of(RasterizerBackend.mesh).support.name}, GPU '
-      '${RasterizerGpu.support.name} '
-      '(${atFirst ? 'at first' : 'after the self-tests'}), '
+      '${RasterizerGpu.support.name}, '
       'selected ${menu.initialSelection?.text}',
     );
     expect(
@@ -129,8 +111,7 @@ void main() {
       }
     }
     // The first choice is the first active entry of GPU (mesh), GPU (atlas)
-    // and Canvas. On OpenGL ES, it's Canvas at first, and the knob switches
-    // to a GPU entry once its self-test passes.
+    // and Canvas.
     expect(
       menu.initialSelection,
       SvgRenderer.values.firstWhere((renderer) => renderer.supported),
@@ -156,16 +137,6 @@ void main() {
       FlameRasterizerExamples(initialRoute: route.toString()),
     );
     await settle();
-    // On OpenGL ES, the GPU entries become active, but a link's entry stays.
-    await tester.runAsync(() async {
-      for (final renderer in [
-        SvgRenderer.rasterizer,
-        SvgRenderer.rasterizerAtlas,
-      ]) {
-        await RasterizerGpu.of(renderer.gpu).initialize();
-      }
-    });
-    await settle();
     if (find.text('Renderer').evaluate().isEmpty) {
       await tester.tap(find.text('Knobs'));
       await settle();
@@ -184,10 +155,6 @@ void main() {
       }
     }
 
-    // So that GPU (mesh) is the first choice on OpenGL ES too.
-    await tester.runAsync(
-      () => RasterizerGpu.of(RasterizerBackend.mesh).initialize(),
-    );
     await tester.pumpWidget(
       const FlameRasterizerExamples(initialRoute: '/?path=games/tube-shooter'),
     );

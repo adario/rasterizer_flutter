@@ -6,11 +6,10 @@ import 'package:flutter_gpu/gpu.dart' as gpu;
 
 import 'core.dart' as ra;
 import '../rasterizer_gpu.dart';
-import 'atlas.dart' show maxPageSize, onMeshFrame;
+import 'atlas.dart' show maxPageSize;
 import 'atlas_pages.dart';
 import 'image_run.dart';
 import 'mesh_gpu.dart';
-import 'switching.dart';
 
 // The mesh renderer. It imports SVGs and plain paths once into meshes, whose
 // triangles stay in GPU buffers. Each frame, it draws them under their
@@ -160,6 +159,10 @@ class MeshRenderer(
     }
     return n;
   }
+
+  /// Compiles its pipelines now, rather than at the frames that first draw
+  /// with each ([MeshGpu.warmUp]).
+  void warmUp() => _gpu.warmUp();
 
   @override
   void trimAtlas() {
@@ -330,7 +333,6 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     if (run._placed) {
       throw StateError('RasterizerRun already placed');
     }
-    scene = resolveScene(scene, RasterizerBackend.mesh);
     if (scene is! MeshScene) {
       throw ArgumentError.value(
         scene,
@@ -592,7 +594,6 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       renderer._trimPending = false;
       renderer.trimAtlas();
     }
-    onMeshFrame?.call();
   }
 
   /// Writes entry [i]'s instance record at [k], its transform moved from the

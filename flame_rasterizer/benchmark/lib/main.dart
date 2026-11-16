@@ -94,8 +94,6 @@ Future<void> main() async {
     'CANVAS_PICTURES',
     defaultValue: true,
   );
-  // On OpenGL ES, the canvas renderer draws until demoGpu's self-test passes.
-  RasterizerGpu.allowOpenGles = true;
   if (mode == 'check') {
     return runApp(
       CheckPage(time: double.parse(checkTime)),

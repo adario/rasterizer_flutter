@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-// The OpenGL ES self-test's scene and the pixels it checks. See
-// RasterizerGpu.initialize.
+// The scene of the GPU renderer's OpenGL ES format probe, and the pixels it
+// checks. See RasterizerGpu.allowOpenGles.
 
-/// A 160 x 160 SVG for the OpenGL ES self-test.
+/// A 160 x 160 SVG for the OpenGL ES format probe.
 ///
-/// The self-test doesn't parse it: `src/ra_self_test.hpp` builds its shapes as
-/// NanoSVG parses them, so that a parser's bug can't fail the GPU renderers.
+/// The probe doesn't parse it: `src/ra_self_test.hpp` builds its shapes as
+/// NanoSVG parses them, so that a parser's bug can't fail the GPU renderer.
 /// A change here needs the same change there, which
 /// `test/self_test_scene_test.dart` checks.
 ///

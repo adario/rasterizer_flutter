@@ -3,35 +3,33 @@ import 'dart:typed_data';
 import '../rasterizer_gpu.dart';
 import 'paths/scene_paths.dart';
 
-export 'self_test_cache.dart' show SelfTestAttempt, SelfTestCache;
-
 // This file replaces atlas.dart where dart:ffi isn't available, as on web.
 // There, only the canvas renderer works.
 
 String? contextError;
 
-RasterizerSupport checkSupport() => RasterizerSupport.unsupportedPlatform;
+RasterizerSupport checkSupport(int textureWidth) =>
+    RasterizerSupport.unsupportedPlatform;
 
 bool openGles = false;
 
 int maxPageSize = RasterizerRenderer.maxAtlasSize;
 
-Future<({bool passed, String detail, bool conclusive})> selfTest(
-  RasterizerBackend backend,
-  Set<String> fail, {
-  bool apply = true,
-}) async => (
-  passed: false,
-  detail: 'no GPU renderer without dart:ffi',
-  conclusive: false,
-);
+Future<String?>? formatProbe;
 
-void Function()? onGpuFrame, onMeshFrame;
+String get formatDetail => 'no GPU renderer without dart:ffi';
+
+String get meshDetail => formatDetail;
+
+void resetFormatProbe() {}
+
+Future<String?> debugProbeFormat(Set<String> fail) async =>
+    'no GPU renderer without dart:ffi';
 
 RasterizerScene parseScene(Uint8List bytes) =>
     throw UnsupportedError('rasterizer_gpu: no GPU renderer without dart:ffi');
 
-Future<RasterizerRenderer> createRenderer(int slots) =>
+Future<RasterizerRenderer> createRenderer(int slots, Set<String> fail) =>
     throw UnsupportedError('rasterizer_gpu: no GPU renderer without dart:ffi');
 
 RasterizerScene parseMeshScene(Uint8List bytes, double maxSize) =>

@@ -7,13 +7,13 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart'
     show AppLifecycleListener, WidgetsFlutterBinding;
 
-/// Logs the app's frames while the renderer initializes, which runs the
-/// OpenGL ES self-test there, and for as long again after it, as a baseline.
+/// Logs the app's frames until its page has created its renderer, and for as
+/// long again after it, as a baseline.
 ///
 /// It logs a `RASTERIZER_EXAMPLE startup` line with each of the two windows'
 /// frames, the longest gap between frames, and how many gaps missed a vsync.
-/// On OpenGL ES, Flutter GPU blocks the UI thread while it creates
-/// pipelines, which shows as gaps.
+/// On OpenGL ES, creating a GPU renderer compiles its pipelines on the UI
+/// thread, which shows as gaps.
 ///
 /// Meanwhile, `RASTERIZER_EXAMPLE event` lines mark the first frame
 /// rasterized, lifecycle changes, and stalls of the UI thread over 250 ms,
@@ -31,6 +31,9 @@ class StartupLog._() {
 
   /// The longest UI thread stall so far, in microseconds.
   static int _stall = 0;
+
+  /// Whether [end] was called.
+  static bool _ended = false;
 
   /// Starts collecting frame timings, and marking events.
   static void begin() {
@@ -67,13 +70,14 @@ class StartupLog._() {
     );
   }
 
-  /// Marks the end of [what], such as the renderer's initialization, and logs
-  /// the startup line once as long again has passed.
+  /// Marks the end of [what], such as the renderer's creation, and logs the
+  /// startup line once as long again has passed. Only its first call counts.
   static void end(String what) {
     final start = _start;
-    if (start == null) {
+    if (start == null || _ended) {
       return;
     }
+    _ended = true;
     final end = Timeline.now;
     Future.delayed(Duration(microseconds: end - start + 200000), () {
       SchedulerBinding.instance.removeTimingsCallback(_timings.addAll);

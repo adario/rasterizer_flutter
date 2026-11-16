@@ -200,7 +200,7 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
       strokedTransformedPipeline;
 
   /// The pipeline for meshes with a glow, made at the first one's draw, so
-  /// games without any don't pay for it.
+  /// games without any don't pay for it. On OpenGL ES, [warmUp] makes it.
   ///
   /// It has no variant for color transforms, as only gradients need one, and a
   /// glow's paths are all colors.
@@ -415,6 +415,76 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
       strips ? mesh.stripIndexCount : mesh.indexCount,
       instanceCount: count,
     );
+  }
+
+  /// Draws once with each of its pipelines into a scratch target, which
+  /// compiles those not compiled yet.
+  ///
+  /// On OpenGL ES, a pipeline compiles at its first draw, which blocks the UI
+  /// thread. So the mesh renderer compiles them all as it's made there,
+  /// rather than at whichever frame first draws each.
+  void warmUp() {
+    gpu.BufferView view(TypedData data) {
+      final buffer = context.createDeviceBufferWithCopy(
+        ByteData.sublistView(data),
+      );
+      return gpu.BufferView(
+        buffer,
+        offsetInBytes: 0,
+        lengthInBytes: buffer.sizeInBytes,
+      );
+    }
+
+    // One triangle of zeros, with room for a glow's vertices, the widest.
+    final vertices = view(Float32List(18)), indices = view(Uint16List(4));
+    final paints = context.createTexture(
+      gpu.StorageMode.devicePrivate,
+      4,
+      1,
+      format: gpu.PixelFormat.r32g32b32a32Float,
+      enableRenderTargetUsage: false,
+    )..overwrite(ByteData(4 * 16));
+    MeshBuffers mesh({bool stroked = false, bool glow = false}) =>
+        MeshBuffers._(
+          vertices,
+          indices,
+          gpu.IndexType.int16,
+          3,
+          paints,
+          false,
+          false,
+          stroked || glow,
+          glow,
+          null,
+          0,
+        );
+    final target = MeshTarget()
+      ..texture = context.createTexture(
+        gpu.StorageMode.devicePrivate,
+        4,
+        4,
+        format: colorFormat,
+      );
+    target.texture!.overwrite(
+      ByteData(target.texture!.getBaseMipLevelSizeInBytes()),
+    );
+    final instances = MeshInstances();
+    beginPass(target, upload(instances, Float32List(instanceFloats), 1));
+    final transform = Float32List(16);
+    for (final stroked in [false, true]) {
+      draw(mesh(stroked: stroked), 0, 1, blend: true);
+      draw(
+        mesh(stroked: stroked),
+        0,
+        1,
+        blend: true,
+        colorTransform: transform,
+      );
+    }
+    draw(mesh(glow: true), 0, 1, blend: true);
+    endPass(instances, last: true);
+    // No real target is this small, as targets grow in steps of 64.
+    _multisampledTextures.remove((width: 4, height: 4));
   }
 
   /// Submits the pass.

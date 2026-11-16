@@ -21,11 +21,12 @@ import 'package:vector_math/vector_math.dart' as vm;
 /// flight can share them.
 ///
 /// Edges' coverage accumulates in [accumulationFormat]: r32Float, or
-/// r16g16b16a16Float where the OpenGL ES self-test found that r32Float can't
-/// be blended into (RasterizerGpu.initialize).
+/// r16g16b16a16Float where the OpenGL ES format probe found that r32Float
+/// can't be blended into (RasterizerGpu.allowOpenGles). Changing it
+/// reallocates the accumulation at the next frame.
 class GpuRenderer(
   gpu.ShaderLibrary library, {
-  final gpu.PixelFormat accumulationFormat = gpu.PixelFormat.r32Float,
+  var gpu.PixelFormat accumulationFormat = gpu.PixelFormat.r32Float,
 }) {
   this
     : opaquesVertex = library['RaOpaquesVertex']!,
@@ -399,20 +400,25 @@ class GpuRenderer(
     return target;
   }
 
-  /// The number of pipeline states [render] draws with.
+  /// Draws once with each pipeline state that [render] draws with, into
+  /// scratch textures, which compiles those not compiled yet.
   ///
-  /// They are: clear, opaques without and with blending, the four kinds of
-  /// edges and molecules, and instances. Each compiles when it first draws.
-  /// On OpenGL ES, Flutter GPU blocks the UI thread while it compiles, for
-  /// 25-130 ms each on the Android emulator.
-  static const warmUpSteps = 8;
+  /// The states are: clear, opaques without and with blending, the four kinds
+  /// of edges and molecules, and instances. Each compiles when it first draws.
+  /// On OpenGL ES, that blocks the UI thread: the states took 110 ms in all
+  /// on the Android emulator, and 470 ms on Mesa's llvmpipe, in release
+  /// builds with no shader cache. So the GPU renderer compiles them all as
+  /// it's made there, rather than at whichever frame first draws each.
+  void warmUp() {
+    for (var step = 0; step < 8; step++) {
+      _warmUp(step);
+    }
+  }
 
-  /// Draws with pipeline state [step] of [warmUpSteps], into scratch
-  /// textures, which compiles it if needed.
+  /// Draws with pipeline state [step] of [warmUp]'s 8.
   ///
-  /// This lets the self-test compile one state per frame. Each step must set
-  /// the same states that [render] sets for that draw.
-  void warmUp(int step) {
+  /// Each step must set the same states that [render] sets for that draw.
+  void _warmUp(int step) {
     final slot = _warmSlot ??= RenderTargets(),
         shared = _warmShared ??= SharedTargets();
     _ensureTargets(slot, shared, 4, 4);
@@ -593,16 +599,17 @@ class GpuRenderer(
         ByteData(slot.target!.getBaseMipLevelSizeInBytes()),
       );
     }
-    if (shared.depth?.width == width && shared.depth?.height == height) {
+    if (shared.depth?.width != width || shared.depth?.height != height) {
+      shared.depth = context.createTexture(
+        gpu.StorageMode.devicePrivate,
+        width,
+        height,
+        format: depthFormat,
+        enableShaderReadUsage: false,
+      );
+    } else if (shared.accumulation?.format == accumulationFormat) {
       return;
     }
-    shared.depth = context.createTexture(
-      gpu.StorageMode.devicePrivate,
-      width,
-      height,
-      format: depthFormat,
-      enableShaderReadUsage: false,
-    );
     shared.accumulation = context.createTexture(
       gpu.StorageMode.devicePrivate,
       width,

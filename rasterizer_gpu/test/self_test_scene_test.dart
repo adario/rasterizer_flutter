@@ -1,11 +1,11 @@
-// Checks the OpenGL ES self-test's scene, from this package's folder:
+// Checks the OpenGL ES format probe's scene, from this package's folder:
 //   flutter test test/self_test_scene_test.dart
 //
-// The self-test doesn't parse selfTestSvg: src/ra_self_test.hpp builds its
-// shapes, so that a parser's bug can't fail the GPU renderers. The scene
-// must still be selfTestSvg's. So at each pixel that the self-test checks,
-// the paths over it, composited as the GPU does, must give the colour that
-// the check expects, both for the built mesh and for the parsed SVG's.
+// The probe doesn't parse selfTestSvg: src/ra_self_test.hpp builds its
+// shapes, so that a parser's bug can't fail the probe. The scene must still
+// be selfTestSvg's. And at each pixel that the probe checks, the SVG's paths
+// over it, composited as the GPU does, must give the colour that the check
+// expects.
 
 import 'dart:typed_data';
 
@@ -31,7 +31,7 @@ bool _covers(Mesh m, int path, double x, double y) {
   return false;
 }
 
-/// Returns [m]'s pixels at the self-test's probes, premultiplied, its paths
+/// Returns [m]'s pixels at the probe's pixels, premultiplied, its paths
 /// composited source over, as the GPU renderers draw them. Other pixels are
 /// transparent.
 Uint8List _render(Mesh m) {
@@ -67,26 +67,9 @@ void main() {
     Uint8List.fromList(selfTestSvg.codeUnits),
     maxSize: size,
   );
-  final builtMesh = Mesh.selfTest(maxSize: size);
 
   test("the parsed SVG's mesh passes the check", () {
     expect(_check(parsedMesh), isNull);
-  });
-
-  test('the built mesh passes the check', () {
-    expect(_check(builtMesh), isNull);
-  });
-
-  test('the built mesh has the parsed paths and paints, in order', () {
-    expect(builtMesh.paths.length, parsedMesh.paths.length);
-    for (var i = 0; i < builtMesh.paths.length; i++) {
-      final built = builtMesh.paths[i], parsed = parsedMesh.paths[i];
-      expect(built.paint, parsed.paint, reason: 'path $i');
-      expect(built.color, parsed.color, reason: 'path $i');
-      expect(built.halfWidth, parsed.halfWidth, reason: 'path $i');
-    }
-    final b = builtMesh.svgBounds, p = parsedMesh.svgBounds;
-    expect([b.lx, b.ly, b.ux, b.uy], [p.lx, p.ly, p.ux, p.uy]);
   });
 
   test("the built scene is the parsed SVG's", () {
@@ -108,10 +91,5 @@ void main() {
     ]) {
       expect(x, closeTo(y, 0.01));
     }
-  });
-
-  test('Mesh.selfTest rejects a size that is not positive', () {
-    expect(() => Mesh.selfTest(maxSize: 0), throwsArgumentError);
-    expect(() => Mesh.selfTest(maxSize: double.nan), throwsArgumentError);
   });
 }

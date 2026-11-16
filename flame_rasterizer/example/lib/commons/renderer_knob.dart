@@ -1,4 +1,3 @@
-import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:widgetbook/widgetbook.dart';
@@ -6,15 +5,13 @@ import 'package:widgetbook/widgetbook.dart';
 /// The Renderer knob's label, which also names its field in the URL.
 const _label = 'Renderer';
 
-/// The knob's GPU entries, in the order that their self-tests run, which is
-/// also the order of the first choice.
+/// The knob's GPU entries, in the order of the first choice.
 const _gpus = [SvgRenderer.rasterizer, SvgRenderer.rasterizerAtlas];
 
 /// Returns the Renderer knob: a dropdown of the [SvgRenderer]s.
 ///
 /// A GPU entry is inactive where its renderer isn't [SvgRenderer.supported]:
-/// on the web, without Impeller, and on OpenGL ES until its self-test passes
-/// (see [refreshRendererKnob]). The first choice is GPU (mesh), else GPU
+/// on the web and without Impeller. The first choice is GPU (mesh), else GPU
 /// (atlas), else Canvas, whichever is active first. Widgetbook's own dropdown
 /// can't make an entry inactive, so this knob has a dropdown of its own.
 ///
@@ -94,39 +91,6 @@ SvgCache cacheKnobs(BuildContext context, {required bool shown}) {
       labelBuilder: (value) => '${value.name} (${value.label})',
     ),
   );
-}
-
-/// Makes a GPU renderer's entry active once its self-test passes, as on
-/// OpenGL ES.
-///
-/// It waits for each renderer's self-test in turn, the mesh renderer's
-/// first. When one passes, it rebuilds the knobs panel. The Renderer knob
-/// keeps an entry that a link or the user picked. Otherwise it takes its new
-/// first choice: from Canvas, if no GPU renderer was supported as the knob
-/// was built, so that the game goes on from where it was with the GPU
-/// renderer. A later pass doesn't change it.
-Future<void> refreshRendererKnob(BuildContext context) async {
-  for (final renderer in _gpus) {
-    if (renderer.supported) {
-      continue;
-    }
-    await RasterizerGpu.of(renderer.gpu).initialize();
-    if (!context.mounted) {
-      return;
-    }
-    if (!renderer.supported) {
-      continue;
-    }
-    final state = WidgetbookState.of(context);
-    final knobs = FieldCodec.decodeQueryGroup(state.queryParams['knobs']);
-    state.updateQueryField(
-      group: 'knobs',
-      field: _label,
-      // A link or the user puts the entry in the URL, the first choice
-      // doesn't. Written down, it stays as the next self-test passes.
-      value: knobs[_label] ?? _firstChoice().label,
-    );
-  }
 }
 
 /// The Renderer knob, whose dropdown can make entries inactive.

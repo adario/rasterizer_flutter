@@ -9,7 +9,6 @@ import '../rasterizer_gpu.dart';
 import 'canvas_paths.dart';
 import 'paths/scene_paths.dart';
 import 'svg_paths/svg_paths.dart';
-import 'switching.dart';
 
 /// A scene that the canvas renderer draws with dart:ui: an SVG parsed in
 /// Dart, or plain paths.
@@ -276,7 +275,6 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     if (_placed) {
       throw StateError('RasterizerRun already placed');
     }
-    scene = resolveScene(scene, RasterizerBackend.canvas);
     if (scene is! CanvasScene) {
       throw ArgumentError.value(
         scene,

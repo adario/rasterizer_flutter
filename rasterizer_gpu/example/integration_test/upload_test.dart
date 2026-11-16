@@ -11,9 +11,7 @@
 // frame's, which hold an earlier frame's bytes.
 //
 // Some frames render 4 at a time, before the slots' blits can complete, so a
-// slot is reused while its buffer is still being copied from. On OpenGL ES,
-// as on an Android emulator built with IMPELLER_BACKEND=opengles, the test
-// runs once the GPU renderer's self-test passes.
+// slot is reused while its buffer is still being copied from.
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -32,9 +30,7 @@ import 'package:rasterizer_gpu_example/scenes.dart';
 Future<void> main() async {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized().framePolicy =
       LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-  RasterizerGpu.allowOpenGles = true;
   runApp(const SizedBox());
-  await RasterizerGpu.initialize();
   if (RasterizerGpu.support != RasterizerSupport.supported) {
     test(
       'no GPU renderer here',

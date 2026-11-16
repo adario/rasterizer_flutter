@@ -24,10 +24,9 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// [rasterizerReady] is first read, such as in `onLoad`. It's a renderer for
 /// [rasterizerGpu] where that's supported, else the canvas renderer, the same
 /// choice as for the [RasterizerSvg]s' imports. Until the renderer is ready,
-/// vector content drawn into the game's canvas draws nothing. With
-/// [RasterizerGpu.allowOpenGles], on OpenGL ES, the renderer and the imports
-/// draw with the canvas renderer until the GPU renderer's self-test passes,
-/// then with the GPU renderer ([RasterizerGpuBackend.initialize]).
+/// vector content drawn into the game's canvas draws nothing. On OpenGL ES,
+/// creating a GPU renderer compiles its shaders, a hitch of up to half a
+/// second ([RasterizerGpu.allowOpenGles]).
 ///
 /// For a game larger than the renderer takes
 /// ([RasterizerRenderer.maxViewportSize] a side), such as a window over 4096
@@ -124,14 +123,9 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
     final removals = _removals;
     final gpu = rasterizerGpu;
     final state = RasterizerGpu.of(gpu);
-    // Reports an unsupported GPU renderer once the choice is settled: on
-    // OpenGL ES, the canvas renderer draws until the self-test is done.
-    state.settledBackend.then((_) {
-      final support = state.support;
-      // Not in release builds, whose users can't act on it.
-      if (support == RasterizerSupport.supported || kReleaseMode) {
-        return;
-      }
+    final support = state.support;
+    // Not in release builds, whose users can't act on it.
+    if (support != RasterizerSupport.supported && !kReleaseMode) {
       final detail = state.supportDetail;
       debugPrint(
         "flame_rasterizer: rasterizer_gpu's "
@@ -139,7 +133,7 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
         'unsupported here (${support.name}${detail == null ? '' : ': $detail'}'
         '), so its canvas renderer draws',
       );
-    });
+    }
     final renderer = await RasterizerRenderer.create(
       slots: rasterizerSlots,
       gpu: gpu,

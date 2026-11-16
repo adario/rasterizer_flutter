@@ -78,7 +78,7 @@ void _defineTests(
         RasterizerSupport.supported,
         reason:
             'rasterizer_gpu\'s ${mesh ? 'mesh' : 'GPU'} renderer needs '
-            'Impeller and Flutter GPU, and on OpenGL ES its self-test. '
+            'Impeller and Flutter GPU. '
             '${state.supportDetail ?? ''}',
       );
     }

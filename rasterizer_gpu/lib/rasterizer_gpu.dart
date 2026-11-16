@@ -1,13 +1,12 @@
 /// Renders SVG scenes with one of three renderers ([RasterizerBackend]).
 ///
 /// - The GPU renderer uses Rasterizer's core and Flutter GPU. It works where
-///   Impeller gives Flutter GPU a Metal or Vulkan context. On OpenGL ES, it
-///   works once [RasterizerGpu.initialize]'s self-test has passed, if
-///   [RasterizerGpu.allowOpenGles] is set. Its support is then
-///   [RasterizerSupport.supported]. Once per frame, it renders all of the
-///   frame's runs ([RasterizerRun]) into one atlas image. It then draws each
-///   run from its rectangle with [ui.Canvas.drawImageRect], at the run's
-///   place in the app's paint order.
+///   Impeller gives Flutter GPU a Metal or Vulkan context, and an OpenGL ES
+///   one while [RasterizerGpu.allowOpenGles] is on, as it is by default. Its
+///   support is then [RasterizerSupport.supported]. Once per frame, it
+///   renders all of the frame's runs ([RasterizerRun]) into one atlas image.
+///   It then draws each run from its rectangle with
+///   [ui.Canvas.drawImageRect], at the run's place in the app's paint order.
 /// - The canvas renderer is the fallback everywhere else. It parses scenes in
 ///   Dart, and each run draws its scenes' paths with [ui.Canvas.drawPath],
 ///   straight into the canvas it's drawn into. It works wherever Flutter
@@ -15,8 +14,7 @@
 /// - The mesh renderer is made for games. It imports each SVG once into
 ///   triangles, which stay in GPU buffers. It renders each run with Flutter
 ///   GPU into an image of its own, then draws it as the GPU renderer does. It
-///   works where Flutter GPU has a context, and on OpenGL ES once its own
-///   self-test has passed. Scenes and renderers made with
+///   works where the GPU renderer does. Scenes and renderers made with
 ///   `gpu: RasterizerBackend.mesh` use it where it's supported, else the
 ///   canvas renderer.
 ///
@@ -30,20 +28,16 @@
 /// ```
 library;
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
-import 'package:flutter/widgets.dart' show WidgetsFlutterBinding;
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
 import 'src/canvas_renderer.dart';
-import 'src/frame_clock.dart';
 import 'src/paths/scene_paths.dart';
 import 'src/svg_paths/svg_paths.dart';
-import 'src/switching.dart';
 import 'src/gpu_stub.dart' if (dart.library.ffi) 'src/atlas.dart' as native;
 
 export 'src/rasterizer_canvas.dart' show RasterizerCanvas;
@@ -70,18 +64,21 @@ enum RasterizerSupport() {
   ///   the runner's `linux/runner/my_application.cc`.
   noFlutterGpu,
 
-  /// Impeller renders with OpenGL ES, and the renderer hasn't passed its
-  /// self-test there.
+  /// Impeller renders with OpenGL ES, and [RasterizerGpu.allowOpenGles] is
+  /// off.
   ///
   /// Android falls back to OpenGL ES without Vulkan, and on devices whose
   /// Vulkan driver Flutter blocks, such as the emulator's. Linux always uses
-  /// it. [RasterizerGpuBackend.initialize] runs the self-test, once
-  /// [RasterizerGpu.allowOpenGles] is set.
+  /// it.
   ///
   /// `io.flutter.embedding.android.ImpellerBackend` set to `vulkan` in the
   /// app's Android manifest asks for Vulkan anyway. Only debug and profile
   /// builds read it: release builds ignore it.
   openGles,
+
+  /// Impeller renders with OpenGL ES, but can't make textures 4096 pixels
+  /// wide, as both GPU renderers need. OpenGL ES only guarantees 2048.
+  smallTextures,
 }
 
 /// Which renderer parses and draws scenes.
@@ -113,13 +110,11 @@ enum RasterizerBackend() {
   /// SVG's clip paths.
   ///
   /// It works only where `RasterizerGpu.of(RasterizerBackend.mesh).support`
-  /// is [RasterizerSupport.supported]. That's where Flutter GPU has a context,
-  /// and on OpenGL ES, once the renderer's own self-test has passed.
+  /// is [RasterizerSupport.supported]: where the GPU renderer's is.
   mesh,
 }
 
-/// The GPU renderers' support and OpenGL ES self-tests, and the options that
-/// all renderers share.
+/// The GPU renderers' support, and the options that all renderers share.
 ///
 /// Each GPU renderer has its own state, from [of]. Members that share a name
 /// with one of [RasterizerGpuBackend]'s are the GPU renderer's,
@@ -139,21 +134,15 @@ abstract final class RasterizerGpu() {
     ),
   };
 
-  static final _gpu = RasterizerGpuBackend._(
-    RasterizerBackend.gpu,
-    native.SelfTestCache.gpu,
-  );
-  static final _mesh = RasterizerGpuBackend._(
-    RasterizerBackend.mesh,
-    native.SelfTestCache.mesh,
-  );
+  static final _gpu = RasterizerGpuBackend._(RasterizerBackend.gpu);
+  static final _mesh = RasterizerGpuBackend._(RasterizerBackend.mesh);
 
   /// Whether Flutter GPU can render here, which both GPU renderers need.
   ///
   /// It's checked once. Off Impeller, getting Flutter GPU's context throws, so
   /// the check looks at whether Impeller is on first.
   static RasterizerSupport get _context =>
-      _contextSupport ??= native.checkSupport();
+      _contextSupport ??= native.checkSupport(debugCheckedTextureWidth);
   static RasterizerSupport? _contextSupport;
 
   /// The GPU renderer's [RasterizerGpuBackend.support].
@@ -169,99 +158,72 @@ abstract final class RasterizerGpu() {
     return native.openGles;
   }
 
-  /// Lets [RasterizerGpuBackend.initialize] try a GPU renderer on OpenGL ES.
+  /// Lets the GPU renderers draw on OpenGL ES.
   ///
-  /// It's off by default. The self-test checks the renderer's results, and
-  /// [rememberSelfTest] stops trying after the renderer crashed or hung the
-  /// app twice. But both GPU renderers have only been tried on the Android
-  /// emulator's OpenGL ES and on Mesa's llvmpipe on Linux, not on a device's
-  /// own driver. `initialize` reads it, so set it before.
-  static bool allowOpenGles = false;
-
-  /// Calls the GPU renderer's [RasterizerGpuBackend.initialize].
-  static Future<void> initialize() => _gpu.initialize();
-
-  /// The GPU renderer's [RasterizerGpuBackend.initialized].
-  static bool get initialized => _gpu.initialized;
-
-  /// The GPU renderer's [RasterizerGpuBackend.settledBackend].
-  static Future<RasterizerBackend> get settledBackend => _gpu.settledBackend;
-
-  /// Whether [RasterizerGpuBackend.initialize] remembers, across launches,
-  /// that a GPU renderer's self-test failed.
+  /// It's on by default. They then draw there from the first frame, as on
+  /// Metal and Vulkan, but for two steps:
+  /// - each renderer compiles its pipelines as it's made, which blocks the UI
+  ///   thread. The GPU renderer's took about 0.1 s on the Android emulator,
+  ///   and 0.5 s on Mesa's llvmpipe, in release builds with no shader cache.
+  ///   The mesh renderer's took about 20 ms and 0.2 s.
+  /// - the first GPU renderer made starts a format probe, which checks that it
+  ///   draws right while accumulating coverage in r32Float. Where it doesn't,
+  ///   the renderer accumulates in r16g16b16a16Float instead: at once where
+  ///   r32Float textures can't be made, else once the probe has read its
+  ///   pixels back, so its first frames may be wrong. The probe then checks
+  ///   r16g16b16a16Float too. [RasterizerGpuBackend.supportDetail] says what
+  ///   the probe found.
   ///
-  /// Later launches then skip the self-test, and draw with the canvas renderer
-  /// from the start, as without [allowOpenGles]. It remembers:
-  /// - a failure of the self-test's checks, which is the same at every launch
-  ///   for one app, OS and driver. It doesn't remember timeouts and
-  ///   exceptions.
-  /// - the app crashing or hanging twice in a row, during the self-test or
-  ///   after the switch to the GPU renderer, until its renderers have rendered
-  ///   [probationFrames] frames. `initialize` counts an attempt as unfinished
-  ///   while it runs with the app in the foreground. So a crash in a device's
-  ///   driver costs a user two crashes, not one per launch. An app killed in
-  ///   the background, as Android does, doesn't count.
-  ///   [RasterizerGpuBackend.supportDetail] then says where the attempts
-  ///   stopped. Debug builds don't count attempts, as an IDE stops the app in
-  ///   the foreground, unless [debugCountAttempts] is set.
-  ///
-  /// Each GPU renderer keeps this in a small file of its own, in
-  /// `Directory.systemTemp`. On Android, that's the app's code cache, which
-  /// Android clears when the app or the platform is upgraded. So a new version
-  /// of the app, of rasterizer_gpu or of the OS's drivers tries again, but a
-  /// GPU driver updated on its own doesn't. On Linux, the file is in the
-  /// user's cache (`$XDG_CACHE_HOME`, else `~/.cache`), in a folder named
-  /// after the app's executable, and holds for one build of the app. So a new
-  /// build tries again, but Mesa updated on its own doesn't.
-  ///
-  /// It doesn't remember a pass: the self-test and its probation run at each
-  /// launch until they fail. It's on by default. `initialize` reads it, so set
-  /// it before.
-  static bool rememberSelfTest = true;
+  /// Support checks one more thing: that textures can be 4096 pixels wide, as
+  /// the GPU renderers need. OpenGL ES only guarantees 2048. Where they can't,
+  /// support is [RasterizerSupport.smallTextures], and the canvas renderer
+  /// draws. Nothing else is checked. A driver that draws wrongly, in either
+  /// format, draws wrongly, with
+  /// no fallback to the canvas renderer, and one that crashes crashes the app.
+  /// Both GPU renderers have only been tried on the Android emulator's OpenGL
+  /// ES and on Mesa's llvmpipe on Linux, not on a device's own driver. Turn it
+  /// off to draw with the canvas renderer on OpenGL ES. Scenes and renderers
+  /// read it as they're made, so set it before.
+  static bool allowOpenGles = true;
 
-  /// The frames after the switch to a GPU renderer on OpenGL ES, until a
-  /// launch's attempt counts as finished ([rememberSelfTest]).
+  /// For tests: what the format probe treats as failing.
   ///
-  /// It's 1800 by default: 30 s of drawing at 60 Hz. Frames rendered by any of
-  /// that GPU renderer's renderers count, so a game that shows no vector
-  /// content doesn't advance it. 0 finishes the attempt at the switch.
-  /// [RasterizerGpuBackend.initialize] reads it, so set it before.
-  static int probationFrames = 1800;
-
-  /// For tests: counts attempts ([rememberSelfTest]) in debug builds too.
+  /// It holds accumulation formats, by Flutter GPU's PixelFormat names, such
+  /// as `r32Float`. A format in it fails at once.
   @visibleForTesting
-  static bool debugCountAttempts = false;
+  static Set<String> debugFailFormatProbe = {};
 
-  /// The GPU renderer's [RasterizerGpuBackend.onProbation].
-  static bool get onProbation => _gpu.onProbation;
-
-  /// Calls the GPU renderer's [RasterizerGpuBackend.forgetSelfTest].
-  static void forgetSelfTest() => _gpu.forgetSelfTest();
-
-  /// For tests: what the self-tests treat as failing.
+  /// For tests: how wide a texture support checks that Flutter GPU can make
+  /// on OpenGL ES.
   ///
-  /// It holds the GPU renderer's accumulation formats, by Flutter GPU's
-  /// PixelFormat names, `r32Float` and `r16g16b16a16Float`. `mesh` stands for
-  /// the mesh renderer's self-test.
+  /// It's 4096, the widest the GPU renderers' textures get there. Wider than
+  /// the device allows, support is [RasterizerSupport.smallTextures].
   @visibleForTesting
-  static Set<String> debugFailSelfTest = {};
+  static int debugCheckedTextureWidth = 4096;
 
-  /// For tests: forgets each GPU renderer's support and
-  /// [RasterizerGpuBackend.initialize]'s result, so they're checked again.
+  /// For tests: the OpenGL ES format probe that the first GPU renderer made
+  /// started, if any.
   ///
-  /// It also reads what [rememberSelfTest] keeps again, as a new launch would.
-  /// To forget that too, call [RasterizerGpuBackend.forgetSelfTest].
+  /// It completes with the probe's failure, or null if it passed.
+  @visibleForTesting
+  static Future<String?>? get debugFormatProbe => native.formatProbe;
+
+  /// For tests: forgets each GPU renderer's support and the format probe's
+  /// result, so they're checked again.
   @visibleForTesting
   static void debugResetSupport() {
-    _gpu._reset();
-    _mesh._reset();
     _contextSupport = null;
     native.contextError = null;
+    native.resetFormatProbe();
   }
 
-  /// Calls the GPU renderer's [RasterizerGpuBackend.debugSelfTest].
+  /// For tests: runs the format probe on its own wherever the GPU renderer is
+  /// supported, Metal and Vulkan included, without changing its format.
+  ///
+  /// Returns null if it passed, else why it didn't.
   @visibleForTesting
-  static Future<String?> debugSelfTest() => _gpu.debugSelfTest();
+  static Future<String?> debugProbeFormat() =>
+      native.debugProbeFormat(debugFailFormatProbe);
 
   /// Uses the canvas renderer even where a GPU renderer is supported.
   ///
@@ -283,62 +245,26 @@ abstract final class RasterizerGpu() {
   /// lists as an asset.
   static const shaderBundle =
       'packages/rasterizer_gpu/build/shaderbundles/rasterizer.shaderbundle';
-
-  /// Waits for the app's first rasterized frame, and returns whether it came.
-  ///
-  /// It waits up to 10 s of time in which frames can come: not in the
-  /// background, nor while the first frame is deferred. On Android's OpenGL
-  /// ES, Flutter GPU's shader and pipeline creation blocks the UI thread on
-  /// the raster thread's GL work, which only runs once a frame has been
-  /// rasterized. So before `runApp`, the self-test blocks for good, as it did
-  /// in a release run. Frames rendered before `runApp`, from a warm-up frame
-  /// or straight into the view, don't count, as they aren't rasterized.
-  static Future<bool> _firstFrameRasterized() async {
-    final binding = WidgetsFlutterBinding.ensureInitialized();
-    if (binding.firstFrameRasterized) {
-      return true;
-    }
-    try {
-      await timeoutWhileFramesCanCome(
-        binding.waitUntilFirstFrameRasterized,
-        const Duration(seconds: 10),
-      );
-      return true;
-    } on TimeoutException {
-      return false;
-    }
-  }
 }
 
 /// One of the GPU renderers, [RasterizerBackend.gpu] or
 /// [RasterizerBackend.mesh], from [RasterizerGpu.of].
 ///
-/// It tells whether the renderer can render here. On OpenGL ES, it runs the
-/// renderer's own self-test, which lets it render there, and remembers its
-/// failures ([RasterizerGpu.rememberSelfTest]). Scenes and renderers made
+/// It tells whether the renderer can render here. Scenes and renderers made
 /// with it as their `gpu` and no backend ([RasterizerScene.fromSvg],
 /// [RasterizerRenderer.create]) use it where it's supported, else the canvas
 /// renderer.
 final class RasterizerGpuBackend._(
   /// Which GPU renderer it is.
   final RasterizerBackend gpu,
-  final native.SelfTestCache _cache,
 ) {
-  bool _passed = false, _initialized = false;
-  String? _detail;
-  Future<void>? _initializing;
-
-  /// The launch's attempt, still open after the switch until the probation's
-  /// frames are rendered.
-  native.SelfTestAttempt? _probation;
-
   /// Whether it can render here.
   ///
-  /// On OpenGL ES, it's [RasterizerSupport.openGles] until [initialize]'s
-  /// self-test has passed.
+  /// On OpenGL ES, it's [RasterizerSupport.supported] while
+  /// [RasterizerGpu.allowOpenGles] is on, else [RasterizerSupport.openGles].
   RasterizerSupport get support {
     final context = RasterizerGpu._context;
-    return context == RasterizerSupport.openGles && _passed
+    return context == RasterizerSupport.openGles && RasterizerGpu.allowOpenGles
         ? RasterizerSupport.supported
         : context;
   }
@@ -346,76 +272,23 @@ final class RasterizerGpuBackend._(
   /// More about [support].
   ///
   /// It's Flutter GPU's error when [support] is
-  /// [RasterizerSupport.noFlutterGpu]. On OpenGL ES, it says whether and how
-  /// the self-test passed, or why it failed.
-  String? get supportDetail {
-    final context = RasterizerGpu._context;
-    return _detail ??
-        switch (context) {
-          RasterizerSupport.noFlutterGpu => native.contextError,
-          RasterizerSupport.openGles =>
-            'not self-tested: set RasterizerGpu.allowOpenGles and await '
-                '$_api.initialize()',
-          _ => null,
-        };
-  }
-
-  /// Runs its self-test, once, where Impeller renders with OpenGL ES and
-  /// [RasterizerGpu.allowOpenGles] is set.
-  ///
-  /// The self-test renders a small scene and reads it back. The GPU
-  /// renderer's accumulates coverage in r32Float, else in r16g16b16a16Float.
-  /// The mesh renderer's draws the scene through an affine transform and a
-  /// projective one. If it passes, [support] becomes
-  /// [RasterizerSupport.supported], and [supportDetail] says how. Otherwise
-  /// [support] stays [RasterizerSupport.openGles], and the canvas renderer
-  /// draws instead. It never throws, and does nothing elsewhere.
-  ///
-  /// Apps needn't call it: the first scene or renderer made for it without a
-  /// backend starts it. Until it completes, those draw with the canvas
-  /// renderer. If the self-test passes, they all switch to this renderer, at
-  /// their renderers' next [RasterizerRenderer.beginFrame]. To have them draw
-  /// with it from the start, with no switch, await it after `runApp`, before
-  /// making any. Nothing is drawn meanwhile then.
-  ///
-  /// On OpenGL ES, it first waits up to 10 s for the app's first rasterized
-  /// frame, as Flutter GPU needs one there. The self-test then compiles the
-  /// renderer's pipelines one per frame, as Flutter GPU blocks the UI thread
-  /// while it compiles one. Both pause while the app defers its first frame
-  /// (`RendererBinding.deferFirstFrame`, as splash screens do) or is in the
-  /// background: their timeouts only count time in which frames can be
-  /// rasterized. The self-test and the switch take no step that blocks the UI
-  /// thread while the app isn't resumed. In the background, one would block
-  /// it for good.
-  Future<void> initialize() => _initializing ??= _initialize();
-
-  /// Whether [initialize] has completed.
-  bool get initialized => _initialized;
-
-  /// Completes with [backend] once it's settled.
-  ///
-  /// That's at once, unless scenes and renderers made for it without a
-  /// backend may still switch to it ([initialize]). Then it's once they have
-  /// switched, or won't.
-  Future<RasterizerBackend> get settledBackend async {
-    if (_switching) {
-      await initialize();
-    }
-    return backend;
-  }
-
-  /// Whether it's on probation: switched to on OpenGL ES, with the launch's
-  /// attempt still unfinished ([RasterizerGpu.rememberSelfTest]).
-  ///
-  /// The probation lasts until its renderers have rendered
-  /// [RasterizerGpu.probationFrames] frames.
-  bool get onProbation => _probation != null;
-
-  /// Forgets a remembered failure ([RasterizerGpu.rememberSelfTest]), so the
-  /// next launch runs its self-test again.
-  ///
-  /// An app's "try the GPU renderer again" setting can call it.
-  void forgetSelfTest() => _cache.forget();
+  /// [RasterizerSupport.noFlutterGpu] or [RasterizerSupport.smallTextures].
+  /// On OpenGL ES, it says how the renderer draws there: for the GPU
+  /// renderer, the format it accumulates coverage in and what the format probe
+  /// found ([RasterizerGpu.allowOpenGles]), and for the mesh renderer, whether
+  /// its targets are multisampled.
+  String? get supportDetail => switch (RasterizerGpu._context) {
+    RasterizerSupport.noFlutterGpu ||
+    RasterizerSupport.smallTextures => native.contextError,
+    RasterizerSupport.openGles when !RasterizerGpu.allowOpenGles =>
+      'OpenGL ES: set RasterizerGpu.allowOpenGles',
+    RasterizerSupport.openGles =>
+      'OpenGL ES, ${switch (gpu) {
+        RasterizerBackend.mesh => native.meshDetail,
+        _ => native.formatDetail,
+      }}',
+    _ => null,
+  };
 
   /// The backend that scenes and renderers made for it without one use.
   ///
@@ -425,138 +298,6 @@ final class RasterizerGpuBackend._(
       !RasterizerGpu.forceCanvas && support == RasterizerSupport.supported
       ? gpu
       : RasterizerBackend.canvas;
-
-  /// For tests: runs its self-test wherever it's supported, Metal and Vulkan
-  /// included, without changing [support].
-  ///
-  /// Returns null if it passed, else why it didn't.
-  @visibleForTesting
-  Future<String?> debugSelfTest() async {
-    final result = await native.selfTest(
-      gpu,
-      RasterizerGpu.debugFailSelfTest,
-      apply: false,
-    );
-    return result.passed ? null : result.detail;
-  }
-
-  /// Its self-test's failure, remembered from an earlier launch
-  /// ([RasterizerGpu.rememberSelfTest]), where the self-test would run.
-  ///
-  /// If there is one, the self-test doesn't run.
-  String? get _remembered {
-    if (!RasterizerGpu.rememberSelfTest ||
-        !RasterizerGpu.allowOpenGles ||
-        support != RasterizerSupport.openGles) {
-      return null;
-    }
-    final failure = _cache.rememberedFailure();
-    if (failure != null) {
-      _detail =
-          'not self-tested: it failed at an earlier launch '
-          '($_api.forgetSelfTest() tries it again): $failure';
-    }
-    return failure;
-  }
-
-  /// How apps reach its members, for [supportDetail]'s messages.
-  String get _api => gpu == RasterizerBackend.mesh
-      ? 'RasterizerGpu.of(RasterizerBackend.mesh)'
-      : 'RasterizerGpu';
-
-  /// Whether scenes and renderers made for it without a backend switch to it
-  /// if its self-test passes.
-  bool get _switching =>
-      RasterizerGpu.allowOpenGles &&
-      !_initialized &&
-      !RasterizerGpu.forceCanvas &&
-      support == RasterizerSupport.openGles &&
-      _remembered == null;
-
-  Future<void> _initialize() async {
-    native.SelfTestAttempt? attempt;
-    String? remember;
-    var passed = false;
-    var probation = 0;
-    try {
-      if (RasterizerGpu.allowOpenGles &&
-          support == RasterizerSupport.openGles &&
-          _remembered == null) {
-        if (!await RasterizerGpu._firstFrameRasterized()) {
-          _detail =
-              'not self-tested: no frame was rasterized within 10 s of frames '
-              'being allowed';
-        } else {
-          // The attempt stays open until the probation's frames after the
-          // switch, as a driver may crash on what's drawn next too.
-          probation = RasterizerGpu.probationFrames;
-          if (RasterizerGpu.rememberSelfTest &&
-              (!kDebugMode || RasterizerGpu.debugCountAttempts)) {
-            attempt = _cache.startAttempt(probation);
-          }
-          final result = await native.selfTest(
-            gpu,
-            RasterizerGpu.debugFailSelfTest,
-          );
-          _detail = result.detail;
-          if (result.passed) {
-            passed = true;
-            await switchToGpu(gpu, () => _passed = true);
-            if (attempt != null && probation > 0) {
-              _startProbation(attempt, probation);
-              attempt = null;
-            }
-          } else if (result.conclusive) {
-            remember = result.detail;
-          }
-        }
-      }
-    } catch (e) {
-      _detail = passed
-          ? 'self-test passed, but the switch to it failed: $e'
-          : 'self-test failed: $e';
-    }
-    attempt?.finish(remember);
-    if (!_passed) {
-      settleOnCanvas(gpu);
-    }
-    _initialized = true;
-  }
-
-  /// Called after each frame that one of its renderers renders.
-  set _onFrame(void Function()? onFrame) {
-    if (gpu == RasterizerBackend.mesh) {
-      native.onMeshFrame = onFrame;
-    } else {
-      native.onGpuFrame = onFrame;
-    }
-  }
-
-  void _startProbation(native.SelfTestAttempt attempt, int frames) {
-    attempt.switched();
-    _probation = attempt;
-    _onFrame = () {
-      if (attempt.frame() < frames) {
-        return;
-      }
-      _onFrame = null;
-      _probation = null;
-      attempt.finish(null);
-    };
-  }
-
-  /// Resets its state, for [RasterizerGpu.debugResetSupport].
-  void _reset() {
-    // The attempt stays in the file as it is, as if the app were killed.
-    _probation?.abandon();
-    _probation = null;
-    _onFrame = null;
-    settleOnCanvas(gpu);
-    _passed = _initialized = false;
-    _initializing = null;
-    _detail = null;
-    _cache.reload();
-  }
 }
 
 /// An SVG's outline, for hitboxes: its paths as one [ui.Path].
@@ -704,9 +445,7 @@ typedef RasterizerPaintedPath = ({ui.Path path, ui.Paint paint});
 /// frame's entries can draw, each with its own transform.
 ///
 /// A scene is parsed for one backend, and only that backend's renderers can
-/// draw it. The exception is a scene that may switch to a GPU renderer on
-/// OpenGL ES ([RasterizerGpuBackend.initialize]). It draws with the canvas
-/// renderer until the switch, and with that GPU renderer after.
+/// draw it.
 abstract class RasterizerScene {
   /// Parses an SVG's bytes, such as an asset's, for [backend].
   ///
@@ -723,13 +462,6 @@ abstract class RasterizerScene {
   /// Other renderers ignore it.
   ///
   /// [dispose], or else a finalizer, frees a GPU scene's native memory.
-  ///
-  /// Without a [backend], while [gpu]'s self-test may still let it draw
-  /// ([RasterizerGpuBackend.initialize]), the scene starts the self-test. It
-  /// keeps the bytes until it's settled, to parse them for [gpu] at the
-  /// switch. If it can't parse them for [gpu] then, it stays with the canvas
-  /// renderer. Runs of [gpu]'s renderers then throw that error when it's
-  /// added to them, as [fromSvg] would have.
   factory RasterizerScene.fromSvg(
     Uint8List bytes, {
     RasterizerBackend? backend,
@@ -740,7 +472,6 @@ abstract class RasterizerScene {
       if (maxSize == null) {
         throw ArgumentError.notNull('maxSize');
       }
-      // Checked here, as the switch would only parse it later.
       if (!(maxSize > 0) || !maxSize.isFinite) {
         throw ArgumentError.value(
           maxSize,
@@ -749,15 +480,7 @@ abstract class RasterizerScene {
         );
       }
     }
-    var chosen = backend;
-    if (chosen == null) {
-      final state = RasterizerGpu.of(gpu);
-      if (state._switching) {
-        state.initialize();
-        return SwitchingScene.fromSvg(bytes, gpu, maxSize);
-      }
-      chosen = state.backend;
-    }
+    final chosen = backend ?? RasterizerGpu.of(gpu).backend;
     switch (chosen) {
       case RasterizerBackend.mesh:
         return native.parseMeshScene(bytes, maxSize!);
@@ -795,7 +518,7 @@ abstract class RasterizerScene {
   ///
   /// Only the mesh renderer draws a [glow]. Its scene's [pathCount] then
   /// counts each path's halo and each draw's core, and its [bounds] reach the
-  /// halos. A switching scene's do so from the switch.
+  /// halos.
   ///
   /// Throws [ArgumentError] if [maxSize] isn't positive. It also throws for a
   /// paint that the GPU renderers can't draw ([canDraw]), whatever the
@@ -816,15 +539,7 @@ abstract class RasterizerScene {
       );
     }
     final scenePaths = ScenePaths(paths, glow: glow);
-    var chosen = backend;
-    if (chosen == null) {
-      final state = RasterizerGpu.of(gpu);
-      if (state._switching) {
-        state.initialize();
-        return SwitchingScene.fromPaths(scenePaths, gpu, maxSize);
-      }
-      chosen = state.backend;
-    }
+    final chosen = backend ?? RasterizerGpu.of(gpu).backend;
     return switch (chosen) {
       RasterizerBackend.mesh => native.importPathMeshScene(scenePaths, maxSize),
       RasterizerBackend.gpu => native.importPathScene(scenePaths, maxSize),
@@ -844,9 +559,6 @@ abstract class RasterizerScene {
   static bool canDraw(ui.Paint paint) => undrawable(paint) == null;
 
   /// The backend it's parsed for, whose renderers draw it.
-  ///
-  /// A scene that may switch ([RasterizerGpuBackend.initialize]) has the
-  /// canvas renderer until the switch, then its GPU renderer.
   RasterizerBackend get backend;
 
   /// Its paths' bounds, grown by half of each stroke's width, in the SVG's
@@ -856,9 +568,7 @@ abstract class RasterizerScene {
   /// triangles', which can be tighter than the GPU and canvas renderers'. The
   /// tiger's are 474.2 × 490.0 with the mesh renderer, against 478.5 × 506.9.
   /// So each renderer places an SVG fitted by its bounds differently, while
-  /// [viewBox] is the same for all. A scene that switches to a GPU
-  /// renderer ([RasterizerGpuBackend.initialize]) has the canvas renderer's
-  /// bounds until the switch, then that renderer's.
+  /// [viewBox] is the same for all.
   ui.Rect get bounds;
 
   /// The SVG's own rectangle, in its coordinates.
@@ -919,11 +629,6 @@ abstract class RasterizerRenderer() {
   /// [UnsupportedError] unless that renderer's support ([RasterizerGpu.of]) is
   /// [RasterizerSupport.supported].
   ///
-  /// Without a [backend], while [gpu]'s self-test may still let it draw
-  /// ([RasterizerGpuBackend.initialize]), the renderer starts the self-test.
-  /// It draws with the canvas renderer until the self-test passes, then with
-  /// [gpu] from the next [beginFrame]. Its [backend] changes then.
-  ///
   /// [meshSamples] are the mesh renderer's samples per pixel, 1 or 4, as
   /// Flutter GPU allows. With 4, its runs' targets are multisampled where
   /// Flutter GPU supports offscreen MSAA, so their edges are antialiased. With
@@ -941,15 +646,7 @@ abstract class RasterizerRenderer() {
     if (meshSamples != 1 && meshSamples != 4) {
       throw ArgumentError.value(meshSamples, 'meshSamples', 'Either 1 or 4');
     }
-    var chosen = backend;
-    if (chosen == null) {
-      final state = RasterizerGpu.of(gpu);
-      if (state._switching) {
-        state.initialize();
-        return SwitchingRenderer(slots, gpu, meshSamples);
-      }
-      chosen = state.backend;
-    }
+    final chosen = backend ?? RasterizerGpu.of(gpu).backend;
     if (chosen == RasterizerBackend.canvas) {
       return CanvasRenderer(slots);
     }
@@ -963,7 +660,7 @@ abstract class RasterizerRenderer() {
     }
     return chosen == RasterizerBackend.mesh
         ? native.createMeshRenderer(slots, meshSamples)
-        : native.createRenderer(slots);
+        : native.createRenderer(slots, RasterizerGpu.debugFailFormatProbe);
   }
 
   /// The most that the GPU renderer's atlas pages, and so its viewports,
@@ -985,9 +682,6 @@ abstract class RasterizerRenderer() {
   static const atlasStep = 256;
 
   /// The backend it renders with.
-  ///
-  /// A renderer that may switch ([RasterizerGpuBackend.initialize]) has the
-  /// canvas renderer until the switch, then its GPU renderer.
   RasterizerBackend get backend;
 
   /// How many frames it keeps in flight, from [create].
@@ -996,8 +690,7 @@ abstract class RasterizerRenderer() {
   /// The longest viewport side that [beginFrame] takes, in device pixels.
   ///
   /// It's [maxAtlasSize], or 4096 on OpenGL ES, for the GPU and mesh
-  /// renderers, and for a renderer that switches to either. It's null for the
-  /// plain canvas renderer, which takes any size.
+  /// renderers. It's null for the canvas renderer, which takes any size.
   int? get maxViewportSize;
 
   /// How many times atlas pages have changed size, frame after frame.
@@ -1035,10 +728,8 @@ abstract class RasterizerRenderer() {
   /// quadratics, else as line segments.
   ///
   /// The GPU and mesh renderers take viewports up to [maxViewportSize] a
-  /// side: [maxAtlasSize], or 4096 on OpenGL ES. So does a renderer that
-  /// draws with the canvas renderer until it switches to one of them
-  /// ([RasterizerGpuBackend.initialize]). The plain canvas renderer takes any
-  /// size.
+  /// side: [maxAtlasSize], or 4096 on OpenGL ES. The canvas renderer takes
+  /// any size.
   RasterizerFrame beginFrame(int width, int height, {bool curves = true});
 
   /// Frees its native memory and GPU resources.
@@ -1056,12 +747,7 @@ typedef RasterizerPixelSize = ({int width, int height});
 /// reuses its frame object, so a frame is only valid until
 /// the next [RasterizerRenderer.beginFrame].
 abstract class RasterizerFrame() {
-  /// The backend that draws it: [RasterizerRenderer.backend] as of
-  /// [RasterizerRenderer.beginFrame].
-  ///
-  /// So for a renderer that switches to a GPU renderer
-  /// ([RasterizerGpuBackend.initialize]), it's the canvas renderer until the
-  /// switch, then that GPU renderer.
+  /// The backend that draws it: its renderer's [RasterizerRenderer.backend].
   RasterizerBackend get backend;
 
   /// Its viewport's width, from [RasterizerRenderer.beginFrame].

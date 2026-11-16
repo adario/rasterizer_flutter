@@ -5,8 +5,7 @@
 // The mesh renderer draws them in perspective, gradients included, through
 // the third row of its instances' transforms. A run's part then covers the
 // bounds of the projected corners. The canvas renderer agrees, and the GPU
-// renderer only draws affine entries. On OpenGL ES, each GPU renderer's tests
-// run once its self-test passes.
+// renderer only draws affine entries.
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -66,12 +65,8 @@ void expectAt(
 Future<void> main() async {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-  RasterizerGpu.allowOpenGles = true;
   runApp(const SizedBox());
   await binding.waitUntilFirstFrameRasterized;
-  for (final gpu in [RasterizerBackend.gpu, RasterizerBackend.mesh]) {
-    await RasterizerGpu.of(gpu).initialize();
-  }
 
   /// Adds a test of [backend], which skips where the backend isn't supported.
   void backendTest(

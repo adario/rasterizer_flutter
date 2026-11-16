@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:math' as math;
 import 'dart:io' show Platform;
@@ -5,7 +6,6 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:ffi/ffi.dart';
-import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter_gpu/gpu.dart' as gpu;
 
 import 'core.dart' as ra;
@@ -13,52 +13,78 @@ import '../rasterizer_gpu.dart';
 import 'atlas_pages.dart';
 import 'atlas_parts.dart';
 import 'canvas_paths.dart';
-import 'frame_clock.dart';
 import 'gpu_renderer.dart';
 import 'image_run.dart';
 import 'meshes.dart';
 import 'paths/scene_paths.dart';
 import 'self_test.dart';
-import 'switching.dart';
-
-export 'self_test_cache.dart' show SelfTestAttempt, SelfTestCache;
 
 // The GPU renderer, and the entry points of both GPU renderers: the core,
 // through FFI, and Flutter GPU. rasterizer_gpu.dart imports this file where
 // dart:ffi is available, else gpu_stub.dart, which has the same functions.
 
-/// Flutter GPU's error, when checkSupport found no context.
+/// Flutter GPU's error, when checkSupport found no context, or textures too
+/// small.
 String? contextError;
-
-/// Called after each frame that a GPU renderer renders, whatever its
-/// viewport.
-///
-/// RasterizerGpu sets it to count the frames of the OpenGL ES probation.
-void Function()? onGpuFrame;
-
-/// The same as [onGpuFrame], after each frame that a mesh renderer renders.
-void Function()? onMeshFrame;
 
 /// Whether Impeller renders with OpenGL ES, as checkSupport found.
 bool openGles = false;
 
 /// The format the GPU renderer accumulates coverage in.
 ///
-/// On OpenGL ES, it's the format the self-test passed with.
+/// It's r32Float, unless the OpenGL ES format probe found that r32Float fails
+/// ([probeFormat]).
 gpu.PixelFormat accumulationFormat = gpu.PixelFormat.r32Float;
+
+/// The OpenGL ES format probe that the first GPU renderer started, if any.
+Future<String?>? formatProbe;
+
+/// The format probe's failure in r32Float, or null.
+String? _formatFailure;
+
+/// The format probe's failure in r16g16b16a16Float, after r32Float failed,
+/// or null.
+String? _fallbackFailure;
+
+/// Whether the format probe has decided.
+bool _formatChecked = false;
+
+/// What the OpenGL ES format probe found, for RasterizerGpu.supportDetail.
+String get formatDetail =>
+    'accumulating in ${accumulationFormat.name}'
+    '${_formatFailure != null ? ', as r32Float failed: $_formatFailure' : ''}'
+    '${!_formatChecked
+        ? ', not checked yet'
+        : _fallbackFailure != null
+        ? ', and r16g16b16a16Float failed too: $_fallbackFailure'
+        : ', checked'}';
+
+/// How the mesh renderer's targets are sampled, for
+/// RasterizerGpu.supportDetail.
+String get meshDetail =>
+    gpu.gpuContext.doesSupportOffscreenMSAA ? '4× multisampled' : 'aliased';
+
+/// Forgets the format probe and its result, for RasterizerGpu's tests.
+void resetFormatProbe() {
+  accumulationFormat = gpu.PixelFormat.r32Float;
+  formatProbe = _formatFailure = _fallbackFailure = null;
+  _formatChecked = false;
+}
 
 /// The largest size of atlas pages, mesh targets and viewports.
 ///
 /// That's RasterizerRenderer.maxAtlasSize, but 4096 on OpenGL ES. OpenGL ES
 /// only guarantees 2048, and Flutter GPU doesn't tell the device's maximum.
-/// The data texture is 4096 wide, so the self-test checks that size.
+/// The data texture is 4096 wide.
 int maxPageSize = RasterizerRenderer.maxAtlasSize;
 
 /// Returns whether Flutter GPU can render here, for both GPU renderers.
 ///
 /// On OpenGL ES, it returns [RasterizerSupport.openGles]: the renderers draw
-/// only once their self-tests pass.
-RasterizerSupport checkSupport() {
+/// there only with RasterizerGpu.allowOpenGles. There, it first makes a
+/// texture [textureWidth] pixels wide, which is [maxPageSize] but for tests,
+/// and returns [RasterizerSupport.smallTextures] if Flutter GPU can't.
+RasterizerSupport checkSupport(int textureWidth) {
   if (!Platform.isMacOS &&
       !Platform.isIOS &&
       !Platform.isAndroid &&
@@ -87,137 +113,115 @@ RasterizerSupport checkSupport() {
   if (!context.doesSupportFramebufferRenderMipmap) {
     openGles = true;
     maxPageSize = 4096;
+    // Impeller refuses a texture larger than the device allows, so creating
+    // it throws. It's the data texture's format.
+    try {
+      context.createTexture(
+        gpu.StorageMode.devicePrivate,
+        textureWidth,
+        1,
+        format: gpu.PixelFormat.r32g32b32a32Float,
+        enableRenderTargetUsage: false,
+      );
+    } catch (e) {
+      contextError = '$e';
+      return RasterizerSupport.smallTextures;
+    }
     return RasterizerSupport.openGles;
   }
   return RasterizerSupport.supported;
 }
 
-/// Runs the OpenGL ES self-test of the GPU renderer [backend], gpu or mesh.
+/// The format probe: checks that the GPU renderer draws right accumulating
+/// coverage in r32Float, else in r16g16b16a16Float, and completes with null
+/// if r32Float passed, else with why each format failed.
 ///
-/// It returns whether the test passed, its detail, and whether a failure is
-/// conclusive: one from its checks alone, not from exceptions or timeouts,
-/// which may be transient. Only a conclusive failure is remembered. The test
-/// runs wherever the renderer can, as tests check it on Metal and Vulkan too.
-///
-/// Each test renders [selfTestSvg]'s scene, built without parsing it
-/// (`src/ra_self_test.hpp`), so that it checks the GPU alone: a parser's bug
-/// would fail it as if the GPU drew wrongly. The GPU renderer's test
-/// accumulates coverage in r32Float, else in r16g16b16a16Float. The format
-/// that passes becomes [accumulationFormat], unless [apply] is false. The mesh
-/// renderer's test renders the scene through an affine transform and a
-/// projective one. For tests,
-/// [fail] names formats to treat as failing, and `mesh` fails the mesh
-/// renderer's test.
-Future<({bool passed, String detail, bool conclusive})> selfTest(
-  RasterizerBackend backend,
+/// It renders [selfTestSvg]'s scene with curves and without, built without
+/// parsing it (`src/ra_self_test.hpp`), so that it checks the GPU alone: a
+/// parser's bug would fail it as if the GPU drew wrongly. It renders before
+/// it returns, then reads the pixels back through a canvas, alongside the
+/// app's frames. With [apply], an r32Float failure makes
+/// [accumulationFormat] r16g16b16a16Float, which renderers switch to at their
+/// next frame. That's at once if rendering throws, as creating an r32Float
+/// texture does where the format isn't supported. Otherwise it's once the
+/// pixels are read back, so the frames rendered meanwhile may be wrong. The
+/// probe then checks r16g16b16a16Float the same way. If that fails too, the
+/// renderers keep drawing, wrongly, and only RasterizerGpu.supportDetail
+/// says so. For tests, [fail] names formats to treat as failing, which fails
+/// at once too. It runs wherever the renderer can, as tests check it on
+/// Metal and Vulkan too.
+Future<String?> probeFormat(
+  gpu.ShaderLibrary library,
   Set<String> fail, {
   bool apply = true,
-}) async {
-  final where = openGles ? 'OpenGL ES, ' : '';
-  if (backend == RasterizerBackend.mesh) {
-    String? failure;
-    var conclusive = true;
-    if (fail.contains('mesh')) {
-      failure = 'forced to fail';
-    } else {
-      final run = _SelfTestRun();
-      try {
-        failure = await timeoutWhileFramesCanCome(
-          _meshSelfTest(run),
-          const Duration(seconds: 20),
-        );
-      } catch (e) {
-        run.stopped = true;
-        failure = '$e';
-        conclusive = false;
-      }
+}) => _then(_probe(library, gpu.PixelFormat.r32Float, fail), (failure) {
+  if (failure == null) {
+    if (apply) {
+      _formatChecked = true;
     }
-    final edges = gpu.gpuContext.doesSupportOffscreenMSAA
-        ? '4× multisampled'
-        : 'aliased';
-    return failure == null
-        ? (
-            passed: true,
-            detail: '${where}self-tested, $edges',
-            conclusive: true,
-          )
-        : (
-            passed: false,
-            detail: 'self-test failed: $failure',
-            conclusive: conclusive,
-          );
+    return null;
   }
-  final failures = <String>[];
-  var conclusive = true;
-  for (final format in [
-    gpu.PixelFormat.r32Float,
-    gpu.PixelFormat.r16g16b16a16Float,
-  ]) {
-    final String? failure;
-    if (fail.contains(format.name)) {
-      failure = 'forced to fail';
-    } else {
-      final run = _SelfTestRun();
-      try {
-        // The test steps a frame at a time, so it pauses in the background,
-        // where the timeout doesn't count.
-        failure = await timeoutWhileFramesCanCome(
-          _selfTest(format, run),
-          const Duration(seconds: 20),
-        );
-      } catch (e) {
-        run.stopped = true;
-        failures.add('${format.name}: $e');
-        conclusive = false;
-        continue;
-      }
-    }
-    if (failure == null) {
-      if (apply) {
-        accumulationFormat = format;
-      }
-      return (
-        passed: true,
-        detail:
-            '${where}self-tested, accumulating in ${format.name}'
-            '${failures.isEmpty ? '' : ' (${failures.join('; ')})'}',
-        conclusive: true,
-      );
-    }
-    failures.add('${format.name}: $failure');
+  if (apply) {
+    _formatFailure = failure;
+    accumulationFormat = gpu.PixelFormat.r16g16b16a16Float;
   }
-  return (
-    passed: false,
-    detail: 'self-test failed: ${failures.join('; ')}',
-    conclusive: conclusive,
-  );
+  return _then(_probe(library, gpu.PixelFormat.r16g16b16a16Float, fail), (
+    fallback,
+  ) {
+    if (apply) {
+      _fallbackFailure = fallback;
+      _formatChecked = true;
+    }
+    return 'r32Float: $failure'
+        '${fallback == null ? '' : '; r16g16b16a16Float: $fallback'}';
+  });
+});
+
+/// Runs [then] on [result]: at once if it's a value, else once it completes.
+Future<String?> _then(
+  FutureOr<String?> result,
+  FutureOr<String?> Function(String? failure) then,
+) => result is Future<String?>
+    ? result.then(then)
+    : Future.sync(() => then(result));
+
+/// Probes [format]: returns its failure at once if [fail] names it or
+/// rendering throws, else a future of its pixels' failure, or of null.
+FutureOr<String?> _probe(
+  gpu.ShaderLibrary library,
+  gpu.PixelFormat format,
+  Set<String> fail,
+) {
+  if (fail.contains(format.name)) {
+    return 'forced to fail';
+  }
+  try {
+    return _renderProbe(
+      library,
+      format,
+    ).then((failure) => failure, onError: (Object e) => '$e');
+  } catch (e) {
+    return '$e';
+  }
 }
 
-/// Renders [selfTestSvg]'s scene with curves and without, and reads it back
-/// through a canvas.
+/// Renders [selfTestSvg]'s scene accumulating in [format], with curves and
+/// without, and returns a future of the failure, or of null if its pixels
+/// are as expected.
 ///
-/// Returns null if its pixels are as expected, else the failure.
-Future<String?> _selfTest(gpu.PixelFormat format, _SelfTestRun testRun) async {
-  await testRun.step();
-  final library = await gpu.ShaderLibrary.fromAsset(RasterizerGpu.shaderBundle);
-  if (library == null) {
-    return "can't load ${RasterizerGpu.shaderBundle}";
-  }
+/// It renders before it returns, so rendering's exceptions are thrown at
+/// once. The pixels are read back after.
+Future<String?> _renderProbe(
+  gpu.ShaderLibrary library,
+  gpu.PixelFormat format,
+) {
   // Built without parsing, so that a parser's bug doesn't fail the GPU.
   final scene = AtlasScene(ra.Scene.selfTest());
-  AtlasRenderer? renderer;
+  // Two frames in flight, so the first frame's image lasts until it's read.
+  final renderer = AtlasRenderer._(library, 2, format);
+  final parts = <({bool curves, RasterizerRunPart? part})>[];
   try {
-    await testRun.step();
-    renderer = AtlasRenderer._(library, 1, format);
-    // Compiles the renderer's pipeline states one per frame, as on OpenGL ES
-    // each blocks the UI thread while it compiles.
-    for (var i = 0; i < GpuRenderer.warmUpSteps; i++) {
-      await testRun.step();
-      renderer._gpu.warmUp(i);
-      await SchedulerBinding.instance.endOfFrame;
-    }
     for (final curves in [true, false]) {
-      await testRun.step();
       final frame = renderer.beginFrame(
         selfTestSize,
         selfTestSize,
@@ -225,69 +229,37 @@ Future<String?> _selfTest(gpu.PixelFormat format, _SelfTestRun testRun) async {
       );
       final run = frame.addRun()..add(scene, 1, 0, 0, 1, 0, 0);
       frame.render();
-      final failure = await _checkRun(run);
-      if (failure != null) {
-        return '${curves ? 'with' : 'without'} curves, $failure';
-      }
+      parts.add((curves: curves, part: run.parts.firstOrNull));
     }
-    return null;
-  } finally {
-    renderer?.dispose();
+  } catch (_) {
+    renderer.dispose();
     scene.dispose();
+    rethrow;
   }
+  return () async {
+    try {
+      for (final (:curves, :part) in parts) {
+        final failure = await _checkPart(part);
+        if (failure != null) {
+          return '${curves ? 'with' : 'without'} curves, $failure';
+        }
+      }
+      return null;
+    } finally {
+      renderer.dispose();
+      scene.dispose();
+    }
+  }();
 }
 
-/// Renders [selfTestSvg]'s scene with a mesh renderer, and reads it back
-/// through a canvas.
-///
-/// It renders through an affine transform, then through a projective one that
-/// draws the same. Returns null if the pixels are as expected, else the
-/// failure.
-Future<String?> _meshSelfTest(_SelfTestRun testRun) async {
-  await testRun.step();
-  final library = await gpu.ShaderLibrary.fromAsset(RasterizerGpu.shaderBundle);
-  if (library == null) {
-    return "can't load ${RasterizerGpu.shaderBundle}";
-  }
-  // Built without parsing, so that a parser's bug doesn't fail the GPU.
-  final scene = MeshScene(ra.Mesh.selfTest(maxSize: selfTestSize.toDouble()));
-  MeshRenderer? renderer;
-  try {
-    await testRun.step();
-    // Makes the renderer's pipeline, which on OpenGL ES blocks the UI thread
-    // while it compiles.
-    renderer = MeshRenderer(library, 1, 4);
-    for (final projective in [false, true]) {
-      await SchedulerBinding.instance.endOfFrame;
-      await testRun.step();
-      final frame = renderer.beginFrame(selfTestSize, selfTestSize);
-      final run = frame.addRun();
-      if (projective) {
-        run.addProjective(scene, 2, 0, 0, 2, 0, 0, 0, 0, 2);
-      } else {
-        run.add(scene, 1, 0, 0, 1, 0, 0);
-      }
-      frame.render();
-      final failure = await _checkRun(run);
-      if (failure != null) {
-        return '${projective ? 'projective' : 'affine'}, $failure';
-      }
-    }
-    return null;
-  } finally {
-    renderer?.dispose();
-    scene.dispose();
-  }
-}
-
-/// Reads [run]'s image back through a canvas, and checks it.
+/// Reads [part]'s image back through a canvas, and checks it.
 ///
 /// Returns null if its pixels are [selfTestSvg]'s, else the failure.
-Future<String?> _checkRun(RasterizerRun run) async {
-  if (run.parts.isEmpty) {
+Future<String?> _checkPart(RasterizerRunPart? part) async {
+  if (part == null) {
     return 'nothing rendered';
   }
-  final part = run.parts.first, image = part.image;
+  final image = part.image;
   final recorder = ui.PictureRecorder();
   // On OpenGL ES, reading the texture's image directly gives zeros, or an
   // earlier frame's pixels.
@@ -325,6 +297,21 @@ Future<String?> _checkRun(RasterizerRun run) async {
   );
 }
 
+/// Runs the format probe on its own, as [probeFormat] does without `apply`.
+Future<String?> debugProbeFormat(Set<String> fail) async =>
+    probeFormat(await _library(), fail, apply: false);
+
+/// Loads the GPU renderers' shaders.
+Future<gpu.ShaderLibrary> _library() async {
+  final library = await gpu.ShaderLibrary.fromAsset(RasterizerGpu.shaderBundle);
+  if (library == null) {
+    throw StateError(
+      'rasterizer_gpu: can\'t load ${RasterizerGpu.shaderBundle}',
+    );
+  }
+  return library;
+}
+
 /// Parses an SVG's [bytes] into a scene for the GPU renderer.
 RasterizerScene parseScene(Uint8List bytes) =>
     AtlasScene(ra.Scene.fromSvgBytes(bytes));
@@ -332,18 +319,19 @@ RasterizerScene parseScene(Uint8List bytes) =>
 /// Creates a GPU renderer with [slots] frames in flight.
 ///
 /// RasterizerRenderer.create only calls this where the renderer is supported.
-/// On OpenGL ES, the switch to it calls this just before it becomes
-/// supported.
-Future<RasterizerRenderer> createRenderer(int slots) async {
-  await _inForeground();
-  final library = await gpu.ShaderLibrary.fromAsset(RasterizerGpu.shaderBundle);
-  if (library == null) {
-    throw StateError(
-      'rasterizer_gpu: can\'t load ${RasterizerGpu.shaderBundle}',
-    );
+/// On OpenGL ES, the first one starts the format probe, with [fail] as
+/// [probeFormat]'s, and each compiles its pipelines as it's made
+/// ([GpuRenderer.warmUp]).
+Future<RasterizerRenderer> createRenderer(int slots, Set<String> fail) async {
+  final library = await _library();
+  if (openGles) {
+    formatProbe ??= probeFormat(library, fail);
   }
-  await _inForeground();
-  return AtlasRenderer._(library, slots, accumulationFormat);
+  final renderer = AtlasRenderer._(library, slots);
+  if (openGles) {
+    renderer._gpu.warmUp();
+  }
+  return renderer;
 }
 
 /// Imports an SVG's [bytes] as a scene for the mesh renderer.
@@ -416,46 +404,13 @@ List<ra.PathDraw> _pathDraws(ScenePaths paths) => [
 ///
 /// Its targets have [samples] per pixel where offscreen MSAA is supported.
 /// It's only called where the renderer is supported, as [createRenderer] is.
+/// On OpenGL ES, it compiles its pipelines as it's made ([MeshGpu.warmUp]).
 Future<RasterizerRenderer> createMeshRenderer(int slots, int samples) async {
-  await _inForeground();
-  final library = await gpu.ShaderLibrary.fromAsset(RasterizerGpu.shaderBundle);
-  if (library == null) {
-    throw StateError(
-      'rasterizer_gpu: can\'t load ${RasterizerGpu.shaderBundle}',
-    );
-  }
-  await _inForeground();
-  return MeshRenderer(library, slots, samples);
-}
-
-/// Waits as [untilForeground] does, on OpenGL ES only.
-///
-/// There, Flutter GPU's calls that block the UI thread block it for good in
-/// the background. Elsewhere, this completes at once.
-Future<void> _inForeground() async {
+  final renderer = MeshRenderer(await _library(), slots, samples);
   if (openGles) {
-    await untilForeground();
+    renderer.warmUp();
   }
-}
-
-/// One run of a self-test.
-///
-/// The self-test stops a run that timed out, so it doesn't go on beside the
-/// next run and compete with it for frames.
-class _SelfTestRun() {
-  /// Whether the run timed out, and so was stopped.
-  bool stopped = false;
-
-  /// Waits as [_inForeground] does, before each of the run's steps.
-  ///
-  /// Then it throws if the run was stopped meanwhile. Nothing reads that
-  /// error, as nothing reads the stopped run's result either.
-  Future<void> step() async {
-    await _inForeground();
-    if (stopped) {
-      throw StateError('Self-test run stopped after its timeout');
-    }
-  }
+  return renderer;
 }
 
 /// A scene that the core parsed, for the GPU renderer.
@@ -496,13 +451,19 @@ class AtlasScene(final ra.Scene scene) implements RasterizerScene {
 /// It keeps [slots] frames in flight, each with its own atlas textures. So a
 /// frame's images stay valid until [slots] frames later, when it renders into
 /// its textures again.
+///
+/// It accumulates coverage in [accumulationFormat], and follows it when the
+/// format probe changes it, unless it's made with a [_format] of its own.
 class AtlasRenderer._(
   gpu.ShaderLibrary library,
-  @override final int slots,
-  gpu.PixelFormat accumulationFormat,
-) implements RasterizerRenderer {
+  @override final int slots, [
+  final gpu.PixelFormat? _format,
+]) implements RasterizerRenderer {
   this
-    : _gpu = GpuRenderer(library, accumulationFormat: accumulationFormat),
+    : _gpu = GpuRenderer(
+        library,
+        accumulationFormat: _format ?? accumulationFormat,
+      ),
       _slotPages = List.generate(slots, (_) => []);
 
   @override
@@ -619,6 +580,9 @@ class AtlasRenderer._(
         'Invalid viewport size $width×$height, which must be within '
         '$maxSize×$maxSize',
       );
+    }
+    if (_format == null) {
+      _gpu.accumulationFormat = accumulationFormat;
     }
     return _frame.._begin(width, height, curves);
   }
@@ -765,7 +729,6 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     if (run._placed) {
       throw StateError('RasterizerRun already placed');
     }
-    scene = resolveScene(scene, RasterizerBackend.gpu);
     if (scene is! AtlasScene) {
       throw ArgumentError.value(
         scene,
@@ -935,7 +898,6 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
       renderer.trimAtlas();
     }
     cpuMicros += watch.elapsedMicroseconds;
-    onGpuFrame?.call();
   }
 
   /// Groups [run]'s entries into parts, once, with [AtlasParts].

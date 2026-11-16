@@ -57,7 +57,6 @@ void main() {
         await wait(tester, 1);
       }
       expect(game.isLoaded, isTrue);
-      await settleRenderer(tester, renderer);
       final rect = tester.getRect(
         find.byType(GameWidget<RevoluteJointSvgsExample>),
       );

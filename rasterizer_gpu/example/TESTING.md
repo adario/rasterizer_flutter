@@ -44,8 +44,7 @@ on Metal, but its antialiasing differs from the app's in about 2% of pixels.
   sums their coverage in another order too. That can change a few pixels by several 255ths, or hundreds by 1/255.
 - **The canvas renderer** is tested against the same goldens, except two kinds: curves drawn as line segments
   (`_fast`), which it never draws, and `gradients_skewed` (see `../README.md`). It's tested wherever it runs, and the
-  GPU renderer only where it's supported. `BACKEND=gpu` or `BACKEND=canvas` tests only that one. With
-  `IMPELLER_BACKEND=opengles` on Android, the test waits for the self-test, and tests the GPU renderer once it passes.
+  GPU renderer only where it's supported. `BACKEND=gpu` or `BACKEND=canvas` tests only that one.
   - Its tolerance is looser, as Impeller antialiases with 4x MSAA, and the core with exact coverage. Images are
     compared in 4×4 pixel blocks, which average edges out: at most 0.5% of blocks may differ by over 32/255, and 0.05%
     by over 64/255. In the first runs, antialiasing alone made at most 0.15% of blocks differ by over 32/255. Drawing
@@ -108,9 +107,8 @@ on Metal, but its antialiasing differs from the app's in about 2% of pixels.
 ## Other tests
 
 ```sh
-flutter test integration_test/self_test_test.dart -d <device>    # the OpenGL ES self-test, and its fallbacks
-flutter test integration_test/switch_test.dart -d <device>       # canvas-first: the switch to the GPU renderer
-flutter test integration_test/defer_test.dart -d <device>        # a deferred first frame
+flutter test integration_test/format_probe_test.dart -d <device> # the OpenGL ES format probe, and its fallback
+flutter test integration_test/defer_test.dart -d <device>        # rendering before a deferred first frame
 flutter test integration_test/atlas_test.dart -d <device>        # atlas pages shrinking after viewport changes
 flutter test integration_test/mesh_test.dart -d <device>         # the mesh renderer's draws, paints and targets
 flutter test integration_test/projective_test.dart -d <device>   # perspective, with each renderer
@@ -122,35 +120,26 @@ flutter test integration_test/upload_test.dart -d <device>       # the GPU rende
 
 `mesh_test` checks the mesh renderer through its API, read back through a canvas: paint order, instances with their
 opacities and tints, opaque meshes drawn without blending, gradients against their formulas, holes, strokes, 32-bit
-indices, multisampled edges with 4 samples and aliased ones with 1, and its run targets. `self_test_test`,
-`switch_test` and `opacity_test` test the mesh renderer too.
+indices, multisampled edges with 4 samples and aliased ones with 1, and its run targets. `defer_test`,
+`projective_test`, `opacity_test` and `edge_test` test the mesh renderer too.
 
 `atlas_test` turns the viewport between portrait and landscape every 150 frames, while heavy frames, which spill onto a
 second page, alternate with light ones. It compares the frames around each shrink with a fresh renderer's. It also
 checks that the pages shrink back, are released when unused, and are trimmed.
 
-On OpenGL ES (`IMPELLER_BACKEND=opengles` on the emulator), the tests check:
-
-- `RasterizerGpu.initialize`, and its fallbacks to `r16g16b16a16Float` and to the canvas renderer;
-- that scenes and renderers made without a backend draw with the canvas renderer until the self-test passes, then
-  switch, and render as a plain GPU renderer does;
-- the same of the mesh renderer's own self-test, in its own file;
-- that the self-test waits while the app is in the background, and that the first-frame wait lasts as long as the
-  app defers its first frame, past their timeouts.
-
-Elsewhere, they check the self-test itself, and that nothing switches. `self_test_test` and `switch_test` also check
-what the self-test remembers across launches (`RasterizerGpu.rememberSelfTest`), and `self_test_test` its probation
-after the switch.
+On OpenGL ES (`IMPELLER_BACKEND=opengles` on the emulator), `format_probe_test` checks that the first GPU renderer
+runs the format probe once, that it passes accumulating in `r32Float`, that a failed probe makes the renderers
+accumulate in `r16g16b16a16Float` and draw right, that a failure in both formats leaves the GPU renderer drawing and
+says so, and that the canvas renderer draws where textures can't be as wide as the renderers need, and without
+`RasterizerGpu.allowOpenGles`. Elsewhere, it checks that the probe passes when run on its own, and that no renderer
+runs it. Everywhere, `defer_test` defers the app's first frame past 10 s, creates both GPU renderers and renders with
+them before it, and checks their pixels once the frame comes.
 
 To run them all, with the goldens, on the emulator's Vulkan and OpenGL ES, on macOS and on web, run
 `python3 -I tool/matrix.py > matrix.txt` from the repository's root, in the background. Follow it with
 `python3 -I tool/follow.py matrix.txt 'STALL|FAIL|passed|failed|FINISHED' FINISHED`. Each `flutter test` runs under a
 watchdog (`tool/device_tests.py`), which kills a run that's silent for 2 minutes, as a GPU app hung on the emulator
 would be. It keeps each run's output in the repository's `build/test_logs/`.
-
-This app's `tool/release_launches.py [build]` checks the crash guard. It launches a release build's atlas page, which
-renders every frame, on the emulator with adb. It kills the app during the self-test, during the probation after the
-switch, and after the probation, in the foreground and in the background.
 
 On web, `flutter test` doesn't run integration tests. `tool/device_tests.py`'s `chrome` device runs them in headless
 Chrome, with `flutter drive` and the app's `test_driver/integration_test.dart`. For example,
@@ -169,14 +158,12 @@ In the Linux container (`tool/linux/`, at the repository's root, with Docker), t
 Impeller's OpenGL ES, on Mesa's llvmpipe. For example:
 
 ```sh
-python3 -I tool/linux/linux.py run -C rasterizer_gpu/example flutter test integration_test/self_test_test.dart -d linux
+python3 -I tool/linux/linux.py run -C rasterizer_gpu/example flutter test integration_test/format_probe_test.dart -d linux
 ```
 
 They run on X11, unless `--wayland` follows `run`: then on Wayland, in weston, where Flutter draws into a subsurface,
 as on most Linux desktops.
 
-The self-test's file is then in the container's `~/.cache`, which a run doesn't keep. To keep it across launches, as
-the crash guard's kill tests need, set `XDG_CACHE_HOME` into `build/`. The app's `linux/` runner was generated in the
-container, as the Mac's Flutter doesn't build for Linux, and turns Flutter GPU on in `linux/runner/my_application.cc`.
+The app's `linux/` runner was generated in the container, as the Mac's Flutter doesn't build for Linux, and turns Flutter GPU on in `linux/runner/my_application.cc`.
 
 `tiger.svg` and its renders are separately licensed: see `assets/tiger/README.md`.

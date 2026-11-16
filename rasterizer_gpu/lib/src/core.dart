@@ -20,7 +20,6 @@ export 'geometry.dart';
 export 'atlas.dart' show AtlasFrame, AtlasRenderer, AtlasRun, AtlasScene;
 export 'paths/path_contours.dart' show PathContours;
 export 'self_test.dart' show selfTestSize, selfTestSvg;
-export 'self_test_cache.dart' show SelfTestCache;
 
 extension on Transform {
   raw.RaTransform _toNative() => Struct.create<raw.RaTransform>()
@@ -316,8 +315,8 @@ class Scene._(
     });
   }
 
-  /// The OpenGL ES self-test's scene: [selfTestSvg]'s, built without parsing
-  /// it, so that the self-test checks the GPU alone.
+  /// The OpenGL ES format probe's scene: [selfTestSvg]'s, built without
+  /// parsing it, so that the probe checks the GPU alone.
   factory Scene.selfTest() {
     return using((arena) {
       final ctm = arena<raw.RaTransform>();
@@ -489,27 +488,6 @@ class Mesh._(raw.RaMeshData n) {
     });
     if (handle == nullptr) {
       throw ArgumentError('Not parseable SVG data');
-    }
-    return _copied(handle);
-  }
-
-  /// The OpenGL ES self-test's mesh: [selfTestSvg]'s, as [Mesh.fromSvgBytes]
-  /// imports it, but built without parsing it, so that the self-test checks
-  /// the GPU alone.
-  ///
-  /// Throws an [ArgumentError] if [maxSize] isn't a positive finite number.
-  factory Mesh.selfTest({required double maxSize}) {
-    if (!(maxSize > 0) || !maxSize.isFinite) {
-      throw ArgumentError.value(
-        maxSize,
-        'maxSize',
-        'Not a positive finite number',
-      );
-    }
-    final handle = raw.ra_mesh_self_test(maxSize);
-    // The core returns null when it runs out of memory.
-    if (handle == nullptr) {
-      throw OutOfMemoryError();
     }
     return _copied(handle);
   }

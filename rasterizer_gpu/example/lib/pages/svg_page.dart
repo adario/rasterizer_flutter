@@ -10,6 +10,7 @@ import '../affine.dart';
 import '../core_frames.dart';
 import '../layout_size.dart';
 import '../scenes.dart';
+import '../startup_log.dart';
 
 /// An SVG asset, fitted to the page, that rasterizer_gpu renders as one run.
 ///
@@ -104,6 +105,7 @@ class _SvgPageState()
         slots: widget.slots,
         gpu: widget.gpu,
       );
+      StartupLog.end('create');
       watchCoreFrames(
         renderer,
         (entries, bytes) => _lastFrame = (entries: entries, bytes: bytes),

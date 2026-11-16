@@ -309,9 +309,6 @@ external Pointer<RaMeshHandle> ra_mesh_from_svg_data(
   double maxSize,
 );
 
-@Native<Pointer<RaMeshHandle> Function(Float)>()
-external Pointer<RaMeshHandle> ra_mesh_self_test(double maxSize);
-
 @Native<RaMeshData Function(Pointer<RaMeshHandle>)>(isLeaf: true)
 external RaMeshData ra_mesh_data(Pointer<RaMeshHandle> mesh);
 

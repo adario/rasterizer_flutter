@@ -30,13 +30,13 @@ Timings mean something only in a profile build: `flutter run --profile -d macos 
   forces the canvas renderer. `BACKEND=mesh` picks the mesh renderer instead of the atlas renderer, where it's
   supported. The SVG page then flattens the SVG's curves for the window's size zoomed in 20×, as far as the sweep
   zooms.
-- On OpenGL ES, the app sets `RasterizerGpu.allowOpenGles`. So the page draws with the canvas renderer until the
-  self-test passes, then with the GPU renderer. The app logs:
-  - the result, in a `RASTERIZER_EXAMPLE support` line;
-  - the frames while the self-test ran, and for as long again after it, in a `RASTERIZER_EXAMPLE startup` line: the
-    longest time between frames, how many missed a vsync, and the UI thread's longest stall;
-  - in the meantime, `RASTERIZER_EXAMPLE event` lines: the first rasterized frame, lifecycle changes, stalls over
-    250 ms, and the backend it settled on.
+- The app logs, on every platform:
+  - the renderer's support and backend, in a `RASTERIZER_EXAMPLE support` line;
+  - the frames until the page has created its renderer, which on OpenGL ES compiles the renderer's pipelines, and for
+    as long again after it, in a `RASTERIZER_EXAMPLE startup` line: the longest time between frames, how many missed a
+    vsync, and the UI thread's longest stall;
+  - in the meantime, `RASTERIZER_EXAMPLE event` lines: the first rasterized frame, lifecycle changes, and stalls over
+    250 ms.
 
   `DEFER_FIRST_FRAME=n` defers the first frame by n seconds, as a splash screen would.
 - On Android, the app leaves Impeller's backend to Flutter, which picks OpenGL ES on the emulator and on devices whose

@@ -48,7 +48,6 @@ void main() {
           await tester.pump();
         }
         expect(game.isLoaded, isTrue);
-        await settleRenderer(tester, renderer);
         // About two seconds, for the SVGs to hit each other and the walls.
         for (var i = 0; i < 120; i++) {
           await tester.runAsync(
