@@ -163,10 +163,12 @@ abstract final class RasterizerGpu() {
   /// It's on by default. They then draw there from the first frame, as on
   /// Metal and Vulkan, but for two steps:
   /// - each renderer compiles its pipelines as it's made, which stalls the UI
-  ///   thread then, and the raster thread at the next frame. In release
-  ///   builds with no shader cache, on Mesa's llvmpipe, the GPU renderer's
-  ///   took about 0.45 s and 85 ms, and the mesh renderer's 0.17 s and 0.82 s.
-  ///   On the Android emulator, they took about 0.1 s and 20 ms.
+  ///   thread, then the raster thread. [RasterizerRenderer.create] completes
+  ///   once both are done, so the first frame doesn't pay for them, and an
+  ///   app can show a loader meanwhile. In release builds with no shader
+  ///   cache, on Mesa's llvmpipe, the GPU renderer's took about 0.55 s and
+  ///   0.15 s, and the mesh renderer's 0.23 s and 0.87 s. On the Android
+  ///   emulator, they took about 0.1 s and 50-90 ms, and 60 ms and 30 ms.
   /// - the first GPU renderer made starts a format probe, which checks that it
   ///   draws right while accumulating coverage in r32Float. Where it doesn't,
   ///   the renderer accumulates in r16g16b16a16Float instead: at once where
@@ -637,6 +639,10 @@ abstract class RasterizerRenderer() {
   /// Flutter GPU supports offscreen MSAA, so their edges are antialiased. With
   /// 1, or where offscreen MSAA isn't supported, they're aliased, which costs
   /// the GPU less.
+  ///
+  /// On OpenGL ES, a GPU renderer compiles its pipelines as it's made, and
+  /// the future completes once they've compiled, on the UI thread and then
+  /// on the raster thread ([RasterizerGpu.allowOpenGles]).
   static Future<RasterizerRenderer> create({
     int slots = 3,
     RasterizerBackend? backend,

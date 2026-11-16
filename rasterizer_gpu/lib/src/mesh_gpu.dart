@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -418,14 +419,16 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   }
 
   /// Draws once with each of its pipelines into a scratch target, which
-  /// compiles those not compiled yet.
+  /// compiles those not compiled yet, and completes once the GPU has run the
+  /// draws.
   ///
   /// On OpenGL ES, a pipeline compiles at its first draw, which stalls the UI
-  /// thread as the renderer is made, and the raster thread at the next frame.
-  /// On Mesa's llvmpipe, that took 170 ms, then 820 ms, in release builds with
-  /// no shader cache. So the mesh renderer compiles them all as it's made
-  /// there, rather than at whichever frame first draws each.
-  void warmUp() {
+  /// thread as the renderer is made, and the raster thread after. That took
+  /// 60 ms, then 30 ms, on the Android emulator. On Mesa's llvmpipe, it took
+  /// 230 ms, then 870 ms, in release builds with no shader cache. So the mesh
+  /// renderer compiles them all as it's made there, rather than at whichever
+  /// frame first draws each.
+  Future<void> warmUp() {
     gpu.BufferView view(TypedData data) {
       final buffer = context.createDeviceBufferWithCopy(
         ByteData.sublistView(data),
@@ -490,9 +493,12 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
       );
     }
     draw(mesh(glow: true), 0, 1, blend: true);
-    endPass(instances, last: true);
+    final done = Completer<void>();
+    _commandBuffer!.submit(completionCallback: (_) => done.complete());
+    _commandBuffer = null;
     // No real target is this small, as targets grow in steps of 64.
     _multisampledTextures.remove((width: 4, height: 4));
+    return done.future;
   }
 
   /// Submits the pass.
