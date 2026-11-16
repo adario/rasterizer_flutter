@@ -189,7 +189,9 @@ abstract final class RasterizerGpu() {
   /// For tests: what the format probe treats as failing.
   ///
   /// It holds accumulation formats, by Flutter GPU's PixelFormat names, such
-  /// as `r32Float`. A format in it fails at once.
+  /// as `r32Float`. A format in it fails at once. One followed by ` pixels`,
+  /// such as `r32Float pixels`, fails once its pixels are read back, as a
+  /// driver that draws it wrongly does.
   @visibleForTesting
   static Set<String> debugFailFormatProbe = {};
 

@@ -147,9 +147,9 @@ RasterizerSupport checkSupport(int textureWidth) {
 /// pixels are read back, so the frames rendered meanwhile may be wrong. The
 /// probe then checks r16g16b16a16Float the same way. If that fails too, the
 /// renderers keep drawing, wrongly, and only RasterizerGpu.supportDetail
-/// says so. For tests, [fail] names formats to treat as failing, which fails
-/// at once too. It runs wherever the renderer can, as tests check it on
-/// Metal and Vulkan too.
+/// says so. For tests, [fail] names formats to treat as failing, as
+/// RasterizerGpu.debugFailFormatProbe does. It runs wherever the renderer
+/// can, as tests check it on Metal and Vulkan too.
 Future<String?> probeFormat(
   gpu.ShaderLibrary library,
   Set<String> fail, {
@@ -187,6 +187,8 @@ Future<String?> _then(
 
 /// Probes [format]: returns its failure at once if [fail] names it or
 /// rendering throws, else a future of its pixels' failure, or of null.
+///
+/// Where [fail] names it followed by ` pixels`, the pixels fail once read.
 FutureOr<String?> _probe(
   gpu.ShaderLibrary library,
   gpu.PixelFormat format,
@@ -195,11 +197,12 @@ FutureOr<String?> _probe(
   if (fail.contains(format.name)) {
     return 'forced to fail';
   }
+  final failPixels = fail.contains('${format.name} pixels');
   try {
-    return _renderProbe(
-      library,
-      format,
-    ).then((failure) => failure, onError: (Object e) => '$e');
+    return _renderProbe(library, format).then(
+      (failure) => failPixels ? 'forced to fail' : failure,
+      onError: (Object e) => '$e',
+    );
   } catch (e) {
     return '$e';
   }
@@ -566,6 +569,11 @@ class AtlasRenderer._(
   /// Reused ones hold an earlier frame's bytes past the frame's own. Fresh ones
   /// check that the shaders read only what the core writes.
   bool debugFreshFrameBuffers = false;
+
+  /// For tests: the format of the first page's accumulation, or null before
+  /// the first frame.
+  gpu.PixelFormat? get debugAccumulationFormat =>
+      _shared.firstOrNull?.accumulation?.format;
 
   late final AtlasFrame _frame = AtlasFrame._(this);
 

@@ -88,6 +88,11 @@ void main() {
         await RasterizerGpu.debugProbeFormat(),
         'r32Float: forced to fail; r16g16b16a16Float: forced to fail',
       );
+      RasterizerGpu.debugFailFormatProbe = {'r32Float pixels'};
+      expect(
+        await RasterizerGpu.debugProbeFormat(),
+        'r32Float: forced to fail',
+      );
     } finally {
       RasterizerGpu.debugFailFormatProbe = {};
     }
@@ -135,6 +140,39 @@ void main() {
         );
         final scene = probeScene();
         expect(await checkProbe(renderProbe(renderer, scene)), isNull);
+        scene.dispose();
+        renderer.dispose();
+      } finally {
+        RasterizerGpu.debugFailFormatProbe = {};
+        RasterizerGpu.debugResetSupport();
+      }
+    });
+
+    test('a renderer made before the probe fails on its pixels switches to '
+        'r16g16b16a16Float at its next frame, and draws right', () async {
+      RasterizerGpu.debugResetSupport();
+      RasterizerGpu.debugFailFormatProbe = {'r32Float pixels'};
+      try {
+        final renderer =
+            await RasterizerRenderer.create(slots: 1) as ra.AtlasRenderer;
+        final scene = probeScene();
+        // The probe reads its pixels back after the app's next frame, so it
+        // hasn't failed yet.
+        expect(RasterizerGpu.supportDetail, endsWith('not checked yet'));
+        expect(await checkProbe(renderProbe(renderer, scene)), isNull);
+        expect(renderer.debugAccumulationFormat?.name, 'r32Float');
+        expect(
+          await RasterizerGpu.debugFormatProbe,
+          'r32Float: forced to fail',
+        );
+        expect(
+          RasterizerGpu.supportDetail,
+          'OpenGL ES, accumulating in r16g16b16a16Float, as r32Float failed: '
+          'forced to fail, checked',
+        );
+        expect(renderer.debugAccumulationFormat?.name, 'r32Float');
+        expect(await checkProbe(renderProbe(renderer, scene)), isNull);
+        expect(renderer.debugAccumulationFormat?.name, 'r16g16b16a16Float');
         scene.dispose();
         renderer.dispose();
       } finally {
