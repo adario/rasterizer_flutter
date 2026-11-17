@@ -71,7 +71,7 @@ canvas renderer on the emulator, use either.
 - **Android:** API 24 or later, and 64-bit. This package's manifest turns on Flutter GPU. The canvas renderer draws:
   - on 32-bit devices, which get no native code;
   - below API 29, where Flutter renders with Skia, without Impeller;
-  - on OpenGL ES, unless the app opts in ([OpenGL ES](#opengl-es)).
+  - on OpenGL ES, if the app turns `RasterizerGpu.allowOpenGles` off ([OpenGL ES](#opengl-es)).
 
   Impeller picks its backend itself: Vulkan where it can, else OpenGL ES. As of Flutter 3.47.9, Android uses OpenGL ES
   on emulators, on Adreno 650 and older GPUs, on older MediaTek, Exynos and PowerVR devices, on Huawei devices, and
@@ -94,10 +94,10 @@ canvas renderer on the emulator, use either.
   ```
 
   This works in release builds too, unlike the `FLUTTER_ENGINE_SWITCHES` environment variable. Flutter's Linux embedder
-  always renders with OpenGL ES, so the GPU renderer only draws if the app opts in ([OpenGL ES](#opengl-es)), and the
-  canvas renderer draws otherwise. The build hook builds the core with the clang that Flutter's Linux builds need,
-  linked to the system's libstdc++. The app then runs on systems whose libstdc++ is as new as the build machine's, or
-  newer, so build it on the oldest distribution it supports.
+  always renders with OpenGL ES, so the GPU renderer draws there unless the app turns `RasterizerGpu.allowOpenGles` off
+  ([OpenGL ES](#opengl-es)). The build hook builds the core with the clang that Flutter's Linux builds need, linked to
+  the system's libstdc++. The app then runs on systems whose libstdc++ is as new as the build machine's, or newer, so
+  build it on the oldest distribution it supports.
 
 - **Windows:** turn on Flutter GPU in the app's runner, `windows/runner/main.cpp`, where it makes its project:
 
