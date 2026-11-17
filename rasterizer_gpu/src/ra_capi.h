@@ -13,7 +13,11 @@
 extern "C" {
 #endif
 
+#ifdef _MSC_VER
+#define RA_EXPORT __declspec(dllexport)
+#else
 #define RA_EXPORT __attribute__((visibility("default"))) __attribute__((used))
+#endif
 
 typedef struct RaScene RaScene;
 typedef struct RaList RaList;

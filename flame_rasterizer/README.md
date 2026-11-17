@@ -32,11 +32,12 @@ The app turns on Flutter GPU as for rasterizer_gpu (see
 
 - **iOS and macOS:** `FLTEnableFlutterGPU` in the app's `Info.plist`.
 - **Linux:** `fl_dart_project_set_enable_flutter_gpu` in the app's runner, `linux/runner/my_application.cc`.
+- **Windows:** `project.set_enable_flutter_gpu(true)` in the app's runner, `windows/runner/main.cpp`.
 - **Android:** optionally, the Vulkan key in the app's manifest, which only debug and profile builds read.
 
-On OpenGL ES, which some Android devices and all of Linux use, the GPU renderer draws from the game's first frame, as
-elsewhere. Creating the game's renderer there compiles its shaders, once: for the mesh renderer, 0.1 s on the Android
-emulator and 1 s with Linux's software renderer (see
+On OpenGL ES, which some Android devices and all of Linux and Windows use, the GPU renderer draws from the game's
+first frame, as elsewhere. Creating the game's renderer there compiles its shaders, once: for the mesh renderer, 0.1 s
+on the Android emulator and 1 s with Linux's software renderer (see
 [rasterizer_gpu's README](https://github.com/adario/rasterizer_flutter/blob/main/rasterizer_gpu/README.md#opengl-es)).
 `rasterizerReady` completes once they've compiled, so a game that awaits it in `onLoad` shows `GameWidget`'s
 `loadingBuilder` meanwhile, and its first frame doesn't wait for them.

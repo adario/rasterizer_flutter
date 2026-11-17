@@ -68,7 +68,7 @@ renderer stays rasterizer_gpu's default, as it draws any SVG at any size with no
 ## The canvas renderer
 
 It has the same API in Dart, with no `dart:ffi`, so it builds for web. It draws wherever the GPU renderers can't: on
-Skia, Windows and web, and on OpenGL ES unless the app opts in. It parses SVGs with vector_graphics_compiler. It
+Skia and web, and on OpenGL ES unless the app opts in. It parses SVGs with vector_graphics_compiler. It
 records each scene once, as a `Picture`: at 1000 vectors, that takes 2.10 ms of UI time a frame, against 4.06 ms when
 drawing their paths, for 5–10% more raster time.
 
