@@ -1,0 +1,42 @@
+name: Build the examples for Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: rasterizer_gpu_example
+            path: rasterizer_gpu/example
+          - name: flame_rasterizer_example
+            path: flame_rasterizer/example
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - name: Build ${{ matrix.name }}
+        working-directory: ${{ matrix.path }}
+        run: flutter build windows --release
+      - name: Upload it
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-windows-x64
+          path: ${{ matrix.path }}/build/windows/x64/runner/Release
+          retention-days: 14
