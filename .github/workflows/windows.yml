@@ -34,9 +34,3 @@ jobs:
       - name: Build ${{ matrix.name }}
         working-directory: ${{ matrix.path }}
         run: flutter build windows --release
-      - name: Upload it
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}-windows-x64
-          path: ${{ matrix.path }}/build/windows/x64/runner/Release
-          retention-days: 14
