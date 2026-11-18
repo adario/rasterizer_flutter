@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 /// Groups a GPU run's entries into parts, by their rectangles.
@@ -11,6 +12,11 @@ import 'dart:typed_data';
 /// parts still open there, and union-find tracks which parts were joined.
 /// Two parts' rectangles may still overlap. That's harmless, as each part's
 /// rectangle in the atlas holds only its own entries.
+///
+/// Parts that overlap can add up to more area than their bounding box, as a
+/// run's entries spread over the viewport do. The entries are then one part,
+/// that box: it takes no more of the atlas, and packs into a smaller page
+/// than the parts would, side by side on its shelves.
 class AtlasParts() {
   // Per entry, by its position in the sorted ids: its union-find parent, and
   // once the parts are added, the part index of its root.
@@ -100,6 +106,9 @@ class AtlasParts() {
       active.addAll([lx, ly, ux, uy, k]);
     }
     done.addAll(active);
+    if (_oneBox(done, n, ids, addPart, setPart)) {
+      return;
+    }
     for (var m = 0; m < done.length; m += 5) {
       _parts[find(done[m + 4])] = addPart(
         done[m],
@@ -111,5 +120,37 @@ class AtlasParts() {
     for (var k = 0; k < n; k++) {
       setPart(ids[k], _parts[find(k)]);
     }
+  }
+
+  /// Makes the [n] entries [ids] one part, the bounding box of the [parts],
+  /// if that box's area is less than the parts' areas added up.
+  ///
+  /// Returns whether it did.
+  static bool _oneBox(
+    List<int> parts,
+    int n,
+    List<int> ids,
+    int Function(int lx, int ly, int ux, int uy) addPart,
+    void Function(int id, int part) setPart,
+  ) {
+    if (parts.length <= 5) {
+      return false;
+    }
+    var lx = parts[0], ly = parts[1], ux = parts[2], uy = parts[3], area = 0;
+    for (var m = 0; m < parts.length; m += 5) {
+      lx = math.min(lx, parts[m]);
+      ly = math.min(ly, parts[m + 1]);
+      ux = math.max(ux, parts[m + 2]);
+      uy = math.max(uy, parts[m + 3]);
+      area += (parts[m + 2] - parts[m]) * (parts[m + 3] - parts[m + 1]);
+    }
+    if ((ux - lx) * (uy - ly) >= area) {
+      return false;
+    }
+    final part = addPart(lx, ly, ux, uy);
+    for (var k = 0; k < n; k++) {
+      setPart(ids[k], part);
+    }
+    return true;
   }
 }
