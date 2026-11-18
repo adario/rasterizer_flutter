@@ -625,7 +625,10 @@ ui.Rect _drawnRect(ui.Rect viewBox, ui.Rect bounds) =>
 ///
 /// A GPU renderer keeps [slots] frames in flight, each with its own atlas
 /// textures. So a frame's images stay valid until [slots] frames later, when
-/// it renders into its textures again.
+/// it renders into its textures again. 2 are enough for frames drawn as
+/// they're built, as Flutter rasterizes a frame before it builds the one
+/// after next. An app that takes an image of a frame later, such as with
+/// `RepaintBoundary.toImage` after the frame, needs 3.
 abstract class RasterizerRenderer() {
   /// Creates a renderer for [backend].
   ///
@@ -644,7 +647,7 @@ abstract class RasterizerRenderer() {
   /// the future completes once they've compiled, on the UI thread and then
   /// on the raster thread ([RasterizerGpu.allowOpenGles]).
   static Future<RasterizerRenderer> create({
-    int slots = 3,
+    int slots = 2,
     RasterizerBackend? backend,
     RasterizerBackend gpu = RasterizerBackend.gpu,
     int meshSamples = 4,

@@ -105,7 +105,7 @@ canvas renderer on the emulator, use either.
 ## Use
 
 ```dart
-final renderer = await RasterizerRenderer.create(slots: 3);   // for RasterizerGpu.backend: gpu or canvas
+final renderer = await RasterizerRenderer.create(slots: 2);   // for RasterizerGpu.backend: gpu or canvas
 final coin = RasterizerScene.fromSvg(bytes);       // parsed for the same backend; shared by any number of entries
 
 // Once per frame, in device pixels, y down
@@ -146,6 +146,8 @@ foreground.draw(canvas, scale: devicePixelRatio);
   transparent pixels, such as `srcIn`, across several parts. A color filter that colors
   transparent pixels, such as a `srcOver` mode, colors each part's rectangle rather than the run's bounds.
 - **Slots:** a frame's images are valid until `slots` frames later, when the renderer renders into their textures again.
+  2, the default, are enough, as Flutter rasterizes a frame before it builds the one after next. An app that takes an
+  image of a frame later, such as with `RepaintBoundary.toImage` after the frame, needs 3.
 - **Parts:** the GPU renderer draws a run from its parts (`run.parts`). Entries whose bounds, grown by a 2 px margin,
   overlap in a chain share a part, made of their bounds within the viewport. Entries apart are in separate parts. So a
   run of entries scattered over the screen takes only their area of the atlas, and a run that covers the screen takes a
@@ -155,8 +157,8 @@ foreground.draw(canvas, scale: devicePixelRatio);
   frames needed, if that's below half its area. If the viewport changed size in those frames, as with a rotation or a
   window resize, it shrinks to that whatever it is. So a page shrinks at most once in 120 frames, and the renderer
   releases pages that no frame needed for 120 frames. Steady scenes and games rarely reallocate them, and a turned phone
-  or a resized window gives back what the larger size took. With 3 `slots`, each page holds about 21 bytes a pixel, or
-  20 on OpenGL ES. `renderer.atlasBytes` gives the estimate, from the textures' formats. `renderer.trimAtlas()` shrinks
+  or a resized window gives back what the larger size took. With 2 `slots`, each page holds about 17 bytes a pixel, or
+  16 on OpenGL ES. `renderer.atlasBytes` gives the estimate, from the textures' formats. `renderer.trimAtlas()` shrinks
   pages to the last frame's needs and releases the rest at once. Call it when the app knows its frames got lighter, such
   as at a level change.
 - **Disposing:** don't dispose of a scene between `add` and `render`, nor before drawing a canvas run that draws it.

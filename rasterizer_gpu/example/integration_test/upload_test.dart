@@ -80,9 +80,11 @@ Future<void> main() async {
 
   test('frames that grow and shrink draw as with fresh buffers', () async {
     final subject = await RasterizerRenderer.create(
+      slots: 3,
       backend: RasterizerBackend.gpu,
     ) as ra.AtlasRenderer;
     final fresh = await RasterizerRenderer.create(
+      slots: 3,
       backend: RasterizerBackend.gpu,
     ) as ra.AtlasRenderer;
     fresh.debugFreshFrameBuffers = true;
