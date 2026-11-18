@@ -774,7 +774,13 @@ abstract class RasterizerFrame() {
   /// Adds a new run, which is drawn on its own.
   ///
   /// Entries in one run overlap in the order [RasterizerRun.add] added them.
-  RasterizerRun addRun();
+  ///
+  /// [clip], in the viewport's device pixels, is where the run's image can
+  /// show, such as the bounds of the clip it's drawn under. The run then
+  /// skips entries that paint nothing in it, and the GPU and mesh renderers
+  /// render only what's in it, within a pixel or two. So a paint that spreads
+  /// the run's image, such as a blur, loses what lay outside it.
+  RasterizerRun addRun({ui.Rect? clip});
 
   /// Renders all of its runs, which then have their images.
   ///

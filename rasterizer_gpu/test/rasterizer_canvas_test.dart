@@ -594,6 +594,74 @@ void main() {
       expect(_pixel(pixels, 5, 5), _clear);
     });
   });
+
+  group('clips', () {
+    /// Returns the clips that [draw]'s runs were added with, the canvas
+    /// moved by 5, 0 and at a pixel ratio of 2 at begin.
+    List<ui.Rect?> clips(
+      void Function(RasterizerCanvas) draw, {
+      bool warp = false,
+    }) {
+      final frame = _ClipSpy(_renderer.beginFrame(2 * _size, 2 * _size));
+      final canvas = RasterizerCanvas()
+        ..warpPerspective = warp ? true : null
+        ..begin(ui.Canvas(ui.PictureRecorder())..translate(5, 0), frame, 2);
+      draw(canvas);
+      canvas.end();
+      return frame.clips;
+    }
+
+    test('a run takes the bounds of its clip, in device pixels', () {
+      final clipped = clips((canvas) {
+        canvas.clipRect(const ui.Rect.fromLTRB(2, 3, 12, 13));
+        _svg.render(canvas, 10);
+      });
+      expect(clipped, [const ui.Rect.fromLTRB(4, 6, 24, 26)]);
+    });
+
+    test('a run under no clip takes in the viewport', () {
+      final [clip] = clips((canvas) => _svg.render(canvas, 10));
+      expect(clip == null || clip.contains(const ui.Offset(0, 0)), isTrue);
+      expect(clip == null || clip.contains(const ui.Offset(80, 80)), isTrue);
+    });
+
+    test('a run whose paint spreads takes no clip', () {
+      final blurred = ui.Paint()
+        ..imageFilter = ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2);
+      final clipped = clips((canvas) {
+        canvas.clipRect(const ui.Rect.fromLTRB(2, 3, 12, 13));
+        _svg.render(canvas, 10, overridePaint: blurred);
+      });
+      expect(clipped, [null]);
+    });
+
+    test('a warped run takes no clip', () {
+      final clipped = clips((canvas) {
+        canvas
+          ..clipRect(const ui.Rect.fromLTRB(2, 3, 12, 13))
+          ..transform(_perspective);
+        _svg.render(canvas, 10);
+      }, warp: true);
+      expect(clipped, [null]);
+    });
+  });
+}
+
+/// A frame that records the clips that its runs are added with.
+class _ClipSpy(final RasterizerFrame _frame) implements RasterizerFrame {
+  final List<ui.Rect?> clips = [];
+
+  @override
+  RasterizerBackend get backend => _frame.backend;
+
+  @override
+  RasterizerRun addRun({ui.Rect? clip}) {
+    clips.add(clip);
+    return _frame.addRun(clip: clip);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /// Checks [pixels] against the squares of the perspective tests, drawn
