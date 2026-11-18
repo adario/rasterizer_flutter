@@ -1,9 +1,25 @@
 name: Build the examples for Windows
 
+# Only changes that can break the Windows build: native code, the build hook,
+# the shaders it compiles, dependencies, the runners and this workflow.
 on:
   push:
     branches: [main]
+    paths:
+      - 'rasterizer_gpu/src/**'
+      - 'rasterizer_gpu/hook/**'
+      - 'rasterizer_gpu/shaders/**'
+      - '**/pubspec.yaml'
+      - '*/example/windows/**'
+      - '.github/workflows/windows.yml'
   pull_request:
+    paths:
+      - 'rasterizer_gpu/src/**'
+      - 'rasterizer_gpu/hook/**'
+      - 'rasterizer_gpu/shaders/**'
+      - '**/pubspec.yaml'
+      - '*/example/windows/**'
+      - '.github/workflows/windows.yml'
   workflow_dispatch:
 
 permissions:
