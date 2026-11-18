@@ -90,6 +90,57 @@ class Tube(
     );
   }
 
+  /// Creates a closed clover, as the outline of the example's `clover.svg`: 4
+  /// round lobes of [lanes] lanes, and a side of a lane between each two, the
+  /// first at the bottom.
+  ///
+  /// The lobes are the SVG's circles. The sides are a little closer to the
+  /// axis than the SVG's, so that they're as long as a lane round a lobe.
+  factory Tube.clover(String name, int lanes) {
+    // In the SVG's units, from its middle: how far across and down the lobes'
+    // middles are, and the lobes' radius.
+    const middle = 161.562;
+    const radius = 132.188;
+    // For sides that far from the axis: how far along a side its ends are
+    // from the lobes' middles, and the angles, from a lobe's middle, at which
+    // its outer arc starts and that it sweeps.
+    ({double along, double start, double sweep}) lobe(double distance) {
+      final along = math.sqrt(
+        radius * radius - (distance - middle) * (distance - middle),
+      );
+      final start = math.atan2(distance - middle, -along);
+      return (
+        along: along,
+        start: start,
+        sweep: start - math.atan2(-along, distance - middle),
+      );
+    }
+
+    final side = _solve(
+      (distance) {
+        final (:along, start: _, :sweep) = lobe(distance);
+        return 2 * radius * math.sin(sweep / (2 * lanes)) -
+            2 * (middle - along);
+      },
+      middle,
+      middle + radius,
+    );
+    final (:along, :start, :sweep) = lobe(side);
+    final quarter = [
+      Offset(along - middle, side),
+      for (var i = 0; i < lanes; i++)
+        const Offset(middle, middle) +
+            Offset.fromDirection(start - sweep * i / lanes, radius),
+    ];
+    return Tube(
+      name,
+      _closed([
+        for (var k = 0; k < 4; k++)
+          for (final point in quarter) rotate(point, -k * math.pi / 2),
+      ], 1),
+    );
+  }
+
   /// Creates an open arc of [lanes] lanes, 1 from the axis, from angle [start]
   /// through [sweep].
   factory Tube.arc(String name, double start, double sweep, int lanes) =>
@@ -297,6 +348,7 @@ abstract final class Tubes() {
   );
   static final cog = Tube.star('Cog', 9, 0.8, 1, math.pi / 2);
   static final gear = Tube.gear('Gear', 6, 8 * math.pi / 180, math.pi / 2);
+  static final clover = Tube.clover('Clover', 5);
   static final ridge = Tube.polyline('Ridge', const [
     Offset(-1, 1),
     Offset(0, 0.6),
@@ -313,6 +365,7 @@ abstract final class Tubes() {
     cog,
     gear,
     ridge,
+    clover,
   ];
 
   /// The widest lane of any tube, and the most lanes any tube has.

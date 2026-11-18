@@ -154,6 +154,15 @@ final List<Level> levels = [
     zappers: 2,
     edgeWalkers: 1,
   ),
+  _level(
+    Tubes.clover,
+    TubeColors.tubeOrange,
+    climbers: 6,
+    splitters: 6,
+    seeders: 5,
+    zappers: 4,
+    edgeWalkers: 3,
+  ),
 ];
 
 /// Returns a level on [tube], in [color], with those enemies and the numbers
