@@ -181,8 +181,8 @@ void main() {
 
   // Tests run without Impeller, where GPU (mesh) is inactive.
   // integration_test/knobs_test.dart checks the Glow knob with it.
-  testWidgets("Tube Shooter's Glow knob doesn't show, and no line glows, "
-      'without GPU (mesh)', (tester) async {
+  testWidgets("Tube Shooter's Glow knob shows, off at first, with Canvas and "
+      'Flame', (tester) async {
     tester.view
       ..physicalSize = const Size(1280, 800)
       ..devicePixelRatio = 1;
@@ -196,24 +196,24 @@ void main() {
       }
     }
 
-    void expectNoGlow(SvgRenderer renderer) {
+    void expectGlowKnob(SvgRenderer renderer) {
       final story = tester.widget<TubeShooterStory>(
         find.byType(TubeShooterStory),
       );
       expect(story.renderer, renderer);
       expect(story.glow, isFalse);
-      expect(find.text('Glow'), findsNothing);
+      expect(find.text('Glow'), findsOneWidget);
     }
 
     await settle();
     expect(find.text('Drifting stars'), findsOneWidget);
-    expectNoGlow(SvgRenderer.rasterizerCanvas);
+    expectGlowKnob(SvgRenderer.rasterizerCanvas);
     await tester.tap(find.byType(DropdownMenu<SvgRenderer>));
     await settle();
     // Tube Shooter draws no SVGs, so Flame SVG shows Flame.
     await tester.tap(find.text('Flame').last);
     await settle();
-    expectNoGlow(SvgRenderer.flameSvg);
+    expectGlowKnob(SvgRenderer.flameSvg);
     await tester.pumpWidget(const SizedBox());
   });
 

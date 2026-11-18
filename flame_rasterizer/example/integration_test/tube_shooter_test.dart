@@ -11,8 +11,9 @@
 // the drop. The test prints the status at the end of each phase, frame times
 // included.
 //
-// Then it plays a whole game with each GPU renderer. None of its frames may
-// fall back to the canvas renderer.
+// Then it plays a whole game with each GPU renderer, with the glow on: the
+// mesh renderer draws it, and TubeGlow draws it over the atlas renderer's.
+// None of its frames may fall back to the canvas renderer.
 import 'package:flame/components.dart' show PathComponent;
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
@@ -21,6 +22,7 @@ import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_test/flutter_test.dart';
@@ -128,6 +130,10 @@ Future<void> wholeGame(WidgetTester tester, SvgRenderer renderer) async {
     (seconds, {done}) => pumpFor(tester, seconds, done: done),
   );
   watch.stop();
+  expect(
+    game.camera.postProcess,
+    renderer == SvgRenderer.rasterizer ? isNull : isA<TubeGlow>(),
+  );
   // ignore: avoid_print
   print(
     '  RASTERIZER_EXAMPLE ${renderer.name} whole game: ${watch.frames} '

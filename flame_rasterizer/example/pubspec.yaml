@@ -39,3 +39,5 @@ flutter:
     - assets/audio/
     - assets/svgs/
     - assets/svgs/wireframe/
+  shaders:
+    - shaders/glow.frag

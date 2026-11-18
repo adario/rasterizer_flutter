@@ -53,12 +53,7 @@ WidgetbookComponent gamesStories() {
               label: 'Drifting stars',
               initialValue: true,
             ),
-            // Only the mesh renderer draws a glow, so the knob shows only with
-            // it. Widgetbook registers the knobs again on each build, so the
-            // hidden knob keeps its value.
-            glow:
-                renderer == SvgRenderer.rasterizer &&
-                context.knobs.boolean(label: 'Glow'),
+            glow: context.knobs.boolean(label: 'Glow'),
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
             speed: speedKnob(context),
@@ -129,7 +124,7 @@ class const TubeShooterStory({
   /// Whether the stars stay, drifting, between the zoom and the drop.
   final bool driftingStars = true,
 
-  /// Whether the lines glow. Only the mesh renderer draws glows.
+  /// Whether the lines glow: see [TubeShooterExample.glow].
   final bool glow = false,
 
   /// Whether the game plays its sounds.

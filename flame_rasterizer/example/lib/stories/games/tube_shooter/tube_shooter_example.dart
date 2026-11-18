@@ -25,6 +25,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/sounds.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
@@ -114,13 +115,14 @@ abstract class TubeShooterExample({
 
     The game makes some paths again every frame, such as the tube's during the
     zoom. It shares others among many components, such as the enemies'
-    shapes. With the mesh renderer, the Glow knob makes the lines glow. The
-    Level knob shows the round's level, and starts a new game at the level it
-    picks. The other knobs keep the stars drifting, turn the sounds on and
-    off, zoom the camera and change the game's speed. A new renderer's game
-    goes on with the same round, ship, enemies and shots, from where they
-    were. The bar under the game shows the renderer, the frame times, the
-    renderer's own numbers and the paths made each second.
+    shapes. The Glow knob makes the lines glow: the mesh renderer draws the
+    glow with them, and the other renderers draw it with a shader over the
+    world. The Level knob shows the round's level, and starts a new game at
+    the level it picks. The other knobs keep the stars drifting, turn the
+    sounds on and off, zoom the camera and change the game's speed. A new
+    renderer's game goes on with the same round, ship, enemies and shots,
+    from where they were. The bar under the game shows the renderer, the
+    frame times, the renderer's own numbers and the paths made each second.
 
     Inspired by Atari's Tempest (1981).
   ''';
@@ -411,23 +413,38 @@ abstract class TubeShooterExample({
     }
   }
 
-  /// The Glow knob's value: whether the lines glow, with [lineGlow] and
-  /// [tubeGlow]. Only the mesh renderer draws glows.
+  /// The Glow knob's value: whether the lines glow.
   ///
-  /// A change imports the lines again: the tube's paths, as a change of the
-  /// view does, and the shapes in [keepStroke]. In a still world, where
-  /// nothing updates, this happens at once.
+  /// If [rendererGlows], the lines glow with [lineGlow] and [tubeGlow], so a
+  /// change imports them again: the tube's paths, as a change of the view
+  /// does, and the shapes in [keepStroke]. In a still world, where nothing
+  /// updates, this happens at once. Otherwise, a [TubeGlow] is the camera's
+  /// post process while it's on.
   bool get glow => _glow;
   bool _glow = false;
 
   set glow(bool value) {
     if (value != _glow) {
       _glow = value;
-      view.invalidate();
-      if (isLoaded && world.timeScale == 0) {
-        _updateStillLines();
+      if (rendererGlows) {
+        view.invalidate();
+        if (isLoaded && world.timeScale == 0) {
+          _updateStillLines();
+        }
+      } else if (isLoaded) {
+        _updateGlow();
       }
     }
+  }
+
+  /// Whether the renderer draws the lines' glow with them, as the mesh
+  /// renderer does. Otherwise, [TubeGlow] draws it.
+  bool get rendererGlows => false;
+
+  /// Makes a [TubeGlow] the camera's post process if [glow] is on, or
+  /// removes it.
+  void _updateGlow() {
+    camera.postProcess = _glow ? TubeGlow(this) : null;
   }
 
   /// The Sound knob's value: whether the game plays its sounds. Off by
@@ -461,8 +478,8 @@ abstract class TubeShooterExample({
     }
   }
 
-  /// The shapes' glow, if the Glow knob is on.
-  RasterizerGlow? get _shapeGlow => _glow ? lineGlow : null;
+  /// The shapes' glow, if the Glow knob is on and the renderer draws it.
+  RasterizerGlow? get _shapeGlow => _glow && rendererGlows ? lineGlow : null;
 
   /// Does what updates would do in a moving world: makes the tube's paths
   /// again for the view, places everything on the tube, and gives the shapes
@@ -480,6 +497,10 @@ abstract class TubeShooterExample({
         case final PlayerComponent ship:
           ship.place();
       }
+    }
+    // In the camera's backdrop, out of the world.
+    for (final star in starField.stars) {
+      star.place();
     }
     for (final group in [player, enemyGroup, shotGroup, explosionGroup]) {
       group.descendants().whereType<PathComponent>().forEach(keepStroke);
@@ -562,7 +583,7 @@ abstract class TubeShooterExample({
       position: Vector2(bounds.left, bounds.top),
       maxSize: math.max(bounds.width, bounds.height) / view.devicePixel,
       priority: priority,
-      glow: _glow ? tubeGlow : null,
+      glow: _glow && rendererGlows ? tubeGlow : null,
     );
     tubeGroup.add(component);
     return component;
@@ -573,7 +594,6 @@ abstract class TubeShooterExample({
     // Before the ship loads in addAll: it sizes its import for the view.
     _fitView();
     world.addAll([
-      starField,
       tubeGroup,
       spawnGroup,
       enemyGroup,
@@ -584,6 +604,11 @@ abstract class TubeShooterExample({
       spikes,
       bolts,
     ]);
+    // Under the world, out of the glow's post process.
+    camera.backdrop.add(starField);
+    if (_glow && !rendererGlows) {
+      _updateGlow();
+    }
     // In the camera's viewport, as StoryGame's FPS counter is: above the
     // world, and unzoomed.
     camera.viewport.addAll([_levelText, _roundText, _livesText, _scoreText]);
@@ -1267,6 +1292,11 @@ class RasterizerTubeShooterExample({
     priority: priority,
     glow: glow,
   );
+
+  /// Whether the Renderer knob picked the mesh renderer, which draws the
+  /// lines' glow with them.
+  @override
+  bool get rendererGlows => renderer == SvgRenderer.rasterizer;
 
   /// Keeps [drawing]'s stroke, and gives it the shapes' glow too. If the Glow
   /// knob changed, it imports the shape again.
