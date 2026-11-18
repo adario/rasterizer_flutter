@@ -29,6 +29,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/z
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1034,15 +1035,40 @@ void main() {
       });
     }
 
-    testWidgets("isn't Flame's, whose paths draw with its knob on or off", (
+    for (final renderer in [
+      SvgRenderer.rasterizerCanvas,
+      SvgRenderer.flameSvg,
+    ]) {
+      testWidgets("is the camera's TubeGlow with ${renderer.label}, which "
+          "goes on and off with its knob, and not the lines'", (tester) async {
+        final game = await pumpGame(tester, renderer);
+        expect(game.rendererGlows, isFalse);
+        expect(game.camera.postProcess, isNull);
+        game.glow = true;
+        // Its shader loads outside the test's fake time.
+        await pumpWhileLoading(tester, () => game.camera.postProcess == null);
+        expect(game.camera.postProcess, isA<TubeGlow>());
+        await pumpFrames(tester, 2);
+        expect(tubePathsOf(game), isNotEmpty);
+        expect(
+          game.descendants().whereType<RasterizerPathComponent>().map(
+            (drawing) => drawing.glow,
+          ),
+          everyElement(isNull),
+        );
+        game.glow = false;
+        await pumpFrames(tester, 2);
+        expect(game.camera.postProcess, isNull);
+        await tester.pumpWidget(const SizedBox());
+      });
+    }
+
+    testWidgets("leaves out the stars, in the camera's backdrop", (
       tester,
     ) async {
-      final game = await pumpGame(tester, SvgRenderer.flameSvg);
-      await pumpFrames(tester, 2);
-      game.glow = true;
-      await pumpFrames(tester, 2);
-      expect(tubePathsOf(game), isNotEmpty);
-      expect(game.descendants().whereType<RasterizerPathComponent>(), isEmpty);
+      final game = await pumpGame(tester, SvgRenderer.rasterizerCanvas);
+      expect(game.starField.parent, same(game.camera.backdrop));
+      expect(game.starField.stars, isNotEmpty);
       await tester.pumpWidget(const SizedBox());
     });
 

@@ -1,10 +1,11 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:flame/extensions.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 
 /// The stars around the tube, never inside it.
@@ -28,11 +29,14 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// Stars are unseen at the farthest, and at their brightest from [bright] in.
 /// [show] fades them in over [fadeTime], and [hide] fades them out, then
 /// removes them.
+///
+/// It's in the camera's backdrop, under the world, so that the camera's post
+/// process, the Glow knob's [TubeGlow], leaves the stars out. Still, it draws
+/// through the viewfinder's transform and updates at the world's time scale,
+/// as if it were in the world.
 class StarFieldComponent()
     extends Component
-    with HasGameRef<TubeShooterExample> {
-  this : super(priority: -1);
-
+    with HasGameRef<TubeShooterExample>, CustomTraversal {
   static const count = 200;
   static const far = 10.0;
   static const bright = 4.0;
@@ -176,6 +180,25 @@ class StarFieldComponent()
     ..eyeDistance = distance
     ..cameFrom = distance
     ..point = _point();
+
+  /// Updates it and the stars as the world's time scale does its components:
+  /// not at all in a still world.
+  @override
+  void updateSubtree(double dt) {
+    final timeScale = gameRef.world.timeScale;
+    if (timeScale > 0) {
+      super.updateSubtree(dt * timeScale);
+    }
+  }
+
+  @override
+  void renderTree(Canvas canvas) {
+    canvas
+      ..save()
+      ..transform2D(gameRef.camera.viewfinder.transform);
+    super.renderTree(canvas);
+    canvas.restore();
+  }
 
   @override
   void update(double dt) {

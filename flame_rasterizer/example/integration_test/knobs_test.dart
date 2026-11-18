@@ -6,7 +6,7 @@
 // system's bars. The Renderer knob's GPU entries must be active only where
 // their renderers are supported, and the knob must pick the first active
 // one, unless a link picks Canvas. Tube Shooter's Glow knob must show with
-// GPU (mesh).
+// the first active one.
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/main.dart';
@@ -148,7 +148,9 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets("Tube Shooter's Glow knob shows with GPU (mesh)", (tester) async {
+  testWidgets("Tube Shooter's Glow knob shows with the first renderer", (
+    tester,
+  ) async {
     Future<void> settle() async {
       for (var i = 0; i < 10; i++) {
         await tester.pump(const Duration(milliseconds: 100));
