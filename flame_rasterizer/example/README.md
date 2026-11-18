@@ -295,11 +295,12 @@ Inspired by Atari's Tempest (1981): a tube shooter with a tube, enemies, colours
   counted only once READY is up, or any key but a modifier alone, begins the level. It does nothing else: no shot, no
   move of the ship, no purge.
 - **Levels.** A round on each level in turn, then again from the first: the hexagon, floor, ridge, horseshoe, octagon,
-  cog, star and diamond, from the easiest to the hardest, by an estimate of what each enemy asks of the ship. The eight
-  tubes have 8 to 20 lanes. All of a tube's lanes are as wide, so that a shape's stroke is one number and a flip is a
-  rigid turn.
-  - Closed tubes: the octagon, hexagon, diamond, star and cog. The star and the cog are concave, and their flips round
-    an inner corner turn by more than half a turn.
+  cog, gear, star and diamond, from the easiest to the hardest, by an estimate of what each enemy asks of the ship. The
+  nine tubes have 8 to 24 lanes. All of a tube's lanes are as wide, so that a shape's stroke is one number and a flip
+  is a rigid turn.
+  - Closed tubes: the octagon, hexagon, diamond, star, cog and gear. All but the first three are concave, and their
+    flips round an inner corner turn by more than half a turn. The gear's 6 teeth have a lane on top, on each flank and
+    in each gap. Its flanks slant by 8°, as a lane pointing at the axis would be seen edge-on.
   - Open tubes: the floor, horseshoe and ridge, the ridge concave. There, the ship stops at the ends, an enemy that
     would leave the tube turns back, and the camera looks at the tube's middle, moving there during the zoom.
 

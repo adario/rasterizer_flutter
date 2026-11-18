@@ -128,8 +128,17 @@ final List<Level> levels = [
     edgeWalkers: 2,
   ),
   _level(
-    Tubes.star,
+    Tubes.gear,
     TubeColors.tubeLime,
+    climbers: 8,
+    splitters: 5,
+    seeders: 5,
+    zappers: 3,
+    edgeWalkers: 3,
+  ),
+  _level(
+    Tubes.star,
+    TubeColors.tubeSlate,
     climbers: 8,
     splitters: 4,
     seeders: 4,
@@ -138,7 +147,7 @@ final List<Level> levels = [
   ),
   _level(
     Tubes.diamond,
-    TubeColors.tubeSlate,
+    TubeColors.tube,
     climbers: 4,
     splitters: 6,
     seeders: 3,
