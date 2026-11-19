@@ -35,7 +35,7 @@ still change.
 | Android, API 24+, arm64 and x86_64 | GPU on Vulkan and OpenGL ES; canvas below API 29, on Skia | Android Emulator: API 37 (arm64, host GPU through gfxstream) on Vulkan, OpenGL ES and Skia; API 28 on Skia |
 | Linux | GPU on OpenGL ES, Linux's only backend | arm64 Docker container: Debian trixie, Mesa's llvmpipe on the CPU, on X11 (Xvfb) and on Wayland (weston) |
 | Web | canvas | Headless Chrome, with CanvasKit and skwasm |
-| Windows | canvas | not built: no machine |
+| Windows | GPU on OpenGL ES, through ANGLE, Windows' only backend | not run: built on GitHub's Windows runners |
 
 GPU means either GPU renderer: the atlas renderer, rasterizer_gpu's default, or the mesh renderer, flame_rasterizer's.
 Both draw on the same platforms. On OpenGL ES, an app can turn them off, with `RasterizerGpu.allowOpenGles`, for the
@@ -97,6 +97,11 @@ The app needs:
 - **Linux:** Flutter GPU turned on in the app's runner, with `fl_dart_project_set_enable_flutter_gpu` in
   `linux/runner/my_application.cc`. Release builds honour it too. Flutter's Linux embedder always renders with OpenGL
   ES, so the GPU renderers draw there unless the app turns `RasterizerGpu.allowOpenGles` off, as on Android.
+- **Windows:** Flutter GPU turned on in the app's runner, with `project.set_enable_flutter_gpu(true)` in
+  `windows/runner/main.cpp`. Flutter's Windows embedder renders with OpenGL ES only, through ANGLE, so the GPU
+  renderers draw there unless the app turns `RasterizerGpu.allowOpenGles` off, as on Linux. Building needs Visual
+  Studio's C++ workload, as any Flutter Windows app does: see Flutter's
+  [Windows setup](https://docs.flutter.dev/platform-integration/windows/setup).
 - **Integration tests, from a clean checkout or the pub cache:** one build of the app (`flutter build <platform>`)
   before `flutter test`. Otherwise `flutter test` checks the assets before rasterizer_gpu's build hook has written its
   shader bundle. `flutter run` and `flutter build` don't need it.

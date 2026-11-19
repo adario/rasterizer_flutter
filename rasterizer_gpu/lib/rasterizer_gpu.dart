@@ -47,7 +47,7 @@ enum RasterizerSupport() {
   /// It can render here.
   supported,
 
-  /// The platform isn't macOS, iOS, 64-bit Android or Linux, as with Windows,
+  /// The platform isn't macOS, iOS, 64-bit Android, Linux or Windows, as with
   /// 32-bit Android or web.
   unsupportedPlatform,
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The GPU renderers draw on Windows too, on Impeller's OpenGL ES through
+  ANGLE, where the app's runner turns Flutter GPU on. The build hook builds
+  the native library there with MSVC. Not tested on Windows yet.
 - **Breaking:** on OpenGL ES, the GPU renderers draw from the first frame,
   as on Metal and Vulkan, with no self-test, and no canvas renderer before a
   switch. `RasterizerGpu.allowOpenGles` is on by default: turned off, the

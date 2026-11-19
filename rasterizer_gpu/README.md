@@ -4,14 +4,14 @@ Renders SVG scenes, and scenes of plain `dart:ui` paths (see [Paths](#paths)), w
 same API:
 
 - **The GPU renderer**, also called the atlas renderer, runs Rasterizer's C++ core with Flutter GPU. It draws on
-  Impeller's Metal backend (iOS, macOS), Vulkan backend (Android) and OpenGL ES backend (Android, Linux): see
+  Impeller's Metal backend (iOS, macOS), Vulkan backend (Android) and OpenGL ES backend (Android, Linux, Windows): see
   [OpenGL ES](#opengl-es). Once per frame, it renders all of the frame's runs of scenes into one atlas image. It then
   draws each run from its parts' rectangles with `Canvas.drawImageRect`, at the run's place in the app's paint order,
   so vector content keeps its z-order among other content.
 - **The mesh renderer**, for games, draws wherever the GPU renderer does. It imports each SVG once into triangles, which
   stay in GPU buffers. Each frame then only writes its entries' transforms, and renders each run into an image of its
   own with instanced draws, 4× multisampled by default. See [The mesh renderer](#the-mesh-renderer).
-- **The canvas renderer** is the fallback everywhere else: on Skia, Windows and web, and on Impeller's OpenGL ES if the
+- **The canvas renderer** is the fallback everywhere else: on Skia and web, and on Impeller's OpenGL ES if the
   app turns `RasterizerGpu.allowOpenGles` off. It parses scenes in Dart, and each run draws its scenes' paths with
   `Canvas.drawPath`, straight into the canvas it's drawn into. See [The canvas renderer](#the-canvas-renderer).
 
@@ -42,7 +42,7 @@ On each, the example's golden tests pass with the GPU and canvas renderers:
   opacity test pass.
 
 Not tested: other iPhone or iPad GPUs, physical Android devices, Linux on a GPU (Mesa's drivers or NVIDIA's), and
-Windows.
+Windows, where the examples build on GitHub's Windows runners (`.github/workflows/windows.yml`) but haven't run.
 
 The mesh renderer passes its own tests (`mesh_test`, `projective_test` and the opacity test) on macOS, on the iOS
 Simulator, in the Linux container, and on the emulator's Vulkan and OpenGL ES, and the defer test too. On the
@@ -71,7 +71,7 @@ canvas renderer on the emulator, use either.
 - **Android:** API 24 or later, and 64-bit. This package's manifest turns on Flutter GPU. The canvas renderer draws:
   - on 32-bit devices, which get no native code;
   - below API 29, where Flutter renders with Skia, without Impeller;
-  - on OpenGL ES, unless the app opts in ([OpenGL ES](#opengl-es)).
+  - on OpenGL ES, if the app turns `RasterizerGpu.allowOpenGles` off ([OpenGL ES](#opengl-es)).
 
   Impeller picks its backend itself: Vulkan where it can, else OpenGL ES. As of Flutter 3.47.9, Android uses OpenGL ES
   on emulators, on Adreno 650 and older GPUs, on older MediaTek, Exynos and PowerVR devices, on Huawei devices, and
@@ -94,13 +94,24 @@ canvas renderer on the emulator, use either.
   ```
 
   This works in release builds too, unlike the `FLUTTER_ENGINE_SWITCHES` environment variable. Flutter's Linux embedder
-  always renders with OpenGL ES, so the GPU renderer only draws if the app opts in ([OpenGL ES](#opengl-es)), and the
-  canvas renderer draws otherwise. The build hook builds the core with the clang that Flutter's Linux builds need,
-  linked to the system's libstdc++. The app then runs on systems whose libstdc++ is as new as the build machine's, or
-  newer, so build it on the oldest distribution it supports.
+  always renders with OpenGL ES, so the GPU renderer draws there unless the app turns `RasterizerGpu.allowOpenGles` off
+  ([OpenGL ES](#opengl-es)). The build hook builds the core with the clang that Flutter's Linux builds need, linked to
+  the system's libstdc++. The app then runs on systems whose libstdc++ is as new as the build machine's, or newer, so
+  build it on the oldest distribution it supports.
 
-- **Web and Windows:** nothing to set up. Only the canvas renderer draws there, and the build hook builds no native
-  code.
+- **Windows:** turn on Flutter GPU in the app's runner, `windows/runner/main.cpp`, where it makes its project:
+
+  ```cpp
+  flutter::DartProject project(L"data");
+  project.set_enable_flutter_gpu(true);
+  ```
+
+  Flutter's Windows embedder renders with Impeller's OpenGL ES backend only, through ANGLE on Direct3D 11, so the GPU
+  renderer draws there unless the app turns `RasterizerGpu.allowOpenGles` off ([OpenGL ES](#opengl-es)). The build
+  hook builds the core with MSVC, from Visual Studio's "Desktop development with C++" workload, which Flutter's
+  [Windows setup](https://docs.flutter.dev/platform-integration/windows/setup) installs. Not tested on Windows yet.
+
+- **Web:** nothing to set up. Only the canvas renderer draws there, and the build hook builds no native code.
 
 ## Use
 

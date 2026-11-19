@@ -41,9 +41,9 @@ This port patches the C++ core, Rasterizer's. `rasterizer_gpu/src/core/README.md
 
 ## Platforms
 
-- **The GPU renderers run on Metal, Android's Vulkan, and Android's and Linux's OpenGL ES.** 32-bit ARM isn't
-  supported.
-- **The canvas renderer draws everywhere else:** on Skia, on web and on Windows. It parses SVGs in Dart with
+- **The GPU renderers run on Metal, Android's Vulkan, and Android's, Linux's and Windows' OpenGL ES.** 32-bit ARM
+  isn't supported.
+- **The canvas renderer draws everywhere else:** on Skia and on web. It parses SVGs in Dart with
   vector_graphics_compiler, through a trimmed copy of `SvgPaths`, a class written for flame_svg.
 - **The canvas renderer has known differences,** which come from vector_graphics_compiler:
   - on a shape that isn't square, a diagonal or rotated linear gradient laid out on its bounding box keeps its bands

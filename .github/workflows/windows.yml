@@ -1,0 +1,52 @@
+name: Build the examples for Windows
+
+# Only changes that can break the Windows build: native code, the build hook,
+# the shaders it compiles, dependencies, the runners and this workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rasterizer_gpu/src/**'
+      - 'rasterizer_gpu/hook/**'
+      - 'rasterizer_gpu/shaders/**'
+      - '**/pubspec.yaml'
+      - '*/example/windows/**'
+      - '.github/workflows/windows.yml'
+  pull_request:
+    paths:
+      - 'rasterizer_gpu/src/**'
+      - 'rasterizer_gpu/hook/**'
+      - 'rasterizer_gpu/shaders/**'
+      - '**/pubspec.yaml'
+      - '*/example/windows/**'
+      - '.github/workflows/windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: rasterizer_gpu_example
+            path: rasterizer_gpu/example
+          - name: flame_rasterizer_example
+            path: flame_rasterizer/example
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - name: Build ${{ matrix.name }}
+        working-directory: ${{ matrix.path }}
+        run: flutter build windows --release

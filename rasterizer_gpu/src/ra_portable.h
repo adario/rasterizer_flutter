@@ -1,6 +1,7 @@
 //
 //  What the core & ra_frame.hpp need off Apple platforms: always_inline, alloca, sincos, the processor count, & a parallel
-//  for, which is GCD's dispatch_apply_f on Apple, as in the original core, & std::threads elsewhere
+//  for, which is GCD's dispatch_apply_f on Apple, as in the original core, & std::threads elsewhere. Also bzero, for
+//  MSVC, & raNonZero, for GNU's x ?: 1, which MSVC lacks
 //
 
 #pragma once
@@ -12,13 +13,21 @@
 
 #ifdef _MSC_VER
 #include <malloc.h>
+#include <string.h>
 #define RA_ALWAYS_INLINE __forceinline
 #define RA_ALLOCA _alloca
+static inline void bzero(void *s, size_t n) {
+    memset(s, 0, n);
+}
 #else
 #include <alloca.h>
 #define RA_ALWAYS_INLINE __attribute__((always_inline))
 #define RA_ALLOCA alloca
 #endif
+
+static inline size_t raNonZero(size_t x) {
+    return x ? x : 1;
+}
 
 #ifdef __APPLE__
 #include <dispatch/dispatch.h>

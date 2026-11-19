@@ -94,7 +94,8 @@ RasterizerSupport checkSupport(int textureWidth) {
   if (!Platform.isMacOS &&
       !Platform.isIOS &&
       !Platform.isAndroid &&
-      !Platform.isLinux) {
+      !Platform.isLinux &&
+      !Platform.isWindows) {
     return RasterizerSupport.unsupportedPlatform;
   }
   // The build hook builds no native code for 32-bit Android.

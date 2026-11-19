@@ -407,7 +407,7 @@ struct Rasterizer {
             if (xxhash == 0) {
                 validate();
                 valid = types.end > 1 && *types.base == Geometry::kMove && (bounds.lx != bounds.ux || bounds.ly != bounds.uy);
-                xxhash = XXH64(points.base, points.end * sizeof(float), XXH64(types.base, types.end * sizeof(uint8_t), 0)) ?: 1;
+                xxhash = raNonZero(XXH64(points.base, points.end * sizeof(float), XXH64(types.base, types.end * sizeof(uint8_t), 0)));
             }
             return xxhash;
         }
@@ -2208,7 +2208,7 @@ struct Rasterizer {
                         const Cell& cell = cmd.quad.cell;
                         if (cmd.data.idx == Context::kClipMaskBegin)     // The mask's device bounds, packed as lx, ly, ux, uy, & its identity
                             ctx->entries.add(Buffer::Entry(Buffer::kClipMask, size_t(cell.lx) | size_t(cell.ly) << 16 | size_t(cell.ux) << 32 | size_t(cell.uy) << 48,
-                                                           XXH64(& cmd.quad.base, sizeof(cmd.quad.base), size_t(cmd.g)) ?: 1));
+                                                           raNonZero(XXH64(& cmd.quad.base, sizeof(cmd.quad.base), size_t(cmd.g)))));
                         else if (cmd.data.idx == Context::kClipDisable)
                             ctx->entries.add(Buffer::Entry(Buffer::kDisableClip, 0, 0));
                         else
