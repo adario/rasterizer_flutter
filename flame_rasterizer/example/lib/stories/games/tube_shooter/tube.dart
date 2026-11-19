@@ -52,6 +52,95 @@ class Tube(
     );
   }
 
+  /// Creates a closed gear of [teeth] teeth, with a lane on each tooth's top,
+  /// on each of its flanks and in each gap's root. The flanks slant by [slant]
+  /// off the way to the axis, so that each tooth narrows outward and no lane
+  /// points at the axis. The first tooth's top is centred at angle [first].
+  factory Tube.gear(String name, int teeth, double slant, double first) {
+    final turn = 2 * math.pi / teeth;
+    // A lane's width is a flank's length, from the rim to the root's radius.
+    double widthAt(double root) =>
+        math.sqrt(1 + root * root - 2 * root * math.cos(slant));
+    // The root is where a tooth's top, its flanks and a gap's root, all as
+    // wide, take a tooth's turn.
+    final root = _solve(
+      (radius) {
+        final width = widthAt(radius);
+        return 2 * math.asin(width / 2) +
+            2 * math.asin(width / (2 * radius)) +
+            2 * slant -
+            turn;
+      },
+      0.5,
+      1,
+    );
+    final width = widthAt(root);
+    final top = 2 * math.asin(width / 2);
+    final gap = 2 * math.asin(width / (2 * root));
+    return Tube(
+      name,
+      _closed([
+        for (var k = 0; k < teeth; k++) ...[
+          Offset.fromDirection(first - k * turn + top / 2),
+          Offset.fromDirection(first - k * turn - top / 2),
+          Offset.fromDirection(first - k * turn - top / 2 - slant, root),
+          Offset.fromDirection(first - k * turn - top / 2 - slant - gap, root),
+        ],
+      ], 1),
+    );
+  }
+
+  /// Creates a closed clover, as the outline of the example's `clover.svg`: 4
+  /// round lobes of [lanes] lanes, and a side of a lane between each two, the
+  /// first at the bottom.
+  ///
+  /// The lobes are the SVG's circles. The sides are a little closer to the
+  /// axis than the SVG's, so that they're as long as a lane round a lobe.
+  factory Tube.clover(String name, int lanes) {
+    // In the SVG's units, from its middle: how far across and down the lobes'
+    // middles are, and the lobes' radius.
+    const middle = 161.562;
+    const radius = 132.188;
+    // For sides that far from the axis: how far along a side its ends are
+    // from the lobes' middles, and the angles, from a lobe's middle, at which
+    // its outer arc starts and that it sweeps.
+    ({double along, double start, double sweep}) lobe(double distance) {
+      final along = math.sqrt(
+        radius * radius - (distance - middle) * (distance - middle),
+      );
+      final start = math.atan2(distance - middle, -along);
+      return (
+        along: along,
+        start: start,
+        sweep: start - math.atan2(-along, distance - middle),
+      );
+    }
+
+    final side = _solve(
+      (distance) {
+        final (:along, start: _, :sweep) = lobe(distance);
+        return 2 * radius * math.sin(sweep / (2 * lanes)) -
+            2 * (middle - along);
+      },
+      middle,
+      middle + radius,
+    );
+    final (:along, :start, :sweep) = lobe(side);
+    final quarter = [
+      Offset(along - middle, side),
+      for (var i = 0; i < lanes; i++)
+        const Offset(middle, middle) +
+            Offset.fromDirection(start - sweep * i / lanes, radius),
+    ];
+    return Tube(
+      name,
+      _closed([
+        for (var k = 0; k < 4; k++)
+          for (final point in quarter) rotate(point, -k * math.pi / 2),
+      ], 1),
+    );
+  }
+
   /// Creates an open arc of [lanes] lanes, 1 from the axis, from angle [start]
   /// through [sweep].
   factory Tube.arc(String name, double start, double sweep, int lanes) =>
@@ -210,6 +299,23 @@ class Tube(
     for (var i = 0; i < lanes; i++) Offset.lerp(from, to, i / lanes)!,
   ];
 
+  /// Returns where [f] crosses 0, between [low] and [high], at which its signs
+  /// differ.
+  static double _solve(double Function(double) f, double low, double high) {
+    final rising = f(low) < 0;
+    var below = low;
+    var above = high;
+    for (var i = 0; i < 64; i++) {
+      final middle = (below + above) / 2;
+      if ((f(middle) < 0) == rising) {
+        below = middle;
+      } else {
+        above = middle;
+      }
+    }
+    return (below + above) / 2;
+  }
+
   /// Returns the points of a closed outline through [corners], with [lanes]
   /// lanes an edge, scaled to reach 1 from the axis, across or down.
   static List<Offset> _closed(List<Offset> corners, int lanes) {
@@ -241,6 +347,8 @@ abstract final class Tubes() {
     12,
   );
   static final cog = Tube.star('Cog', 9, 0.8, 1, math.pi / 2);
+  static final gear = Tube.gear('Gear', 6, 8 * math.pi / 180, math.pi / 2);
+  static final clover = Tube.clover('Clover', 5);
   static final ridge = Tube.polyline('Ridge', const [
     Offset(-1, 1),
     Offset(0, 0.6),
@@ -255,7 +363,9 @@ abstract final class Tubes() {
     star,
     horseshoe,
     cog,
+    gear,
     ridge,
+    clover,
   ];
 
   /// The widest lane of any tube, and the most lanes any tube has.

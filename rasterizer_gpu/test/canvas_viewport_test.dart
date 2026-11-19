@@ -40,9 +40,10 @@ class _EntrySpy() implements ui.Canvas {
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
-/// Returns a new frame's run of affine entries, each a translation by [moves].
-CanvasRun _run(List<({double x, double y})> moves) {
-  final run = _renderer.beginFrame(_width, _height).addRun();
+/// Returns a new frame's run of affine entries, each a translation by [moves],
+/// added with [clip].
+CanvasRun _run(List<({double x, double y})> moves, {ui.Rect? clip}) {
+  final run = _renderer.beginFrame(_width, _height).addRun(clip: clip);
   for (final (:x, :y) in moves) {
     run.add(_scene, 1, 0, 0, 1, x, y);
   }
@@ -74,6 +75,31 @@ void main() {
       (x: -1000, y: -1000), // Far off.
     ]).draw(spy);
     expect(spy.entries, 3);
+  });
+
+  test("entries off the run's clip are skipped", () {
+    final spy = _EntrySpy();
+    _run([
+      (x: 30, y: 30), // Inside.
+      (x: -10.5, y: 30), // Right edge at 19.5, within a pixel: drawn.
+      (x: -11, y: 30), // Right edge at 19, a pixel off: skipped.
+      (x: 61, y: 30), // Left edge at 61, a pixel off: skipped.
+      (x: 30, y: 69), // Top edge at 61: skipped.
+      (x: 30, y: _height - 10.0), // In the viewport, off the clip.
+    ], clip: const ui.Rect.fromLTRB(20.4, 20, 59.6, 60)).draw(spy);
+    expect(spy.entries, 2);
+  });
+
+  test('a clip off the viewport, or inverted, skips every entry', () {
+    for (final clip in [
+      const ui.Rect.fromLTRB(-50, 0, -10, 80),
+      const ui.Rect.fromLTRB(60, 20, 20, 60),
+      const ui.Rect.fromLTRB(double.nan, 20, 60, 60),
+    ]) {
+      final spy = _EntrySpy();
+      _run([(x: 10, y: 10), (x: 40, y: 30)], clip: clip).draw(spy);
+      expect(spy.entries, 0, reason: '$clip');
+    }
   });
 
   test('a stroke reaching into the viewport keeps its entry', () {

@@ -10,6 +10,7 @@ import 'atlas.dart' show maxPageSize;
 import 'atlas_pages.dart';
 import 'image_run.dart';
 import 'mesh_gpu.dart';
+import 'viewport_clip.dart';
 
 // The mesh renderer. It imports SVGs and plain paths once into meshes, whose
 // triangles stay in GPU buffers. Each frame, it draws them under their
@@ -304,16 +305,17 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
   }
 
   @override
-  MeshRun addRun() {
+  MeshRun addRun({ui.Rect? clip}) {
     _checkOpen();
     if (_runCount == _runs.length) {
       _runs.add(MeshRun._(this, _runCount));
     }
-    return _runs[_runCount++].._reset();
+    return _runs[_runCount++]
+      .._reset(viewportClip(clip, _width, _height, _margin));
   }
 
-  /// Adds an entry of [scene] to [run], unless it draws nothing in the
-  /// viewport.
+  /// Adds an entry of [scene] to [run], unless it draws nothing in the run's
+  /// clip.
   void _add(
     MeshRun run,
     RasterizerScene scene,
@@ -414,8 +416,12 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       maxX += _strokeReach;
       maxY += _strokeReach;
     }
-    // Off the viewport, or NaN.
-    if (!(maxX > 0 && maxY > 0 && minX < _width && minY < _height)) {
+    // Off the clip, or NaN.
+    final clip = run._clip;
+    if (!(maxX > clip.left &&
+        maxY > clip.top &&
+        minX < clip.right &&
+        minY < clip.bottom)) {
       return;
     }
     if (minX < run._lx) {
@@ -455,17 +461,18 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
   /// Places [run] in the slot's next target.
   ///
   /// The run covers its entries' bounds with the margin, rounded out and
-  /// clipped to the viewport. Its target is the size of its page, which fits
+  /// clipped to its clip. Its target is the size of its page, which fits
   /// that.
   void _place(MeshRun run) {
     run._placed = true;
     if (run._entries.isEmpty) {
       return;
     }
-    final lx = (run._lx.floor() - _margin).clamp(0, _width),
-        ly = (run._ly.floor() - _margin).clamp(0, _height);
-    final ux = (run._ux.ceil() + _margin).clamp(0, _width),
-        uy = (run._uy.ceil() + _margin).clamp(0, _height);
+    final clip = run._clip;
+    final lx = (run._lx.floor() - _margin).clamp(clip.left, clip.right),
+        ly = (run._ly.floor() - _margin).clamp(clip.top, clip.bottom);
+    final ux = (run._ux.ceil() + _margin).clamp(clip.left, clip.right),
+        uy = (run._uy.ceil() + _margin).clamp(clip.top, clip.bottom);
     final w = ux - lx, h = uy - ly;
     if (w <= 0 || h <= 0) {
       return;
@@ -658,13 +665,15 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
 /// A mesh renderer's run, drawn as an image from its target.
 class MeshRun._(final MeshFrame _frame, @override final int index)
     extends ImageRun {
-  // The run's entries and their bounds in the viewport. Once placed, its
-  // target and its place in the viewport.
+  // The run's entries and their bounds in the viewport, and the pixels its
+  // clip leaves it, with the margin. Once placed, its target and its place in
+  // the viewport.
   final List<int> _entries = [];
   double _lx = double.infinity,
       _ly = double.infinity,
       _ux = double.negativeInfinity,
       _uy = double.negativeInfinity;
+  PixelRect _clip = (left: 0, top: 0, right: 0, bottom: 0);
   MeshTarget? _target;
   int _x = 0, _y = 0;
   bool _placed = false;
@@ -675,7 +684,8 @@ class MeshRun._(final MeshFrame _frame, @override final int index)
   @override
   bool get isEmpty => _placed ? parts.isEmpty : _entries.isEmpty;
 
-  void _reset() {
+  void _reset(PixelRect clip) {
+    _clip = clip;
     _entries.clear();
     _lx = _ly = double.infinity;
     _ux = _uy = double.negativeInfinity;

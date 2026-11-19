@@ -20,7 +20,7 @@ const String kSvg = String.fromEnvironment(
 const bool kCurves = bool.fromEnvironment('CURVES', defaultValue: true);
 const bool kSweep = bool.fromEnvironment('SWEEP');
 const int kGrid = int.fromEnvironment('GRID', defaultValue: 1);
-const int kSlots = int.fromEnvironment('SLOTS', defaultValue: 3);
+const int kSlots = int.fromEnvironment('SLOTS', defaultValue: 2);
 
 // Settings for the atlas page: it draws ENTRIES entries in RUNS runs, and logs
 // timings after FRAMES frames.

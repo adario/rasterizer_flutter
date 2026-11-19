@@ -24,6 +24,10 @@ import '../rasterizer_gpu.dart';
 /// where other content comes between scenes, where a clip or layer
 /// separates them, or where their paints differ.
 ///
+/// A run renders only within the bounds of the clip it's drawn under
+/// ([RasterizerFrame.addRun]'s `clip`), unless its paint has an image or
+/// mask filter, or it's warped.
+///
 /// A scene drawn under a transform with perspective is drawn in perspective,
 /// in its run. With the GPU renderer, it's a run of its own instead, whose
 /// image the canvas draws warped by the perspective: see [drawScene].
@@ -31,7 +35,8 @@ import '../rasterizer_gpu.dart';
 /// When a run ends while the canvas's transform can't be inverted, as under a
 /// scale of 0, it draws the run once a restore undoes that transform. If that
 /// restore also undoes a clip over the run, it draws the run without that
-/// clip. That happens when the clip and the transform are in one save. A
+/// clip, though it may leave out what lies outside the clip's bounds. That
+/// happens when the clip and the transform are in one save. A
 /// transform made in a save of its own, before what it draws, never does
 /// this. Flame's components make theirs that way.
 ///
@@ -239,7 +244,7 @@ class RasterizerCanvas() implements ui.Canvas {
     } else if (_run != null && !_drawsAlike(_runPaint, paint)) {
       _endRun();
     }
-    final run = _run ??= _startRun(paint);
+    final run = _run ??= _startRun(paint, warped: warped);
     // The canvas's current transform, then the map from recorder space to the
     // viewport's device pixels. That map is affine, so the w row stays.
     final ma = _pa * m0 + _pc * m1 + _ptx * g,
@@ -380,9 +385,42 @@ class RasterizerCanvas() implements ui.Canvas {
   }
 
   // The run's copy of the paint is opaque, as each entry has its own opacity.
-  RasterizerRun _startRun(ui.Paint? paint) {
+  //
+  // As clips end runs, the run is drawn under the current clip, so it's
+  // clipped to its bounds, unless the paint can spread what lies outside
+  // them in. A warped run renders in other pixels than the viewport's, so it
+  // isn't.
+  RasterizerRun _startRun(ui.Paint? paint, {bool warped = false}) {
     _runPaint = paint == null ? null : _layerPaint(paint);
-    return _frame.addRun();
+    final spreads =
+        paint != null &&
+        (paint.imageFilter != null || paint.maskFilter != null);
+    return _frame.addRun(clip: warped || spreads ? null : _viewportClip());
+  }
+
+  /// Returns the bounds of the canvas's clip in the viewport's device pixels,
+  /// or null if they aren't finite.
+  ui.Rect? _viewportClip() {
+    final r = _canvas.getDestinationClipBounds();
+    if (!(r.left.isFinite &&
+        r.top.isFinite &&
+        r.right.isFinite &&
+        r.bottom.isFinite)) {
+      return null;
+    }
+    // The corners' bounds, through the map from recorder space.
+    final x0 = _pa * r.left + _pc * r.top + _ptx,
+        y0 = _pb * r.left + _pd * r.top + _pty;
+    final dxw = _pa * r.width,
+        dyw = _pb * r.width,
+        dxh = _pc * r.height,
+        dyh = _pd * r.height;
+    return ui.Rect.fromLTRB(
+      x0 + (dxw < 0 ? dxw : 0) + (dxh < 0 ? dxh : 0),
+      y0 + (dyw < 0 ? dyw : 0) + (dyh < 0 ? dyh : 0),
+      x0 + (dxw > 0 ? dxw : 0) + (dxh > 0 ? dxh : 0),
+      y0 + (dyw > 0 ? dyw : 0) + (dyh > 0 ? dyh : 0),
+    );
   }
 
   /// Draws vector content into [canvas] with [paint], as [drawScene] takes it.

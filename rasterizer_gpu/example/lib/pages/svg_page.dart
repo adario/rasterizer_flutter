@@ -40,7 +40,7 @@ class const SvgPage({
   final bool sweep = false,
 
   /// The renderer's frames in flight.
-  final int slots = 3,
+  final int slots = 2,
 
   /// How many times it draws the asset across and down. The copies are
   /// offset by whole multiples of the asset's bounds, rounded up.

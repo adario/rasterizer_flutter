@@ -45,9 +45,11 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
   ///
   /// It's [RasterizerRenderer.create]'s `slots`. Each frame in flight has its
   /// own atlas pages or run targets, and costs their memory. So a frame's
-  /// images stay valid until that many frames later. The game reads it once,
-  /// when it creates the renderer.
-  int get rasterizerSlots => 3;
+  /// images stay valid until that many frames later. 2 are enough, unless
+  /// the app takes an image of the game's frames later, such as with
+  /// `RepaintBoundary.toImage` after the frame: then it needs 3. The game
+  /// reads it once, when it creates the renderer.
+  int get rasterizerSlots => 2;
 
   /// The GPU renderer to draw with where it's supported, else the canvas
   /// renderer draws.

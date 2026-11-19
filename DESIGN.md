@@ -31,7 +31,10 @@ between other draws.
   par: 5–8% faster.
 - **Coverage accumulates in `r32Float`.** In `r16g16b16a16Float`, a thousand additions of 0.001 end 2.3% off, so that
   format is only the fallback on OpenGL ES.
-- **3 frames in flight**, as Flutter GPU has no fences to wait on.
+- **2 frames in flight**, as Flutter GPU has no fences to wait on, and Flutter rasterizes a frame before it builds the
+  one after next. Under GPU load, Flutter's frame timings showed it on macOS, an iPhone, and the emulator's Vulkan and
+  OpenGL ES, while the next frame's build often began before a frame's raster ended. Against 3, it saves 19% of the
+  atlas pages' memory and a third of the mesh renderer's targets, at the same frame rate.
 - **One copy per upload.** Each frame slot has a host-visible `DeviceBuffer`, which `copyBufferToTexture` copies into
   the data texture. For 300 animated tigers, the upload takes a median 1.92 ms, against 5.69 ms through
   `Texture.overwrite`.

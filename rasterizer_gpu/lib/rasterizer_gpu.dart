@@ -625,7 +625,10 @@ ui.Rect _drawnRect(ui.Rect viewBox, ui.Rect bounds) =>
 ///
 /// A GPU renderer keeps [slots] frames in flight, each with its own atlas
 /// textures. So a frame's images stay valid until [slots] frames later, when
-/// it renders into its textures again.
+/// it renders into its textures again. 2 are enough for frames drawn as
+/// they're built, as Flutter rasterizes a frame before it builds the one
+/// after next. An app that takes an image of a frame later, such as with
+/// `RepaintBoundary.toImage` after the frame, needs 3.
 abstract class RasterizerRenderer() {
   /// Creates a renderer for [backend].
   ///
@@ -644,7 +647,7 @@ abstract class RasterizerRenderer() {
   /// the future completes once they've compiled, on the UI thread and then
   /// on the raster thread ([RasterizerGpu.allowOpenGles]).
   static Future<RasterizerRenderer> create({
-    int slots = 3,
+    int slots = 2,
     RasterizerBackend? backend,
     RasterizerBackend gpu = RasterizerBackend.gpu,
     int meshSamples = 4,
@@ -774,7 +777,13 @@ abstract class RasterizerFrame() {
   /// Adds a new run, which is drawn on its own.
   ///
   /// Entries in one run overlap in the order [RasterizerRun.add] added them.
-  RasterizerRun addRun();
+  ///
+  /// [clip], in the viewport's device pixels, is where the run's image can
+  /// show, such as the bounds of the clip it's drawn under. The run then
+  /// skips entries that paint nothing in it, and the GPU and mesh renderers
+  /// render only what's in it, within a pixel or two. So a paint that spreads
+  /// the run's image, such as a blur, loses what lay outside it.
+  RasterizerRun addRun({ui.Rect? clip});
 
   /// Renders all of its runs, which then have their images.
   ///

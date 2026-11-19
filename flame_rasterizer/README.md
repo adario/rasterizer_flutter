@@ -90,7 +90,8 @@ class MyGame extends FlameGame with HasRasterizer {
   (`RasterizerSvg.load(..., gpu:)`): drawing one loaded for the other throws. Other overrides tune the renderer:
   - `rasterizerMeshSamples` is the mesh renderer's samples per pixel. With 4, the default, it antialiases edges with
     MSAA. With 1, it draws them aliased, which costs less GPU time where many SVGs overlap.
-  - `rasterizerSlots` is the number of frames in flight, 3 by default. Each one costs its own atlas pages or targets.
+  - `rasterizerSlots` is the number of frames in flight, 2 by default. Each one costs its own atlas pages or targets.
+    A game whose frames the app takes images of later, such as with `RepaintBoundary.toImage`, needs 3.
   - `rasterizerCurves`, true by default, has the atlas renderer draw curves as quadratics rather than line segments.
 - **`SvgHitbox(svg.outline, size: size)`** is a Flame `PathHitbox` in the shape of the SVG's paths, for collisions that
   follow them rather than the SVG's rectangle. Add it to the `RasterizerSvgComponent`. The hitbox stretches to the

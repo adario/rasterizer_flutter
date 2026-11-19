@@ -104,6 +104,33 @@ void main() {
     expect(entries, everyElement(0));
   });
 
+  test('parts that overlap, and cover more than their bounding box, are one '
+      'part, that box', () {
+    // A is done when C comes, as it ends left of C. C joins B, and their
+    // union overlaps A: 19,000 + 117,000 pixels in a box of 120,000.
+    final (entryParts: entries, :parts) = group([
+      (minX: 0, minY: 0, maxX: 100, maxY: 190), // A
+      (minX: 10, minY: 200, maxX: 400, maxY: 300), // B
+      (minX: 120, minY: 0, maxX: 200, maxY: 250), // C
+    ]);
+    expect(parts, [(minX: 0, minY: 0, maxX: 400, maxY: 300)]);
+    expect(entries, everyElement(0));
+  });
+
+  test('parts that overlap, but cover less than their bounding box, stay '
+      'apart', () {
+    // As above, but A is shorter: 10,000 + 97,500 pixels in 120,000.
+    final (entryParts: entries, :parts) = group([
+      (minX: 0, minY: 0, maxX: 100, maxY: 100), // A
+      (minX: 10, minY: 200, maxX: 400, maxY: 300), // B
+      (minX: 120, minY: 50, maxX: 200, maxY: 250), // C
+    ]);
+    expect(parts, hasLength(2));
+    expect(overlap(parts[0], parts[1]), isTrue);
+    expect(entries[1], entries[2]);
+    expect(entries[0], isNot(entries[1]));
+  });
+
   test('entries in different parts never overlap, whatever their layout', () {
     final random = math.Random(26);
     for (var round = 0; round < 200; round++) {

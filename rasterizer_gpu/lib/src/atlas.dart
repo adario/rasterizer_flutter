@@ -18,6 +18,7 @@ import 'image_run.dart';
 import 'meshes.dart';
 import 'paths/scene_paths.dart';
 import 'format_probe.dart';
+import 'viewport_clip.dart';
 
 // The GPU renderer, and the entry points of both GPU renderers: the core,
 // through FFI, and Flutter GPU. rasterizer_gpu.dart imports this file where
@@ -727,12 +728,13 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   RasterizerBackend get backend => RasterizerBackend.gpu;
 
   @override
-  AtlasRun addRun() {
+  AtlasRun addRun({ui.Rect? clip}) {
     _checkOpen();
     if (_runCount == _runs.length) {
       _runs.add(AtlasRun._(this, _runCount));
     }
-    return _runs[_runCount++].._reset();
+    return _runs[_runCount++]
+      .._reset(viewportClip(clip, _width, _height, _margin));
   }
 
   void _add(
@@ -818,11 +820,23 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
       return;
     }
     const out = 2.0 * _margin;
-    final w = _width + out, h = _height + out;
-    final lx = (minX.clamp(-out, w).floor() - _margin).clamp(0, _width),
-        ly = (minY.clamp(-out, h).floor() - _margin).clamp(0, _height);
-    final ux = (maxX.clamp(-out, w).ceil() + _margin).clamp(0, _width),
-        uy = (maxY.clamp(-out, h).ceil() + _margin).clamp(0, _height);
+    final w = _width + out, h = _height + out, clip = run._clip;
+    final lx = (minX.clamp(-out, w).floor() - _margin).clamp(
+          clip.left,
+          clip.right,
+        ),
+        ly = (minY.clamp(-out, h).floor() - _margin).clamp(
+          clip.top,
+          clip.bottom,
+        );
+    final ux = (maxX.clamp(-out, w).ceil() + _margin).clamp(
+          clip.left,
+          clip.right,
+        ),
+        uy = (maxY.clamp(-out, h).ceil() + _margin).clamp(
+          clip.top,
+          clip.bottom,
+        );
     if (ux <= lx || uy <= ly) {
       return;
     }
@@ -1264,13 +1278,14 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
 /// the frame's atlas pages.
 class AtlasRun._(final AtlasFrame _frame, @override final int index)
     extends ImageRun {
-  // Its entries' bounds in the viewport, its first and last entries with a
-  // rectangle, or -1, and once grouped, the range of its parts among the
-  // frame's.
+  // Its entries' bounds in the viewport, the pixels its clip leaves it, with
+  // the margin, its first and last entries with a rectangle, or -1, and once
+  // grouped, the range of its parts among the frame's.
   double _lx = double.infinity,
       _ly = double.infinity,
       _ux = double.negativeInfinity,
       _uy = double.negativeInfinity;
+  PixelRect _clip = (left: 0, top: 0, right: 0, bottom: 0);
   int _first = -1, _last = -1, _partStart = 0, _partCount = 0;
   bool _grouped = false, _placed = false;
 
@@ -1280,7 +1295,8 @@ class AtlasRun._(final AtlasFrame _frame, @override final int index)
   @override
   bool get isEmpty => _grouped ? _partCount == 0 : !_lx.isFinite;
 
-  void _reset() {
+  void _reset(PixelRect clip) {
+    _clip = clip;
     _lx = _ly = double.infinity;
     _ux = _uy = double.negativeInfinity;
     _first = _last = -1;

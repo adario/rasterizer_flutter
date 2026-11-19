@@ -9,6 +9,7 @@ import '../rasterizer_gpu.dart';
 import 'canvas_paths.dart';
 import 'paths/scene_paths.dart';
 import 'svg_paths/svg_paths.dart';
+import 'viewport_clip.dart';
 
 /// A scene that the canvas renderer draws with dart:ui: an SVG parsed in
 /// Dart, or plain paths.
@@ -170,12 +171,12 @@ class CanvasFrame._(final CanvasRenderer _renderer) implements RasterizerFrame {
   }
 
   @override
-  CanvasRun addRun() {
+  CanvasRun addRun({ui.Rect? clip}) {
     _checkOpen();
     if (_runCount == _runs.length) {
       _runs.add(CanvasRun._(this, _runCount));
     }
-    return _runs[_runCount++].._reset();
+    return _runs[_runCount++].._reset(viewportClip(clip, _width, _height, 0));
   }
 
   @override
@@ -195,7 +196,8 @@ class CanvasFrame._(final CanvasRenderer _renderer) implements RasterizerFrame {
 }
 
 /// A canvas renderer's run: [draw] draws its entries, transformed and clipped
-/// to the viewport, and skips those that paint nothing in it.
+/// to the viewport, and skips those that paint nothing in it or in the run's
+/// clip.
 class CanvasRun._(final CanvasFrame _frame, @override final int index)
     extends RasterizerRun {
   // The entries' scenes, and their transforms, 9 values each:
@@ -207,6 +209,9 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
   int _count = 0;
   bool _placed = false;
 
+  // The pixels its clip leaves it.
+  PixelRect _clip = (left: 0, top: 0, right: 0, bottom: 0);
+
   // A matrix for Canvas.transform, whose 2D projective part each entry
   // rewrites.
   static final _matrix = Float64List(16)..[10] = 1;
@@ -217,7 +222,8 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
   @override
   bool get isEmpty => _count == 0;
 
-  void _reset() {
+  void _reset(PixelRect clip) {
+    _clip = clip;
     _scenes.clear();
     _colorFilters.clear();
     _count = 0;
@@ -341,16 +347,16 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
         ),
       );
     }
-    // Entries that paint nothing in the viewport are skipped, as the clip
-    // would hide them. Without the clip, they're skipped unless the paint can
-    // spread them into the viewport.
+    // Entries that paint nothing in the viewport, or in the run's clip, are
+    // skipped, as the clips would hide them. Without the viewport's clip,
+    // they're skipped unless the paint can spread them into the viewport.
     final skips =
         clipped ||
         paint == null ||
         (paint.imageFilter == null && paint.maskFilter == null);
     final m = _matrix;
     for (var i = 0; i < _count; i++) {
-      if (skips && _missesViewport(i)) {
+      if (skips && _missesClip(i)) {
         continue;
       }
       final k = 9 * i;
@@ -414,13 +420,13 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
   }
 
   /// Returns whether entry [i] paints nothing within a device pixel of the
-  /// viewport, or its bounds are NaN.
-  bool _missesViewport(int i) {
+  /// viewport and the run's clip, or its bounds are NaN.
+  bool _missesClip(int i) {
     final (:left, :top, :right, :bottom) = _paintedInViewport(i);
-    return !(right > -1 &&
-        bottom > -1 &&
-        left < _frame.width + 1 &&
-        top < _frame.height + 1);
+    return !(right > _clip.left - 1 &&
+        bottom > _clip.top - 1 &&
+        left < _clip.right + 1 &&
+        top < _clip.bottom + 1);
   }
 
   /// Returns the bounds of what entry [i] can paint, in the viewport.
