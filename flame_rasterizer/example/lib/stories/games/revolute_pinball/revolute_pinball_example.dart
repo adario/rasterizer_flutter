@@ -45,9 +45,10 @@ abstract class RevolutePinballExample({
 
   static const description = '''
     A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
-    it, and drops 20 bodies over a wheel. The next 20 drop once each is in a
-    bucket, gone through the drain, or at rest. Left or A, Right or D, or a
-    tap in the bottom third's left or right half flips a flipper. Fill both
+    it, and drops 10 bodies over a wheel. Once each is in a bucket, gone
+    through the drain, or at rest, the wheel turns the other way, amber until
+    it's at full speed, and the next 10 drop. Left or A, Right or D, or a tap
+    in the bottom third's left or right half flips a flipper. Fill both
     buckets.
   ''';
 
@@ -58,7 +59,7 @@ abstract class RevolutePinballExample({
     LogicalKeyboardKey.keyD: 1,
   };
 
-  static const _dropped = 20;
+  static const _dropped = 10;
   static const _maxBodies = 100;
 
   /// The room left above a bucket's resting bodies, in meters, under which
@@ -77,11 +78,15 @@ abstract class RevolutePinballExample({
 
   _Table? _table;
   var _flippers = <_Flipper>[];
+  CircleShuffler? _wheel;
   var _buckets = <_Bucket>[];
   final _ready = VectorTextComponent(
     text: 'READY',
     capHeight: VectorTextComponent.maxCapHeight,
   );
+
+  /// Whether the next drop waits for the wheel to turn the other way.
+  var _queued = false;
 
   /// The last bodies dropped, with how long each has been at rest.
   var _current = <BodyComponent, double>{};
@@ -173,7 +178,7 @@ abstract class RevolutePinballExample({
         for (final side in [-1, 1])
           _Flipper(Vector2(-side * pivot.x, pivot.y), flipper, side),
       ],
-      CircleShuffler(
+      _wheel = CircleShuffler(
         Vector2(0, a.top + 0.35 * a.height),
         scale: 0.15 * small / CircleShuffler.reach,
         wireframe: true,
@@ -207,7 +212,7 @@ abstract class RevolutePinballExample({
   }
 
   void spawn() {
-    if (!isLoaded || svgBodies.length + balls.length + _dropped > _maxBodies) {
+    if (!isLoaded) {
       return;
     }
     final spawn = Vector2(0, _arena.top + 0.1 * _arena.height);
@@ -282,8 +287,16 @@ abstract class RevolutePinballExample({
         ..full = top < bucket.inner.top + _fullRoom;
     }
     final done = [for (final body in _current.keys.toList()) _done(body, dt)];
-    if (_started && !done.contains(false)) {
-      spawn();
+    if (_started &&
+        !done.contains(false) &&
+        svgBodies.length + balls.length + _dropped <= _maxBodies) {
+      if (!_queued) {
+        _queued = true;
+        _wheel?.reverse();
+      } else if (!(_wheel?.reversing ?? false)) {
+        _queued = false;
+        spawn();
+      }
     }
   }
 

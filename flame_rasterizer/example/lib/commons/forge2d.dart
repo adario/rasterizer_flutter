@@ -777,6 +777,45 @@ class CircleShuffler(
   /// How far the wheel reaches from its center, in meters.
   static const reach = _radius + _circleRadius;
 
+  /// The motor's speed, in radians a second.
+  static const _speed = math.pi;
+
+  /// How long the motor takes to turn the other way, in seconds.
+  static const _reverseTime = 1.0;
+
+  late final RevoluteJoint _joint;
+
+  /// The speed that the motor heads for.
+  double _targetSpeed = _speed;
+
+  /// The motor's speed, kept here: Box2D's is a float, which never equals
+  /// [_targetSpeed].
+  double _motorSpeed = _speed;
+
+  /// Its color, and the one it takes while [reversing].
+  late final _color = paint.color;
+  static final _reversingColor = ExampleColors.dynamicColor(2);
+
+  /// Slows the wheel down, then turns it the other way.
+  void reverse() => _targetSpeed = -_targetSpeed;
+
+  /// Whether it's turning the other way after [reverse], until it's at full
+  /// speed.
+  bool get reversing => _motorSpeed != _targetSpeed;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    final speed = _motorSpeed;
+    if (speed != _targetSpeed) {
+      final step = 2 * _speed * dt / _reverseTime;
+      _joint.motorSpeed = _motorSpeed = (_targetSpeed - speed).abs() <= step
+          ? _targetSpeed
+          : speed + step * (_targetSpeed - speed).sign;
+    }
+    paint.color = reversing ? _reversingColor : _color;
+  }
+
   @override
   Body createBody() {
     const pieces = 5;
@@ -801,12 +840,12 @@ class CircleShuffler(
     }
     // The joint holds the wheel to an empty static body, as its ground.
     final ground = world.createBody(BodyDef());
-    world.physicsWorld.createRevoluteJoint(
+    _joint = world.physicsWorld.createRevoluteJoint(
       RevoluteJointDef(
         bodyA: body,
         bodyB: ground,
         localAnchorB: body.position.clone(),
-        motorSpeed: math.pi,
+        motorSpeed: _speed,
         maxMotorTorque: 1000000,
         enableMotor: true,
       ),
