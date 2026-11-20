@@ -439,7 +439,7 @@ The integration tests, in `integration_test/`, run on a device, with
 - `forge2d_test.dart`: Revolute Joint Svgs with each renderer. A tap and two drops give 45 bodies, which stay inside the
   walls, and flame_rasterizer draws the SVG bodies in one run, with Pieces on.
 - `svg_shooter_test.dart`: Svg Shooter with each renderer, firing for about two seconds. flame_rasterizer draws the SVGs
-  in at most two runs, and the game scores.
+  in one run, and the game scores.
 - `tube_shooter_test.dart`: after a warm-up, Tube Shooter with the mesh renderer on three tubes: the octagon, closed,
   the horseshoe, open, and the star, concave. Each runs with its glow on and off, six games in all, through its zoom,
   two seconds of fire sweeping round the rim, without zappers, and its drop, with their stars. flame_rasterizer draws
