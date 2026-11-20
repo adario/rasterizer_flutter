@@ -45,7 +45,7 @@ abstract class RevolutePinballExample({
 
   static const description = '''
     A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
-    it, and drops 10 bodies over a wheel. The next 10 drop once each is in a
+    it, and drops 20 bodies over a wheel. The next 20 drop once each is in a
     bucket, gone through the drain, or at rest. Left or A, Right or D, or a
     tap in the bottom third's left or right half flips a flipper. Fill both
     buckets.
@@ -58,9 +58,12 @@ abstract class RevolutePinballExample({
     LogicalKeyboardKey.keyD: 1,
   };
 
-  static const _dropped = 10;
+  static const _dropped = 20;
   static const _maxBodies = 100;
-  static const _capacity = 10;
+
+  /// The room left above a bucket's resting bodies, in meters, under which
+  /// it's full.
+  static const _fullRoom = SvgBodies.maxSide / 2;
 
   /// How long a body below [_restSpeed] stays so to be at rest, in seconds.
   static const _restTime = 0.5;
@@ -83,9 +86,8 @@ abstract class RevolutePinballExample({
   /// The last bodies dropped, with how long each has been at rest.
   var _current = <BodyComponent, double>{};
 
-  String get _bucketCounts => _buckets
-      .map((b) => '${b.count}/$_capacity${b.full ? ' full' : ''}')
-      .join(' · ');
+  String get _bucketCounts =>
+      _buckets.map((b) => '${b.count}${b.full ? ' full' : ''}').join(' · ');
 
   @override
   Iterable<String> get exampleStats => [
@@ -240,11 +242,20 @@ abstract class RevolutePinballExample({
       removeBodies(gone);
     }
     for (final bucket in _buckets) {
-      bucket.count = [...svgBodies, ...balls]
-          .where(
-            (b) => b.isLoaded && bucket.holds(b.body.position.toOffset()),
-          )
-          .length;
+      var count = 0;
+      var top = double.infinity;
+      for (final b in [...svgBodies, ...balls]) {
+        if (!b.isLoaded || !bucket.holds(b.body.position.toOffset())) {
+          continue;
+        }
+        count++;
+        if (b.body.linearVelocity.length < _restSpeed) {
+          top = math.min(top, b.body.position.y - _halfSize(b));
+        }
+      }
+      bucket
+        ..count = count
+        ..full = top < bucket.inner.top + _fullRoom;
     }
     final done = [for (final body in _current.keys.toList()) _done(body, dt)];
     if (_started && !done.contains(false)) {
@@ -275,6 +286,13 @@ abstract class RevolutePinballExample({
     }
     return KeyEventResult.handled;
   }
+
+  /// About half of [body]'s height.
+  static double _halfSize(BodyComponent body) => switch (body) {
+    Ball() => body.radius,
+    SvgBody() => math.max(body.size.x, body.size.y) / 2,
+    _ => 0,
+  };
 
   void _hold(int flipper, Object holder) =>
       _flippers.elementAtOrNull(flipper)?.hold(holder);
@@ -338,14 +356,6 @@ class _Table(final List<Component> _parts)
   }
 
   @override
-  void onRemove() {
-    super.onRemove();
-    (gameRef.world as BodiesHud).countBodies(
-      -children.whereType<BodyComponent>().length,
-    );
-  }
-
-  @override
   void update(double dt) {
     if (next?._ready ?? false) {
       removeFromParent();
@@ -374,8 +384,8 @@ class _Guide(final List<Vector2> _vertices)
 }
 
 /// An open-top bucket around [inner], a U path that collides as its convex
-/// pieces, which glows once it holds [RevolutePinballExample._capacity]
-/// bodies. As a body comes in, its count fades in above it for a while.
+/// pieces, which glows once it's [full]. As a body comes in, its count fades
+/// in above it for a while.
 class _Bucket(final Rect inner) extends BodyComponent {
   static const _countCap = 2.4;
 
@@ -430,7 +440,9 @@ class _Bucket(final Rect inner) extends BodyComponent {
 
   VectorTextComponent? _countText;
 
-  bool get full => count >= RevolutePinballExample._capacity;
+  /// Whether its resting bodies leave less than
+  /// [RevolutePinballExample._fullRoom] above them.
+  bool full = false;
 
   @override
   void update(double dt) {
@@ -450,7 +462,7 @@ class _Bucket(final Rect inner) extends BodyComponent {
     add(
       _countText =
           VectorTextComponent(
-              text: '$count/${RevolutePinballExample._capacity}',
+              text: '$count',
               capHeight: _countCap,
             )
             ..position = Vector2(
