@@ -47,6 +47,12 @@ mixin BodiesHud on Forge2DWorld {
     }
   }
 
+  /// Counts [delta] more bodies, for those that aren't the world's children.
+  void countBodies(int delta) {
+    _bodyCount += delta;
+    _updateBodyCount();
+  }
+
   void _updateBodyCount() {
     _bodyCountText.text = 'Bodies: $_bodyCount';
   }

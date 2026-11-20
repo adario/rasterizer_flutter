@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
@@ -34,7 +35,7 @@ mixin PathComponents<W extends World> on FlameGame<W> {
 /// bottom left if [left], [line] lines above the last one; without, at its
 /// middle, or [below] it, in logical pixels. It keeps its place when the
 /// parent is resized. Its priority puts it under the FPS counter, so that it
-/// draws in the same run as the world.
+/// draws in the same run as the world. Its [opacity] fades all its glyphs.
 class VectorTextComponent({
   required final double capHeight,
   String text = '',
@@ -42,7 +43,9 @@ class VectorTextComponent({
   final bool left = false,
   final double below = 0,
   final Color color = const Color(0xFFFFFFFF),
-}) extends PositionComponent with HasGameRef<PathComponents> {
+}) extends PositionComponent
+    with HasGameRef<PathComponents>
+    implements OpacityProvider {
   this
     : super(
         anchor: line == null
@@ -65,6 +68,18 @@ class VectorTextComponent({
   /// straight lines, which flatten the same at any size, so the large size
   /// loses nothing.
   static const glyphMaxSize = 3 * maxCapHeight;
+
+  @override
+  double get opacity => _opacity;
+  double _opacity = 1;
+
+  @override
+  set opacity(double value) {
+    _opacity = value;
+    for (final glyph in _glyphs) {
+      glyph?.opacity = value;
+    }
+  }
 
   String get text => _text;
   String _text = text;
@@ -101,7 +116,7 @@ class VectorTextComponent({
 
   /// Its glyphs' components, by their characters' indices in [_laidOut]:
   /// null for a space.
-  final _glyphs = <Component?>[];
+  final _glyphs = <PathComponent?>[];
 
   /// Replaces the components of the glyphs that changed with new ones for
   /// [text]. A character that stays in its place keeps its component.
@@ -130,9 +145,9 @@ class VectorTextComponent({
   }
 
   /// Returns a component of [glyph] at index [i].
-  Component _glyphComponent(int i, Path glyph) {
+  PathComponent _glyphComponent(int i, Path glyph) {
     final bounds = glyph.getBounds();
-    return gameRef.pathComponent(
+    final component = gameRef.pathComponent(
       glyph,
       Paint()
         ..style = PaintingStyle.stroke
@@ -142,5 +157,9 @@ class VectorTextComponent({
       position: Vector2(i * VectorFont.advance + bounds.left, bounds.top),
       maxSize: glyphMaxSize,
     );
+    if (_opacity != 1) {
+      component.opacity = _opacity;
+    }
+    return component;
   }
 }

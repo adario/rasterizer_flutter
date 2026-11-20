@@ -33,6 +33,7 @@ dev_dependencies:
   integration_test:
     sdk: flutter
 
+  material_ui: any
 flutter:
   uses-material-design: true
   assets:

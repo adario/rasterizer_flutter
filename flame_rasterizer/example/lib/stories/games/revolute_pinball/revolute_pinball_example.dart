@@ -2,12 +2,12 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'package:flame/geometry.dart' show convexPieces;
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
-import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
@@ -83,11 +83,6 @@ abstract class RevolutePinballExample({
   /// The last bodies dropped, with how long each has been at rest.
   var _current = <BodyComponent, double>{};
 
-  final _bucketText = TextComponent(
-    anchor: Anchor.topCenter,
-    textRenderer: StoryGame.hudTextRenderer,
-  );
-
   String get _bucketCounts => _buckets
       .map((b) => '${b.count}/$_capacity${b.full ? ' full' : ''}')
       .join(' · ');
@@ -111,7 +106,7 @@ abstract class RevolutePinballExample({
       return;
     }
     world.add(PiecesLayer());
-    camera.viewport.addAll([_bucketText, _ready]);
+    camera.viewport.add(_ready);
     _buildTable();
     startStatus();
   }
@@ -119,7 +114,6 @@ abstract class RevolutePinballExample({
   @override
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
-    _bucketText.position.setValues(size.x / 2, StoryGame.hudMargin);
     if (isLoaded) {
       _buildTable();
     }
@@ -253,7 +247,6 @@ abstract class RevolutePinballExample({
           )
           .length;
     }
-    _bucketText.text = 'Buckets: $_bucketCounts';
     final done = [for (final body in _current.keys.toList()) _done(body, dt)];
     if (_started && !done.contains(false)) {
       spawn();
@@ -325,12 +318,33 @@ class RevolutePinballWorld()
 
 /// The table's parts for one arena size. It stops drawing once [next] has
 /// mounted all of its parts, and then goes, so that resizing doesn't flicker.
-class _Table(final List<Component> _parts) extends Component {
+class _Table(final List<Component> _parts)
+    extends Component
+    with HasGameRef<RevolutePinballExample> {
   this : super(children: _parts);
 
   _Table? next;
 
   bool get _ready => isMounted && children.length == _parts.length;
+
+  /// Counts its bodies in the world's body count.
+  @override
+  void onChildrenChanged(Component child, ChildrenChangeType type) {
+    super.onChildrenChanged(child, type);
+    if (child is BodyComponent) {
+      (gameRef.world as BodiesHud).countBodies(
+        type == ChildrenChangeType.added ? 1 : -1,
+      );
+    }
+  }
+
+  @override
+  void onRemove() {
+    super.onRemove();
+    (gameRef.world as BodiesHud).countBodies(
+      -children.whereType<BodyComponent>().length,
+    );
+  }
 
   @override
   void update(double dt) {
@@ -362,11 +376,9 @@ class _Guide(final List<Vector2> _vertices)
 
 /// An open-top bucket around [inner], a U path that collides as its convex
 /// pieces, which glows once it holds [RevolutePinballExample._capacity]
-/// bodies.
+/// bodies. As a body comes in, its count fades in above it for a while.
 class _Bucket(final Rect inner) extends BodyComponent {
-  this {
-    add(_label);
-  }
+  static const _countCap = 2.4;
 
   static const _thickness = 0.6;
 
@@ -392,12 +404,10 @@ class _Bucket(final Rect inner) extends BodyComponent {
 
   int count = 0;
 
-  late final _label = TextComponent(
-    anchor: Anchor.bottomCenter,
-    position: Vector2(inner.center.dx, inner.top - 0.5),
-    scale: Vector2.all(0.15),
-    textRenderer: StoryGame.hudTextRenderer,
-  );
+  /// The count last frame, null before the first.
+  int? _lastCount;
+
+  VectorTextComponent? _countText;
 
   bool get full => count >= RevolutePinballExample._capacity;
 
@@ -407,7 +417,36 @@ class _Bucket(final Rect inner) extends BodyComponent {
     if (_paints.color != color) {
       _paints = GlowPaints(color, _paints.outlineWidth);
     }
-    _label.text = '$count/${RevolutePinballExample._capacity}';
+    final last = _lastCount;
+    if (last != null && count > last) {
+      _showCount();
+    }
+    _lastCount = count;
+  }
+
+  void _showCount() {
+    _countText?.removeFromParent();
+    add(
+      _countText =
+          VectorTextComponent(
+              text: '$count/${RevolutePinballExample._capacity}',
+              capHeight: _countCap,
+            )
+            ..position = Vector2(
+              inner.center.dx,
+              inner.top - 0.5 - _countCap / 2,
+            )
+            ..opacity = 0
+            ..add(
+              SequenceEffect([
+                OpacityEffect.fadeIn(EffectController(duration: 0.3)),
+                OpacityEffect.fadeOut(
+                  EffectController(duration: 0.5, startDelay: 2),
+                ),
+                RemoveEffect(),
+              ]),
+            ),
+    );
   }
 
   @override
