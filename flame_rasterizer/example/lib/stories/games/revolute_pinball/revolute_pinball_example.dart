@@ -3,12 +3,14 @@ import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
+import 'package:flame/geometry.dart' show convexPieces;
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult;
@@ -16,7 +18,12 @@ import 'package:flutter/widgets.dart' show KeyEventResult;
 abstract class RevolutePinballExample({
   @override required var bool pieces,
   required super.status,
-}) extends Forge2DExampleGame with ExampleSvgs, SvgBodies, KeyboardEvents {
+}) extends Forge2DExampleGame
+    with
+        ExampleSvgs,
+        SvgBodies,
+        KeyboardEvents,
+        PathComponents<Forge2DExampleWorld> {
   this : super(world: RevolutePinballWorld());
 
   factory RevolutePinballExample.of(
@@ -37,10 +44,11 @@ abstract class RevolutePinballExample({
         );
 
   static const description = '''
-    A pinball with the bodies of Revolute Joint Svgs. Space, or a double tap
-    above the bottom third, drops 10 bodies over a wheel. Left or A, Right or
-    D, or a tap in the bottom third's left or right half flips a flipper.
-    Bodies that fall through the drain are gone. Fill both buckets.
+    A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
+    it, and drops 10 bodies over a wheel. The next 10 drop once each is in a
+    bucket, gone through the drain, or at rest. Left or A, Right or D, or a
+    tap in the bottom third's left or right half flips a flipper. Fill both
+    buckets.
   ''';
 
   static final _flipperKeys = {
@@ -54,6 +62,10 @@ abstract class RevolutePinballExample({
   static const _maxBodies = 100;
   static const _capacity = 10;
 
+  /// How long a body below [_restSpeed] stays so to be at rest, in seconds.
+  static const _restTime = 0.5;
+  static const _restSpeed = 0.5;
+
   /// The flippers' angle at rest, and the guides' slope.
   static const _restAngle = math.pi / 6;
 
@@ -63,6 +75,14 @@ abstract class RevolutePinballExample({
   _Table? _table;
   var _flippers = <_Flipper>[];
   var _buckets = <_Bucket>[];
+  final _ready = VectorTextComponent(
+    text: 'READY',
+    capHeight: VectorTextComponent.maxCapHeight,
+  );
+
+  /// The last bodies dropped, with how long each has been at rest.
+  var _current = <BodyComponent, double>{};
+
   final _bucketText = TextComponent(
     anchor: Anchor.topCenter,
     textRenderer: StoryGame.hudTextRenderer,
@@ -91,7 +111,7 @@ abstract class RevolutePinballExample({
       return;
     }
     world.add(PiecesLayer());
-    camera.viewport.add(_bucketText);
+    camera.viewport.addAll([_bucketText, _ready]);
     _buildTable();
     startStatus();
   }
@@ -156,6 +176,16 @@ abstract class RevolutePinballExample({
     world.add(_table = table);
   }
 
+  var _started = false;
+
+  void _start() {
+    if (!_started && isLoaded) {
+      _started = true;
+      _ready.removeFromParent();
+      spawn();
+    }
+  }
+
   void spawn() {
     if (!isLoaded || svgBodies.length + balls.length + _dropped > _maxBodies) {
       return;
@@ -173,10 +203,36 @@ abstract class RevolutePinballExample({
       world: world.physicsWorld,
       random: random,
     );
+    _current = {};
     for (final (i, body) in bodies.indexed) {
       final position = positions[i];
-      addBody(body.create(position, awayFrom(spawn, position, 2, random)));
+      final component = body.create(
+        position,
+        awayFrom(spawn, position, 2, random),
+      );
+      addBody(component);
+      _current[component] = 0;
     }
+  }
+
+  /// Whether [body] is gone through the drain, is in a bucket, or has been at
+  /// rest for [_restTime], after [dt] more seconds.
+  bool _done(BodyComponent body, double dt) {
+    if (body.isRemoving || body.isRemoved) {
+      return true;
+    }
+    if (!body.isLoaded) {
+      return false;
+    }
+    final position = body.body.position.toOffset();
+    if (_buckets.any((bucket) => bucket.inner.contains(position))) {
+      return true;
+    }
+    final resting =
+        body.body.linearVelocity.length < _restSpeed &&
+        body.body.angularVelocity.abs() < _restSpeed;
+    final time = _current[body] = resting ? _current[body]! + dt : 0;
+    return time >= _restTime;
   }
 
   @override
@@ -198,6 +254,10 @@ abstract class RevolutePinballExample({
           .length;
     }
     _bucketText.text = 'Buckets: $_bucketCounts';
+    final done = [for (final body in _current.keys.toList()) _done(body, dt)];
+    if (_started && !done.contains(false)) {
+      spawn();
+    }
   }
 
   @override
@@ -205,11 +265,13 @@ abstract class RevolutePinballExample({
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
-    final key = event.logicalKey;
-    if (event is KeyDownEvent && key == LogicalKeyboardKey.space) {
-      spawn();
+    if (!_started) {
+      if (event is KeyDownEvent) {
+        _start();
+      }
       return KeyEventResult.handled;
     }
+    final key = event.logicalKey;
     final flipper = _flipperKeys[key];
     if (flipper == null) {
       return KeyEventResult.ignored;
@@ -235,24 +297,16 @@ abstract class RevolutePinballExample({
 class RevolutePinballWorld()
     extends Forge2DExampleWorld
     with TapCallbacks, HasGameRef<RevolutePinballExample>, BodiesHud {
-  DateTime? _lastTap;
-
   @override
   void onTapDown(TapDownEvent event) {
     super.onTapDown(event);
-    final position = event.canvasPosition;
-    if (position.y > gameRef.size.y * 2 / 3) {
-      _lastTap = null;
-      gameRef._hold(position.x < gameRef.size.x / 2 ? 0 : 1, event.pointerId);
+    if (!gameRef._started) {
+      gameRef._start();
       return;
     }
-    final now = DateTime.now();
-    final last = _lastTap;
-    if (last != null && now.difference(last).inMilliseconds < 300) {
-      _lastTap = null;
-      gameRef.spawn();
-    } else {
-      _lastTap = now;
+    final position = event.canvasPosition;
+    if (position.y > gameRef.size.y * 2 / 3) {
+      gameRef._hold(position.x < gameRef.size.x / 2 ? 0 : 1, event.pointerId);
     }
   }
 
@@ -306,14 +360,35 @@ class _Guide(final List<Vector2> _vertices)
     );
 }
 
-/// An open-top bucket around [inner], which glows once it holds
-/// [RevolutePinballExample._capacity] bodies.
-class _Bucket(final Rect inner) extends BodyComponent with GlowingBody {
-  this : super(paint: Paint()..color = ExampleColors.slate) {
+/// An open-top bucket around [inner], a U path that collides as its convex
+/// pieces, which glows once it holds [RevolutePinballExample._capacity]
+/// bodies.
+class _Bucket(final Rect inner) extends BodyComponent {
+  this {
     add(_label);
   }
 
   static const _thickness = 0.6;
+
+  late final _outline = () {
+    final (l, t, r, b) = (inner.left, inner.top, inner.right, inner.bottom);
+    const w = _thickness;
+    return [
+      Vector2(l - w, t),
+      Vector2(l, t),
+      Vector2(l, b),
+      Vector2(r, b),
+      Vector2(r, t),
+      Vector2(r + w, t),
+      Vector2(r + w, b + w),
+      Vector2(l - w, b + w),
+    ];
+  }();
+
+  late final _path = Path()
+    ..addPolygon([for (final v in _outline) v.toOffset()], true);
+
+  var _paints = GlowPaints(ExampleColors.slate, 0.12);
 
   int count = 0;
 
@@ -328,26 +403,26 @@ class _Bucket(final Rect inner) extends BodyComponent with GlowingBody {
 
   @override
   void update(double dt) {
-    paint.color = full ? ExampleColors.dynamicColor(4) : ExampleColors.slate;
+    final color = full ? ExampleColors.dynamicColor(4) : ExampleColors.slate;
+    if (_paints.color != color) {
+      _paints = GlowPaints(color, _paints.outlineWidth);
+    }
     _label.text = '$count/${RevolutePinballExample._capacity}';
+  }
+
+  @override
+  void render(Canvas canvas) {
+    canvas
+      ..drawPath(_path, _paints.fill)
+      ..drawPath(_path, _paints.outline);
   }
 
   @override
   Body createBody() {
     final body = world.createBody(BodyDef());
-    const t = _thickness;
-    for (final part in [
-      Rect.fromLTRB(inner.left - t, inner.top, inner.left, inner.bottom + t),
-      Rect.fromLTRB(inner.right, inner.top, inner.right + t, inner.bottom + t),
-      Rect.fromLTRB(inner.left, inner.bottom, inner.right, inner.bottom + t),
-    ]) {
+    for (final piece in convexPieces(_outline)) {
       body.createShape(
-        Polygon([
-          Vector2(part.left, part.top),
-          Vector2(part.right, part.top),
-          Vector2(part.right, part.bottom),
-          Vector2(part.left, part.bottom),
-        ]),
+        Polygon(piece),
         ShapeDef(material: SurfaceMaterial(friction: 0.5)),
       );
     }
@@ -443,6 +518,25 @@ class RasterizerRevolutePinballExample({
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
   }
+
+  @override
+  PathComponent pathComponent(
+    Path path,
+    Paint paint, {
+    Vector2? position,
+    Anchor? anchor,
+    double? maxSize,
+    int? priority,
+    RasterizerGlow? glow,
+  }) => RasterizerPathComponent(
+    path: path,
+    paint: paint,
+    position: position,
+    anchor: anchor,
+    maxSize: maxSize,
+    priority: priority,
+    glow: glow,
+  );
 }
 
 class FlameSvgRevolutePinballExample({
@@ -455,4 +549,21 @@ class FlameSvgRevolutePinballExample({
 
   @override
   SvgCacheSize get cacheSize => cache.size;
+
+  @override
+  PathComponent pathComponent(
+    Path path,
+    Paint paint, {
+    Vector2? position,
+    Anchor? anchor,
+    double? maxSize,
+    int? priority,
+    RasterizerGlow? glow,
+  }) => PathComponent(
+    path: path,
+    paint: paint,
+    position: position,
+    anchor: anchor,
+    priority: priority,
+  );
 }
