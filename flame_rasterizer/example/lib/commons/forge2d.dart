@@ -802,26 +802,25 @@ class PiecesLayer() extends Component with HasGameRef<SvgBodies> {
 }
 
 /// flame_path_shapes' wheel: five circles around [_position] that a motor
-/// turns, [scale] times as large, drawn as outlines if `wireframe`. It goes
-/// on from [from], if any.
+/// turns, [scale] times as large. It's filled, or drawn as the other glowing
+/// bodies in [color], if given. It goes on from [from], if any.
 ///
 /// It passes through the walls, which a short game brings into its way.
 class CircleShuffler(
   final Vector2 _position, {
   final BodySnapshot? from,
   final double scale = 1,
-  final bool wireframe = false,
+  final Color? color,
 }) extends BodyComponent with GlowingBody {
+  this : super(paint: color == null ? null : (Paint()..color = color));
+
   @override
   Path get glowPath => GlowingBody.pathOf(body.shapes, spokes: false);
 
   @override
-  List<Paint> get glowLayers => [
-    Paint()
-      ..color = const Color(0xFFFFFFFF)
-      ..style = wireframe ? PaintingStyle.stroke : PaintingStyle.fill
-      ..strokeWidth = outlineWidth,
-  ];
+  List<Paint> get glowLayers => color == null
+      ? [Paint()..color = const Color(0xFFFFFFFF)]
+      : super.glowLayers;
 
   /// The distance of the circles' centers from the wheel's, in meters.
   static const _radius = 6.0;

@@ -246,7 +246,7 @@ abstract class RevolutePinballExample({
       _wheel = CircleShuffler(
         Vector2(0, a.top + 0.35 * a.height),
         scale: 0.15 * small / CircleShuffler.reach,
-        wireframe: true,
+        color: ExampleColors.dynamicColor(0),
       ),
       ..._buckets = [
         for (final side in [-1, 1])
