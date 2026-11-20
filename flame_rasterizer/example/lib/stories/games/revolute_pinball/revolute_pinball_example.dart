@@ -530,7 +530,7 @@ class _Guide(@override final List<Vector2> outline)
   @override
   Body createBody() {
     final body = world.createBody(BodyDef());
-    addPieces(body, ShapeDef(material: SurfaceMaterial(friction: 0.5)));
+    addPieces(body, ShapeDef(material: SurfaceMaterial(friction: 0.3)));
     return body;
   }
 }
@@ -759,7 +759,8 @@ class _Flipper(final Vector2 _pivot, final double _length, final int _side)
     addPieces(
       body,
       ShapeDef(
-        material: SurfaceMaterial(friction: 0.5),
+        // Below the balls' restitution, so that only SVG bodies bounce more.
+        material: SurfaceMaterial(friction: 0.1, restitution: 0.6),
         density: _density,
         enableContactEvents: true,
       ),
