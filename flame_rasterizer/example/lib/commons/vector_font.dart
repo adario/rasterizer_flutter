@@ -1,7 +1,7 @@
 import 'dart:ui';
 
 /// A font of straight lines: capitals, digits, a space, a colon,
-/// a period, a dash and a slash.
+/// a period, a dash, a slash and a percent sign.
 ///
 /// Each glyph is polylines through the points of a grid [width] wide and
 /// [capHeight] tall, half points included, with y down and the baseline at
@@ -97,6 +97,11 @@ abstract final class VectorFont() {
     '.': ['2,5.75 2,6'],
     '-': ['1,3 3,3'],
     '/': ['3.5,0 0.5,6'],
+    '%': [
+      '0.75,0 1.5,0 1.5,1.5 0,1.5 0,0 0.75,0',
+      '3.5,0 0.5,6',
+      '3.25,4.5 4,4.5 4,6 2.5,6 2.5,4.5 3.25,4.5',
+    ],
   };
 
   static Path _path(List<String> polylines) {
