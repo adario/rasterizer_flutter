@@ -8,6 +8,7 @@ import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
+import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flutter/foundation.dart';
 
 /// A Forge2D example's world, which runs at its game's
@@ -453,4 +454,379 @@ double _distanceToSegment(Vector2 point, Vector2 a, Vector2 b) {
   }
   final t = ((point - a).dot(ab) / lengthSquared).clamp(0.0, 1.0);
   return point.distanceTo(a + ab * t);
+}
+
+/// A body to drop: its bounding radius, and a function that creates it.
+typedef NewBody = ({
+  double radius,
+  BodyComponent Function(Vector2 position, Vector2 velocity) create,
+});
+
+/// An SVG's size, and its convex pieces at that size.
+typedef _SizedPieces = ({Vector2 size, List<List<Vector2>> pieces});
+
+/// A Forge2D example that drops balls, and SVG bodies from 3 to 3.5 meters at
+/// their larger side. [PiecesLayer] draws the SVGs' convex pieces over them
+/// while [pieces] is true.
+mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
+  /// The balls' smallest radius, in meters. Box2D works best with bodies
+  /// from 0.1 to 10 meters.
+  static const _minBallRadius = 0.4;
+
+  /// The balls' largest radius, in meters.
+  static const _maxBallRadius = 1.0;
+
+  /// The larger side of the smallest SVGs, in meters.
+  ///
+  /// The SVGs come in [_sides] sizes, from 3 to 3.5 meters by tenths, as in
+  /// flame_path_shapes. So [_sizeAndPieces] works out each SVG's pieces once
+  /// per size.
+  static const _minSide = 3.0;
+
+  /// How many sizes the SVGs come in.
+  static const _sides = 6;
+
+  /// The larger side of the largest SVGs, in meters.
+  static const maxSide = _minSide + (_sides - 1) / 10;
+
+  math.Random get random;
+
+  /// Whether [PiecesLayer] draws the SVG bodies' convex pieces.
+  bool get pieces;
+
+  /// The SVG bodies dropped so far.
+  final svgBodies = <SvgBody>[];
+
+  /// The balls dropped so far.
+  final balls = <Ball>[];
+
+  /// The SVGs of [randomSvgNames], loaded up front so that dropping can be
+  /// synchronous.
+  final _svgs = <String, ExampleSvg>{};
+
+  /// Each SVG's size and convex pieces, by its name and its size's index.
+  final _pieces = <({String name, int side}), _SizedPieces>{};
+
+  /// The index of the next body's color: the bodies take the colors in turn.
+  int tint = 0;
+
+  @override
+  Iterable<String> get exampleStats {
+    final ballCount = '${balls.length} ball${balls.length == 1 ? '' : 's'}';
+    final svgCount =
+        '${svgBodies.length} SVG${svgBodies.length == 1 ? '' : 's'}';
+    return ['$ballCount, $svgCount'];
+  }
+
+  /// Loads the SVGs of [randomSvgNames]. Returns false if the game was removed
+  /// while they loaded, and its physics world is destroyed.
+  Future<bool> loadBodySvgs() async {
+    for (final name in randomSvgNames) {
+      _svgs[name] = await loadSvg('assets/svgs/$name.svg');
+      if (isRemoved) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Adds [body] to the world, and to [svgBodies] or [balls].
+  void addBody(BodyComponent body) {
+    switch (body) {
+      case SvgBody():
+        svgBodies.add(body);
+      case Ball():
+        balls.add(body);
+    }
+    world.add(body);
+  }
+
+  /// Removes [bodies] from the world, and from [svgBodies] and [balls].
+  void removeBodies(List<BodyComponent> bodies) {
+    svgBodies.removeWhere(bodies.contains);
+    balls.removeWhere(bodies.contains);
+    world.removeAll(bodies);
+  }
+
+  /// Picks a ball of random radius, in the next color. Returns its radius,
+  /// and a function that creates it with a position and a velocity.
+  NewBody randomBall() {
+    final radius =
+        _minBallRadius +
+        random.nextDouble() * (_maxBallRadius - _minBallRadius);
+    final color = ExampleColors.dynamicColor(tint++);
+    return (
+      radius: radius,
+      create: (position, velocity) =>
+          Ball(position, velocity, radius: radius, color: color),
+    );
+  }
+
+  /// Picks a random SVG, at a random size and angle, spinning at up to [spin]
+  /// radians a second, in the next color. Returns its bounding radius, and a
+  /// function that creates its body with a position and a velocity.
+  NewBody randomSvg({double spin = 0}) {
+    final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
+    final side = random.nextInt(_sides);
+    final (:size, pieces: _) = _sizeAndPieces(name, side);
+    final color = ExampleColors.dynamicColor(tint++);
+    final angle = random.nextDouble() * 2 * math.pi;
+    final angularVelocity = (2 * random.nextDouble() - 1) * spin;
+    return (
+      radius: size.length / 2,
+      create: (position, velocity) => createSvgBody(
+        name,
+        side,
+        position,
+        velocity,
+        angle: angle,
+        angularVelocity: angularVelocity,
+        color: color,
+      ),
+    );
+  }
+
+  /// Creates the body of the SVG [name] at its [side]th size, in [color],
+  /// which starts at [position] and [angle], moving at [velocity] and
+  /// [angularVelocity], or goes on from [from], if any.
+  SvgBody createSvgBody(
+    String name,
+    int side,
+    Vector2 position,
+    Vector2 velocity, {
+    required double angle,
+    required Color color,
+    double angularVelocity = 0,
+    BodySnapshot? from,
+  }) {
+    final (:size, :pieces) = _sizeAndPieces(name, side);
+    return SvgBody(
+      _svgs[name]!,
+      size,
+      pieces,
+      position,
+      velocity,
+      angle: angle,
+      color: color,
+      name: name,
+      side: side,
+      angularVelocity: angularVelocity,
+      from: from,
+    );
+  }
+
+  /// Returns the size and convex pieces of the SVG [name] at its [side]th size,
+  /// worked out once.
+  _SizedPieces _sizeAndPieces(
+    String name,
+    int side,
+  ) => _pieces[(name: name, side: side)] ??= () {
+    final svg = _svgs[name]!;
+    final s = (_minSide + side / 10) / math.max(svg.size.x, svg.size.y);
+    final size = svg.size * s;
+    return (size: size, pieces: convexPiecesOf(svg.outline, size));
+  }();
+}
+
+/// A body that draws [svg], [size] meters large and centered on it, and
+/// collides as the SVG's convex [pieces].
+///
+/// It starts at [_position] and [_angle], moving at [_velocity], or goes on
+/// from [from], if any, and draws above the other bodies. [PiecesLayer] draws
+/// its pieces in [color].
+class SvgBody(
+  final ExampleSvg svg,
+  final Vector2 size,
+  final List<List<Vector2>> pieces,
+  final Vector2 _position,
+  final Vector2 _velocity, {
+  required final double _angle,
+  required final Color color,
+
+  /// The SVG's name, for a game with another renderer to load it.
+  required final String name,
+
+  /// The index of the SVG's size, for a game with another renderer.
+  required final int side,
+  final double _angularVelocity = 0,
+  final BodySnapshot? from,
+}) extends BodyComponent {
+  this : super(renderBody: false, priority: 1);
+
+  /// The [pieces] as one path, for [PiecesLayer].
+  late final piecesPath = () {
+    final path = Path();
+    for (final piece in pieces) {
+      path.addPolygon([for (final v in piece) v.toOffset()], true);
+    }
+    return path;
+  }();
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    // Sized in pixels and scaled back to meters, as flame_svg's fixed cache
+    // mode rasterizes an SVG at its component's size, without the camera's.
+    final pixels = gameRef.metersToPixels;
+    add(
+      svg.component()
+        ..size = size * pixels
+        ..scale = Vector2.all(1 / pixels)
+        ..anchor = Anchor.center,
+    );
+  }
+
+  @override
+  Body createBody() {
+    final body = world.createBody(
+      BodyDef(
+        type: BodyType.dynamic,
+        position: _position,
+        rotation: Rot.fromAngle(_angle),
+        linearVelocity: _velocity,
+        angularVelocity: _angularVelocity,
+      ),
+    );
+    final shapeDef = ShapeDef(
+      material: SurfaceMaterial(restitution: 0.4, friction: 0.5),
+    );
+    for (final piece in pieces) {
+      body.createShape(Polygon(piece), shapeDef);
+    }
+    return body..goOnFrom(from);
+  }
+}
+
+/// Draws the SVG bodies' convex pieces over them, while the game's
+/// [SvgBodies.pieces] is true.
+///
+/// It draws after all the bodies, so that the SVGs stay in one run. A child
+/// of each body, drawn over its SVG, would end the run at each body.
+class PiecesLayer() extends Component with HasGameRef<SvgBodies> {
+  this : super(priority: 2);
+
+  /// The width of the pieces' outlines, in meters, as in flame_path_shapes.
+  static const _outlineWidth = 0.04;
+
+  /// The paints for each body color.
+  final _paints = <Color, GlowPaints>{};
+
+  @override
+  void render(Canvas canvas) {
+    if (!gameRef.pieces) {
+      return;
+    }
+    for (final svgBody in gameRef.svgBodies) {
+      if (!svgBody.isLoaded) {
+        continue;
+      }
+      final paints = _paints[svgBody.color] ??= GlowPaints(
+        svgBody.color,
+        _outlineWidth,
+      );
+      final position = svgBody.body.position;
+      canvas
+        ..save()
+        ..translate(position.x, position.y)
+        ..rotate(svgBody.angle)
+        ..drawPath(svgBody.piecesPath, paints.fill)
+        ..drawPath(svgBody.piecesPath, paints.outline)
+        ..restore();
+    }
+  }
+}
+
+/// flame_path_shapes' wheel: five circles around [_position] that a motor
+/// turns, [scale] times as large, drawn as outlines if `wireframe`. It goes
+/// on from [from], if any.
+///
+/// It passes through the walls, which a short game brings into its way.
+class CircleShuffler(
+  final Vector2 _position, {
+  final BodySnapshot? from,
+  final double scale = 1,
+  bool wireframe = false,
+}) extends BodyComponent {
+  this
+    : super(
+        paint: wireframe
+            ? (Paint()
+                ..color = BodyComponent.defaultColor
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 0.12)
+            : null,
+      );
+
+  /// The distance of the circles' centers from the wheel's, in meters.
+  static const _radius = 6.0;
+
+  /// The circles' radius, in meters.
+  static const _circleRadius = 1.2;
+
+  /// How far the wheel reaches from its center, in meters.
+  static const reach = _radius + _circleRadius;
+
+  @override
+  Body createBody() {
+    const pieces = 5;
+    final body = world.createBody(
+      BodyDef(type: BodyType.dynamic, position: _position),
+    );
+    final shapeDef = ShapeDef(
+      density: 50,
+      material: SurfaceMaterial(friction: 0.4, restitution: 0.6),
+      filter: Filter(maskBits: Filter.allCategories & ~Wall.category),
+    );
+    for (var i = 0; i < pieces; i++) {
+      final angle = 2 * math.pi * i / pieces;
+      body.createShape(
+        Circle(
+          radius: _circleRadius * scale,
+          center: Vector2(math.cos(angle), math.sin(angle))
+            ..scale(_radius * scale),
+        ),
+        shapeDef,
+      );
+    }
+    // The joint holds the wheel to an empty static body, as its ground.
+    final ground = world.createBody(BodyDef());
+    world.physicsWorld.createRevoluteJoint(
+      RevoluteJointDef(
+        bodyA: body,
+        bodyB: ground,
+        localAnchorB: body.position.clone(),
+        motorSpeed: math.pi,
+        maxMotorTorque: 1000000,
+        enableMotor: true,
+      ),
+    );
+    return body..goOnFrom(from);
+  }
+}
+
+/// One of the two ramps of flame_path_shapes' funnel above the wheel. It's on
+/// the right of [_center], or on the left if [isMirrored].
+class CornerRamp(final Vector2 _center, {final bool isMirrored = false})
+    extends BodyComponent
+    with GlowingBody {
+  this : super(paint: Paint()..color = ExampleColors.slate);
+
+  @override
+  Body createBody() {
+    final mirror = isMirrored ? -1 : 1;
+    // The two tips are 12 meters apart: about three and a half SVGs, and a
+    // little less than the wheel's 14.4 meters. At 8 meters, SVGs dropped
+    // above the opening sometimes clogged it.
+    final tip = 6.0 * mirror;
+    // A solid polygon, not a chain loop. Chains are one-sided in Box2D v3, so
+    // a chain ramp would let balls in from the other side and trap them.
+    return world.createBody(BodyDef(position: _center))..createShape(
+      Polygon([
+        Vector2(tip, 0),
+        Vector2(tip + 20 * mirror, -20),
+        Vector2(tip + 35 * mirror, -30),
+      ]),
+      ShapeDef(material: SurfaceMaterial(friction: 0.5)),
+    );
+  }
 }
