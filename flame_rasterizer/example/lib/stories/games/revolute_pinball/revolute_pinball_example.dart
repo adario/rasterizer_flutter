@@ -128,26 +128,50 @@ abstract class RevolutePinballExample({
     final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
     final flipper = 0.18 * a.width;
     final small = math.min(a.width, a.height);
+    // The left flipper and guide, mirrored for the right ones: the tip ends
+    // at the drain, and the guide's recess under it at the bottom.
+    const angle = _restAngle;
+    const gap = _Flipper.gap;
+    final bottom = _Flipper.bottomAngle(flipper);
+    final tip = _Flipper.tipCenter(flipper);
+    final floor =
+        (tip +
+              Vector2(math.cos(bottom), math.sin(bottom)) *
+                  (_Flipper.tipRadius + gap))
+          ..rotate(angle);
     final pivot = Vector2(
-      drain + flipper * math.cos(_restAngle),
-      a.bottom - flipper * math.sin(_restAngle),
+      -drain - _Flipper.tipRadius - (tip.clone()..rotate(angle)).x,
+      a.bottom - floor.y,
     );
-    final guideTop = a.bottom - (a.right - drain) * math.tan(_restAngle);
+    final socket = [
+      for (final p in _Flipper.arc(
+        Vector2.zero(),
+        _Flipper.radius + gap,
+        math.pi + math.asin(_Flipper.radius / (_Flipper.radius + gap)),
+        bottom,
+      ))
+        p
+          ..rotate(angle)
+          ..add(pivot),
+    ];
+    final top = socket.first;
+    final guide = [
+      Vector2(a.left, top.y - (top.x - a.left) * math.tan(angle)),
+      ...socket,
+      pivot + floor,
+      Vector2(a.left, a.bottom),
+    ];
     final bucketWidth = math.max(0.2 * a.width, 2 * SvgBodies.maxSide);
     final bucketHeight = 0.2 * small;
     final table = _Table([
       Wall(Vector2(a.left, a.top), Vector2(a.right, a.top)),
       Wall(Vector2(a.left, a.top), Vector2(a.left, a.bottom)),
       Wall(Vector2(a.right, a.top), Vector2(a.right, a.bottom)),
-      for (final side in [-1, 1])
-        _Guide([
-          Vector2(side * a.right, guideTop),
-          Vector2(side * drain, a.bottom),
-          Vector2(side * a.right, a.bottom),
-        ]),
+      _Guide(guide),
+      _Guide([for (final v in guide.reversed) Vector2(-v.x, v.y)]),
       ..._flippers = [
         for (final side in [-1, 1])
-          _Flipper(Vector2(side * pivot.x, pivot.y), flipper, side),
+          _Flipper(Vector2(-side * pivot.x, pivot.y), flipper, side),
       ],
       CircleShuffler(
         Vector2(0, a.top + 0.35 * a.height),
@@ -370,23 +394,50 @@ class _Table(final List<Component> _parts)
   }
 }
 
-class _Guide(final List<Vector2> _vertices)
+/// A body drawn as its [outline], in its own coordinates, that collides as
+/// the outline's convex pieces.
+mixin _Outlined on GlowingBody {
+  List<Vector2> get outline;
+
+  late final _path = Path()
+    ..addPolygon([for (final v in outline) v.toOffset()], true);
+
+  @override
+  void render(Canvas canvas) => renderPath(canvas, _path);
+
+  void addPieces(Body body, ShapeDef def) {
+    for (final piece in convexPieces(
+      outline,
+      minDistance: 4 * linearSlop,
+      minWidth: 2 * linearSlop,
+    )) {
+      body.createShape(Polygon(piece), def);
+    }
+  }
+}
+
+/// A slide down to a flipper, with a recess for it.
+class _Guide(@override final List<Vector2> outline)
     extends BodyComponent
-    with GlowingBody {
+    with GlowingBody, _Outlined {
   this : super(paint: Paint()..color = ExampleColors.slate);
 
   @override
-  Body createBody() => world.createBody(BodyDef())
-    ..createShape(
-      Polygon(_vertices),
-      ShapeDef(material: SurfaceMaterial(friction: 0.5)),
-    );
+  Body createBody() {
+    final body = world.createBody(BodyDef());
+    addPieces(body, ShapeDef(material: SurfaceMaterial(friction: 0.5)));
+    return body;
+  }
 }
 
 /// An open-top bucket around [inner], a U path that collides as its convex
 /// pieces, which glows once it's [full]. As a body comes in, its count fades
 /// in above it for a while.
-class _Bucket(final Rect inner) extends BodyComponent {
+class _Bucket(final Rect inner)
+    extends BodyComponent
+    with GlowingBody, _Outlined {
+  this : super(paint: Paint()..color = ExampleColors.slate);
+
   static const _countCap = 2.4;
 
   static const _thickness = 0.6;
@@ -408,7 +459,8 @@ class _Bucket(final Rect inner) extends BodyComponent {
   }
 
   /// Straight sides down to the bottom's half ellipse.
-  late final _outline = () {
+  @override
+  late final outline = () {
     const w = _thickness;
     List<Vector2> arc(double rx, double ry, {required bool leftToRight}) =>
         List.generate(_segments + 1, (i) {
@@ -428,11 +480,6 @@ class _Bucket(final Rect inner) extends BodyComponent {
     ];
   }();
 
-  late final _path = Path()
-    ..addPolygon([for (final v in _outline) v.toOffset()], true);
-
-  var _paints = GlowPaints(ExampleColors.slate, 0.12);
-
   int count = 0;
 
   /// The count last frame, null before the first.
@@ -446,10 +493,7 @@ class _Bucket(final Rect inner) extends BodyComponent {
 
   @override
   void update(double dt) {
-    final color = full ? ExampleColors.dynamicColor(4) : ExampleColors.slate;
-    if (_paints.color != color) {
-      _paints = GlowPaints(color, _paints.outlineWidth);
-    }
+    paint.color = full ? ExampleColors.dynamicColor(4) : ExampleColors.slate;
     final last = _lastCount;
     if (last != null && count > last) {
       _showCount();
@@ -483,36 +527,60 @@ class _Bucket(final Rect inner) extends BodyComponent {
   }
 
   @override
-  void render(Canvas canvas) {
-    canvas
-      ..drawPath(_path, _paints.fill)
-      ..drawPath(_path, _paints.outline);
-  }
-
-  @override
   Body createBody() {
     final body = world.createBody(BodyDef());
-    for (final piece in convexPieces(
-      _outline,
-      minDistance: 4 * linearSlop,
-      minWidth: 2 * linearSlop,
-    )) {
-      body.createShape(
-        Polygon(piece),
-        ShapeDef(material: SurfaceMaterial(friction: 0.5)),
-      );
-    }
+    addPieces(body, ShapeDef(material: SurfaceMaterial(friction: 0.5)));
     return body;
   }
 }
 
-/// A flipper [_length] meters long, on the left of its [_pivot] if [_side] is
-/// 1, or on the right if -1. It lies on a guide at rest. Holding it kicks it
+/// A flipper [_length] meters from its pivot's center to its tip's, on the
+/// left of its [_pivot] if [_side] is 1, or on the right if -1. It lies in a
+/// guide's recess at rest, its flat top along the guide. Holding it kicks it
 /// up, and a motor holds it at the top. Released, it falls back.
 class _Flipper(final Vector2 _pivot, final double _length, final int _side)
     extends BodyComponent
-    with GlowingBody {
+    with GlowingBody, _Outlined {
   this : super(paint: Paint()..color = ExampleColors.dynamicColor(0));
+
+  /// The radii of its round ends.
+  static const radius = 0.6;
+  static const tipRadius = 0.3;
+
+  /// The room between it and its guide's recess.
+  static const gap = 0.1;
+
+  static const _segments = 16;
+
+  /// For a left flipper with its pivot at the origin and its top along the
+  /// x axis: its tip's center, and the angle of its bottom edge's normal.
+  static Vector2 tipCenter(double length) =>
+      Vector2(length, tipRadius - radius);
+  static double bottomAngle(double length) =>
+      2 * math.atan2(tipRadius - radius, length) + math.pi / 2;
+
+  /// The arc around [center] from angle [from] to [to].
+  static List<Vector2> arc(
+    Vector2 center,
+    double radius,
+    double from,
+    double to,
+  ) => List.generate(_segments + 1, (i) {
+    final a = from + (to - from) * i / _segments;
+    return center + Vector2(math.cos(a), math.sin(a)) * radius;
+  });
+
+  @override
+  late final outline = () {
+    final bottom = bottomAngle(_length);
+    final left = [
+      ...arc(Vector2.zero(), radius, bottom, 3 * math.pi / 2),
+      ...arc(tipCenter(_length), tipRadius, -math.pi / 2, bottom),
+    ];
+    return _side < 0
+        ? left
+        : [for (final v in left.reversed) Vector2(-v.x, v.y)];
+  }();
 
   /// The kick's angular speed, and the motor's, in radians a second.
   static const _kickSpeed = 12.0;
@@ -547,28 +615,22 @@ class _Flipper(final Vector2 _pivot, final double _length, final int _side)
   @override
   Body createBody() {
     const angle = RevolutePinballExample._restAngle;
-    final d = -_side * _length;
-    final body =
-        world.createBody(
-          BodyDef(
-            type: BodyType.dynamic,
-            position: _pivot,
-            rotation: Rot.fromAngle(-_side * angle),
-            gravityScale: _gravityScale,
-            isBullet: true,
-          ),
-        )..createShape(
-          Polygon([
-            Vector2.zero(),
-            Vector2(d, 0),
-            Vector2(d, -0.6),
-            Vector2(0, -1.2),
-          ]),
-          ShapeDef(
-            material: SurfaceMaterial(friction: 0.5),
-            density: _density,
-          ),
-        );
+    final body = world.createBody(
+      BodyDef(
+        type: BodyType.dynamic,
+        position: _pivot,
+        rotation: Rot.fromAngle(-_side * angle),
+        gravityScale: _gravityScale,
+        isBullet: true,
+      ),
+    );
+    addPieces(
+      body,
+      ShapeDef(
+        material: SurfaceMaterial(friction: 0.5),
+        density: _density,
+      ),
+    );
     _joint = world.physicsWorld.createRevoluteJoint(
       RevoluteJointDef(
         bodyA: world.createBody(BodyDef()),

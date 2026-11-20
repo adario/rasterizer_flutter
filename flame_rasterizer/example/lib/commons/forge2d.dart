@@ -153,11 +153,16 @@ mixin GlowingBody on BodyComponent {
   late final Path _path = Path();
 
   @override
-  void renderPolygon(Canvas canvas, List<Offset> points) {
-    final paints = _paints;
-    final path = _path
+  void renderPolygon(Canvas canvas, List<Offset> points) => renderPath(
+    canvas,
+    _path
       ..reset()
-      ..addPolygon(points, true);
+      ..addPolygon(points, true),
+  );
+
+  /// Draws [path] filled and outlined, like its polygons.
+  void renderPath(Canvas canvas, Path path) {
+    final paints = _paints;
     canvas
       ..drawPath(path, paints.fill)
       ..drawPath(path, paints.outline);
