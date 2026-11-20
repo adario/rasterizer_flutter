@@ -482,7 +482,7 @@ typedef _SizedPieces = ({Vector2 size, List<List<Vector2>> pieces});
 mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// The balls' smallest radius, in meters. Box2D works best with bodies
   /// from 0.1 to 10 meters.
-  static const _minBallRadius = 0.4;
+  double get minBallRadius => 0.4;
 
   /// The balls' largest radius, in meters.
   static const _maxBallRadius = 1.0;
@@ -563,8 +563,7 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// and a function that creates it with a position and a velocity.
   NewBody randomBall() {
     final radius =
-        _minBallRadius +
-        random.nextDouble() * (_maxBallRadius - _minBallRadius);
+        minBallRadius + random.nextDouble() * (_maxBallRadius - minBallRadius);
     final color = ExampleColors.dynamicColor(tint++);
     return (
       radius: radius,

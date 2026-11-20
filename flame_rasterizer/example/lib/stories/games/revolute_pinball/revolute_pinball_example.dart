@@ -76,6 +76,10 @@ abstract class RevolutePinballExample({
   @override
   final random = math.Random();
 
+  /// Smaller balls can get stuck at the flippers' tips.
+  @override
+  double get minBallRadius => 0.52;
+
   _Table? _table;
   var _flippers = <_Flipper>[];
   CircleShuffler? _wheel;
