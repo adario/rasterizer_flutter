@@ -372,6 +372,9 @@ class _Flipper(final Vector2 _pivot, final double _length, final int _side)
   /// How much faster than the other bodies it falls.
   static const _gravityScale = 16.0;
 
+  /// Less than the other bodies', so that they slow it as it hits them.
+  static const _density = 0.3;
+
   final _holders = <Object>{};
   late final RevoluteJoint _joint;
 
@@ -410,7 +413,10 @@ class _Flipper(final Vector2 _pivot, final double _length, final int _side)
             Vector2(d, -0.6),
             Vector2(0, -1.2),
           ]),
-          ShapeDef(material: SurfaceMaterial(friction: 0.5)),
+          ShapeDef(
+            material: SurfaceMaterial(friction: 0.5),
+            density: _density,
+          ),
         );
     _joint = world.physicsWorld.createRevoluteJoint(
       RevoluteJointDef(
