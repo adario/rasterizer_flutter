@@ -111,12 +111,14 @@ abstract class RevolutePinballExample({
     final a = _arena;
     final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
     final flipper = 0.18 * a.width;
+    final small = math.min(a.width, a.height);
     final pivot = Vector2(
       drain + flipper * math.cos(_restAngle),
       a.bottom - flipper * math.sin(_restAngle),
     );
     final guideTop = a.bottom - (a.right - drain) * math.tan(_restAngle);
     final bucketWidth = math.max(0.2 * a.width, 2 * SvgBodies.maxSide);
+    final bucketHeight = 0.15 * small;
     final table = _Table([
       Wall(Vector2(a.left, a.top), Vector2(a.right, a.top)),
       Wall(Vector2(a.left, a.top), Vector2(a.left, a.bottom)),
@@ -133,7 +135,7 @@ abstract class RevolutePinballExample({
       ],
       CircleShuffler(
         Vector2(0, a.top + 0.35 * a.height),
-        scale: 0.15 * a.height / CircleShuffler.reach,
+        scale: 0.15 * small / CircleShuffler.reach,
         wireframe: true,
       ),
       ..._buckets = [
@@ -142,10 +144,10 @@ abstract class RevolutePinballExample({
             Rect.fromCenter(
               center: Offset(
                 side * (a.right - 0.06 * a.width - bucketWidth / 2),
-                a.top + 0.225 * a.height,
+                a.top + 0.15 * a.height + bucketHeight / 2,
               ),
               width: bucketWidth,
-              height: 0.15 * a.height,
+              height: bucketHeight,
             ),
           ),
       ],
@@ -307,17 +309,27 @@ class _Guide(final List<Vector2> _vertices)
 /// An open-top bucket around [inner], which glows once it holds
 /// [RevolutePinballExample._capacity] bodies.
 class _Bucket(final Rect inner) extends BodyComponent with GlowingBody {
-  this : super(paint: Paint()..color = ExampleColors.slate);
+  this : super(paint: Paint()..color = ExampleColors.slate) {
+    add(_label);
+  }
 
   static const _thickness = 0.6;
 
   int count = 0;
+
+  late final _label = TextComponent(
+    anchor: Anchor.bottomCenter,
+    position: Vector2(inner.center.dx, inner.top - 0.5),
+    scale: Vector2.all(0.15),
+    textRenderer: StoryGame.hudTextRenderer,
+  );
 
   bool get full => count >= RevolutePinballExample._capacity;
 
   @override
   void update(double dt) {
     paint.color = full ? ExampleColors.dynamicColor(4) : ExampleColors.slate;
+    _label.text = '$count/${RevolutePinballExample._capacity}';
   }
 
   @override
