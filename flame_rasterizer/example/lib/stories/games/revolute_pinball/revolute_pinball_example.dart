@@ -132,7 +132,7 @@ abstract class RevolutePinballExample({
     );
     final guideTop = a.bottom - (a.right - drain) * math.tan(_restAngle);
     final bucketWidth = math.max(0.2 * a.width, 2 * SvgBodies.maxSide);
-    final bucketHeight = 0.15 * small;
+    final bucketHeight = 0.2 * small;
     final table = _Table([
       Wall(Vector2(a.left, a.top), Vector2(a.right, a.top)),
       Wall(Vector2(a.left, a.top), Vector2(a.left, a.bottom)),
@@ -219,7 +219,7 @@ abstract class RevolutePinballExample({
       return false;
     }
     final position = body.body.position.toOffset();
-    if (_buckets.any((bucket) => bucket.inner.contains(position))) {
+    if (_buckets.any((bucket) => bucket.holds(position))) {
       return true;
     }
     final resting =
@@ -242,8 +242,7 @@ abstract class RevolutePinballExample({
     for (final bucket in _buckets) {
       bucket.count = [...svgBodies, ...balls]
           .where(
-            (b) =>
-                b.isLoaded && bucket.inner.contains(b.body.position.toOffset()),
+            (b) => b.isLoaded && bucket.holds(b.body.position.toOffset()),
           )
           .length;
     }
@@ -382,18 +381,40 @@ class _Bucket(final Rect inner) extends BodyComponent {
 
   static const _thickness = 0.6;
 
+  /// How many segments make each of the bottom's half ellipses.
+  static const _segments = 48;
+
+  /// The radii and the center of the bottom's inner half ellipse, as wide as
+  /// [inner], and at most as deep.
+  late final _rx = inner.width / 2;
+  late final _ry = math.min(_rx, inner.height);
+  late final _center = Offset(inner.center.dx, inner.bottom - _ry);
+
+  /// Whether [point] is inside the bucket.
+  bool holds(Offset point) {
+    final d = point - _center;
+    return inner.contains(point) &&
+        (d.dy <= 0 || math.pow(d.dx / _rx, 2) + math.pow(d.dy / _ry, 2) <= 1);
+  }
+
+  /// Straight sides down to the bottom's half ellipse.
   late final _outline = () {
-    final (l, t, r, b) = (inner.left, inner.top, inner.right, inner.bottom);
     const w = _thickness;
+    List<Vector2> arc(double rx, double ry, {required bool leftToRight}) =>
+        List.generate(_segments + 1, (i) {
+          final a = (leftToRight ? _segments - i : i) * math.pi / _segments;
+          return Vector2(
+            _center.dx + rx * math.cos(a),
+            _center.dy + ry * math.sin(a),
+          );
+        });
     return [
-      Vector2(l - w, t),
-      Vector2(l, t),
-      Vector2(l, b),
-      Vector2(r, b),
-      Vector2(r, t),
-      Vector2(r + w, t),
-      Vector2(r + w, b + w),
-      Vector2(l - w, b + w),
+      Vector2(inner.left - w, inner.top),
+      Vector2(inner.left, inner.top),
+      ...arc(_rx, _ry, leftToRight: true),
+      Vector2(inner.right, inner.top),
+      Vector2(inner.right + w, inner.top),
+      ...arc(_rx + w, _ry + w, leftToRight: false),
     ];
   }();
 
@@ -459,7 +480,11 @@ class _Bucket(final Rect inner) extends BodyComponent {
   @override
   Body createBody() {
     final body = world.createBody(BodyDef());
-    for (final piece in convexPieces(_outline)) {
+    for (final piece in convexPieces(
+      _outline,
+      minDistance: 4 * linearSlop,
+      minWidth: 2 * linearSlop,
+    )) {
       body.createShape(
         Polygon(piece),
         ShapeDef(material: SurfaceMaterial(friction: 0.5)),
