@@ -782,13 +782,16 @@ class _Flipper(final Vector2 _pivot, final double _length, final int _side)
 
 /// A trail of [_body]'s center of mass for [_time] seconds, below all else:
 /// one curve per step, which matches its positions and velocities at both
-/// ends. Over the second half, it fades from its oldest curve to its newest.
+/// ends. From [_fadeStart] on, it fades from its oldest curve to its newest.
 class _Trail(final BodyComponent _body)
     extends Component
     with HasGameRef<RevolutePinballExample> {
   this : super(priority: -1);
 
   static const _time = 1.0;
+
+  /// When it starts fading, as a share of [_time].
+  static const _fadeStart = 0.25;
 
   /// The width of the fade's edge, as a share of [_time].
   static const _edge = 0.3;
@@ -820,7 +823,7 @@ class _Trail(final BodyComponent _body)
     if (_body.isLoaded && !_body.isRemoving && !_body.isRemoved) {
       _record(dt);
     }
-    final front = (2 * _age / _time - 1) * (1 + _edge);
+    final front = (_age / _time - _fadeStart) / (1 - _fadeStart) * (1 + _edge);
     _curves.removeWhere((c) {
       final opacity = ((c.age / _time + _edge - front) / _edge).clamp(0.0, 1.0);
       c.curve.opacity = opacity;
