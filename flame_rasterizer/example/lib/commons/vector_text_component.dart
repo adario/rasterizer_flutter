@@ -23,6 +23,68 @@ mixin PathComponents<W extends World> on FlameGame<W> {
   });
 }
 
+/// [PathComponents] that creates [RasterizerPathComponent]s.
+mixin RasterizerPathComponents<W extends World> on PathComponents<W> {
+  @override
+  PathComponent pathComponent(
+    Path path,
+    Paint paint, {
+    Vector2? position,
+    Anchor? anchor,
+    double? maxSize,
+    int? priority,
+    RasterizerGlow? glow,
+  }) => RasterizerPathComponent(
+    path: path,
+    paint: paint,
+    position: position,
+    anchor: anchor,
+    maxSize: maxSize,
+    priority: priority,
+    glow: glow,
+  );
+}
+
+/// [PathComponents] that creates Flame's [PathComponent]s, which apply their
+/// paint's color filter, such as a tint, to their paint layers too, as
+/// [RasterizerPathComponent]s do.
+mixin FlamePathComponents<W extends World> on PathComponents<W> {
+  @override
+  PathComponent pathComponent(
+    Path path,
+    Paint paint, {
+    Vector2? position,
+    Anchor? anchor,
+    double? maxSize,
+    int? priority,
+    RasterizerGlow? glow,
+  }) => _FlamePathComponent(
+    path: path,
+    paint: paint,
+    position: position,
+    anchor: anchor,
+    priority: priority,
+  );
+}
+
+class _FlamePathComponent({
+  required super.path,
+  super.paint,
+  super.position,
+  super.anchor,
+  super.priority,
+}) extends PathComponent {
+  @override
+  void render(Canvas canvas) {
+    if (hasPaintLayers) {
+      for (final layer in paintLayers) {
+        layer.colorFilter = paint.colorFilter;
+      }
+    }
+    super.render(canvas);
+  }
+}
+
 /// A text in `VectorFont`, with capitals [capHeight] logical pixels high, in
 /// [color].
 ///

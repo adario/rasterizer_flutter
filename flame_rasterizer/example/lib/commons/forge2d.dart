@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:flame/extensions.dart';
 import 'package:flame/geometry.dart' show convexPieces;
 import 'package:flame_forge2d/flame_forge2d.dart' as forge2d show World;
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
@@ -9,6 +10,7 @@ import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flutter/foundation.dart';
 
 /// A Forge2D example's world, which runs at its game's
@@ -123,54 +125,88 @@ class GlowPaints(final Color color, final double outlineWidth) {
     ..strokeWidth = outlineWidth;
 }
 
-/// Draws a body's shapes with [GlowPaints] of its paint's color.
+/// Draws a body's [glowPath] with [GlowPaints] of its paint's color, as a
+/// child path component of the game's [PathComponents].
+///
+/// The paints are white, and the child is tinted with the color. So the
+/// bodies that share a [glowPath] object share its import, whatever their
+/// color. The body's own shapes aren't drawn.
 mixin GlowingBody on BodyComponent {
   /// The width of the outline, in meters.
   double get outlineWidth => 0.12;
 
-  GlowPaints? _glow;
+  /// The path to draw, in the body's coordinates: its shapes, by default.
+  Path get glowPath => pathOf(body.shapes);
 
-  /// The paints for its paint's color, made again when the color changes.
-  GlowPaints get _paints {
-    final glow = _glow;
-    if (glow != null && glow.color == paint.color) {
-      return glow;
+  /// The paint layers to draw [glowPath] with, in white.
+  List<Paint> get glowLayers {
+    final paints = GlowPaints(const Color(0xFFFFFFFF), outlineWidth);
+    return [paints.fill, paints.outline];
+  }
+
+  /// Whether it draws [glowPath]: false for a body that its game draws
+  /// otherwise.
+  bool glows = true;
+
+  PathComponent? _glow;
+
+  /// The color it's tinted with.
+  Color? _tint;
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    renderBody = false;
+    if (!glows) {
+      return;
     }
-    return _glow = GlowPaints(paint.color, outlineWidth);
+    final path = glowPath;
+    add(
+      _glow =
+          (findGame()! as PathComponents).pathComponent(
+              path,
+              Paint(),
+              position: path.getBounds().topLeft.toVector2(),
+            )
+            ..paintLayers = glowLayers
+            ..tint(_tint = paint.color),
+    );
   }
 
   @override
-  void renderCircle(Canvas canvas, Offset center, double radius) {
-    final paints = _paints;
-    canvas
-      ..drawCircle(center, radius, paints.fill)
-      ..drawCircle(center, radius, paints.outline)
-      // A radius line shows the body turning.
-      ..drawLine(center, center + Offset(radius, 0), paints.outline);
+  void update(double dt) {
+    super.update(dt);
+    final glow = _glow;
+    if (glow != null && paint.color != _tint) {
+      glow.tint(_tint = paint.color);
+    }
   }
 
-  /// One path, reset for each polygon, as `BodyComponent` does.
-  late final Path _path = Path();
-
-  @override
-  void renderPolygon(Canvas canvas, List<Offset> points) => renderPath(
-    canvas,
-    _path
-      ..reset()
-      ..addPolygon(points, true),
-  );
-
-  /// Draws [path] filled and outlined, like its polygons.
-  void renderPath(Canvas canvas, Path path) {
-    final paints = _paints;
-    canvas
-      ..drawPath(path, paints.fill)
-      ..drawPath(path, paints.outline);
-  }
-
-  @override
-  void renderSegment(Canvas canvas, Offset p1, Offset p2) {
-    canvas.drawLine(p1, p2, _paints.outline);
+  /// Returns [shapes] as one path. A circle has a radius line that shows it
+  /// turning, if [spokes].
+  static Path pathOf(Iterable<Shape> shapes, {bool spokes = true}) {
+    final path = Path();
+    for (final shape in shapes) {
+      switch (shape.geometry) {
+        case Circle(:final center, :final radius):
+          final c = center.toOffset();
+          path.addOval(Rect.fromCircle(center: c, radius: radius));
+          if (spokes) {
+            path
+              ..moveTo(c.dx, c.dy)
+              ..lineTo(c.dx + radius, c.dy);
+          }
+        case Segment(:final point1, :final point2):
+          path
+            ..moveTo(point1.x, point1.y)
+            ..lineTo(point2.x, point2.y);
+        case Polygon(:final points):
+          path.addPolygon([for (final v in points!) v.toOffset()], true);
+        case Capsule():
+          throw UnsupportedError('Capsules');
+      }
+    }
+    return path;
   }
 }
 
@@ -260,6 +296,12 @@ class Ball(
   final BodySnapshot? from,
 }) extends BodyComponent with GlowingBody {
   this : super(paint: Paint()..color = color);
+
+  /// The balls' paths, by radius, so that the balls of a size share one.
+  static final _paths = <double, Path>{};
+
+  @override
+  Path get glowPath => _paths[radius] ??= super.glowPath;
 
   @override
   Body createBody() {
@@ -487,6 +529,10 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// The balls' largest radius, in meters.
   static const _maxBallRadius = 1.0;
 
+  /// How many radii the balls come in, evenly spaced, so that the balls of a
+  /// radius share their path's import.
+  static const _ballSizes = 6;
+
   /// The larger side of the smallest SVGs, in meters.
   ///
   /// The SVGs come in [_sides] sizes, from 3 to 3.5 meters by tenths, as in
@@ -577,7 +623,10 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// and a function that creates it with a position and a velocity.
   NewBody randomBall() {
     final radius =
-        minBallRadius + random.nextDouble() * (_maxBallRadius - minBallRadius);
+        minBallRadius +
+        random.nextInt(_ballSizes) *
+            (_maxBallRadius - minBallRadius) /
+            (_ballSizes - 1);
     final color = nextColor();
     return (
       radius: radius,
@@ -761,17 +810,18 @@ class CircleShuffler(
   final Vector2 _position, {
   final BodySnapshot? from,
   final double scale = 1,
-  bool wireframe = false,
-}) extends BodyComponent {
-  this
-    : super(
-        paint: wireframe
-            ? (Paint()
-                ..color = BodyComponent.defaultColor
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 0.12)
-            : null,
-      );
+  final bool wireframe = false,
+}) extends BodyComponent with GlowingBody {
+  @override
+  Path get glowPath => GlowingBody.pathOf(body.shapes, spokes: false);
+
+  @override
+  List<Paint> get glowLayers => [
+    Paint()
+      ..color = const Color(0xFFFFFFFF)
+      ..style = wireframe ? PaintingStyle.stroke : PaintingStyle.fill
+      ..strokeWidth = outlineWidth,
+  ];
 
   /// The distance of the circles' centers from the wheel's, in meters.
   static const _radius = 6.0;

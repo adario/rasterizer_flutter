@@ -116,7 +116,7 @@ abstract class RevolutePinballExample({
   /// Draws [ball] as MultipleShapes' paths.
   void _drawAsPath(Ball ball) {
     ball
-      ..renderBody = false
+      ..glows = false
       ..add(
         outlineComponent(
             _circle,
@@ -506,11 +506,9 @@ class _Table(final List<Component> _parts)
 mixin _Outlined on GlowingBody {
   List<Vector2> get outline;
 
-  late final _path = Path()
-    ..addPolygon([for (final v in outline) v.toOffset()], true);
-
   @override
-  void render(Canvas canvas) => renderPath(canvas, _path);
+  Path get glowPath =>
+      Path()..addPolygon([for (final v in outline) v.toOffset()], true);
 
   void addPieces(Body body, ShapeDef def) {
     for (final piece in convexPieces(
@@ -872,29 +870,14 @@ class RasterizerRevolutePinballExample({
   required super.status,
   @override required final SvgRenderer renderer,
 }) extends RevolutePinballExample
-    with HasRasterizer, ExampleRasterizer, RasterizerSvgs {
+    with
+        HasRasterizer,
+        ExampleRasterizer,
+        RasterizerSvgs,
+        RasterizerPathComponents {
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
   }
-
-  @override
-  PathComponent pathComponent(
-    Path path,
-    Paint paint, {
-    Vector2? position,
-    Anchor? anchor,
-    double? maxSize,
-    int? priority,
-    RasterizerGlow? glow,
-  }) => RasterizerPathComponent(
-    path: path,
-    paint: paint,
-    position: position,
-    anchor: anchor,
-    maxSize: maxSize,
-    priority: priority,
-    glow: glow,
-  );
 
   @override
   PathComponent outlineComponent(
@@ -914,29 +897,12 @@ class FlameSvgRevolutePinballExample({
   required super.pieces,
   required super.status,
   final SvgCache cache = defaultSvgCache,
-}) extends RevolutePinballExample with FlameSvgs {
+}) extends RevolutePinballExample with FlameSvgs, FlamePathComponents {
   @override
   SvgCacheMode get cacheMode => cache.mode;
 
   @override
   SvgCacheSize get cacheSize => cache.size;
-
-  @override
-  PathComponent pathComponent(
-    Path path,
-    Paint paint, {
-    Vector2? position,
-    Anchor? anchor,
-    double? maxSize,
-    int? priority,
-    RasterizerGlow? glow,
-  }) => PathComponent(
-    path: path,
-    paint: paint,
-    position: position,
-    anchor: anchor,
-    priority: priority,
-  );
 
   @override
   PathComponent outlineComponent(

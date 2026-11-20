@@ -8,6 +8,7 @@ import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flutter/foundation.dart';
 
 part 'revolute_joint_svgs_snapshot.dart';
@@ -36,7 +37,8 @@ abstract class RevoluteJointSvgsExample({
   required super.status,
   math.Random? random,
   RevoluteJointSvgsSnapshot? from,
-}) extends Forge2DExampleGame with ExampleSvgs, SvgBodies {
+}) extends Forge2DExampleGame
+    with ExampleSvgs, SvgBodies, PathComponents<Forge2DExampleWorld> {
   this : super(world: RevoluteJointSvgsWorld());
 
   /// Creates the game for [settings]' renderer, with flame_svg's [cache] for
@@ -213,7 +215,11 @@ class RasterizerRevoluteJointExample({
   super.random,
   super.from,
 }) extends RevoluteJointSvgsExample
-    with HasRasterizer, ExampleRasterizer, RasterizerSvgs {
+    with
+        HasRasterizer,
+        ExampleRasterizer,
+        RasterizerSvgs,
+        RasterizerPathComponents {
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
   }
@@ -227,7 +233,7 @@ class FlameSvgRevoluteJointExample({
   final SvgCache cache = defaultSvgCache,
   super.random,
   super.from,
-}) extends RevoluteJointSvgsExample with FlameSvgs {
+}) extends RevoluteJointSvgsExample with FlameSvgs, FlamePathComponents {
   @override
   SvgCacheMode get cacheMode => cache.mode;
 
