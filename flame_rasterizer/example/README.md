@@ -2,13 +2,17 @@
 
 [flame_rasterizer](..)'s example app. It shows flame_rasterizer's SVGs next to flame_svg's, in a
 [Widgetbook](https://pub.dev/packages/widgetbook) laid out as Flame's own examples are. Run it with
-`flutter run -d <macos | chrome | an iPhone | emulator-5554 | linux>`. On an iPhone, pick your development team in Xcode
-first (Runner ▸ Signing & Capabilities), as the project has none.
+`flutter run -d <macos | chrome | an iPhone | emulator-5554 | linux | windows>`. On an iPhone, pick your development
+team in Xcode first (Runner ▸ Signing & Capabilities), as the project has none.
 
 On Linux, the app's sounds go through flame_audio's audioplayers_linux, which builds against GStreamer. On Debian or
 Ubuntu, install its headers first: `sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev`. Playing the
 sounds also needs `gstreamer1.0-plugins-base` and `gstreamer1.0-plugins-good`, for its WAV parser, which most desktops
 have already. The repository's Linux container (`tool/linux/`) installs all four.
+
+On Windows, building needs Visual Studio's "Desktop development with C++" workload, and Developer Mode on, for the
+symlinks Flutter makes to the app's plugins: see Flutter's
+[Windows setup](https://docs.flutter.dev/platform-integration/windows/setup).
 
 The example runs on Flame's main: flame 2.0.0-dev, flame_svg 3.0.0-dev and flame_forge2d 0.21.0-dev, through the
 workspace's dependency overrides (the root `pubspec.yaml`), as Flame's examples do. On web, flame_rasterizer draws with
@@ -447,9 +451,9 @@ Each test but `knobs_test.dart` prints a `RASTERIZER_EXAMPLE` line per game, wit
 Tube Shooter's with the score, and Svg Shooter's with the health. On web, these tests run with `flutter drive`, through
 the repository's `tool/device_tests.py`, with device `chrome`.
 
-From a clean checkout, build the app once (`flutter build macos`, `flutter build ios`, `flutter build linux`, or
-`flutter build apk --debug --target-platform android-arm64`) before `flutter test`. Otherwise `flutter test` checks the
-assets before rasterizer_gpu's build hook has written its shader bundle.
+From a clean checkout, build the app once (`flutter build macos`, `flutter build ios`, `flutter build linux`,
+`flutter build windows`, or `flutter build apk --debug --target-platform android-arm64`) before `flutter test`.
+Otherwise `flutter test` checks the assets before rasterizer_gpu's build hook has written its shader bundle.
 
 On Android, the app leaves Impeller's backend to Flutter, which picks OpenGL ES on the emulator and on devices whose
 Vulkan can't work. A debug or profile build with `IMPELLER_BACKEND=vulkan` or `IMPELLER_BACKEND=opengles` asks for that

@@ -1,7 +1,7 @@
 # rasterizer_gpu_example
 
-[rasterizer_gpu](..)'s example app, for macOS, iOS, Android, Linux and web. It shows an SVG to pan and zoom, and runs
-the atlas benchmark. [TESTING.md](TESTING.md) describes its tests, the golden tests among them.
+[rasterizer_gpu](..)'s example app, for macOS, iOS, Android, Linux, Windows and web. It shows an SVG to pan and zoom,
+and runs the atlas benchmark. [TESTING.md](TESTING.md) describes its tests, the golden tests among them.
 
 To run it on an iPhone, first pick your development team in Xcode (Runner ▸ Signing & Capabilities): the project has
 none.
@@ -45,6 +45,9 @@ Timings mean something only in a profile build: `flutter run --profile -d macos 
   start: Vulkan on some older GPUs, and any backend below API 29, where Flutter renders with Skia. There, the canvas
   renderer draws.
 - On Linux, Impeller renders with OpenGL ES. The app's runner turns Flutter GPU on in `linux/runner/my_application.cc`.
+- On Windows, Impeller renders with OpenGL ES, through ANGLE. The app's runner turns Flutter GPU on in
+  `windows/runner/main.cpp`. Building needs Visual Studio's C++ workload: see Flutter's
+  [Windows setup](https://docs.flutter.dev/platform-integration/windows/setup).
 - On web, only the canvas renderer draws: `flutter run -d chrome`, or `flutter build web [--wasm]`.
 
 `tiger.svg` and its renders are separately licensed: see `assets/tiger/README.md`.

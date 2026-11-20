@@ -17,6 +17,7 @@ After a change here, `python3 -I ../../tool/make_patch.py <Rasterizer checkout>`
 1. **Portability**, to build off Apple platforms:
    - `#import` becomes `#include`, so the headers get `#pragma once`.
    - GCD, `sysconf`, `__sincos`, `always_inline` and `alloca` go through `../ra_portable.h`.
+   - For MSVC: `bzero` comes from `../ra_portable.h` too, and GNU's `x ?: 1` becomes its `raNonZero(x)`.
 2. **Device clips**: `Ra::SceneList::deviceClips` holds either nothing or one rectangle per scene, in device pixels.
    - Each rectangle clips its scene, as the device bounds clip the whole list. The atlas needs one per run. A scene's
      own clip can't do that once its transform rotates, as that clip is in the scene's coordinates.

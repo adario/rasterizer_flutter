@@ -9,8 +9,8 @@ import 'package:native_toolchain_c/native_toolchain_c.dart';
 /// Builds the GPU renderers' shader bundle and the package's native library.
 ///
 /// The library holds the Rasterizer core, NanoSVG, libtess2 and the C API, for
-/// macOS, iOS, 64-bit Android and Linux. The core's sources are in src/core,
-/// and libtess2's in src/libtess2: see each one's README.md.
+/// macOS, iOS, 64-bit Android, Linux and Windows. The core's sources are in
+/// src/core, and libtess2's in src/libtess2: see each one's README.md.
 ///
 /// flutter_gpu_shaders always writes the bundle into this package's
 /// build/shaderbundles/, and pubspec.yaml lists it as an asset. When the
@@ -39,7 +39,11 @@ void main(List<String> args) async {
     final code = input.config.code;
     final os = code.targetOS;
     // Elsewhere, only the canvas renderer draws, which needs no native code.
-    if (os != OS.macOS && os != OS.iOS && os != OS.android && os != OS.linux) {
+    if (os != OS.macOS &&
+        os != OS.iOS &&
+        os != OS.android &&
+        os != OS.linux &&
+        os != OS.windows) {
       print(
         'rasterizer_gpu: no GPU renderer for $os, so its native code isn\'t '
         'built: the canvas renderer draws instead',
@@ -79,15 +83,24 @@ void main(List<String> args) async {
       cppLinkStdLib: os == OS.android ? 'c++_static' : null,
       // Bionic's libm isn't linked by default, unlike Apple's libSystem.
       libraries: [if (os == OS.android) 'm'],
-      // Export only the C API, RA_EXPORT: not NanoSVG's, libtess2's or
-      // xxHash's symbols, which another library loaded alongside may have too.
-      flags: ['-fvisibility=hidden', '-fvisibility-inlines-hidden'],
+      // MSVC's math.h defines M_PI only with this.
+      defines: {if (os == OS.windows) '_USE_MATH_DEFINES': null},
+      flags: os == OS.windows
+          // MSVC unwinds C++ exceptions, which the core throws, only with
+          // /EHsc. It already exports only RA_EXPORT's dllexport functions.
+          ? ['/EHsc']
+          // Export only the C API, RA_EXPORT: not NanoSVG's, libtess2's or
+          // xxHash's symbols, which another library loaded alongside may
+          // have too.
+          : ['-fvisibility=hidden', '-fvisibility-inlines-hidden'],
     );
     await cbuilder.run(
       input: input,
       output: output,
       logger: Logger('')
-        ..level = Level.WARNING
+        // MSVC prints its errors to stdout, which native_toolchain_c logs as
+        // info, not to stderr, which it logs as severe.
+        ..level = os == OS.windows ? Level.INFO : Level.WARNING
         ..onRecord.listen((record) => print(record.message)),
     );
   });
