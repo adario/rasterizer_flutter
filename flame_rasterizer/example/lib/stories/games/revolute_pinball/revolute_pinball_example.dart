@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
+import 'package:flame/extensions.dart';
 import 'package:flame/geometry.dart' show convexPieces;
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
@@ -79,6 +80,9 @@ abstract class RevolutePinballExample({
   /// Smaller balls can get stuck at the flippers' tips.
   @override
   double get minBallRadius => 0.52;
+
+  /// The last trail of each body a flipper kicked.
+  final _trails = <BodyComponent, _Trail>{};
 
   _Table? _table;
   var _flippers = <_Flipper>[];
@@ -264,9 +268,23 @@ abstract class RevolutePinballExample({
     return time >= _restTime;
   }
 
+  /// Starts a trail behind [body]'s component, unless its last one is still
+  /// going.
+  void _kicked(Body body) {
+    for (final component in [...svgBodies, ...balls]) {
+      if (component.isLoaded && component.body == body) {
+        if (_trails[component]?.over ?? true) {
+          world.add(_trails[component] = _Trail(component));
+        }
+        return;
+      }
+    }
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
+    _trails.removeWhere((_, trail) => trail.over);
     final bottom = _arena.bottom + SvgBodies.maxSide;
     bool drained(BodyComponent body) =>
         body.isLoaded && body.body.position.y > bottom;
@@ -348,6 +366,18 @@ abstract class RevolutePinballExample({
 class RevolutePinballWorld()
     extends Forge2DExampleWorld
     with TapCallbacks, HasGameRef<RevolutePinballExample>, BodiesHud {
+  @override
+  void update(double dt) {
+    super.update(dt);
+    final events = physicsWorld.contactEvents;
+    for (final flipper in gameRef._flippers) {
+      flipper.track(events);
+      if (flipper.kicking) {
+        flipper.touching.forEach(gameRef._kicked);
+      }
+    }
+  }
+
   @override
   void onTapDown(TapDownEvent event) {
     super.onTapDown(event);
@@ -614,6 +644,33 @@ class _Flipper(final Vector2 _pivot, final double _length, final int _side)
   final _holders = <Object>{};
   late final RevoluteJoint _joint;
 
+  /// The bodies touching it.
+  final touching = <Body>{};
+
+  /// Whether it's swinging up.
+  bool get kicking => isLoaded && _side * body.angularVelocity > 1;
+
+  /// Updates [touching] with [events].
+  void track(ContactEvents events) {
+    if (!isLoaded) {
+      return;
+    }
+    Body? other(Shape a, Shape b) => !a.isValid || !b.isValid
+        ? null
+        : (a.body == body ? b.body : (b.body == body ? a.body : null));
+    for (final event in events.begin) {
+      if (other(event.shapeA, event.shapeB) case final other?) {
+        touching.add(other);
+      }
+    }
+    for (final event in events.end) {
+      if (other(event.shapeA, event.shapeB) case final other?) {
+        touching.remove(other);
+      }
+    }
+    touching.removeWhere((other) => !other.isValid);
+  }
+
   void hold(Object holder) {
     if (_holders.isEmpty && isLoaded) {
       body.angularVelocity += _side * _kickSpeed;
@@ -646,6 +703,7 @@ class _Flipper(final Vector2 _pivot, final double _length, final int _side)
       ShapeDef(
         material: SurfaceMaterial(friction: 0.5),
         density: _density,
+        enableContactEvents: true,
       ),
     );
     _joint = world.physicsWorld.createRevoluteJoint(
@@ -661,6 +719,91 @@ class _Flipper(final Vector2 _pivot, final double _length, final int _side)
       ),
     );
     return body;
+  }
+}
+
+/// A trail of [_body]'s center of mass for [_time] seconds, below all else:
+/// one curve per step, which matches its positions and velocities at both
+/// ends. Over the second half, it fades from its oldest curve to its newest.
+class _Trail(final BodyComponent _body)
+    extends Component
+    with HasGameRef<RevolutePinballExample> {
+  this : super(priority: -1);
+
+  static const _time = 1.0;
+
+  /// The width of the fade's edge, as a share of [_time].
+  static const _edge = 0.3;
+
+  static const _width = 0.2;
+
+  late final _color = switch (_body) {
+    SvgBody(:final color) => color,
+    _ => _body.paint.color,
+  };
+
+  var _age = 0.0;
+  Vector2? _position;
+  Vector2? _velocity;
+  final _curves = <({PathComponent curve, double age})>[];
+
+  bool get over => _age >= _time;
+
+  @override
+  void update(double dt) {
+    if (dt == 0) {
+      return;
+    }
+    _age += dt;
+    if (over) {
+      removeFromParent();
+      return;
+    }
+    if (_body.isLoaded && !_body.isRemoving && !_body.isRemoved) {
+      _record(dt);
+    }
+    final front = (2 * _age / _time - 1) * (1 + _edge);
+    _curves.removeWhere((c) {
+      final opacity = ((c.age / _time + _edge - front) / _edge).clamp(0.0, 1.0);
+      c.curve.opacity = opacity;
+      if (opacity == 0) {
+        c.curve.removeFromParent();
+      }
+      return opacity == 0;
+    });
+  }
+
+  /// Adds the curve from the last step's position to this one's, [dt]
+  /// seconds later.
+  void _record(double dt) {
+    final p1 = _body.body.worldCenterOfMass;
+    final v1 = _body.body.linearVelocity;
+    final p0 = _position;
+    final v0 = _velocity;
+    _position = p1;
+    _velocity = v1;
+    if (p0 == null || v0 == null) {
+      return;
+    }
+    final c0 = p0 + v0 * (dt / 3);
+    final c1 = p1 - v1 * (dt / 3);
+    final path = Path()
+      ..moveTo(p0.x, p0.y)
+      ..cubicTo(c0.x, c0.y, c1.x, c1.y, p1.x, p1.y);
+    final bounds = path.getBounds();
+    final curve = gameRef.pathComponent(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _width
+        ..strokeCap = StrokeCap.round
+        ..color = _color,
+      position: bounds.topLeft.toVector2(),
+      // At a device pixel ratio of up to 3.
+      maxSize: 3 * gameRef.metersToPixels * (bounds.longestSide + _width),
+    );
+    _curves.add((curve: curve, age: _age));
+    add(curve);
   }
 }
 
