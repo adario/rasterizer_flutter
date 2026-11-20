@@ -64,9 +64,10 @@ abstract class RevolutePinballExample({
   static const _dropped = 15;
   static const _maxBodies = 100;
 
-  /// The room left above a bucket's resting bodies, in meters, under which
-  /// it's full.
-  static const _fullRoom = SvgBodies.maxSide / 2;
+  /// A bucket is full with at least [_fullCount] bodies, all at rest, whose
+  /// bounding box is at least [_fullShare] of its height.
+  static const _fullCount = 2;
+  static const _fullShare = 0.85;
 
   /// How long a body below [_restSpeed] stays so to be at rest, in seconds.
   static const _restTime = 0.5;
@@ -320,12 +321,13 @@ abstract class RevolutePinballExample({
     if (_buckets.any((bucket) => bucket.holds(position))) {
       return true;
     }
-    final resting =
-        body.body.linearVelocity.length < _restSpeed &&
-        body.body.angularVelocity.abs() < _restSpeed;
-    final time = _current[body] = resting ? _current[body]! + dt : 0;
+    final time = _current[body] = _still(body.body) ? _current[body]! + dt : 0;
     return time >= _restTime;
   }
+
+  static bool _still(Body body) =>
+      body.linearVelocity.length < _restSpeed &&
+      body.angularVelocity.abs() < _restSpeed;
 
   /// Starts a trail behind [body]'s component, unless its last one is still
   /// going.
@@ -352,20 +354,7 @@ abstract class RevolutePinballExample({
       removeBodies(gone);
     }
     for (final bucket in _buckets) {
-      var count = 0;
-      var top = double.infinity;
-      for (final b in [...svgBodies, ...balls]) {
-        if (!b.isLoaded || !bucket.holds(b.body.position.toOffset())) {
-          continue;
-        }
-        count++;
-        if (b.body.linearVelocity.length < _restSpeed) {
-          top = math.min(top, b.body.position.y - _halfSize(b));
-        }
-      }
-      bucket
-        ..count = count
-        ..full = top < bucket.inner.top + _fullRoom;
+      bucket.track([...svgBodies, ...balls], dt);
     }
     final done = [for (final body in _current.keys.toList()) _done(body, dt)];
     if (_started &&
@@ -404,13 +393,6 @@ abstract class RevolutePinballExample({
     }
     return KeyEventResult.handled;
   }
-
-  /// About half of [body]'s height.
-  static double _halfSize(BodyComponent body) => switch (body) {
-    Ball() => body.radius,
-    SvgBody() => math.max(body.size.x, body.size.y) / 2,
-    _ => 0,
-  };
 
   void _hold(int flipper, Object holder) =>
       _flippers.elementAtOrNull(flipper)?.hold(holder);
@@ -536,7 +518,8 @@ class _Guide(@override final List<Vector2> outline)
 
 /// An open-top bucket around [inner], a U path that collides as its convex
 /// pieces, which glows once it's [full]. As a body comes in, its count fades
-/// in above it for a while.
+/// in above it for a while; once that body is at rest, so does [_share], as a
+/// percentage, below it.
 class _Bucket(final Rect inner)
     extends BodyComponent
     with GlowingBody, _Outlined {
@@ -584,38 +567,80 @@ class _Bucket(final Rect inner)
     ];
   }();
 
-  int count = 0;
+  /// Its bodies, with how long each has been still, null before the first
+  /// [track].
+  Map<BodyComponent, double>? _bodies;
 
-  /// The count last frame, null before the first.
-  int? _lastCount;
+  /// The bodies that came in and aren't at rest yet.
+  final _arrivals = <BodyComponent>{};
 
-  VectorTextComponent? _countText;
+  int get count => _bodies?.length ?? 0;
 
-  /// Whether its resting bodies leave less than
-  /// [RevolutePinballExample._fullRoom] above them.
   bool full = false;
+
+  /// The texts above and below it.
+  final _texts = <bool, VectorTextComponent>{};
+
+  /// The height of its bodies' bounding box, as a share of its own.
+  double get _share {
+    var top = double.infinity;
+    var bottom = double.negativeInfinity;
+    for (final b in _bodies!.keys) {
+      for (final shape in b.body.shapes) {
+        final box = shape.aabb;
+        top = math.min(top, box.lowerBound.y);
+        bottom = math.max(bottom, box.upperBound.y);
+      }
+    }
+    return count == 0 ? 0 : (bottom - top) / inner.height;
+  }
+
+  /// Updates its bodies from [bodies], after [dt] more seconds.
+  void track(Iterable<BodyComponent> bodies, double dt) {
+    final last = _bodies;
+    final now = _bodies = {
+      for (final b in bodies)
+        if (b.isLoaded && holds(b.body.position.toOffset()))
+          b: RevolutePinballExample._still(b.body) ? (last?[b] ?? 0) + dt : 0,
+    };
+    bool atRest(BodyComponent b) => now[b]! >= RevolutePinballExample._restTime;
+    if (last != null) {
+      _arrivals.addAll(now.keys.where((b) => !last.containsKey(b)));
+      if (now.length > last.length) {
+        _show('${now.length}', below: false);
+      }
+    }
+    _arrivals.removeWhere((b) => !now.containsKey(b));
+    if (_arrivals.any(atRest)) {
+      _arrivals.removeWhere(atRest);
+      _show('${(100 * _share).round()}%', below: true);
+    }
+    full =
+        now.length >= RevolutePinballExample._fullCount &&
+        now.keys.every(atRest) &&
+        _share >= RevolutePinballExample._fullShare;
+  }
 
   @override
   void update(double dt) {
     paint.color = full ? ExampleColors.dynamicColor(4) : ExampleColors.slate;
-    final last = _lastCount;
-    if (last != null && count > last) {
-      _showCount();
-    }
-    _lastCount = count;
+    super.update(dt);
   }
 
-  void _showCount() {
-    _countText?.removeFromParent();
+  /// Fades in [text] for a while, [below] it or above.
+  void _show(String text, {required bool below}) {
+    _texts[below]?.removeFromParent();
     add(
-      _countText =
+      _texts[below] =
           VectorTextComponent(
-              text: '$count',
+              text: text,
               capHeight: _countCap,
             )
             ..position = Vector2(
               inner.center.dx,
-              inner.top - 0.5 - _countCap / 2,
+              below
+                  ? inner.bottom + _thickness + 0.5 + _countCap / 2
+                  : inner.top - 0.5 - _countCap / 2,
             )
             ..opacity = 0
             ..add(
