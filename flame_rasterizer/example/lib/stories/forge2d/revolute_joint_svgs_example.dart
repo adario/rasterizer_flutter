@@ -23,8 +23,8 @@ typedef RevoluteJointSvgsSettings = ({SvgRenderer renderer, bool pieces});
 /// turns, under a funnel of two ramps. Each tap drops [dropped] bodies: half
 /// balls, and half SVGs from 3 to 3.5 meters at their larger side. The SVG
 /// bodies draw above the others, so that flame_rasterizer draws them all in
-/// one run of a [RasterizerCanvas]. [PiecesLayer] draws their convex pieces
-/// over them while [pieces] is true.
+/// one run of a [RasterizerCanvas]. Their convex pieces draw over them, in
+/// the same run, while [pieces] is true.
 ///
 /// The status adds the bodies dropped to [StoryGame]'s. As in
 /// flame_path_shapes, the number of bodies at the top right counts the
@@ -146,7 +146,6 @@ abstract class RevoluteJointSvgsExample({
       _wheel = CircleShuffler(_wheelPosition, from: _from?.wheel),
       CornerRamp(center, isMirrored: true),
       CornerRamp(center),
-      PiecesLayer(),
     ]);
     _restoreBodies();
     startStatus();

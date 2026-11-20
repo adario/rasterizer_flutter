@@ -147,13 +147,14 @@ void main() {
       contains('Bodies: $bodies'),
     );
 
-    // PiecesLayer draws after all the bodies, so they stay in one run.
+    // Each SVG body's pieces draw over it, in the same run.
     await tester.pumpWidget(story(pieces: true));
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 16));
     }
     expect(game.pieces, isTrue);
-    expect(find.textContaining('1 run, $bodies entries'), findsOneWidget);
+    final pieces = bodies + game.svgBodies.length;
+    expect(find.textContaining('1 run, $pieces entries'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 

@@ -515,12 +515,16 @@ typedef NewBody = ({
   BodyComponent Function(Vector2 position, Vector2 velocity) create,
 });
 
-/// An SVG's size, and its convex pieces at that size.
-typedef _SizedPieces = ({Vector2 size, List<List<Vector2>> pieces});
+/// An SVG's size, and its convex pieces at that size, also as one path.
+typedef _SizedPieces = ({
+  Vector2 size,
+  List<List<Vector2>> pieces,
+  Path path,
+});
 
 /// A Forge2D example that drops balls, and SVG bodies from 3 to 3.5 meters at
-/// their larger side. [PiecesLayer] draws the SVGs' convex pieces over them
-/// while [pieces] is true.
+/// their larger side. The SVGs' convex pieces draw over them while [pieces]
+/// is true.
 mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// The balls' smallest radius, in meters. Box2D works best with bodies
   /// from 0.1 to 10 meters.
@@ -548,8 +552,12 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
 
   math.Random get random;
 
-  /// Whether [PiecesLayer] draws the SVG bodies' convex pieces.
+  /// Whether the SVG bodies' convex pieces draw over them.
   bool get pieces;
+
+  /// The paints of the convex pieces, in white, as each body tints them with
+  /// its color. The outline is 0.04 meters wide, as in flame_path_shapes.
+  static final _piecesPaints = GlowPaints(const Color(0xFFFFFFFF), 0.04);
 
   /// The SVG bodies dropped so far.
   final svgBodies = <SvgBody>[];
@@ -619,6 +627,20 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     ..scale = Vector2.all(1 / metersToPixels)
     ..anchor = Anchor.center;
 
+  /// Creates the component that draws [body]'s convex pieces over its SVG.
+  /// The bodies of an SVG's size share its path's import.
+  PathComponent piecesOutline(SvgBody body) {
+    final (size: _, pieces: _, :path) = _sizeAndPieces(body.name, body.side);
+    return (this as PathComponents).pathComponent(
+        path,
+        Paint(),
+        position: path.getBounds().topLeft.toVector2(),
+        priority: 1,
+      )
+      ..paintLayers = [_piecesPaints.fill, _piecesPaints.outline]
+      ..tint(body.color);
+  }
+
   /// Picks a ball of random radius, in the next color. Returns its radius,
   /// and a function that creates it with a position and a velocity.
   NewBody randomBall() {
@@ -641,7 +663,7 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   NewBody randomSvg({double spin = 0}) {
     final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
     final side = random.nextInt(_sides);
-    final (:size, pieces: _) = _sizeAndPieces(name, side);
+    final (:size, pieces: _, path: _) = _sizeAndPieces(name, side);
     final color = nextColor(name);
     final angle = random.nextDouble() * 2 * math.pi;
     final angularVelocity = (2 * random.nextDouble() - 1) * spin;
@@ -672,7 +694,7 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     double angularVelocity = 0,
     BodySnapshot? from,
   }) {
-    final (:size, :pieces) = _sizeAndPieces(name, side);
+    final (:size, :pieces, path: _) = _sizeAndPieces(name, side);
     return SvgBody(
       _svgs[name]!,
       size,
@@ -697,7 +719,12 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     final svg = _svgs[name]!;
     final s = (_minSide + side / 10) / math.max(svg.size.x, svg.size.y);
     final size = svg.size * s;
-    return (size: size, pieces: convexPiecesOf(svg.outline, size));
+    final pieces = convexPiecesOf(svg.outline, size);
+    final path = Path();
+    for (final piece in pieces) {
+      path.addPolygon([for (final v in piece) v.toOffset()], true);
+    }
+    return (size: size, pieces: pieces, path: path);
   }();
 }
 
@@ -705,8 +732,8 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
 /// collides as the SVG's convex [pieces].
 ///
 /// It starts at [_position] and [_angle], moving at [_velocity], or goes on
-/// from [from], if any, and draws above the other bodies. [PiecesLayer] draws
-/// its pieces in [color].
+/// from [from], if any, and draws above the other bodies. Its pieces draw over
+/// it in [color] while the game's [SvgBodies.pieces] is true.
 class SvgBody(
   final ExampleSvg svg,
   final Vector2 size,
@@ -726,19 +753,28 @@ class SvgBody(
 }) extends BodyComponent {
   this : super(renderBody: false, priority: 1);
 
-  /// The [pieces] as one path, for [PiecesLayer].
-  late final piecesPath = () {
-    final path = Path();
-    for (final piece in pieces) {
-      path.addPolygon([for (final v in piece) v.toOffset()], true);
-    }
-    return path;
-  }();
+  /// The component that draws its pieces, while the game shows them.
+  PathComponent? _piecesOutline;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     add((gameRef as SvgBodies).svgImage(this));
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    final game = gameRef as SvgBodies;
+    if (game.pieces == (_piecesOutline != null)) {
+      return;
+    }
+    if (_piecesOutline case final outline?) {
+      outline.removeFromParent();
+      _piecesOutline = null;
+    } else {
+      add(_piecesOutline = game.piecesOutline(this));
+    }
   }
 
   @override
@@ -759,45 +795,6 @@ class SvgBody(
       body.createShape(Polygon(piece), shapeDef);
     }
     return body..goOnFrom(from);
-  }
-}
-
-/// Draws the SVG bodies' convex pieces over them, while the game's
-/// [SvgBodies.pieces] is true.
-///
-/// It draws after all the bodies, so that the SVGs stay in one run. A child
-/// of each body, drawn over its SVG, would end the run at each body.
-class PiecesLayer() extends Component with HasGameRef<SvgBodies> {
-  this : super(priority: 2);
-
-  /// The width of the pieces' outlines, in meters, as in flame_path_shapes.
-  static const _outlineWidth = 0.04;
-
-  /// The paints for each body color.
-  final _paints = <Color, GlowPaints>{};
-
-  @override
-  void render(Canvas canvas) {
-    if (!gameRef.pieces) {
-      return;
-    }
-    for (final svgBody in gameRef.svgBodies) {
-      if (!svgBody.isLoaded) {
-        continue;
-      }
-      final paints = _paints[svgBody.color] ??= GlowPaints(
-        svgBody.color,
-        _outlineWidth,
-      );
-      final position = svgBody.body.position;
-      canvas
-        ..save()
-        ..translate(position.x, position.y)
-        ..rotate(svgBody.angle)
-        ..drawPath(svgBody.piecesPath, paints.fill)
-        ..drawPath(svgBody.piecesPath, paints.outline)
-        ..restore();
-    }
   }
 }
 

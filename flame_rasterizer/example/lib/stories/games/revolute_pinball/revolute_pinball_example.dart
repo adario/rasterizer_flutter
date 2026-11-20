@@ -177,7 +177,6 @@ abstract class RevolutePinballExample({
     if (!await loadBodySvgs()) {
       return;
     }
-    world.add(PiecesLayer());
     camera.viewport.add(_ready);
     _buildTable();
     startStatus();

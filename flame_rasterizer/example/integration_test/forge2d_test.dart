@@ -93,8 +93,9 @@ void main() {
       final text = status(tester);
       expect(text, startsWith(rendererStatus(renderer)));
       if (renderer != SvgRenderer.flameSvg) {
-        // The 45 bodies, the 4 walls, the 2 ramps and the wheel.
-        expect(text, contains('1 run, ${45 + 7} entries'));
+        // The 45 bodies, the 4 walls, the 2 ramps, the wheel and the SVG
+        // bodies' pieces.
+        expect(text, contains('1 run, ${45 + 7 + svgs} entries'));
       }
       await tester.pumpWidget(const SizedBox());
     });
