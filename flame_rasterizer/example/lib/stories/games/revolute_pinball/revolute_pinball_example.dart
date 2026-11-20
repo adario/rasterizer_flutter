@@ -6,6 +6,7 @@ import 'package:flame/events.dart';
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
+import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flutter/foundation.dart';
@@ -39,7 +40,7 @@ abstract class RevolutePinballExample({
     A pinball with the bodies of Revolute Joint Svgs. Space, or a double tap
     above the bottom third, drops 10 bodies over a wheel. Left or A, Right or
     D, or a tap in the bottom third's left or right half flips a flipper.
-    Bodies that fall through the drain are gone.
+    Bodies that fall through the drain are gone. Fill both buckets.
   ''';
 
   static final _flipperKeys = {
@@ -51,6 +52,7 @@ abstract class RevolutePinballExample({
 
   static const _dropped = 10;
   static const _maxBodies = 100;
+  static const _capacity = 10;
 
   /// The flippers' angle at rest, and the guides' slope.
   static const _restAngle = math.pi / 6;
@@ -60,6 +62,21 @@ abstract class RevolutePinballExample({
 
   _Table? _table;
   var _flippers = <_Flipper>[];
+  var _buckets = <_Bucket>[];
+  final _bucketText = TextComponent(
+    anchor: Anchor.topCenter,
+    textRenderer: StoryGame.hudTextRenderer,
+  );
+
+  String get _bucketCounts => _buckets
+      .map((b) => '${b.count}/$_capacity${b.full ? ' full' : ''}')
+      .join(' · ');
+
+  @override
+  Iterable<String> get exampleStats => [
+    ...super.exampleStats,
+    'buckets $_bucketCounts',
+  ];
 
   Rect get _arena => Rect.fromCenter(
     center: Offset.zero,
@@ -74,6 +91,7 @@ abstract class RevolutePinballExample({
       return;
     }
     world.add(PiecesLayer());
+    camera.viewport.add(_bucketText);
     _buildTable();
     startStatus();
   }
@@ -81,13 +99,14 @@ abstract class RevolutePinballExample({
   @override
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
+    _bucketText.position.setValues(size.x / 2, StoryGame.hudMargin);
     if (isLoaded) {
       _buildTable();
     }
   }
 
-  /// Rebuilds the walls, the guides, the flippers and the wheel for the
-  /// arena's size.
+  /// Rebuilds the walls, the guides, the flippers, the wheel and the buckets
+  /// for the arena's size.
   void _buildTable() {
     final a = _arena;
     final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
@@ -97,6 +116,7 @@ abstract class RevolutePinballExample({
       a.bottom - flipper * math.sin(_restAngle),
     );
     final guideTop = a.bottom - (a.right - drain) * math.tan(_restAngle);
+    final bucketWidth = math.max(0.2 * a.width, 2 * SvgBodies.maxSide);
     final table = _Table([
       Wall(Vector2(a.left, a.top), Vector2(a.right, a.top)),
       Wall(Vector2(a.left, a.top), Vector2(a.left, a.bottom)),
@@ -116,6 +136,19 @@ abstract class RevolutePinballExample({
         scale: 0.15 * a.height / CircleShuffler.reach,
         wireframe: true,
       ),
+      ..._buckets = [
+        for (final side in [-1, 1])
+          _Bucket(
+            Rect.fromCenter(
+              center: Offset(
+                side * (a.right - 0.06 * a.width - bucketWidth / 2),
+                a.top + 0.225 * a.height,
+              ),
+              width: bucketWidth,
+              height: 0.15 * a.height,
+            ),
+          ),
+      ],
     ]);
     _table?.next = table;
     world.add(_table = table);
@@ -154,6 +187,15 @@ abstract class RevolutePinballExample({
     if (gone.isNotEmpty) {
       removeBodies(gone);
     }
+    for (final bucket in _buckets) {
+      bucket.count = [...svgBodies, ...balls]
+          .where(
+            (b) =>
+                b.isLoaded && bucket.inner.contains(b.body.position.toOffset()),
+          )
+          .length;
+    }
+    _bucketText.text = 'Buckets: $_bucketCounts';
   }
 
   @override
@@ -260,6 +302,45 @@ class _Guide(final List<Vector2> _vertices)
       Polygon(_vertices),
       ShapeDef(material: SurfaceMaterial(friction: 0.5)),
     );
+}
+
+/// An open-top bucket around [inner], which glows once it holds
+/// [RevolutePinballExample._capacity] bodies.
+class _Bucket(final Rect inner) extends BodyComponent with GlowingBody {
+  this : super(paint: Paint()..color = ExampleColors.slate);
+
+  static const _thickness = 0.6;
+
+  int count = 0;
+
+  bool get full => count >= RevolutePinballExample._capacity;
+
+  @override
+  void update(double dt) {
+    paint.color = full ? ExampleColors.dynamicColor(4) : ExampleColors.slate;
+  }
+
+  @override
+  Body createBody() {
+    final body = world.createBody(BodyDef());
+    const t = _thickness;
+    for (final part in [
+      Rect.fromLTRB(inner.left - t, inner.top, inner.left, inner.bottom + t),
+      Rect.fromLTRB(inner.right, inner.top, inner.right + t, inner.bottom + t),
+      Rect.fromLTRB(inner.left, inner.bottom, inner.right, inner.bottom + t),
+    ]) {
+      body.createShape(
+        Polygon([
+          Vector2(part.left, part.top),
+          Vector2(part.right, part.top),
+          Vector2(part.right, part.bottom),
+          Vector2(part.left, part.bottom),
+        ]),
+        ShapeDef(material: SurfaceMaterial(friction: 0.5)),
+      );
+    }
+    return body;
+  }
 }
 
 /// A flipper [_length] meters long, on the left of its [_pivot] if [_side] is
