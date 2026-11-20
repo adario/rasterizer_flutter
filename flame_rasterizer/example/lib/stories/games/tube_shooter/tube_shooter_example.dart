@@ -6,6 +6,7 @@ import 'package:flame/events.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/bolts_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/climber_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/dot_component.dart';
@@ -19,7 +20,6 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/s
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/splitter_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_field_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/tube_component.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/zapper_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
@@ -73,7 +73,8 @@ abstract class TubeShooterExample({
   /// Which of the [levels] the first round plays.
   final int firstLevel = 0,
   TubeShooterSnapshot? from,
-}) extends ExampleGame with DragCallbacks, KeyboardEvents {
+}) extends ExampleGame
+    with DragCallbacks, KeyboardEvents, PathComponents<ExampleWorld> {
   /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
   /// SVG, which goes on from [from], if any, at its first level and pace.
   factory TubeShooterExample.of(
@@ -148,7 +149,7 @@ abstract class TubeShooterExample({
 
   /// The cap height, in logical pixels, of the round's number on the zoom,
   /// PURGE once the purge is used, and Game Over, at the middle.
-  static const bannerCap = 40.0;
+  static const bannerCap = VectorTextComponent.maxCapHeight;
 
   /// How long PURGE shows once the purge is used, in seconds.
   static const purgeTime = 1.0;
@@ -506,18 +507,6 @@ abstract class TubeShooterExample({
       group.descendants().whereType<PathComponent>().forEach(keepStroke);
     }
   }
-
-  /// Creates a component of the game's renderer that draws [path] with
-  /// [paint], and with [glow] if the renderer draws glows.
-  PathComponent pathComponent(
-    Path path,
-    Paint paint, {
-    Vector2? position,
-    Anchor? anchor,
-    double? maxSize,
-    int? priority,
-    RasterizerGlow? glow,
-  });
 
   /// Creates a component that draws [shape], one of `Shapes`, stroked in
   /// [color] about its origin.

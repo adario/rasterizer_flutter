@@ -1,13 +1,28 @@
 import 'dart:ui';
 
 import 'package:flame/components.dart';
-
+import 'package:flame/game.dart';
+import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/font.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flame_rasterizer_example/commons/vector_font.dart';
 
-/// A text in `TubeFont`, with capitals [capHeight] logical pixels high, in
+/// A game that creates path components of its renderer, for
+/// [VectorTextComponent].
+mixin PathComponents<W extends World> on FlameGame<W> {
+  /// Creates a component of the game's renderer that draws [path] with
+  /// [paint], and with [glow] if the renderer draws glows.
+  PathComponent pathComponent(
+    Path path,
+    Paint paint, {
+    Vector2? position,
+    Anchor? anchor,
+    double? maxSize,
+    int? priority,
+    RasterizerGlow? glow,
+  });
+}
+
+/// A text in `VectorFont`, with capitals [capHeight] logical pixels high, in
 /// [color].
 ///
 /// It draws each glyph with a path component of the game's renderer. All the
@@ -26,27 +41,30 @@ class VectorTextComponent({
   final int? line,
   final bool left = false,
   final double below = 0,
-  final Color color = TubeColors.text,
-}) extends PositionComponent with HasGameRef<TubeShooterExample> {
+  final Color color = const Color(0xFFFFFFFF),
+}) extends PositionComponent with HasGameRef<PathComponents> {
   this
     : super(
         anchor: line == null
             ? Anchor.center
             : (left ? Anchor.bottomLeft : Anchor.bottomRight),
-        scale: Vector2.all(capHeight / TubeFont.capHeight),
+        scale: Vector2.all(capHeight / VectorFont.capHeight),
         priority: -1,
       );
 
   /// From a line's baseline to the next's, in cap heights.
   static const lineSpacing = 1.6;
 
-  /// The size every glyph is imported for: the largest text's cap height, at a
-  /// device pixel ratio of 3.
+  /// The largest text's cap height.
+  static const maxCapHeight = 40.0;
+
+  /// The size every glyph is imported for: [maxCapHeight], at a device pixel
+  /// ratio of 3.
   ///
   /// One size lets texts of every size share each glyph's import. Glyphs are
   /// straight lines, which flatten the same at any size, so the large size
   /// loses nothing.
-  static const glyphMaxSize = 3 * TubeShooterExample.bannerCap;
+  static const glyphMaxSize = 3 * maxCapHeight;
 
   String get text => _text;
   String _text = text;
@@ -88,7 +106,7 @@ class VectorTextComponent({
   /// Replaces the components of the glyphs that changed with new ones for
   /// [text]. A character that stays in its place keeps its component.
   void _layOut() {
-    size.setValues(TubeFont.widthOf(_text), TubeFont.capHeight);
+    size.setValues(VectorFont.widthOf(_text), VectorFont.capHeight);
     while (_glyphs.length > _text.length) {
       _glyphs.removeLast()?.removeFromParent();
     }
@@ -96,7 +114,7 @@ class VectorTextComponent({
       if (i < _laidOut.length && _laidOut[i] == char) {
         continue;
       }
-      final glyph = TubeFont.glyph(char);
+      final glyph = VectorFont.glyph(char);
       final component = glyph == null ? null : _glyphComponent(i, glyph);
       if (i < _glyphs.length) {
         _glyphs[i]?.removeFromParent();
@@ -118,10 +136,10 @@ class VectorTextComponent({
       glyph,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = TubeFont.stroke
+        ..strokeWidth = VectorFont.stroke
         ..strokeCap = StrokeCap.square
         ..color = color,
-      position: Vector2(i * TubeFont.advance + bounds.left, bounds.top),
+      position: Vector2(i * VectorFont.advance + bounds.left, bounds.top),
       maxSize: glyphMaxSize,
     );
   }

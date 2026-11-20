@@ -13,6 +13,7 @@ import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/game_story.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/climber_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/edge_walker_component.dart';
@@ -24,7 +25,6 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/s
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/splitter_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_field_component.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/zapper_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';

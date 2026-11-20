@@ -335,7 +335,7 @@ Inspired by Atari's Tempest (1981): a tube shooter with a tube, enemies, colours
     do. The stars' places turn, not their distances.
   - They fade in over 0.3 s as the game starts, and stay, still once it's over. With the Drifting stars knob off, they
     fade out over 0.3 s as the zoom ends, and are gone once the game is over.
-- **Texts.** The game has its own font, `TubeFont`: capitals, digits, a space, a colon, a period and a dash. Each
+- **Texts.** The game draws its texts in `VectorFont`, a font of capitals, digits, a space, a colon, a period and a dash. Each
   glyph is 1 to 3 straight polylines on a grid 4 wide and 6 tall, stroked an eighth of its height wide, with miter
   joins, none sharper than 60°, and square ends, as the shapes are. Each glyph is a path, which all its components
   share, so that a text set again, such as the score, only imports the glyphs that no other text shows. Each text is a

@@ -1,18 +1,18 @@
 import 'dart:ui';
 
-/// The game's own font of straight lines: capitals, digits, a space, a colon,
+/// A font of straight lines: capitals, digits, a space, a colon,
 /// a period and a dash.
 ///
 /// Each glyph is polylines through the points of a grid [width] wide and
 /// [capHeight] tall, half points included, with y down and the baseline at
-/// the bottom. Like the shapes, glyphs are stroked [stroke] wide, with miter
+/// the bottom. Glyphs are stroked [stroke] wide, with miter
 /// joins and square ends. The font makes each glyph's path once, and all the
 /// glyph's components share it, so each glyph costs one import.
 ///
 /// No join is sharper than 60°, so that its miter stays within a stroke's
 /// width of its point, whatever the renderer's miter limit. Sharper corners
 /// are two polylines.
-abstract final class TubeFont() {
+abstract final class VectorFont() {
   static const width = 4.0;
   static const capHeight = 6.0;
 
