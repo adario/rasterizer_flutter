@@ -559,12 +559,26 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     world.removeAll(bodies);
   }
 
+  /// Returns the next body's color, a ball's or the SVG [svg]'s: the next of
+  /// [ExampleColors.dynamics].
+  Color nextColor([String? svg]) => ExampleColors.dynamicColor(tint++);
+
+  /// Creates the component that draws [body]'s SVG, centered on it.
+  ///
+  /// It's sized in pixels and scaled back to meters, as flame_svg's fixed
+  /// cache mode rasterizes an SVG at its component's size, without the
+  /// camera's.
+  PositionComponent svgImage(SvgBody body) => body.svg.component()
+    ..size = body.size * metersToPixels
+    ..scale = Vector2.all(1 / metersToPixels)
+    ..anchor = Anchor.center;
+
   /// Picks a ball of random radius, in the next color. Returns its radius,
   /// and a function that creates it with a position and a velocity.
   NewBody randomBall() {
     final radius =
         minBallRadius + random.nextDouble() * (_maxBallRadius - minBallRadius);
-    final color = ExampleColors.dynamicColor(tint++);
+    final color = nextColor();
     return (
       radius: radius,
       create: (position, velocity) =>
@@ -579,7 +593,7 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
     final side = random.nextInt(_sides);
     final (:size, pieces: _) = _sizeAndPieces(name, side);
-    final color = ExampleColors.dynamicColor(tint++);
+    final color = nextColor(name);
     final angle = random.nextDouble() * 2 * math.pi;
     final angularVelocity = (2 * random.nextDouble() - 1) * spin;
     return (
@@ -675,15 +689,7 @@ class SvgBody(
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    // Sized in pixels and scaled back to meters, as flame_svg's fixed cache
-    // mode rasterizes an SVG at its component's size, without the camera's.
-    final pixels = gameRef.metersToPixels;
-    add(
-      svg.component()
-        ..size = size * pixels
-        ..scale = Vector2.all(1 / pixels)
-        ..anchor = Anchor.center,
-    );
+    add((gameRef as SvgBodies).svgImage(this));
   }
 
   @override

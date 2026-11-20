@@ -10,6 +10,7 @@ import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
+import 'package:flame_rasterizer_example/commons/outline_paints.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flutter/foundation.dart';
@@ -46,9 +47,9 @@ abstract class RevolutePinballExample({
 
   static const description = '''
     A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
-    it, and drops 10 bodies over a wheel. Once each is in a bucket, gone
+    it, and drops 15 bodies over a wheel. Once each is in a bucket, gone
     through the drain, or at rest, the wheel turns the other way, amber until
-    it's at full speed, and the next 10 drop. Left or A, Right or D, or a tap
+    it's at full speed, and the next 15 drop. Left or A, Right or D, or a tap
     in the bottom third's left or right half flips a flipper. Fill both
     buckets.
   ''';
@@ -60,7 +61,7 @@ abstract class RevolutePinballExample({
     LogicalKeyboardKey.keyD: 1,
   };
 
-  static const _dropped = 10;
+  static const _dropped = 15;
   static const _maxBodies = 100;
 
   /// The room left above a bucket's resting bodies, in meters, under which
@@ -80,6 +81,62 @@ abstract class RevolutePinballExample({
   /// Smaller balls can get stuck at the flippers' tips.
   @override
   double get minBallRadius => 0.52;
+
+  /// MultipleShapes' path colors: each SVG's own, and the balls' in turn.
+  @override
+  Color nextColor([String? svg]) {
+    const colors = OutlinePaints.colors;
+    final index = svg == null ? tint++ : randomSvgNames.indexOf(svg);
+    return colors[index % colors.length];
+  }
+
+  /// The SVG's outline, drawn as MultipleShapes' paths.
+  @override
+  PositionComponent svgImage(SvgBody body) {
+    final outline = body.svg.outline;
+    final rect = outline.rect;
+    final bounds = outline.path.getBounds();
+    final scale = Vector2(body.size.x / rect.width, body.size.y / rect.height);
+    return outlineComponent(
+        outline.path,
+        OutlinePaints.of(body.color, rect.longestSide),
+        maxSize: 3 * metersToPixels * SvgBodies.maxSide,
+      )
+      ..position = Vector2(
+        (bounds.left - rect.center.dx) * scale.x,
+        (bounds.top - rect.center.dy) * scale.y,
+      )
+      ..scale = scale;
+  }
+
+  /// A unit circle, which every ball draws, scaled to its radius.
+  static final _circle = Path()
+    ..addOval(Rect.fromCircle(center: Offset.zero, radius: 1));
+
+  /// Draws [ball] as MultipleShapes' paths.
+  void _drawAsPath(Ball ball) {
+    ball
+      ..renderBody = false
+      ..add(
+        outlineComponent(
+            _circle,
+            OutlinePaints.of(ball.paint.color, 2),
+            // The largest balls are 2 meters wide.
+            maxSize: 3 * metersToPixels * 2,
+          )
+          ..position = Vector2.all(-ball.radius)
+          ..scale = Vector2.all(ball.radius),
+      );
+  }
+
+  /// Creates a component of the game's renderer that draws [path] with
+  /// [paintLayers], imported for [maxSize], at a device pixel ratio of up to
+  /// 3.
+  PathComponent outlineComponent(
+    Path path,
+    List<Paint> paintLayers, {
+    required double maxSize,
+  });
 
   /// The last trail of each body a flipper kicked.
   final _trails = <BodyComponent, _Trail>{};
@@ -243,6 +300,9 @@ abstract class RevolutePinballExample({
         position,
         awayFrom(spawn, position, 2, random),
       );
+      if (component is Ball) {
+        _drawAsPath(component);
+      }
       addBody(component);
       _current[component] = 0;
     }
@@ -835,6 +895,19 @@ class RasterizerRevolutePinballExample({
     priority: priority,
     glow: glow,
   );
+
+  @override
+  PathComponent outlineComponent(
+    Path path,
+    List<Paint> paintLayers, {
+    required double maxSize,
+  }) => RasterizerPathComponent(
+    path: path,
+    paintLayers: paintLayers,
+    maxSize: maxSize,
+    // Its polygons aren't used.
+    sampling: path.getBounds().longestSide,
+  );
 }
 
 class FlameSvgRevolutePinballExample({
@@ -863,5 +936,17 @@ class FlameSvgRevolutePinballExample({
     position: position,
     anchor: anchor,
     priority: priority,
+  );
+
+  @override
+  PathComponent outlineComponent(
+    Path path,
+    List<Paint> paintLayers, {
+    required double maxSize,
+  }) => PathComponent(
+    path: path,
+    paintLayers: paintLayers,
+    // Its polygons aren't used.
+    sampling: path.getBounds().longestSide,
   );
 }
