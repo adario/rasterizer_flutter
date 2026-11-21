@@ -105,11 +105,12 @@ abstract class SvgShooterExample({
   );
 
   /// The groups of stars, missiles, enemies and explosions, as in Rogue
-  /// Shooter, but without its batching.
+  /// Shooter, but without its batching. The explosions draw above the player
+  /// too, so that their particles don't split the SVGs' run.
   final starGroup = Component(priority: -1);
   final missileGroup = Component();
   final enemyGroup = Component();
-  final explosionGroup = Component();
+  final explosionGroup = Component(priority: 1);
 
   late final PlayerComponent player;
   final _enemyCreator = EnemyCreator(sinceWave: from?.sinceWave);

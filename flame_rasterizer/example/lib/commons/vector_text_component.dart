@@ -1,0 +1,249 @@
+import 'dart:ui';
+
+import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
+import 'package:flame/game.dart';
+import 'package:flame_rasterizer/flame_rasterizer.dart';
+import 'package:flame_rasterizer_example/commons/example_game.dart';
+import 'package:flame_rasterizer_example/commons/vector_font.dart';
+
+/// A game that creates path components of its renderer, for
+/// [VectorTextComponent].
+mixin PathComponents<W extends World> on FlameGame<W> {
+  /// Creates a component of the game's renderer that draws [path] with
+  /// [paint], and with [glow] if the renderer draws glows.
+  PathComponent pathComponent(
+    Path path,
+    Paint paint, {
+    Vector2? position,
+    Anchor? anchor,
+    double? maxSize,
+    int? priority,
+    RasterizerGlow? glow,
+  });
+}
+
+/// [PathComponents] that creates [RasterizerPathComponent]s.
+mixin RasterizerPathComponents<W extends World> on PathComponents<W> {
+  @override
+  PathComponent pathComponent(
+    Path path,
+    Paint paint, {
+    Vector2? position,
+    Anchor? anchor,
+    double? maxSize,
+    int? priority,
+    RasterizerGlow? glow,
+  }) => RasterizerPathComponent(
+    path: path,
+    paint: paint,
+    position: position,
+    anchor: anchor,
+    maxSize: maxSize,
+    priority: priority,
+    glow: glow,
+  );
+}
+
+/// [PathComponents] that creates Flame's [PathComponent]s, which apply their
+/// paint's color filter, such as a tint, to their paint layers too, as
+/// [RasterizerPathComponent]s do.
+mixin FlamePathComponents<W extends World> on PathComponents<W> {
+  @override
+  PathComponent pathComponent(
+    Path path,
+    Paint paint, {
+    Vector2? position,
+    Anchor? anchor,
+    double? maxSize,
+    int? priority,
+    RasterizerGlow? glow,
+  }) => _FlamePathComponent(
+    path: path,
+    paint: paint,
+    position: position,
+    anchor: anchor,
+    priority: priority,
+  );
+}
+
+class _FlamePathComponent({
+  required super.path,
+  super.paint,
+  super.position,
+  super.anchor,
+  super.priority,
+}) extends PathComponent {
+  @override
+  void render(Canvas canvas) {
+    if (hasPaintLayers) {
+      for (final layer in paintLayers) {
+        layer.colorFilter = paint.colorFilter;
+      }
+    }
+    super.render(canvas);
+  }
+}
+
+/// A text in `VectorFont`, with capitals [capHeight] logical pixels high, in
+/// [color].
+///
+/// It draws each glyph with a path component of the game's renderer. All the
+/// components of a glyph share its path. Setting a new text replaces only the
+/// components of the characters that changed, and imports only the glyphs
+/// that no other text shows.
+///
+/// With a [line], the text sits at the bottom right of its parent, or at the
+/// bottom left if [left], [line] lines above the last one; without, at its
+/// middle, or [below] it, in logical pixels. It keeps its place when the
+/// parent is resized. Its priority puts it under the FPS counter, so that it
+/// draws in the same run as the world. Its [opacity] fades all its glyphs,
+/// and its [tint] colors them.
+class VectorTextComponent({
+  required final double capHeight,
+  String text = '',
+  final int? line,
+  final bool left = false,
+  final double below = 0,
+  final Color color = const Color(0xFFFFFFFF),
+}) extends PositionComponent
+    with HasGameRef<PathComponents>
+    implements OpacityProvider {
+  this
+    : super(
+        anchor: line == null
+            ? Anchor.center
+            : (left ? Anchor.bottomLeft : Anchor.bottomRight),
+        scale: Vector2.all(capHeight / VectorFont.capHeight),
+        priority: -1,
+      );
+
+  /// From a line's baseline to the next's, in cap heights.
+  static const lineSpacing = 1.6;
+
+  /// The largest text's cap height.
+  static const maxCapHeight = 40.0;
+
+  /// The size every glyph is imported for: [maxCapHeight], at a device pixel
+  /// ratio of 3.
+  ///
+  /// One size lets texts of every size share each glyph's import. Glyphs are
+  /// straight lines, which flatten the same at any size, so the large size
+  /// loses nothing.
+  static const glyphMaxSize = 3 * maxCapHeight;
+
+  @override
+  double get opacity => _opacity;
+  double _opacity = 1;
+
+  @override
+  set opacity(double value) {
+    _opacity = value;
+    for (final glyph in _glyphs) {
+      glyph?.opacity = value;
+    }
+  }
+
+  /// The color its glyphs are tinted with, over [color], or null for none.
+  Color? get tint => _tint;
+  Color? _tint;
+
+  set tint(Color? value) {
+    if (value == _tint) {
+      return;
+    }
+    _tint = value;
+    _glyphs.forEach(_tintGlyph);
+  }
+
+  void _tintGlyph(PathComponent? glyph) {
+    if (_tint case final tint?) {
+      glyph?.tint(tint);
+    } else {
+      glyph?.paint.colorFilter = null;
+    }
+  }
+
+  String get text => _text;
+  String _text = text;
+
+  set text(String value) {
+    if (value == _text) {
+      return;
+    }
+    _text = value;
+    if (isLoaded) {
+      _layOut();
+    }
+  }
+
+  @override
+  Future<void> onLoad() async => _layOut();
+
+  @override
+  void onParentResize(Vector2 maxSize) {
+    super.onParentResize(maxSize);
+    final line = this.line;
+    if (line == null) {
+      position.setValues(maxSize.x / 2, maxSize.y / 2 + below);
+    } else {
+      position.setValues(
+        left ? StoryGame.hudMargin : maxSize.x - StoryGame.hudMargin,
+        maxSize.y - StoryGame.hudMargin - line * lineSpacing * capHeight,
+      );
+    }
+  }
+
+  /// The text its glyphs show.
+  String _laidOut = '';
+
+  /// Its glyphs' components, by their characters' indices in [_laidOut]:
+  /// null for a space.
+  final _glyphs = <PathComponent?>[];
+
+  /// Replaces the components of the glyphs that changed with new ones for
+  /// [text]. A character that stays in its place keeps its component.
+  void _layOut() {
+    size.setValues(VectorFont.widthOf(_text), VectorFont.capHeight);
+    while (_glyphs.length > _text.length) {
+      _glyphs.removeLast()?.removeFromParent();
+    }
+    for (final (i, char) in _text.split('').indexed) {
+      if (i < _laidOut.length && _laidOut[i] == char) {
+        continue;
+      }
+      final glyph = VectorFont.glyph(char);
+      final component = glyph == null ? null : _glyphComponent(i, glyph);
+      if (i < _glyphs.length) {
+        _glyphs[i]?.removeFromParent();
+        _glyphs[i] = component;
+      } else {
+        _glyphs.add(component);
+      }
+      if (component != null) {
+        add(component);
+      }
+    }
+    _laidOut = _text;
+  }
+
+  /// Returns a component of [glyph] at index [i].
+  PathComponent _glyphComponent(int i, Path glyph) {
+    final bounds = glyph.getBounds();
+    final component = gameRef.pathComponent(
+      glyph,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = VectorFont.stroke
+        ..strokeCap = StrokeCap.square
+        ..color = color,
+      position: Vector2(i * VectorFont.advance + bounds.left, bounds.top),
+      maxSize: glyphMaxSize,
+    );
+    if (_opacity != 1) {
+      component.opacity = _opacity;
+    }
+    _tintGlyph(component);
+    return component;
+  }
+}

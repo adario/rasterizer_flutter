@@ -72,6 +72,7 @@ const paths = [
   'forge2d/revolute-joint-svgs',
   'games/svg-shooter',
   'games/tube-shooter',
+  'games/revolute-pinball',
 ];
 
 void main() {
@@ -100,6 +101,7 @@ void main() {
     expect(find.text('Revolute Joint Svgs'), findsOneWidget);
     expect(find.text('Svg Shooter'), findsOneWidget);
     expect(find.text('Tube Shooter'), findsOneWidget);
+    expect(find.text('Revolute Pinball'), findsOneWidget);
   });
 
   // Below 840 wide, such as macOS's default window, Widgetbook shows the knobs
@@ -319,12 +321,13 @@ void main() {
         ..devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       // Tube Shooter's sounds, which it loads before it starts its status,
-      // don't load in a test's fake time.
+      // don't load in a test's fake time, nor do Revolute Pinball's.
       final route = Uri(
         path: '/',
         queryParameters: {
           'path': path,
-          if (path == 'games/tube-shooter') 'knobs': '{Sound:false}',
+          if (path case 'games/tube-shooter' || 'games/revolute-pinball')
+            'knobs': '{Sound:false}',
         },
       );
       await tester.pumpWidget(FlameRasterizerExamples(initialRoute: '$route'));

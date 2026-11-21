@@ -6,7 +6,7 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
-import 'package:flame_rasterizer_example/commons/material.dart' show Colors;
+import 'package:flame_rasterizer_example/commons/outline_paints.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/svg/collidable_svgs_example.dart'
     show CollidableArena;
@@ -116,21 +116,6 @@ abstract class MultipleShapesExample({
 
   /// The snowman's size, as in Flame's example.
   static final _snowmanSize = Vector2(120, 250);
-
-  /// The paths' colors, one for each SVG, in turn: Material's colors, except
-  /// the tints' green and purple.
-  static const _pathColors = [
-    Colors.blue,
-    Colors.orange,
-    Colors.teal,
-    Colors.pink,
-    Colors.amber,
-    Colors.indigo,
-    Colors.red,
-  ];
-
-  /// A path's stroke width, as a share of its outline's longer side.
-  static const _strokeShare = 1 / 50;
 
   final math.Random random = random ?? math.Random();
 
@@ -303,25 +288,15 @@ abstract class MultipleShapesExample({
     );
   }
 
-  /// Creates paints for the [k]th outline's path: a fill in its color, at
-  /// Flame's example's alpha, and a lighter, rounded stroke, [_strokeShare]
-  /// of the outline's longer side wide.
+  /// Creates [OutlinePaints] for the [k]th outline's path, in its color.
   ///
   /// Every shape of the outline gets equal paints, so with flame_rasterizer
   /// they all share one import. Each shape still gets its own paints, so
   /// that each is tinted on its own.
-  List<ui.Paint> _pathPaints(int k) {
-    final color = _pathColors[k % _pathColors.length];
-    return [
-      ui.Paint()..color = color.withValues(alpha: 0.8),
-      ui.Paint()
-        ..color = Color.lerp(color, Colors.white, 0.5)!
-        ..style = ui.PaintingStyle.stroke
-        ..strokeWidth = _outlines[k].rect.longestSide * _strokeShare
-        ..strokeJoin = ui.StrokeJoin.round
-        ..strokeCap = ui.StrokeCap.round,
-    ];
-  }
+  List<ui.Paint> _pathPaints(int k) => OutlinePaints.of(
+    OutlinePaints.colors[k % OutlinePaints.colors.length],
+    _outlines[k].rect.longestSide,
+  );
 
   /// Returns the size of its [i]th shape at [scale].
   Vector2 _sizeOf(int i, double scale) {

@@ -4,6 +4,7 @@ import 'package:flame_rasterizer_example/commons/game_story.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/renderer_knob.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
@@ -61,6 +62,22 @@ WidgetbookComponent gamesStories() {
         },
         codeLink: baseLink('games/tube_shooter'),
         info: TubeShooterExample.description,
+      ),
+      ExampleUseCase(
+        name: 'Revolute Pinball',
+        builder: (context) {
+          final renderer = rendererKnob(context);
+          return RevolutePinballStory(
+            renderer: renderer,
+            pieces: context.knobs.boolean(label: 'Pieces'),
+            sound: context.knobs.boolean(label: 'Sound', initialValue: true),
+            zoom: zoomKnob(context),
+            speed: speedKnob(context),
+            cache: cacheKnobs(context, shown: renderer == SvgRenderer.flameSvg),
+          );
+        },
+        codeLink: baseLink('games/revolute_pinball'),
+        info: RevolutePinballExample.description,
       ),
     ],
   );
@@ -187,6 +204,35 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
         ..sound = widget.sound,
       zoom: widget.zoom,
       speed: widget.speed,
+    );
+  }
+}
+
+class const RevolutePinballStory({
+  required final SvgRenderer renderer,
+  required final bool pieces,
+  required final bool sound,
+  final double zoom = 1,
+  final double speed = 1,
+  final SvgCache cache = defaultSvgCache,
+  super.key,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GameStory<RevolutePinballExample, Never>(
+      renderer: renderer,
+      cache: cache,
+      create: (status, _) => RevolutePinballExample.of(
+        renderer,
+        status,
+        pieces: pieces,
+        cache: cache,
+      )..sound = sound,
+      update: (game) => game
+        ..pieces = pieces
+        ..sound = sound,
+      zoom: zoom,
+      speed: speed,
     );
   }
 }

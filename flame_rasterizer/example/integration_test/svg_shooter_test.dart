@@ -4,9 +4,8 @@
 // Each game must load, draw and name its renderer in the status bar. It then
 // fires for about two seconds, sweeping from side to side, and must score,
 // whether or not the game is over by then. With flame_rasterizer, its SVGs
-// must draw in at most two runs, as the explosions' particles split them. A
-// run is a batch of entries, each an SVG placed in the frame, that the
-// renderer draws together.
+// must draw in one run, under the explosions' particles. A run is a batch of
+// entries, each an SVG placed in the frame, that the renderer draws together.
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
@@ -67,7 +66,7 @@ void main() {
           status;
       expect(status, startsWith(rendererStatus(renderer)));
       if (renderer != SvgRenderer.flameSvg) {
-        expect(status, contains(RegExp(r'\b[12] runs?, ')));
+        expect(status, contains(RegExp(r'\b1 run, ')));
       }
       expect(game.score, greaterThan(0));
       await tester.pumpWidget(const SizedBox());

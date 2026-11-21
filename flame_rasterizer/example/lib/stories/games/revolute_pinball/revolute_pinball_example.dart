@@ -1,0 +1,636 @@
+import 'dart:math' as math;
+import 'dart:ui';
+
+import 'package:flame/components.dart';
+import 'package:flame/events.dart';
+import 'package:flame/extensions.dart';
+import 'package:flame_forge2d/flame_forge2d.dart' hide World;
+import 'package:flame_rasterizer/flame_rasterizer.dart';
+import 'package:flame_rasterizer_example/commons/example_colors.dart';
+import 'package:flame_rasterizer_example/commons/forge2d.dart';
+import 'package:flame_rasterizer_example/commons/game_sounds.dart';
+import 'package:flame_rasterizer_example/commons/outline_paints.dart';
+import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
+import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/bucket_component.dart';
+import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/flipper_component.dart';
+import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/guide_component.dart';
+import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/table_component.dart';
+import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/trail_component.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show KeyEventResult;
+
+enum PinballSound(final String file) {
+  flip('flip'),
+  score('score'),
+  empty('empty'),
+  drain('drain'),
+  over('crash');
+
+  String get path => 'assets/audio/$file.wav';
+}
+
+abstract class RevolutePinballExample({
+  @override required var bool pieces,
+  required super.status,
+}) extends Forge2DExampleGame
+    with
+        ExampleSvgs,
+        SvgBodies,
+        KeyboardEvents,
+        PathComponents<Forge2DExampleWorld> {
+  this : super(world: RevolutePinballWorld());
+
+  factory RevolutePinballExample.of(
+    SvgRenderer renderer,
+    ValueNotifier<String> status, {
+    required bool pieces,
+    SvgCache cache = defaultSvgCache,
+  }) => renderer == SvgRenderer.flameSvg
+      ? FlameSvgRevolutePinballExample(
+          pieces: pieces,
+          status: status,
+          cache: cache,
+        )
+      : RasterizerRevolutePinballExample(
+          pieces: pieces,
+          status: status,
+          renderer: renderer,
+        );
+
+  static const description = '''
+    A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
+    it, and drops 15 bodies over a wheel. Once each is in a bucket, gone
+    through the drain, or at rest, the wheel turns the other way, amber until
+    it's at full speed, and the next 15 drop. Left or A, Right or D, or a tap
+    in the bottom third's left or right half flips a flipper. A body coming
+    to rest in a bucket scores by its area and the bucket's fill. Drained
+    bodies take energy, until the game is over. A full bucket gives its
+    bodies' area back, and empties. The Sound knob turns sounds on and off.
+  ''';
+
+  /// The Sound knob's value. The sounds load the first time it's on.
+  bool get sound => _sound;
+  bool _sound = false;
+
+  set sound(bool value) {
+    _sound = value;
+    if (value && _sounds == null) {
+      // At most 2 of each sound at once, so 10 at most.
+      (_sounds = GameSounds([
+        for (final sound in PinballSound.values) sound.path,
+      ], size: 2)).load();
+    }
+  }
+
+  GameSounds? _sounds;
+
+  void play(PinballSound sound) {
+    if (_sound) {
+      _sounds?.play(sound.path);
+    }
+  }
+
+  @override
+  void onRemove() {
+    _sounds?.dispose();
+    super.onRemove();
+  }
+
+  static final _flipperKeys = {
+    LogicalKeyboardKey.arrowLeft: 0,
+    LogicalKeyboardKey.keyA: 0,
+    LogicalKeyboardKey.arrowRight: 1,
+    LogicalKeyboardKey.keyD: 1,
+  };
+
+  static const _dropped = 15;
+  static const _maxBodies = 100;
+
+  /// How long a body below [_restSpeed] stays so to be at rest, in seconds.
+  static const restTime = 0.5;
+  static const _restSpeed = 0.5;
+
+  /// The game ends once the drained bodies' area reaches [_drainShare] of
+  /// the arena's.
+  static const _drainShare = 0.2;
+
+  static const _hudCap = 12.0;
+
+  /// The flippers' angle at rest, and the guides' slope.
+  static const restAngle = math.pi / 6;
+
+  @override
+  final random = math.Random();
+
+  /// Smaller balls can get stuck at the flippers' tips.
+  @override
+  double get minBallRadius => 0.52;
+
+  /// MultipleShapes' path colors: each SVG's own, and the balls' in turn.
+  @override
+  Color nextColor([String? svg]) {
+    const colors = OutlinePaints.colors;
+    final index = svg == null ? tint++ : randomSvgNames.indexOf(svg);
+    return colors[index % colors.length];
+  }
+
+  /// The SVG's outline, drawn as MultipleShapes' paths.
+  @override
+  PositionComponent svgImage(SvgBody body) {
+    final outline = body.svg.outline;
+    final rect = outline.rect;
+    final bounds = outline.path.getBounds();
+    final scale = Vector2(body.size.x / rect.width, body.size.y / rect.height);
+    return outlineComponent(
+        outline.path,
+        OutlinePaints.of(body.color, rect.longestSide),
+        maxSize: 3 * metersToPixels * SvgBodies.maxSide,
+      )
+      ..position = Vector2(
+        (bounds.left - rect.center.dx) * scale.x,
+        (bounds.top - rect.center.dy) * scale.y,
+      )
+      ..scale = scale;
+  }
+
+  /// A unit circle, which every ball draws, scaled to its radius.
+  static final _circle = Path()
+    ..addOval(Rect.fromCircle(center: Offset.zero, radius: 1));
+
+  /// Draws [ball] as MultipleShapes' paths.
+  void _drawAsPath(Ball ball) {
+    ball
+      ..glows = false
+      ..add(
+        outlineComponent(
+            _circle,
+            OutlinePaints.of(ball.paint.color, 2),
+            // The largest balls are 2 meters wide.
+            maxSize: 3 * metersToPixels * 2,
+          )
+          ..position = Vector2.all(-ball.radius)
+          ..scale = Vector2.all(ball.radius),
+      );
+  }
+
+  /// Creates a component of the game's renderer that draws [path] with
+  /// [paintLayers], imported for [maxSize], at a device pixel ratio of up to
+  /// 3.
+  PathComponent outlineComponent(
+    Path path,
+    List<Paint> paintLayers, {
+    required double maxSize,
+  });
+
+  /// The last trail of each body a flipper kicked.
+  final _trails = <BodyComponent, TrailComponent>{};
+
+  TableComponent? _table;
+  var _flippers = <FlipperComponent>[];
+  CircleShuffler? _wheel;
+  var _buckets = <BucketComponent>[];
+  final _ready = VectorTextComponent(
+    text: 'READY',
+    capHeight: VectorTextComponent.maxCapHeight,
+  );
+  final _gameOver = VectorTextComponent(
+    text: 'GAME OVER',
+    capHeight: VectorTextComponent.maxCapHeight,
+  );
+  final _energyText = VectorTextComponent(
+    capHeight: _hudCap,
+    line: 0,
+    left: true,
+  );
+  final _targetText = VectorTextComponent(
+    capHeight: _hudCap,
+    line: 1,
+    left: true,
+  );
+  final _dropsText = VectorTextComponent(capHeight: _hudCap, line: 1);
+  final _scoreText = VectorTextComponent(capHeight: _hudCap, line: 0);
+
+  /// The energy's colors from 0% to 100%.
+  static const _energyColors = [
+    Color(0xFFF87171),
+    Color(0xFFFB923C),
+    Color(0xFFFDE047),
+    Color(0xFF34D399),
+  ];
+
+  int score = 0;
+  var _drops = 0;
+
+  /// The area of the bodies gone through the drain, in square meters.
+  double drainedArea = 0.0;
+
+  var _over = false;
+
+  /// The world's speed before the game ended.
+  var _speed = 1.0;
+
+  double get _energy => math.max(
+    0,
+    1 - drainedArea / (_drainShare * _arena.width * _arena.height),
+  );
+
+  static double area(BodyComponent body) =>
+      body.body.mass / body.body.shapes.first.density;
+
+  /// Whether the next drop waits for the wheel to turn the other way.
+  var _queued = false;
+
+  /// The last bodies dropped, with how long each has been at rest.
+  var _current = <BodyComponent, double>{};
+
+  Rect get _arena => Rect.fromCenter(
+    center: Offset.zero,
+    width: size.x / metersToPixels,
+    height: size.y / metersToPixels,
+  );
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    if (!await loadBodySvgs()) {
+      return;
+    }
+    camera.viewport.addAll([
+      _ready,
+      _energyText,
+      _targetText,
+      _dropsText,
+      _scoreText,
+    ]);
+    _buildTable();
+    startStatus();
+  }
+
+  @override
+  void onGameResize(Vector2 size) {
+    super.onGameResize(size);
+    if (isLoaded) {
+      _buildTable();
+    }
+  }
+
+  /// Rebuilds the walls, the guides, the flippers, the wheel and the buckets
+  /// for the arena's size.
+  void _buildTable() {
+    final a = _arena;
+    final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
+    final flipper = 0.18 * a.width;
+    final small = math.min(a.width, a.height);
+    // The left flipper and guide, mirrored for the right ones: the tip ends
+    // at the drain, and the guide's recess under it at the bottom.
+    const angle = restAngle;
+    const gap = FlipperComponent.gap;
+    final bottom = FlipperComponent.bottomAngle(flipper);
+    final tip = FlipperComponent.tipCenter(flipper);
+    final floor =
+        (tip +
+              Vector2(math.cos(bottom), math.sin(bottom)) *
+                  (FlipperComponent.tipRadius + gap))
+          ..rotate(angle);
+    final pivot = Vector2(
+      -drain - FlipperComponent.tipRadius - (tip.clone()..rotate(angle)).x,
+      a.bottom - floor.y,
+    );
+    final socket = [
+      for (final p in FlipperComponent.arc(
+        Vector2.zero(),
+        FlipperComponent.radius + gap,
+        math.pi +
+            math.asin(
+              FlipperComponent.radius / (FlipperComponent.radius + gap),
+            ),
+        bottom,
+      ))
+        p
+          ..rotate(angle)
+          ..add(pivot),
+    ];
+    final top = socket.first;
+    final guide = [
+      Vector2(a.left, top.y - (top.x - a.left) * math.tan(angle)),
+      ...socket,
+      pivot + floor,
+      Vector2(a.left, a.bottom),
+    ];
+    final bucketWidth = math.max(0.2 * a.width, 2 * SvgBodies.maxSide);
+    final bucketHeight = 0.2 * small;
+    final table = TableComponent([
+      Wall(Vector2(a.left, a.top), Vector2(a.right, a.top)),
+      Wall(Vector2(a.left, a.top), Vector2(a.left, a.bottom)),
+      Wall(Vector2(a.right, a.top), Vector2(a.right, a.bottom)),
+      GuideComponent(guide),
+      GuideComponent([for (final v in guide.reversed) Vector2(-v.x, v.y)]),
+      ..._flippers = [
+        for (final side in [-1, 1])
+          FlipperComponent(Vector2(-side * pivot.x, pivot.y), flipper, side),
+      ],
+      _wheel = CircleShuffler(
+        Vector2(0, a.top + 0.35 * a.height),
+        scale: 0.15 * small / CircleShuffler.reach,
+        color: ExampleColors.dynamicColor(0),
+      ),
+      ..._buckets = [
+        for (final side in [-1, 1])
+          BucketComponent(
+            Rect.fromCenter(
+              center: Offset(
+                side * (a.right - 0.06 * a.width - bucketWidth / 2),
+                a.top + 0.15 * a.height + bucketHeight / 2,
+              ),
+              width: bucketWidth,
+              height: bucketHeight,
+            ),
+          ),
+      ],
+    ]);
+    _table?.next = table;
+    world.add(_table = table);
+  }
+
+  var _started = false;
+
+  void _start() {
+    if (_over) {
+      _newGame();
+    } else if (!_started && isLoaded) {
+      _started = true;
+      _ready.removeFromParent();
+      spawn();
+    }
+  }
+
+  /// Freezes the world and shows GAME OVER until a key or a tap.
+  void _endGame() {
+    _over = true;
+    _speed = world.timeScale;
+    world.timeScale = 0;
+    camera.viewport.add(_gameOver);
+    play(PinballSound.over);
+  }
+
+  /// Clears the bodies and the score, and waits at READY.
+  void _newGame() {
+    _over = false;
+    _started = false;
+    _gameOver.removeFromParent();
+    world.timeScale = _speed;
+    removeBodies([...svgBodies, ...balls]);
+    _current = {};
+    _queued = false;
+    score = 0;
+    _drops = 0;
+    drainedArea = 0;
+    camera.viewport.add(_ready);
+  }
+
+  void spawn() {
+    if (!isLoaded) {
+      return;
+    }
+    _drops++;
+    final spawn = Vector2(0, _arena.top + 0.1 * _arena.height);
+    final ballsFirst = random.nextBool();
+    final bodies = [
+      for (var i = 0; i < _dropped; i++)
+        if (i.isEven == ballsFirst) randomBall() else randomSvg(spin: 2),
+    ];
+    final positions = spreadAround(
+      spawn,
+      [for (final body in bodies) body.radius],
+      bounds: _arena.deflate(Wall.width),
+      world: world.physicsWorld,
+      random: random,
+    );
+    _current = {};
+    for (final (i, body) in bodies.indexed) {
+      final position = positions[i];
+      final component = body.create(
+        position,
+        awayFrom(spawn, position, 2, random),
+      );
+      if (component is Ball) {
+        _drawAsPath(component);
+      }
+      addBody(component);
+      _current[component] = 0;
+    }
+  }
+
+  /// Whether [body] is gone through the drain, is in a bucket, or has been at
+  /// rest for [restTime], after [dt] more seconds.
+  bool _done(BodyComponent body, double dt) {
+    if (body.isRemoving || body.isRemoved) {
+      return true;
+    }
+    if (!body.isLoaded) {
+      return false;
+    }
+    final position = body.body.position.toOffset();
+    if (_buckets.any((bucket) => bucket.holds(position))) {
+      return true;
+    }
+    final time = _current[body] = isStill(body.body) ? _current[body]! + dt : 0;
+    return time >= restTime;
+  }
+
+  static bool isStill(Body body) =>
+      body.linearVelocity.length < _restSpeed &&
+      body.angularVelocity.abs() < _restSpeed;
+
+  /// Starts a trail behind [body]'s component, unless its last one is still
+  /// going.
+  void _kicked(Body body) {
+    for (final component in [...svgBodies, ...balls]) {
+      if (component.isLoaded && component.body == body) {
+        if (_trails[component]?.over ?? true) {
+          world.add(_trails[component] = TrailComponent(component));
+        }
+        return;
+      }
+    }
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _sounds?.nextFrame();
+    _trails.removeWhere((_, trail) => trail.over);
+    _scoreText.text = 'SCORE $score';
+    _dropsText.text = 'DROP $_drops';
+    final energy = _energy;
+    final x = energy * (_energyColors.length - 1);
+    final i = math.min(x.floor(), _energyColors.length - 2);
+    _energyText
+      ..text = 'ENERGY ${(100 * energy).round()}%'
+      ..tint = Color.lerp(_energyColors[i], _energyColors[i + 1], x - i);
+    final target = _buckets.map((b) => b.level).fold(0.0, math.max);
+    _targetText.text = 'TARGET ${(100 * target).round()}%';
+    if (_over) {
+      return;
+    }
+    final bottom = _arena.bottom + SvgBodies.maxSide;
+    bool drained(BodyComponent body) =>
+        body.isLoaded && body.body.position.y > bottom;
+    final gone = [...svgBodies.where(drained), ...balls.where(drained)];
+    if (gone.isNotEmpty) {
+      drainedArea += gone.fold(0.0, (sum, body) => sum + area(body));
+      play(PinballSound.drain);
+      removeBodies(gone);
+    }
+    for (final bucket in _buckets) {
+      bucket.track([...svgBodies, ...balls], dt);
+    }
+    if (_started && _energy < 0.005) {
+      _endGame();
+      return;
+    }
+    final done = [for (final body in _current.keys.toList()) _done(body, dt)];
+    if (_started &&
+        !done.contains(false) &&
+        svgBodies.length + balls.length + _dropped <= _maxBodies) {
+      if (!_queued) {
+        _queued = true;
+        _wheel?.reverse();
+      } else if (!(_wheel?.reversing ?? false)) {
+        _queued = false;
+        spawn();
+      }
+    }
+  }
+
+  @override
+  KeyEventResult onKeyEvent(
+    KeyEvent event,
+    Set<LogicalKeyboardKey> keysPressed,
+  ) {
+    if (!_started || _over) {
+      if (event is KeyDownEvent) {
+        _start();
+      }
+      return KeyEventResult.handled;
+    }
+    final key = event.logicalKey;
+    final flipper = _flipperKeys[key];
+    if (flipper == null) {
+      return KeyEventResult.ignored;
+    }
+    if (event is KeyDownEvent) {
+      _hold(flipper, key);
+    } else if (event is KeyUpEvent) {
+      _release(key);
+    }
+    return KeyEventResult.handled;
+  }
+
+  void _hold(int flipper, Object holder) {
+    if (_flippers.elementAtOrNull(flipper)?.hold(holder) ?? false) {
+      play(PinballSound.flip);
+    }
+  }
+
+  void _release(Object holder) {
+    for (final flipper in _flippers) {
+      flipper.release(holder);
+    }
+  }
+}
+
+class RevolutePinballWorld()
+    extends Forge2DExampleWorld
+    with TapCallbacks, HasGameRef<RevolutePinballExample> {
+  @override
+  void update(double dt) {
+    super.update(dt);
+    final events = physicsWorld.contactEvents;
+    for (final flipper in gameRef._flippers) {
+      flipper.track(events);
+      if (flipper.kicking) {
+        flipper.touching.forEach(gameRef._kicked);
+      }
+    }
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    super.onTapDown(event);
+    if (!gameRef._started || gameRef._over) {
+      gameRef._start();
+      return;
+    }
+    final position = event.canvasPosition;
+    if (position.y > gameRef.size.y * 2 / 3) {
+      gameRef._hold(position.x < gameRef.size.x / 2 ? 0 : 1, event.pointerId);
+    }
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    super.onTapUp(event);
+    gameRef._release(event.pointerId);
+  }
+
+  @override
+  void onTapCancel(TapCancelEvent event) {
+    super.onTapCancel(event);
+    gameRef._release(event.pointerId);
+  }
+}
+
+class RasterizerRevolutePinballExample({
+  required super.pieces,
+  required super.status,
+  @override required final SvgRenderer renderer,
+}) extends RevolutePinballExample
+    with
+        HasRasterizer,
+        ExampleRasterizer,
+        RasterizerSvgs,
+        RasterizerPathComponents {
+  this {
+    RasterizerGpu.forceCanvas = forceCanvas;
+  }
+
+  @override
+  PathComponent outlineComponent(
+    Path path,
+    List<Paint> paintLayers, {
+    required double maxSize,
+  }) => RasterizerPathComponent(
+    path: path,
+    paintLayers: paintLayers,
+    maxSize: maxSize,
+    // Its polygons aren't used.
+    sampling: path.getBounds().longestSide,
+  );
+}
+
+class FlameSvgRevolutePinballExample({
+  required super.pieces,
+  required super.status,
+  final SvgCache cache = defaultSvgCache,
+}) extends RevolutePinballExample with FlameSvgs, FlamePathComponents {
+  @override
+  SvgCacheMode get cacheMode => cache.mode;
+
+  @override
+  SvgCacheSize get cacheSize => cache.size;
+
+  @override
+  PathComponent outlineComponent(
+    Path path,
+    List<Paint> paintLayers, {
+    required double maxSize,
+  }) => PathComponent(
+    path: path,
+    paintLayers: paintLayers,
+    // Its polygons aren't used.
+    sampling: path.getBounds().longestSide,
+  );
+}

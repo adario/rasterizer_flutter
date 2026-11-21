@@ -2,12 +2,15 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:flame/extensions.dart';
 import 'package:flame/geometry.dart' show convexPieces;
 import 'package:flame_forge2d/flame_forge2d.dart' as forge2d show World;
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
+import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flutter/foundation.dart';
 
 /// A Forge2D example's world, which runs at its game's
@@ -116,49 +119,88 @@ class GlowPaints(final Color color, final double outlineWidth) {
     ..strokeWidth = outlineWidth;
 }
 
-/// Draws a body's shapes with [GlowPaints] of its paint's color.
+/// Draws a body's [glowPath] with [GlowPaints] of its paint's color, as a
+/// child path component of the game's [PathComponents].
+///
+/// The paints are white, and the child is tinted with the color. So the
+/// bodies that share a [glowPath] object share its import, whatever their
+/// color. The body's own shapes aren't drawn.
 mixin GlowingBody on BodyComponent {
   /// The width of the outline, in meters.
   double get outlineWidth => 0.12;
 
-  GlowPaints? _glow;
+  /// The path to draw, in the body's coordinates: its shapes, by default.
+  Path get glowPath => pathOf(body.shapes);
 
-  /// The paints for its paint's color, made again when the color changes.
-  GlowPaints get _paints {
-    final glow = _glow;
-    if (glow != null && glow.color == paint.color) {
-      return glow;
+  /// The paint layers to draw [glowPath] with, in white.
+  List<Paint> get glowLayers {
+    final paints = GlowPaints(const Color(0xFFFFFFFF), outlineWidth);
+    return [paints.fill, paints.outline];
+  }
+
+  /// Whether it draws [glowPath]: false for a body that its game draws
+  /// otherwise.
+  bool glows = true;
+
+  PathComponent? _glow;
+
+  /// The color it's tinted with.
+  Color? _tint;
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    renderBody = false;
+    if (!glows) {
+      return;
     }
-    return _glow = GlowPaints(paint.color, outlineWidth);
+    final path = glowPath;
+    add(
+      _glow =
+          (findGame()! as PathComponents).pathComponent(
+              path,
+              Paint(),
+              position: path.getBounds().topLeft.toVector2(),
+            )
+            ..paintLayers = glowLayers
+            ..tint(_tint = paint.color),
+    );
   }
 
   @override
-  void renderCircle(Canvas canvas, Offset center, double radius) {
-    final paints = _paints;
-    canvas
-      ..drawCircle(center, radius, paints.fill)
-      ..drawCircle(center, radius, paints.outline)
-      // A radius line shows the body turning.
-      ..drawLine(center, center + Offset(radius, 0), paints.outline);
+  void update(double dt) {
+    super.update(dt);
+    final glow = _glow;
+    if (glow != null && paint.color != _tint) {
+      glow.tint(_tint = paint.color);
+    }
   }
 
-  /// One path, reset for each polygon, as `BodyComponent` does.
-  late final Path _path = Path();
-
-  @override
-  void renderPolygon(Canvas canvas, List<Offset> points) {
-    final paints = _paints;
-    final path = _path
-      ..reset()
-      ..addPolygon(points, true);
-    canvas
-      ..drawPath(path, paints.fill)
-      ..drawPath(path, paints.outline);
-  }
-
-  @override
-  void renderSegment(Canvas canvas, Offset p1, Offset p2) {
-    canvas.drawLine(p1, p2, _paints.outline);
+  /// Returns [shapes] as one path. A circle has a radius line that shows it
+  /// turning, if [spokes].
+  static Path pathOf(Iterable<Shape> shapes, {bool spokes = true}) {
+    final path = Path();
+    for (final shape in shapes) {
+      switch (shape.geometry) {
+        case Circle(:final center, :final radius):
+          final c = center.toOffset();
+          path.addOval(Rect.fromCircle(center: c, radius: radius));
+          if (spokes) {
+            path
+              ..moveTo(c.dx, c.dy)
+              ..lineTo(c.dx + radius, c.dy);
+          }
+        case Segment(:final point1, :final point2):
+          path
+            ..moveTo(point1.x, point1.y)
+            ..lineTo(point2.x, point2.y);
+        case Polygon(:final points):
+          path.addPolygon([for (final v in points!) v.toOffset()], true);
+        case Capsule():
+          throw UnsupportedError('Capsules');
+      }
+    }
+    return path;
   }
 }
 
@@ -248,6 +290,12 @@ class Ball(
   final BodySnapshot? from,
 }) extends BodyComponent with GlowingBody {
   this : super(paint: Paint()..color = color);
+
+  /// The balls' paths, by radius, so that the balls of a size share one.
+  static final _paths = <double, Path>{};
+
+  @override
+  Path get glowPath => _paths[radius] ??= super.glowPath;
 
   @override
   Body createBody() {
@@ -453,4 +501,427 @@ double _distanceToSegment(Vector2 point, Vector2 a, Vector2 b) {
   }
   final t = ((point - a).dot(ab) / lengthSquared).clamp(0.0, 1.0);
   return point.distanceTo(a + ab * t);
+}
+
+/// A body to drop: its bounding radius, and a function that creates it.
+typedef NewBody = ({
+  double radius,
+  BodyComponent Function(Vector2 position, Vector2 velocity) create,
+});
+
+/// An SVG's size, and its convex pieces at that size, also as one path.
+typedef _SizedPieces = ({
+  Vector2 size,
+  List<List<Vector2>> pieces,
+  Path path,
+});
+
+/// A Forge2D example that drops balls, and SVG bodies from 3 to 3.5 meters at
+/// their larger side. The SVGs' convex pieces draw over them while [pieces]
+/// is true.
+mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
+  /// The balls' smallest radius, in meters. Box2D works best with bodies
+  /// from 0.1 to 10 meters.
+  double get minBallRadius => 0.4;
+
+  /// The balls' largest radius, in meters.
+  static const _maxBallRadius = 1.0;
+
+  /// How many radii the balls come in, evenly spaced, so that the balls of a
+  /// radius share their path's import.
+  static const _ballSizes = 6;
+
+  /// The larger side of the smallest SVGs, in meters.
+  ///
+  /// The SVGs come in [_sides] sizes, from 3 to 3.5 meters by tenths, as in
+  /// flame_path_shapes. So [_sizeAndPieces] works out each SVG's pieces once
+  /// per size.
+  static const _minSide = 3.0;
+
+  /// How many sizes the SVGs come in.
+  static const _sides = 6;
+
+  /// The larger side of the largest SVGs, in meters.
+  static const maxSide = _minSide + (_sides - 1) / 10;
+
+  math.Random get random;
+
+  /// Whether the SVG bodies' convex pieces draw over them.
+  bool get pieces;
+
+  /// The paints of the convex pieces, in white, as each body tints them with
+  /// its color. The outline is 0.04 meters wide, as in flame_path_shapes.
+  static final _piecesPaints = GlowPaints(const Color(0xFFFFFFFF), 0.04);
+
+  /// The SVG bodies dropped so far.
+  final svgBodies = <SvgBody>[];
+
+  /// The balls dropped so far.
+  final balls = <Ball>[];
+
+  /// The SVGs of [randomSvgNames], loaded up front so that dropping can be
+  /// synchronous.
+  final _svgs = <String, ExampleSvg>{};
+
+  /// Each SVG's size and convex pieces, by its name and its size's index.
+  final _pieces = <({String name, int side}), _SizedPieces>{};
+
+  /// The index of the next body's color: the bodies take the colors in turn.
+  int tint = 0;
+
+  @override
+  Iterable<String> get exampleStats {
+    final ballCount = '${balls.length} ball${balls.length == 1 ? '' : 's'}';
+    final svgCount =
+        '${svgBodies.length} SVG${svgBodies.length == 1 ? '' : 's'}';
+    return ['$ballCount, $svgCount'];
+  }
+
+  /// Loads the SVGs of [randomSvgNames]. Returns false if the game was removed
+  /// while they loaded, and its physics world is destroyed.
+  Future<bool> loadBodySvgs() async {
+    for (final name in randomSvgNames) {
+      _svgs[name] = await loadSvg('assets/svgs/$name.svg');
+      if (isRemoved) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Adds [body] to the world, and to [svgBodies] or [balls].
+  void addBody(BodyComponent body) {
+    switch (body) {
+      case SvgBody():
+        svgBodies.add(body);
+      case Ball():
+        balls.add(body);
+    }
+    world.add(body);
+  }
+
+  /// Removes [bodies] from the world, and from [svgBodies] and [balls].
+  void removeBodies(List<BodyComponent> bodies) {
+    svgBodies.removeWhere(bodies.contains);
+    balls.removeWhere(bodies.contains);
+    world.removeAll(bodies);
+  }
+
+  /// Returns the next body's color, a ball's or the SVG [svg]'s: the next of
+  /// [ExampleColors.dynamics].
+  Color nextColor([String? svg]) => ExampleColors.dynamicColor(tint++);
+
+  /// Creates the component that draws [body]'s SVG, centered on it.
+  ///
+  /// It's sized in pixels and scaled back to meters, as flame_svg's fixed
+  /// cache mode rasterizes an SVG at its component's size, without the
+  /// camera's.
+  PositionComponent svgImage(SvgBody body) => body.svg.component()
+    ..size = body.size * metersToPixels
+    ..scale = Vector2.all(1 / metersToPixels)
+    ..anchor = Anchor.center;
+
+  /// Creates the component that draws [body]'s convex pieces over its SVG.
+  /// The bodies of an SVG's size share its path's import.
+  PathComponent piecesOutline(SvgBody body) {
+    final (size: _, pieces: _, :path) = _sizeAndPieces(body.name, body.side);
+    return (this as PathComponents).pathComponent(
+        path,
+        Paint(),
+        position: path.getBounds().topLeft.toVector2(),
+        priority: 1,
+      )
+      ..paintLayers = [_piecesPaints.fill, _piecesPaints.outline]
+      ..tint(body.color);
+  }
+
+  /// Picks a ball of random radius, in the next color. Returns its radius,
+  /// and a function that creates it with a position and a velocity.
+  NewBody randomBall() {
+    final radius =
+        minBallRadius +
+        random.nextInt(_ballSizes) *
+            (_maxBallRadius - minBallRadius) /
+            (_ballSizes - 1);
+    final color = nextColor();
+    return (
+      radius: radius,
+      create: (position, velocity) =>
+          Ball(position, velocity, radius: radius, color: color),
+    );
+  }
+
+  /// Picks a random SVG, at a random size and angle, spinning at up to [spin]
+  /// radians a second, in the next color. Returns its bounding radius, and a
+  /// function that creates its body with a position and a velocity.
+  NewBody randomSvg({double spin = 0}) {
+    final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
+    final side = random.nextInt(_sides);
+    final (:size, pieces: _, path: _) = _sizeAndPieces(name, side);
+    final color = nextColor(name);
+    final angle = random.nextDouble() * 2 * math.pi;
+    final angularVelocity = (2 * random.nextDouble() - 1) * spin;
+    return (
+      radius: size.length / 2,
+      create: (position, velocity) => createSvgBody(
+        name,
+        side,
+        position,
+        velocity,
+        angle: angle,
+        angularVelocity: angularVelocity,
+        color: color,
+      ),
+    );
+  }
+
+  /// Creates the body of the SVG [name] at its [side]th size, in [color],
+  /// which starts at [position] and [angle], moving at [velocity] and
+  /// [angularVelocity], or goes on from [from], if any.
+  SvgBody createSvgBody(
+    String name,
+    int side,
+    Vector2 position,
+    Vector2 velocity, {
+    required double angle,
+    required Color color,
+    double angularVelocity = 0,
+    BodySnapshot? from,
+  }) {
+    final (:size, :pieces, path: _) = _sizeAndPieces(name, side);
+    return SvgBody(
+      _svgs[name]!,
+      size,
+      pieces,
+      position,
+      velocity,
+      angle: angle,
+      color: color,
+      name: name,
+      side: side,
+      angularVelocity: angularVelocity,
+      from: from,
+    );
+  }
+
+  /// Returns the size and convex pieces of the SVG [name] at its [side]th size,
+  /// worked out once.
+  _SizedPieces _sizeAndPieces(
+    String name,
+    int side,
+  ) => _pieces[(name: name, side: side)] ??= () {
+    final svg = _svgs[name]!;
+    final s = (_minSide + side / 10) / math.max(svg.size.x, svg.size.y);
+    final size = svg.size * s;
+    final pieces = convexPiecesOf(svg.outline, size);
+    final path = Path();
+    for (final piece in pieces) {
+      path.addPolygon([for (final v in piece) v.toOffset()], true);
+    }
+    return (size: size, pieces: pieces, path: path);
+  }();
+}
+
+/// A body that draws [svg], [size] meters large and centered on it, and
+/// collides as the SVG's convex [pieces].
+///
+/// It starts at [_position] and [_angle], moving at [_velocity], or goes on
+/// from [from], if any, and draws above the other bodies. Its pieces draw over
+/// it in [color] while the game's [SvgBodies.pieces] is true.
+class SvgBody(
+  final ExampleSvg svg,
+  final Vector2 size,
+  final List<List<Vector2>> pieces,
+  final Vector2 _position,
+  final Vector2 _velocity, {
+  required final double _angle,
+  required final Color color,
+
+  /// The SVG's name, for a game with another renderer to load it.
+  required final String name,
+
+  /// The index of the SVG's size, for a game with another renderer.
+  required final int side,
+  final double _angularVelocity = 0,
+  final BodySnapshot? from,
+}) extends BodyComponent {
+  this : super(renderBody: false, priority: 1);
+
+  /// The component that draws its pieces, while the game shows them.
+  PathComponent? _piecesOutline;
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    add((gameRef as SvgBodies).svgImage(this));
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    final game = gameRef as SvgBodies;
+    if (game.pieces == (_piecesOutline != null)) {
+      return;
+    }
+    if (_piecesOutline case final outline?) {
+      outline.removeFromParent();
+      _piecesOutline = null;
+    } else {
+      add(_piecesOutline = game.piecesOutline(this));
+    }
+  }
+
+  @override
+  Body createBody() {
+    final body = world.createBody(
+      BodyDef(
+        type: BodyType.dynamic,
+        position: _position,
+        rotation: Rot.fromAngle(_angle),
+        linearVelocity: _velocity,
+        angularVelocity: _angularVelocity,
+      ),
+    );
+    final shapeDef = ShapeDef(
+      material: SurfaceMaterial(restitution: 0.4, friction: 0.5),
+    );
+    for (final piece in pieces) {
+      body.createShape(Polygon(piece), shapeDef);
+    }
+    return body..goOnFrom(from);
+  }
+}
+
+/// flame_path_shapes' wheel: five circles around [_position] that a motor
+/// turns, [scale] times as large. It's filled, or drawn as the other glowing
+/// bodies in [color], if given. It goes on from [from], if any.
+///
+/// It passes through the walls, which a short game brings into its way.
+class CircleShuffler(
+  final Vector2 _position, {
+  final BodySnapshot? from,
+  final double scale = 1,
+  final Color? color,
+}) extends BodyComponent with GlowingBody {
+  this : super(paint: color == null ? null : (Paint()..color = color));
+
+  @override
+  Path get glowPath => GlowingBody.pathOf(body.shapes, spokes: false);
+
+  @override
+  List<Paint> get glowLayers => color == null
+      ? [Paint()..color = const Color(0xFFFFFFFF)]
+      : super.glowLayers;
+
+  /// The distance of the circles' centers from the wheel's, in meters.
+  static const _radius = 6.0;
+
+  /// The circles' radius, in meters.
+  static const _circleRadius = 1.2;
+
+  /// How far the wheel reaches from its center, in meters.
+  static const reach = _radius + _circleRadius;
+
+  /// The motor's speed, in radians a second.
+  static const _speed = math.pi;
+
+  /// How long the motor takes to turn the other way, in seconds.
+  static const _reverseTime = 1.0;
+
+  late final RevoluteJoint _joint;
+
+  /// The speed that the motor heads for.
+  double _targetSpeed = _speed;
+
+  /// The motor's speed, kept here: Box2D's is a float, which never equals
+  /// [_targetSpeed].
+  double _motorSpeed = _speed;
+
+  /// Its color, and the one it takes while [reversing].
+  late final _color = paint.color;
+  static final _reversingColor = ExampleColors.dynamicColor(2);
+
+  /// Slows the wheel down, then turns it the other way.
+  void reverse() => _targetSpeed = -_targetSpeed;
+
+  /// Whether it's turning the other way after [reverse], until it's at full
+  /// speed.
+  bool get reversing => _motorSpeed != _targetSpeed;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    final speed = _motorSpeed;
+    if (speed != _targetSpeed) {
+      final step = 2 * _speed * dt / _reverseTime;
+      _joint.motorSpeed = _motorSpeed = (_targetSpeed - speed).abs() <= step
+          ? _targetSpeed
+          : speed + step * (_targetSpeed - speed).sign;
+    }
+    paint.color = reversing ? _reversingColor : _color;
+  }
+
+  @override
+  Body createBody() {
+    const pieces = 5;
+    final body = world.createBody(
+      BodyDef(type: BodyType.dynamic, position: _position),
+    );
+    final shapeDef = ShapeDef(
+      density: 50,
+      material: SurfaceMaterial(friction: 0.4, restitution: 0.6),
+      filter: Filter(maskBits: Filter.allCategories & ~Wall.category),
+    );
+    for (var i = 0; i < pieces; i++) {
+      final angle = 2 * math.pi * i / pieces;
+      body.createShape(
+        Circle(
+          radius: _circleRadius * scale,
+          center: Vector2(math.cos(angle), math.sin(angle))
+            ..scale(_radius * scale),
+        ),
+        shapeDef,
+      );
+    }
+    // The joint holds the wheel to an empty static body, as its ground.
+    final ground = world.createBody(BodyDef());
+    _joint = world.physicsWorld.createRevoluteJoint(
+      RevoluteJointDef(
+        bodyA: body,
+        bodyB: ground,
+        localAnchorB: body.position.clone(),
+        motorSpeed: _speed,
+        maxMotorTorque: 1000000,
+        enableMotor: true,
+      ),
+    );
+    return body..goOnFrom(from);
+  }
+}
+
+/// One of the two ramps of flame_path_shapes' funnel above the wheel. It's on
+/// the right of [_center], or on the left if [isMirrored].
+class CornerRamp(final Vector2 _center, {final bool isMirrored = false})
+    extends BodyComponent
+    with GlowingBody {
+  this : super(paint: Paint()..color = ExampleColors.slate);
+
+  @override
+  Body createBody() {
+    final mirror = isMirrored ? -1 : 1;
+    // The two tips are 12 meters apart: about three and a half SVGs, and a
+    // little less than the wheel's 14.4 meters. At 8 meters, SVGs dropped
+    // above the opening sometimes clogged it.
+    final tip = 6.0 * mirror;
+    // A solid polygon, not a chain loop. Chains are one-sided in Box2D v3, so
+    // a chain ramp would let balls in from the other side and trap them.
+    return world.createBody(BodyDef(position: _center))..createShape(
+      Polygon([
+        Vector2(tip, 0),
+        Vector2(tip + 20 * mirror, -20),
+        Vector2(tip + 35 * mirror, -30),
+      ]),
+      ShapeDef(material: SurfaceMaterial(friction: 0.5)),
+    );
+  }
 }

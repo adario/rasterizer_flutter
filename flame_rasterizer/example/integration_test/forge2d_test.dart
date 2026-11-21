@@ -3,9 +3,9 @@
 //
 // Each game must load Box2D, drop 45 bodies, 15 at each of three places, and
 // keep them inside its walls. With Pieces on, it must name its renderer in
-// the status bar. With flame_rasterizer, all its SVG bodies must draw in one
-// run: a batch of entries, each an SVG placed in the frame, that the renderer
-// draws together.
+// the status bar. With flame_rasterizer, all its bodies must draw in one run:
+// a batch of entries, each an SVG or a path placed in the frame, that the
+// renderer draws together.
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
@@ -93,7 +93,9 @@ void main() {
       final text = status(tester);
       expect(text, startsWith(rendererStatus(renderer)));
       if (renderer != SvgRenderer.flameSvg) {
-        expect(text, contains('1 run, $svgs entries'));
+        // The 45 bodies, the 4 walls, the 2 ramps, the wheel and the SVG
+        // bodies' pieces.
+        expect(text, contains('1 run, ${45 + 7 + svgs} entries'));
       }
       await tester.pumpWidget(const SizedBox());
     });

@@ -1,35 +1,41 @@
 import 'dart:js_interop';
 
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/sounds.dart';
 import 'package:flutter/services.dart';
 import 'package:web/web.dart' as web;
 
-/// The game's sounds on the web, which the Web Audio API plays: each sound is
+/// A game's sounds on the web, which the Web Audio API plays: each sound is
 /// decoded once, and each play starts a new source node with it.
 ///
 /// audioplayers plays each sound with an `<audio>` element instead, and in
 /// Safari starting one can block the page for hundreds of milliseconds.
-class SoundBank._(final Map<Sound, web.AudioBuffer> _buffers, final int _size) {
+class SoundBank._(
+  final Map<String, web.AudioBuffer> _buffers,
+  final int _size,
+) {
   /// The page's audio context, which every game shares: once the user's input
   /// starts it, it stays started for the games that come later.
   static web.AudioContext? _context;
 
   /// The decoded sounds, which every game shares.
-  static final _decoded = <Sound, Future<web.AudioBuffer>>{};
+  static final _decoded = <String, Future<web.AudioBuffer>>{};
 
   /// How many banks are loaded and not disposed: while there are none, the
   /// context is suspended, so that it costs nothing.
   static var _banks = 0;
 
   /// How many times each sound is playing.
-  final _playing = <Sound, int>{};
+  final _playing = <String, int>{};
 
-  /// Loads every sound, which can play [size] times at once.
-  static Future<SoundBank> load({required int size}) async {
+  /// Loads the sounds at [paths], each of which can play [size] times at
+  /// once.
+  static Future<SoundBank> load(
+    List<String> paths, {
+    required int size,
+  }) async {
     final context = _context ??= _createContext();
     final buffers = {
-      for (final sound in Sound.values)
-        sound: await (_decoded[sound] ??= _decode(context, sound)),
+      for (final path in paths)
+        path: await (_decoded[path] ??= _decode(context, path)),
     };
     _banks++;
     context.resume().toDart.ignore();
@@ -58,9 +64,9 @@ class SoundBank._(final Map<Sound, web.AudioBuffer> _buffers, final int _size) {
 
   static Future<web.AudioBuffer> _decode(
     web.AudioContext context,
-    Sound sound,
+    String path,
   ) async {
-    final data = await rootBundle.load(sound.path);
+    final data = await rootBundle.load(path);
     // A copy of just the asset's bytes, which decodeAudioData takes over.
     final bytes = Uint8List.fromList(
       data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
@@ -68,22 +74,22 @@ class SoundBank._(final Map<Sound, web.AudioBuffer> _buffers, final int _size) {
     return await context.decodeAudioData(bytes.buffer.toJS).toDart;
   }
 
-  /// Plays [sound], unless it's already playing as many times as it can:
-  /// then, skips it.
-  void play(Sound sound) {
+  /// Plays the sound at [path], unless it's already playing as many times as
+  /// it can: then, skips it.
+  void play(String path) {
     final context = _context!;
-    final playing = _playing[sound] ?? 0;
+    final playing = _playing[path] ?? 0;
     // A source started while the context is suspended would play when it
     // resumes, together with every other sound started meanwhile.
     if (playing >= _size || context.state != 'running') {
       return;
     }
-    final source = context.createBufferSource()..buffer = _buffers[sound];
+    final source = context.createBufferSource()..buffer = _buffers[path];
     source.connect(context.destination);
     source.onended = ((web.Event _) {
-      _playing[sound] = _playing[sound]! - 1;
+      _playing[path] = _playing[path]! - 1;
     }).toJS;
-    _playing[sound] = playing + 1;
+    _playing[path] = playing + 1;
     source.start();
   }
 

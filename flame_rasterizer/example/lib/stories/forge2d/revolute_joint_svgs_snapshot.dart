@@ -42,7 +42,7 @@ extension RevoluteJointSvgsSnapshots on RevoluteJointSvgsExample {
             body: svgBody.body.snapshot,
           ),
     ],
-    tint: _tint,
+    tint: tint,
   );
 
   /// Drops the snapshot's bodies again, where they were and moving as they
@@ -62,7 +62,7 @@ extension RevoluteJointSvgsSnapshots on RevoluteJointSvgsExample {
       }
       for (final svgBody in from.svgBodies) {
         svgBodies.add(
-          _svgBody(
+          createSvgBody(
             svgBody.name,
             svgBody.side,
             svgBody.body.position,
@@ -74,7 +74,7 @@ extension RevoluteJointSvgsSnapshots on RevoluteJointSvgsExample {
         );
       }
       world.addAll([...balls, ...svgBodies]);
-      _tint = from.tint;
+      tint = from.tint;
     }
   }
 }

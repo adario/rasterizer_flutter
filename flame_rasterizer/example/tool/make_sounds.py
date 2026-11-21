@@ -1,5 +1,6 @@
-"""Synthesizes Tube Shooter's sounds as short mono 16-bit WAVs, 22050 Hz, one per
-`Sound` in lib/stories/games/tube_shooter/sounds.dart. The noise is seeded, so the
+"""Synthesizes Tube Shooter's and Revolute Pinball's sounds as short mono
+16-bit WAVs, 22050 Hz, one per sound in lib/stories/games/tube_shooter/sounds.dart
+and lib/stories/games/revolute_pinball/revolute_pinball_example.dart. The noise is seeded, so the
 files come out the same each run. From flame_rasterizer/example:
   python3 -I tool/make_sounds.py assets/audio
 """
@@ -160,6 +161,37 @@ def whoosh(length, f0, f1, c0, c1):
     return normalize(out, 0.45)
 
 
+def chime(notes, step, length, peak):
+    """Sine notes started [step] seconds apart, each ringing for [length]."""
+    n = int(RATE * (step * (len(notes) - 1) + length))
+    out = [0.0] * n
+    for k, f in enumerate(notes):
+        start = int(RATE * step * k)
+        for i in range(int(RATE * length)):
+            t = i / RATE
+            out[start + i] += (math.sin(2 * math.pi * f * t)
+                               + 0.3 * math.sin(4 * math.pi * f * t)) \
+                * env(t, length, 0.002)
+    return normalize(out, peak)
+
+
+def flip():
+    length = 0.07
+    n = int(RATE * length)
+    thump = sweep(260, 90, length, tri, n)
+    click = noise(n, 3000)
+    return normalize([(k + 0.5 * c) * env(i / RATE, length, 0.001)
+                      for i, (k, c) in enumerate(zip(thump, click))], 0.4)
+
+
+def drain():
+    length = 0.5
+    n = int(RATE * length)
+    tone = sweep(500, 80, length, square, n, power=0.7)
+    return normalize([s * env(i / RATE, length, 0.01)
+                      for i, s in enumerate(tone)], 0.25)
+
+
 SOUNDS = {
     'fire': fire,
     'enemy_fire': enemy_fire,
@@ -170,6 +202,11 @@ SOUNDS = {
     'purge': purge,
     'zoom': lambda: whoosh(1.0, 120, 900, 300, 4000),
     'drop': lambda: whoosh(2.0, 900, 70, 4000, 200),
+    # Revolute Pinball's.
+    'flip': flip,
+    'score': lambda: chime([1320, 1760], 0.06, 0.25, 0.3),
+    'empty': lambda: chime([523, 659, 784, 1047, 1319], 0.09, 0.4, 0.4),
+    'drain': drain,
 }
 
 if __name__ == '__main__':

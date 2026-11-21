@@ -5,25 +5,16 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
-import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flutter/foundation.dart';
 
 part 'revolute_joint_svgs_snapshot.dart';
 
 /// The values of the example's knobs, except Zoom, Speed and the cache knobs.
 typedef RevoluteJointSvgsSettings = ({SvgRenderer renderer, bool pieces});
-
-/// An SVG's size, and its convex pieces at that size.
-typedef _SizedPieces = ({Vector2 size, List<List<Vector2>> pieces});
-
-/// A body to drop: its bounding radius, and a function that creates it.
-typedef _NewBody = ({
-  double radius,
-  BodyComponent Function(Vector2 position, Vector2 velocity) create,
-});
 
 /// Flame's Forge2D revolute joint example, as flame_path_shapes extends it,
 /// with SVGs: see [description].
@@ -32,8 +23,8 @@ typedef _NewBody = ({
 /// turns, under a funnel of two ramps. Each tap drops [dropped] bodies: half
 /// balls, and half SVGs from 3 to 3.5 meters at their larger side. The SVG
 /// bodies draw above the others, so that flame_rasterizer draws them all in
-/// one run of a [RasterizerCanvas]. [PiecesLayer] draws their convex pieces
-/// over them while [pieces] is true.
+/// one run of a [RasterizerCanvas]. Their convex pieces draw over them, in
+/// the same run, while [pieces] is true.
 ///
 /// The status adds the bodies dropped to [StoryGame]'s. As in
 /// flame_path_shapes, the number of bodies at the top right counts the
@@ -42,11 +33,12 @@ typedef _NewBody = ({
 /// Given the snapshot of a game with another renderer, it goes on from there,
 /// with the same bodies: see [RevoluteJointSvgsSnapshots].
 abstract class RevoluteJointSvgsExample({
-  required var bool pieces,
+  @override required var bool pieces,
   required super.status,
   math.Random? random,
   RevoluteJointSvgsSnapshot? from,
-}) extends Forge2DExampleGame with ExampleSvgs {
+}) extends Forge2DExampleGame
+    with ExampleSvgs, SvgBodies, PathComponents<Forge2DExampleWorld> {
   this : super(world: RevoluteJointSvgsWorld());
 
   /// Creates the game for [settings]' renderer, with flame_svg's [cache] for
@@ -98,23 +90,6 @@ abstract class RevoluteJointSvgsExample({
   /// How many bodies each tap drops.
   static const dropped = 15;
 
-  /// The balls' smallest radius, in meters. Box2D works best with bodies
-  /// from 0.1 to 10 meters.
-  static const _minBallRadius = 0.4;
-
-  /// The balls' largest radius, in meters.
-  static const _maxBallRadius = 1.0;
-
-  /// The larger side of the smallest SVGs, in meters.
-  ///
-  /// The SVGs come in [_sides] sizes, from 3 to 3.5 meters by tenths, as in
-  /// flame_path_shapes. So [_sizeAndPieces] works out each SVG's pieces once
-  /// per size.
-  static const _minSide = 3.0;
-
-  /// How many sizes the SVGs come in.
-  static const _sides = 6;
-
   /// The speed at which new bodies move away from the tap, in meters a
   /// second.
   static const _spreadSpeed = 2.0;
@@ -124,12 +99,13 @@ abstract class RevoluteJointSvgsExample({
   static const _maxWheelDepth = 25.0;
 
   /// The room that the wheel leaves for the largest SVG, in meters.
-  static const _wheelClearance = _minSide + (_sides - 1) / 10;
+  static const _wheelClearance = SvgBodies.maxSide;
 
   /// The wheel's least depth, in meters, which leaves [_wheelClearance]
   /// between it and the ramps' tips, 6 meters from the funnel's center.
   static const _minWheelDepth = 9.0;
 
+  @override
   final math.Random random = random ?? math.Random();
 
   /// The snapshot that it goes on from, if any.
@@ -138,32 +114,8 @@ abstract class RevoluteJointSvgsExample({
   /// The wheel, from [onLoad] on.
   CircleShuffler? _wheel;
 
-  /// The SVG bodies dropped so far.
-  final svgBodies = <SvgBody>[];
-
-  /// The balls dropped so far.
-  final balls = <Ball>[];
-
   /// The walls along the game's edges, at a zoom of 1.
   var _walls = <Wall>[];
-
-  /// The SVGs of [randomSvgNames], loaded up front so that [drop] can be
-  /// synchronous.
-  final _svgs = <String, ExampleSvg>{};
-
-  /// Each SVG's size and convex pieces, by its name and its size's index.
-  final _pieces = <({String name, int side}), _SizedPieces>{};
-
-  /// The index of the next body's color: the bodies take the colors in turn.
-  int _tint = 0;
-
-  @override
-  Iterable<String> get exampleStats {
-    final ballCount = '${balls.length} ball${balls.length == 1 ? '' : 's'}';
-    final svgCount =
-        '${svgBodies.length} SVG${svgBodies.length == 1 ? '' : 's'}';
-    return ['$ballCount, $svgCount'];
-  }
 
   /// The world's rectangle that the game shows at a zoom of 1.
   Rect get _arena => Rect.fromCenter(
@@ -185,13 +137,8 @@ abstract class RevoluteJointSvgsExample({
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    for (final name in randomSvgNames) {
-      _svgs[name] = await loadSvg('assets/svgs/$name.svg');
-      // The game was removed while it loaded, and its physics world is
-      // destroyed.
-      if (isRemoved) {
-        return;
-      }
+    if (!await loadBodySvgs()) {
+      return;
     }
     final center = Vector2.zero();
     world.addAll([
@@ -199,7 +146,6 @@ abstract class RevoluteJointSvgsExample({
       _wheel = CircleShuffler(_wheelPosition, from: _from?.wheel),
       CornerRamp(center, isMirrored: true),
       CornerRamp(center),
-      PiecesLayer(),
     ]);
     _restoreBodies();
     startStatus();
@@ -211,12 +157,11 @@ abstract class RevoluteJointSvgsExample({
     if (!isLoaded) {
       return;
     }
-    // Half balls and half SVGs, alternating, each with its bounding radius
-    // and a function that creates it.
+    // Half balls and half SVGs, alternating.
     final ballsFirst = random.nextBool();
-    final bodies = <_NewBody>[
+    final bodies = <NewBody>[
       for (var i = 0; i < dropped; i++)
-        if (i.isEven == ballsFirst) _randomBall() else _randomSvg(),
+        if (i.isEven == ballsFirst) randomBall() else randomSvg(),
     ];
     final positions = spreadAround(
       tap,
@@ -227,88 +172,9 @@ abstract class RevoluteJointSvgsExample({
     );
     for (final (i, (radius: _, :create)) in bodies.indexed) {
       final position = positions[i];
-      final body = create(
-        position,
-        awayFrom(tap, position, _spreadSpeed, random),
-      );
-      switch (body) {
-        case SvgBody():
-          svgBodies.add(body);
-        case Ball():
-          balls.add(body);
-      }
-      world.add(body);
+      addBody(create(position, awayFrom(tap, position, _spreadSpeed, random)));
     }
   }
-
-  /// Picks a ball of random radius, in the next color. Returns its radius,
-  /// and a function that creates it with a position and a velocity.
-  _NewBody _randomBall() {
-    final radius =
-        _minBallRadius +
-        random.nextDouble() * (_maxBallRadius - _minBallRadius);
-    final color = ExampleColors.dynamicColor(_tint++);
-    return (
-      radius: radius,
-      create: (position, velocity) =>
-          Ball(position, velocity, radius: radius, color: color),
-    );
-  }
-
-  /// Picks a random SVG, at a random size and angle, in the next color.
-  /// Returns its bounding radius, and a function that creates its body with a
-  /// position and a velocity.
-  _NewBody _randomSvg() {
-    final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
-    final side = random.nextInt(_sides);
-    final (:size, pieces: _) = _sizeAndPieces(name, side);
-    final color = ExampleColors.dynamicColor(_tint++);
-    final angle = random.nextDouble() * 2 * math.pi;
-    return (
-      radius: size.length / 2,
-      create: (position, velocity) =>
-          _svgBody(name, side, position, velocity, angle: angle, color: color),
-    );
-  }
-
-  /// Creates the body of the SVG [name] at its [side]th size, in [color],
-  /// which starts at [position] and [angle], moving at [velocity], or goes on
-  /// from [from], if any.
-  SvgBody _svgBody(
-    String name,
-    int side,
-    Vector2 position,
-    Vector2 velocity, {
-    required double angle,
-    required Color color,
-    BodySnapshot? from,
-  }) {
-    final (:size, :pieces) = _sizeAndPieces(name, side);
-    return SvgBody(
-      _svgs[name]!,
-      size,
-      pieces,
-      position,
-      velocity,
-      angle: angle,
-      color: color,
-      name: name,
-      side: side,
-      from: from,
-    );
-  }
-
-  /// Returns the size and convex pieces of the SVG [name] at its [side]th size,
-  /// worked out once.
-  _SizedPieces _sizeAndPieces(
-    String name,
-    int side,
-  ) => _pieces[(name: name, side: side)] ??= () {
-    final svg = _svgs[name]!;
-    final s = (_minSide + side / 10) / math.max(svg.size.x, svg.size.y);
-    final size = svg.size * s;
-    return (size: size, pieces: convexPiecesOf(svg.outline, size));
-  }();
 
   /// Moves the walls to the game's new edges, and removes the bodies they
   /// leave outside, which would fall forever.
@@ -323,10 +189,7 @@ abstract class RevoluteJointSvgsExample({
     world.addAll(_walls = Wall.around(arena));
     bool outside(BodyComponent body) =>
         body.isLoaded && !arena.contains(body.body.position.toOffset());
-    final gone = [...svgBodies.where(outside), ...balls.where(outside)];
-    svgBodies.removeWhere(gone.contains);
-    balls.removeWhere(gone.contains);
-    world.removeAll(gone);
+    removeBodies([...svgBodies.where(outside), ...balls.where(outside)]);
   }
 }
 
@@ -342,193 +205,6 @@ class RevoluteJointSvgsWorld()
   }
 }
 
-/// A body that draws [svg], [size] meters large and centered on it, and
-/// collides as the SVG's convex [pieces].
-///
-/// It starts at [_position] and [_angle], moving at [_velocity], or goes on
-/// from [from], if any, and draws above the other bodies. [PiecesLayer] draws
-/// its pieces in [color].
-class SvgBody(
-  final ExampleSvg svg,
-  final Vector2 size,
-  final List<List<Vector2>> pieces,
-  final Vector2 _position,
-  final Vector2 _velocity, {
-  required final double _angle,
-  required final Color color,
-
-  /// The SVG's name, for a game with another renderer to load it.
-  required final String name,
-
-  /// The index of the SVG's size, for a game with another renderer.
-  required final int side,
-  final BodySnapshot? from,
-}) extends BodyComponent {
-  this : super(renderBody: false, priority: 1);
-
-  /// The [pieces] as one path, for [PiecesLayer].
-  late final piecesPath = () {
-    final path = Path();
-    for (final piece in pieces) {
-      path.addPolygon([for (final v in piece) v.toOffset()], true);
-    }
-    return path;
-  }();
-
-  @override
-  Future<void> onLoad() async {
-    await super.onLoad();
-    // Sized in pixels and scaled back to meters, as flame_svg's fixed cache
-    // mode rasterizes an SVG at its component's size, without the camera's.
-    final pixels = gameRef.metersToPixels;
-    add(
-      svg.component()
-        ..size = size * pixels
-        ..scale = Vector2.all(1 / pixels)
-        ..anchor = Anchor.center,
-    );
-  }
-
-  @override
-  Body createBody() {
-    final body = world.createBody(
-      BodyDef(
-        type: BodyType.dynamic,
-        position: _position,
-        rotation: Rot.fromAngle(_angle),
-        linearVelocity: _velocity,
-      ),
-    );
-    final shapeDef = ShapeDef(
-      material: SurfaceMaterial(restitution: 0.4, friction: 0.5),
-    );
-    for (final piece in pieces) {
-      body.createShape(Polygon(piece), shapeDef);
-    }
-    return body..goOnFrom(from);
-  }
-}
-
-/// Draws the SVG bodies' convex pieces over them, while the game's
-/// [RevoluteJointSvgsExample.pieces] is true.
-///
-/// It draws after all the bodies, so that the SVGs stay in one run. A child
-/// of each body, drawn over its SVG, would end the run at each body.
-class PiecesLayer()
-    extends Component
-    with HasGameRef<RevoluteJointSvgsExample> {
-  this : super(priority: 2);
-
-  /// The width of the pieces' outlines, in meters, as in flame_path_shapes.
-  static const _outlineWidth = 0.04;
-
-  /// The paints for each body color.
-  final _paints = <Color, GlowPaints>{};
-
-  @override
-  void render(Canvas canvas) {
-    if (!gameRef.pieces) {
-      return;
-    }
-    for (final svgBody in gameRef.svgBodies) {
-      if (!svgBody.isLoaded) {
-        continue;
-      }
-      final paints = _paints[svgBody.color] ??= GlowPaints(
-        svgBody.color,
-        _outlineWidth,
-      );
-      final position = svgBody.body.position;
-      canvas
-        ..save()
-        ..translate(position.x, position.y)
-        ..rotate(svgBody.angle)
-        ..drawPath(svgBody.piecesPath, paints.fill)
-        ..drawPath(svgBody.piecesPath, paints.outline)
-        ..restore();
-    }
-  }
-}
-
-/// flame_path_shapes' wheel: five circles around [_position] that a motor
-/// turns. It goes on from [from], if any.
-///
-/// It passes through the walls, which a short game brings into its way.
-class CircleShuffler(final Vector2 _position, {final BodySnapshot? from})
-    extends BodyComponent {
-  /// The distance of the circles' centers from the wheel's, in meters.
-  static const _radius = 6.0;
-
-  /// The circles' radius, in meters.
-  static const _circleRadius = 1.2;
-
-  /// How far the wheel reaches from its center, in meters.
-  static const reach = _radius + _circleRadius;
-
-  @override
-  Body createBody() {
-    const pieces = 5;
-    final body = world.createBody(
-      BodyDef(type: BodyType.dynamic, position: _position),
-    );
-    final shapeDef = ShapeDef(
-      density: 50,
-      material: SurfaceMaterial(friction: 0.4, restitution: 0.6),
-      filter: Filter(maskBits: Filter.allCategories & ~Wall.category),
-    );
-    for (var i = 0; i < pieces; i++) {
-      final angle = 2 * math.pi * i / pieces;
-      body.createShape(
-        Circle(
-          radius: _circleRadius,
-          center: Vector2(_radius * math.cos(angle), _radius * math.sin(angle)),
-        ),
-        shapeDef,
-      );
-    }
-    // The joint holds the wheel to an empty static body, as its ground.
-    final ground = world.createBody(BodyDef());
-    world.physicsWorld.createRevoluteJoint(
-      RevoluteJointDef(
-        bodyA: body,
-        bodyB: ground,
-        localAnchorB: body.position.clone(),
-        motorSpeed: math.pi,
-        maxMotorTorque: 1000000,
-        enableMotor: true,
-      ),
-    );
-    return body..goOnFrom(from);
-  }
-}
-
-/// One of the two ramps of flame_path_shapes' funnel above the wheel. It's on
-/// the right of [_center], or on the left if [isMirrored].
-class CornerRamp(final Vector2 _center, {final bool isMirrored = false})
-    extends BodyComponent
-    with GlowingBody {
-  this : super(paint: Paint()..color = ExampleColors.slate);
-
-  @override
-  Body createBody() {
-    final mirror = isMirrored ? -1 : 1;
-    // The two tips are 12 meters apart: about three and a half SVGs, and a
-    // little less than the wheel's 14.4 meters. At 8 meters, SVGs dropped
-    // above the opening sometimes clogged it.
-    final tip = 6.0 * mirror;
-    // A solid polygon, not a chain loop. Chains are one-sided in Box2D v3, so
-    // a chain ramp would let balls in from the other side and trap them.
-    return world.createBody(BodyDef(position: _center))..createShape(
-      Polygon([
-        Vector2(tip, 0),
-        Vector2(tip + 20 * mirror, -20),
-        Vector2(tip + 35 * mirror, -30),
-      ]),
-      ShapeDef(material: SurfaceMaterial(friction: 0.5)),
-    );
-  }
-}
-
 /// The example with flame_rasterizer: [RasterizerSvgComponent]s draw its
 /// SVGs, with the renderer that the Renderer knob picks.
 class RasterizerRevoluteJointExample({
@@ -538,7 +214,11 @@ class RasterizerRevoluteJointExample({
   super.random,
   super.from,
 }) extends RevoluteJointSvgsExample
-    with HasRasterizer, ExampleRasterizer, RasterizerSvgs {
+    with
+        HasRasterizer,
+        ExampleRasterizer,
+        RasterizerSvgs,
+        RasterizerPathComponents {
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
   }
@@ -552,7 +232,7 @@ class FlameSvgRevoluteJointExample({
   final SvgCache cache = defaultSvgCache,
   super.random,
   super.from,
-}) extends RevoluteJointSvgsExample with FlameSvgs {
+}) extends RevoluteJointSvgsExample with FlameSvgs, FlamePathComponents {
   @override
   SvgCacheMode get cacheMode => cache.mode;
 

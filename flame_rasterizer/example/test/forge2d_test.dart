@@ -10,13 +10,16 @@ import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/game_story.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/forge2d/revolute_joint_svgs_example.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'pump_while_loading.dart';
 
 /// The smallest [Forge2DExampleGame]: a physics world with one ball.
-class _WorldGame({required super.status}) extends Forge2DExampleGame {
+class _WorldGame({required super.status})
+    extends Forge2DExampleGame
+    with PathComponents<Forge2DExampleWorld>, FlamePathComponents {
   this : super(world: Forge2DExampleWorld());
 
   @override
@@ -89,7 +92,7 @@ void main() {
 
   // Tests run without Impeller, so flame_rasterizer draws with
   // rasterizer_gpu's canvas renderer.
-  testWidgets('a tap drops 15 bodies, the SVGs in one run, Pieces too', (
+  testWidgets('a tap drops 15 bodies, all drawn in one run, Pieces too', (
     tester,
   ) async {
     late RevoluteJointSvgsExample game;
@@ -132,29 +135,26 @@ void main() {
       expect(arena.contains(Offset(position.x, position.y)), isTrue);
     }
     expect(find.textContaining('canvas (noImpeller) · '), findsOneWidget);
-    expect(
-      find.textContaining('1 run, ${game.svgBodies.length} entries'),
-      findsOneWidget,
-    );
+    // An entry for each body: the SVGs, and the other bodies' paths.
+    const bodies = 15 + 7;
+    expect(find.textContaining('1 run, $bodies entries'), findsOneWidget);
     expect(find.textContaining('${game.balls.length} balls, '), findsOneWidget);
     // The bodies dropped, plus the 4 walls, the 2 ramps and the wheel.
     expect(
       game.camera.viewport.children.whereType<TextComponent>().map(
         (text) => text.text,
       ),
-      contains('Bodies: ${15 + 7}'),
+      contains('Bodies: $bodies'),
     );
 
-    // PiecesLayer draws after all the bodies, so the SVGs stay in one run.
+    // Each SVG body's pieces draw over it, in the same run.
     await tester.pumpWidget(story(pieces: true));
     for (var i = 0; i < 20; i++) {
       await tester.pump(const Duration(milliseconds: 16));
     }
     expect(game.pieces, isTrue);
-    expect(
-      find.textContaining('1 run, ${game.svgBodies.length} entries'),
-      findsOneWidget,
-    );
+    final pieces = bodies + game.svgBodies.length;
+    expect(find.textContaining('1 run, $pieces entries'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 

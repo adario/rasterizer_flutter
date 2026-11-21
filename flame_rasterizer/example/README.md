@@ -30,7 +30,8 @@ share these knobs:
 
 Zoom and Speed are continuous sliders, which show their values to two decimals. A new renderer makes a new game, which
 goes on from where the old one was. So does a new cache, except in Svg Renderers, which loads its SVG again in the
-running game. The other knobs change the running game.
+running game. The other knobs change the running game. Revolute Pinball doesn't go on yet: a new renderer or cache
+starts it again.
 
 The use cases other than Svg Renderers, Svg Shooter and Tube Shooter pick their SVGs at random from 14 of the 27
 (`randomSvgNames`, in `commons/svg_renderers.dart`). They leave out:
@@ -339,11 +340,11 @@ Inspired by Atari's Tempest (1981): a tube shooter with a tube, enemies, colours
     do. The stars' places turn, not their distances.
   - They fade in over 0.3 s as the game starts, and stay, still once it's over. With the Drifting stars knob off, they
     fade out over 0.3 s as the zoom ends, and are gone once the game is over.
-- **Texts.** The game has its own font, `TubeFont`: capitals, digits, a space, a colon, a period and a dash. Each
-  glyph is 1 to 3 straight polylines on a grid 4 wide and 6 tall, stroked an eighth of its height wide, with miter
-  joins, none sharper than 60°, and square ends, as the shapes are. Each glyph is a path, which all its components
-  share, so that a text set again, such as the score, only imports the glyphs that no other text shows. Each text is a
-  component with a child per glyph, in the camera's viewport, in white:
+- **Texts.** The game draws its texts in `VectorFont`, a font of capitals, digits, a space, a colon, a period, a dash
+  and a slash. Each glyph is 1 to 3 straight polylines on a grid 4 wide and 6 tall, stroked an eighth of its height
+  wide, with miter joins, none sharper than 60°, and square ends, as the shapes are. Each glyph is a path, which all its
+  components share, so that a text set again, such as the score, only imports the glyphs that no other text shows. Each
+  text is a component with a child per glyph, in the camera's viewport, in white:
   - the round, the lives, the purge and the score, at the bottom right, their capitals 12 logical pixels high;
   - the round's number in the middle during each zoom, READY, and Game Over, 40 high.
 
@@ -379,6 +380,37 @@ The status bar shows the paths made a second, after the renderer's numbers. Thin
 - the paths made a second: one a frame during the zoom and the drop, while seeders climb, and while zappers pulse, and
   the frame times then;
 - the dots, the stars and the texts, which make no paths.
+
+## Games ▸ Revolute Pinball
+
+A pinball with Revolute Joint Svgs' bodies, wheel and walls, in a `Forge2DGame` at 10 pixels a meter. The table fits the
+window, and is built again when the window is resized:
+
+- **Drops.** A key or a tap starts the game, and drops 15 bodies over the wheel, half balls and half SVGs. Once each is
+  in a bucket, gone through the drain, or at rest for 0.5 s, the wheel turns the other way, amber until it's at full
+  speed, and the next 15 drop, up to 100 bodies on the table.
+- **Flippers.** Left or A, Right or D, or a tap in the bottom third's left or right half kicks a flipper, which a motor
+  holds up while the key or the finger is down. A kicked body leaves a trail that fades out in 1 s.
+- **Buckets.** Two, at the top left and right. A body coming to rest in one scores by its area and the bucket's fill. A
+  bucket whose bodies, at least 2, are at rest and fill 85% of its height is full: it turns green, gives their area
+  back to the energy, and empties in 5 s, shrinking its bodies to a fifth from the bottom up.
+- **Energy.** Drained bodies take energy, by their area against a fifth of the table's. At 0, the game is over and the
+  world stops, until a key or a tap starts a new game.
+- **Texts.** In `VectorFont`, 12 logical pixels high: the energy, from green to red, and the fuller bucket's fill, at
+  the bottom left; the drop and the score at the bottom right.
+- **Sounds.** Kicks, bodies coming to rest in a bucket, full buckets, the drain and game over each have a sound, which
+  `tool/make_sounds.py` synthesizes, played as Tube Shooter's are (`commons/game_sounds.dart`), 2 a sound.
+
+The table's paths are imported once, and stay on the fast path: the flippers, guides and buckets draw their outlines
+and glows as paths, as the bodies do.
+
+Its knobs pick:
+
+- **Renderer**: as above.
+- **Pieces**: as in Revolute Joint Svgs.
+- **Sound**: as in Tube Shooter.
+- **Zoom** and **Speed**: as in Revolute Joint Svgs.
+- **Cache mode** and **Cache size**: as in Revolute Joint Svgs.
 
 ## Tests
 
@@ -420,6 +452,10 @@ The status bar shows the paths made a second, after the renderer's numbers. Thin
   tube's path made again each frame, in one run. The ship's moves and shots, each enemy, the dots, the stars, the glow,
   READY, the purge, the rounds, the drop, the texts and Game Over each have a test, with the numbers above. A whole
   game on each level draws no path with the canvas fallback.
+- `revolute_pinball_test.dart`: Revolute Pinball loads with each renderer at READY, with 2 flippers, 2 buckets, the
+  wheel and its texts at 100% energy. A key starts it and drops 15 bodies. Left kicks the left flipper, which falls
+  back once released. Drained energy ends the game and stops the world, and a key starts a new one. A resize builds
+  the table again.
 
 The integration tests, in `integration_test/`, run on a device, with
 `flutter test integration_test/<file> -d <macos | an iPhone's UDID | emulator-5554>`:
@@ -439,7 +475,7 @@ The integration tests, in `integration_test/`, run on a device, with
 - `forge2d_test.dart`: Revolute Joint Svgs with each renderer. A tap and two drops give 45 bodies, which stay inside the
   walls, and flame_rasterizer draws the SVG bodies in one run, with Pieces on.
 - `svg_shooter_test.dart`: Svg Shooter with each renderer, firing for about two seconds. flame_rasterizer draws the SVGs
-  in at most two runs, and the game scores.
+  in one run, and the game scores.
 - `tube_shooter_test.dart`: after a warm-up, Tube Shooter with the mesh renderer on three tubes: the octagon, closed,
   the horseshoe, open, and the star, concave. Each runs with its glow on and off, six games in all, through its zoom,
   two seconds of fire sweeping round the rim, without zappers, and its drop, with their stars. flame_rasterizer draws
