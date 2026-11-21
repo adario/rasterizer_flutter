@@ -97,7 +97,8 @@ class _FlamePathComponent({
 /// bottom left if [left], [line] lines above the last one; without, at its
 /// middle, or [below] it, in logical pixels. It keeps its place when the
 /// parent is resized. Its priority puts it under the FPS counter, so that it
-/// draws in the same run as the world. Its [opacity] fades all its glyphs.
+/// draws in the same run as the world. Its [opacity] fades all its glyphs,
+/// and its [tint] colors them.
 class VectorTextComponent({
   required final double capHeight,
   String text = '',
@@ -140,6 +141,26 @@ class VectorTextComponent({
     _opacity = value;
     for (final glyph in _glyphs) {
       glyph?.opacity = value;
+    }
+  }
+
+  /// The color its glyphs are tinted with, over [color], or null for none.
+  Color? get tint => _tint;
+  Color? _tint;
+
+  set tint(Color? value) {
+    if (value == _tint) {
+      return;
+    }
+    _tint = value;
+    _glyphs.forEach(_tintGlyph);
+  }
+
+  void _tintGlyph(PathComponent? glyph) {
+    if (_tint case final tint?) {
+      glyph?.tint(tint);
+    } else {
+      glyph?.paint.colorFilter = null;
     }
   }
 
@@ -222,6 +243,7 @@ class VectorTextComponent({
     if (_opacity != 1) {
       component.opacity = _opacity;
     }
+    _tintGlyph(component);
     return component;
   }
 }
