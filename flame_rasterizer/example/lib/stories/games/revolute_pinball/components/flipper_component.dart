@@ -58,7 +58,7 @@ class FlipperComponent(
   }();
 
   /// The kick's angular speed, and the motor's, in radians a second.
-  static const _kickSpeed = 12.0;
+  static const _kickSpeed = 15.0;
 
   /// Its angle above the horizontal when fully kicked.
   static const _upAngle = 40 * math.pi / 180;

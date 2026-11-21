@@ -139,7 +139,11 @@ abstract class RevolutePinballExample({
 
   /// Smaller balls can get stuck at the flippers' tips.
   @override
-  double get minBallRadius => 0.52;
+  double get minBallRadius => 0.7;
+
+  /// Half the balls', so that a kick throws them farther.
+  @override
+  double get svgDensity => 0.5;
 
   /// MultipleShapes' path colors: each SVG's own, and the balls' in turn.
   @override
