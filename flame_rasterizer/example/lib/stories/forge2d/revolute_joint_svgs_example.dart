@@ -114,6 +114,9 @@ abstract class RevoluteJointSvgsExample({
   /// The wheel, from [onLoad] on.
   CircleShuffler? _wheel;
 
+  /// The last time we dropped bodies.
+  late DateTime _lastDrop = DateTime.now();
+
   /// The walls along the game's edges, at a zoom of 1.
   var _walls = <Wall>[];
 
@@ -174,6 +177,14 @@ abstract class RevoluteJointSvgsExample({
       final position = positions[i];
       addBody(create(position, awayFrom(tap, position, _spreadSpeed, random)));
     }
+
+    // Reverse the wheel if enough time has elapsed since the last drop.
+    const delay = 250;
+    final now = DateTime.now();
+    if (now.difference(_lastDrop).inMilliseconds > delay) {
+      _wheel?.reverse();
+    }
+    _lastDrop = now;
   }
 
   /// Moves the walls to the game's new edges, and removes the bodies they
