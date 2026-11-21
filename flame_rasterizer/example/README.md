@@ -401,7 +401,8 @@ window, and is built again when the window is resized:
   `tool/make_sounds.py` synthesizes, played as Tube Shooter's are (`commons/game_sounds.dart`), 2 a sound.
 
 The table's paths are imported once, and stay on the fast path: the flippers, guides and buckets draw their outlines
-and glows as paths, as the bodies do.
+and glows as paths, as the bodies do, but for the flame, drawn as its SVG, and the spaceship and the robot, drawn as
+their wireframes in their color.
 
 Its knobs pick:
 

@@ -153,9 +153,29 @@ abstract class RevolutePinballExample({
     return colors[index % colors.length];
   }
 
-  /// The SVG's outline, drawn as MultipleShapes' paths.
+  /// The SVGs drawn as their wireframe, in their color.
+  static const _wireframed = ['spaceship', 'robot'];
+  final _wireframes = <String, ExampleSvg>{};
+
+  /// The flame as it is, the [_wireframed] SVGs' wireframes, and the others'
+  /// outlines, drawn as MultipleShapes' paths.
   @override
   PositionComponent svgImage(SvgBody body) {
+    if (body.name == 'flame') {
+      return super.svgImage(body);
+    }
+    if (_wireframes[body.name] case final wireframe?) {
+      // Its viewBox is the SVG's, grown by half its stroke a side.
+      final size = body.size.clone()
+        ..multiply(wireframe.size)
+        ..divide(body.svg.size);
+      final svg = wireframe.component()
+        ..size = size * metersToPixels
+        ..scale = Vector2.all(1 / metersToPixels)
+        ..anchor = Anchor.center;
+      (svg as HasPaint).tint(body.color);
+      return svg;
+    }
     final outline = body.svg.outline;
     final rect = outline.rect;
     final bounds = outline.path.getBounds();
@@ -281,6 +301,12 @@ abstract class RevolutePinballExample({
     await super.onLoad();
     if (!await loadBodySvgs()) {
       return;
+    }
+    for (final name in _wireframed) {
+      _wireframes[name] = await loadSvg('assets/svgs/wireframe/$name.svg');
+      if (isRemoved) {
+        return;
+      }
     }
     camera.viewport.addAll([
       if (!(_from?.started ?? false)) _ready,
