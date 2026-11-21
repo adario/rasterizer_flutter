@@ -219,15 +219,17 @@ class const RevolutePinballStory({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return GameStory<RevolutePinballExample, Never>(
+    return GameStory<RevolutePinballExample, RevolutePinballSnapshot>(
       renderer: renderer,
       cache: cache,
-      create: (status, _) => RevolutePinballExample.of(
+      create: (status, from) => RevolutePinballExample.of(
         renderer,
         status,
         pieces: pieces,
         cache: cache,
+        from: from,
       )..sound = sound,
+      snapshot: (game) => game.snapshot,
       update: (game) => game
         ..pieces = pieces
         ..sound = sound,

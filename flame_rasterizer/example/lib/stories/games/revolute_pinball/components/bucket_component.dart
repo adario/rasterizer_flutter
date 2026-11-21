@@ -81,6 +81,9 @@ class BucketComponent(final Rect inner)
   /// Whether it's full, and so emptying.
   bool get full => _emptying.isNotEmpty;
 
+  /// Whether [body] is one of the bodies that it empties.
+  bool empties(BodyComponent body) => _emptying.containsKey(body);
+
   RevolutePinballExample get _game => findGame()! as RevolutePinballExample;
 
   /// How long emptying takes, and each body's share of it, in seconds.
@@ -131,11 +134,17 @@ class BucketComponent(final Rect inner)
         if (b.isLoaded &&
             !_emptying.containsKey(b) &&
             holds(b.body.position.toOffset()))
-          b: RevolutePinballExample.isStill(b.body) ? (last?[b] ?? 0) + dt : 0,
+          b: _game.settled.remove(b)
+              ? RevolutePinballExample.restTime
+              : RevolutePinballExample.isStill(b.body)
+              ? (last?[b] ?? 0) + dt
+              : 0,
     };
     final atRest = _atRest;
     if (last != null) {
-      _arrivals.addAll(now.keys.where((b) => !last.containsKey(b)));
+      _arrivals.addAll(
+        now.keys.where((b) => !last.containsKey(b) && !atRest(b)),
+      );
       if (now.length > last.length) {
         _show('${now.length}', below: false);
       }

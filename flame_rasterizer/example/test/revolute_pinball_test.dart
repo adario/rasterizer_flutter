@@ -142,6 +142,62 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  // At speed 0, a new renderer's game shows the same bodies and HUD.
+  testWidgets('a new renderer goes on from where the game was', (
+    tester,
+  ) async {
+    late RevolutePinballExample game;
+    Widget story(SvgRenderer renderer, {double speed = 1}) => MaterialApp(
+      home: GameStory<RevolutePinballExample, RevolutePinballSnapshot>(
+        renderer: renderer,
+        create: (status, from) => game = RevolutePinballExample.of(
+          renderer,
+          status,
+          pieces: false,
+          from: from,
+        ),
+        snapshot: (game) => game.snapshot,
+        speed: speed,
+      ),
+    );
+    await tester.pumpWidget(story(SvgRenderer.rasterizer));
+    await pumpWhileLoading(tester, () => !game.isLoaded);
+    await pumpFrames(tester, 10);
+    await press(tester, LogicalKeyboardKey.space);
+    await pumpFrames(tester, 60);
+    game.score = 123;
+    await tester.pumpWidget(story(SvgRenderer.rasterizer, speed: 0));
+    await pumpFrames(tester, 1);
+    final snapshot = game.snapshot;
+    expect(snapshot.balls.length + snapshot.svgBodies.length, 10);
+
+    for (final renderer in [
+      SvgRenderer.rasterizerCanvas,
+      SvgRenderer.rasterizerAtlas,
+    ]) {
+      final last = game;
+      await tester.pumpWidget(story(renderer, speed: 0));
+      await pumpWhileLoading(tester, () => !game.isLoaded);
+      expect(game, isNot(same(last)));
+      await pumpFrames(tester, 2);
+      final next = game.snapshot;
+      expect(next.wheel, snapshot.wheel, reason: renderer.label);
+      expect(
+        next.balls.map((b) => b.ball),
+        snapshot.balls.map((b) => b.ball),
+        reason: renderer.label,
+      );
+      expect(
+        next.svgBodies.map((b) => b.svgBody),
+        snapshot.svgBodies.map((b) => b.svgBody),
+        reason: renderer.label,
+      );
+      expect(textsOf(game), containsAll(['DROP 1', 'SCORE 123']));
+      expect(textsOf(game), isNot(contains('READY')));
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('a resize builds the table again, for the new size', (
     tester,
   ) async {

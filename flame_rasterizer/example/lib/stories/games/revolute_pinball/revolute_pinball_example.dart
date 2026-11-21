@@ -21,6 +21,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult;
 
+part 'revolute_pinball_snapshot.dart';
+
 enum PinballSound(final String file) {
   flip('flip'),
   score('score'),
@@ -34,6 +36,7 @@ enum PinballSound(final String file) {
 abstract class RevolutePinballExample({
   @override required var bool pieces,
   required super.status,
+  RevolutePinballSnapshot? from,
 }) extends Forge2DExampleGame
     with
         ExampleSvgs,
@@ -47,17 +50,27 @@ abstract class RevolutePinballExample({
     ValueNotifier<String> status, {
     required bool pieces,
     SvgCache cache = defaultSvgCache,
+    RevolutePinballSnapshot? from,
   }) => renderer == SvgRenderer.flameSvg
       ? FlameSvgRevolutePinballExample(
           pieces: pieces,
           status: status,
           cache: cache,
+          from: from,
         )
       : RasterizerRevolutePinballExample(
           pieces: pieces,
           status: status,
           renderer: renderer,
+          from: from,
         );
+
+  /// The snapshot that it goes on from, if any.
+  final RevolutePinballSnapshot? _from = from;
+
+  /// The bodies that were in a bucket before a renderer switch, which the
+  /// bucket takes as at rest.
+  final settled = <BodyComponent>{};
 
   static const description = '''
     A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
@@ -153,6 +166,14 @@ abstract class RevolutePinballExample({
         (bounds.top - rect.center.dy) * scale.y,
       )
       ..scale = scale;
+  }
+
+  @override
+  void addBody(BodyComponent body) {
+    if (body is Ball) {
+      _drawAsPath(body);
+    }
+    super.addBody(body);
   }
 
   /// A unit circle, which every ball draws, scaled to its radius.
@@ -258,13 +279,16 @@ abstract class RevolutePinballExample({
       return;
     }
     camera.viewport.addAll([
-      _ready,
+      if (!(_from?.started ?? false)) _ready,
       _energyText,
       _targetText,
       _dropsText,
       _scoreText,
     ]);
-    _buildTable();
+    _buildTable(wheel: _from?.wheel);
+    if (_from case final from?) {
+      _goOnFrom(from);
+    }
     startStatus();
   }
 
@@ -277,8 +301,8 @@ abstract class RevolutePinballExample({
   }
 
   /// Rebuilds the walls, the guides, the flippers, the wheel and the buckets
-  /// for the arena's size.
-  void _buildTable() {
+  /// for the arena's size. The wheel goes on from [wheel], if any.
+  void _buildTable({BodySnapshot? wheel}) {
     final a = _arena;
     final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
     final flipper = 0.18 * a.width;
@@ -335,6 +359,7 @@ abstract class RevolutePinballExample({
         Vector2(0, a.top + 0.35 * a.height),
         scale: 0.15 * small / CircleShuffler.reach,
         color: ExampleColors.dynamicColor(0),
+        from: wheel,
       ),
       ..._buckets = [
         for (final side in [-1, 1])
@@ -372,7 +397,6 @@ abstract class RevolutePinballExample({
     _speed = world.timeScale;
     world.timeScale = 0;
     camera.viewport.add(_gameOver);
-    play(PinballSound.over);
   }
 
   /// Clears the bodies and the score, and waits at READY.
@@ -415,9 +439,6 @@ abstract class RevolutePinballExample({
         position,
         awayFrom(spawn, position, 2, random),
       );
-      if (component is Ball) {
-        _drawAsPath(component);
-      }
       addBody(component);
       _current[component] = 0;
     }
@@ -488,6 +509,7 @@ abstract class RevolutePinballExample({
       bucket.track([...svgBodies, ...balls], dt);
     }
     if (_started && _energy < 0.005) {
+      play(PinballSound.over);
       _endGame();
       return;
     }
@@ -586,6 +608,7 @@ class RevolutePinballWorld()
 class RasterizerRevolutePinballExample({
   required super.pieces,
   required super.status,
+  super.from,
   @override required final SvgRenderer renderer,
 }) extends RevolutePinballExample
     with
@@ -614,6 +637,7 @@ class RasterizerRevolutePinballExample({
 class FlameSvgRevolutePinballExample({
   required super.pieces,
   required super.status,
+  super.from,
   final SvgCache cache = defaultSvgCache,
 }) extends RevolutePinballExample with FlameSvgs, FlamePathComponents {
   @override

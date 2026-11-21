@@ -30,8 +30,7 @@ share these knobs:
 
 Zoom and Speed are continuous sliders, which show their values to two decimals. A new renderer makes a new game, which
 goes on from where the old one was. So does a new cache, except in Svg Renderers, which loads its SVG again in the
-running game. The other knobs change the running game. Revolute Pinball doesn't go on yet: a new renderer or cache
-starts it again.
+running game. The other knobs change the running game.
 
 The use cases other than Svg Renderers, Svg Shooter and Tube Shooter pick their SVGs at random from 14 of the 27
 (`randomSvgNames`, in `commons/svg_renderers.dart`). They leave out:
@@ -406,7 +405,8 @@ and glows as paths, as the bodies do.
 
 Its knobs pick:
 
-- **Renderer**: as above.
+- **Renderer**: as above. The new game goes on with the same bodies, wheel, score, energy and drop, but without the
+  trails, the kicks and the bodies a bucket empties. The bodies in a bucket are at rest in it.
 - **Pieces**: as in Revolute Joint Svgs.
 - **Sound**: as in Tube Shooter.
 - **Zoom** and **Speed**: as in Revolute Joint Svgs.
@@ -454,8 +454,8 @@ Its knobs pick:
   game on each level draws no path with the canvas fallback.
 - `revolute_pinball_test.dart`: Revolute Pinball loads with each renderer at READY, with 2 flippers, 2 buckets, the
   wheel and its texts at 100% energy. A key starts it and drops 10 bodies. Left kicks the left flipper, which falls
-  back once released. Drained energy ends the game and stops the world, and a key starts a new one. A resize builds
-  the table again.
+  back once released. Drained energy ends the game and stops the world, and a key starts a new one. A new renderer
+  goes on with the same bodies, wheel, drop and score. A resize builds the table again.
 
 The integration tests, in `integration_test/`, run on a device, with
 `flutter test integration_test/<file> -d <macos | an iPhone's UDID | emulator-5554>`:
