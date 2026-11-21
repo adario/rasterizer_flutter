@@ -249,7 +249,7 @@ void main() {
       for (var i = 0; i < 60; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
-      final wheel = game.snapshot.wheel!;
+      final wheel = game.snapshot.wheel!.body;
       // The motor's speed, negative as the joint holds the wheel to the
       // ground.
       expect(wheel.angularVelocity, closeTo(-math.pi, 0.01));

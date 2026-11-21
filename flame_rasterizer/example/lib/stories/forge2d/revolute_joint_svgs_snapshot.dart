@@ -3,7 +3,7 @@ part of 'revolute_joint_svgs_example.dart';
 /// What a game for another renderer goes on from: the wheel and the bodies
 /// dropped, where they are and how they move, and the next body's color.
 typedef RevoluteJointSvgsSnapshot = ({
-  BodySnapshot? wheel,
+  WheelSnapshot? wheel,
   List<BallSnapshot> balls,
   List<SvgBodySnapshot> svgBodies,
   int tint,
@@ -20,7 +20,7 @@ extension RevoluteJointSvgsSnapshots on RevoluteJointSvgsExample {
   /// Box2D body yet.
   RevoluteJointSvgsSnapshot get snapshot => (
     wheel: switch (_wheel) {
-      final wheel? when wheel.isLoaded => wheel.body.snapshot,
+      final wheel? when wheel.isLoaded => wheel.snapshot,
       _ => null,
     },
     balls: [

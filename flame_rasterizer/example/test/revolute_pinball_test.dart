@@ -165,6 +165,7 @@ void main() {
     await pumpFrames(tester, 10);
     await press(tester, LogicalKeyboardKey.space);
     await pumpFrames(tester, 60);
+    partsOf<CircleShuffler>(game).single.reverse();
     game.score = 123;
     await tester.pumpWidget(story(SvgRenderer.rasterizer, speed: 0));
     await pumpFrames(tester, 1);
@@ -182,6 +183,7 @@ void main() {
       await pumpFrames(tester, 2);
       final next = game.snapshot;
       expect(next.wheel, snapshot.wheel, reason: renderer.label);
+      expect(partsOf<CircleShuffler>(game).single.reversing, isTrue);
       expect(
         next.balls.map((b) => b.ball),
         snapshot.balls.map((b) => b.ball),

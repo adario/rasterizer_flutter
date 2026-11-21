@@ -7,7 +7,7 @@ part of 'revolute_pinball_example.dart';
 /// It leaves out the trails, the kicks, and the bodies that a bucket empties.
 /// The bodies in a bucket are at rest in the new game.
 typedef RevolutePinballSnapshot = ({
-  BodySnapshot? wheel,
+  WheelSnapshot? wheel,
   List<({BallSnapshot ball, double? rest})> balls,
   List<({SvgBodySnapshot svgBody, double? rest})> svgBodies,
   int tint,
@@ -16,6 +16,7 @@ typedef RevolutePinballSnapshot = ({
   double drainedArea,
   bool started,
   bool over,
+  bool queued,
 });
 
 /// Takes a [RevolutePinballExample]'s snapshot, and goes on from one.
@@ -25,7 +26,7 @@ extension RevolutePinballSnapshots on RevolutePinballExample {
         body.isLoaded && !_buckets.any((bucket) => bucket.empties(body));
     return (
       wheel: switch (_wheel) {
-        final wheel? when wheel.isLoaded => wheel.body.snapshot,
+        final wheel? when wheel.isLoaded => wheel.snapshot,
         _ => null,
       },
       balls: [
@@ -43,6 +44,7 @@ extension RevolutePinballSnapshots on RevolutePinballExample {
       drainedArea: drainedArea,
       started: _started,
       over: _over,
+      queued: _queued,
     );
   }
 
@@ -71,6 +73,7 @@ extension RevolutePinballSnapshots on RevolutePinballExample {
     _drops = from.drops;
     drainedArea = from.drainedArea;
     _started = from.started;
+    _queued = from.queued;
     if (from.over) {
       _endGame();
     }

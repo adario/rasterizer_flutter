@@ -306,7 +306,7 @@ abstract class RevolutePinballExample({
 
   /// Rebuilds the walls, the guides, the flippers, the wheel and the buckets
   /// for the arena's size. The wheel goes on from [wheel], if any.
-  void _buildTable({BodySnapshot? wheel}) {
+  void _buildTable({WheelSnapshot? wheel}) {
     _tableSize.setFrom(size);
     final a = _arena;
     final drain = math.max(0.06 * a.width, SvgBodies.maxSide);

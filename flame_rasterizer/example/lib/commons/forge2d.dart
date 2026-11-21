@@ -831,6 +831,14 @@ class SvgBody(
   }
 }
 
+/// What a [CircleShuffler] in a game with another renderer goes on from: its
+/// body, and its motor's speed and the speed that it heads for.
+typedef WheelSnapshot = ({
+  BodySnapshot body,
+  double motorSpeed,
+  double targetSpeed,
+});
+
 /// flame_path_shapes' wheel: five circles around [_position] that a motor
 /// turns, [scale] times as large. It's filled, or drawn as the other glowing
 /// bodies in [color], if given. It goes on from [from], if any.
@@ -838,7 +846,7 @@ class SvgBody(
 /// It passes through the walls, which a short game brings into its way.
 class CircleShuffler(
   final Vector2 _position, {
-  final BodySnapshot? from,
+  final WheelSnapshot? from,
   final double scale = 1,
   final Color? color,
 }) extends BodyComponent with GlowingBody {
@@ -870,11 +878,18 @@ class CircleShuffler(
   late final RevoluteJoint _joint;
 
   /// The speed that the motor heads for.
-  double _targetSpeed = _speed;
+  late double _targetSpeed = from?.targetSpeed ?? _speed;
 
   /// The motor's speed, kept here: Box2D's is a float, which never equals
   /// [_targetSpeed].
-  double _motorSpeed = _speed;
+  late double _motorSpeed = from?.motorSpeed ?? _speed;
+
+  /// What it goes on from in a game with another renderer.
+  WheelSnapshot get snapshot => (
+    body: body.snapshot,
+    motorSpeed: _motorSpeed,
+    targetSpeed: _targetSpeed,
+  );
 
   /// Its color, and the one it takes while [reversing].
   late final _color = paint.color;
@@ -929,12 +944,12 @@ class CircleShuffler(
         bodyA: body,
         bodyB: ground,
         localAnchorB: body.position.clone(),
-        motorSpeed: _speed,
+        motorSpeed: _motorSpeed,
         maxMotorTorque: 1000000,
         enableMotor: true,
       ),
     );
-    return body..goOnFrom(from);
+    return body..goOnFrom(from?.body);
   }
 }
 
