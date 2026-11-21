@@ -99,12 +99,15 @@ class FlipperComponent(
     touching.removeWhere((other) => !other.isValid);
   }
 
-  void hold(Object holder) {
-    if (_holders.isEmpty && isLoaded) {
+  /// Whether it kicked.
+  bool hold(Object holder) {
+    final kick = _holders.isEmpty && isLoaded;
+    if (kick) {
       body.angularVelocity += _side * _kickSpeed;
       _joint.motorEnabled = true;
     }
     _holders.add(holder);
+    return kick;
   }
 
   void release(Object holder) {

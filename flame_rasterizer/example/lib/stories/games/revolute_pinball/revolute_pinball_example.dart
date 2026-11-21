@@ -8,6 +8,7 @@ import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
+import 'package:flame_rasterizer_example/commons/game_sounds.dart';
 import 'package:flame_rasterizer_example/commons/outline_paints.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
@@ -19,6 +20,16 @@ import 'package:flame_rasterizer_example/stories/games/revolute_pinball/componen
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult;
+
+enum PinballSound(final String file) {
+  flip('flip'),
+  score('score'),
+  empty('empty'),
+  drain('drain'),
+  over('crash');
+
+  String get path => 'assets/audio/$file.wav';
+}
 
 abstract class RevolutePinballExample({
   @override required var bool pieces,
@@ -56,8 +67,36 @@ abstract class RevolutePinballExample({
     in the bottom third's left or right half flips a flipper. A body coming
     to rest in a bucket scores by its area and the bucket's fill. Drained
     bodies take energy, until the game is over. A full bucket gives its
-    bodies' area back, and empties.
+    bodies' area back, and empties. The Sound knob turns sounds on and off.
   ''';
+
+  /// The Sound knob's value. The sounds load the first time it's on.
+  bool get sound => _sound;
+  bool _sound = false;
+
+  set sound(bool value) {
+    _sound = value;
+    if (value && _sounds == null) {
+      // At most 2 of each sound at once, so 10 at most.
+      (_sounds = GameSounds([
+        for (final sound in PinballSound.values) sound.path,
+      ], size: 2)).load();
+    }
+  }
+
+  GameSounds? _sounds;
+
+  void play(PinballSound sound) {
+    if (_sound) {
+      _sounds?.play(sound.path);
+    }
+  }
+
+  @override
+  void onRemove() {
+    _sounds?.dispose();
+    super.onRemove();
+  }
 
   static final _flipperKeys = {
     LogicalKeyboardKey.arrowLeft: 0,
@@ -342,6 +381,7 @@ abstract class RevolutePinballExample({
     _speed = world.timeScale;
     world.timeScale = 0;
     camera.viewport.add(_gameOver);
+    play(PinballSound.over);
   }
 
   /// Clears the bodies and the score, and waits at READY.
@@ -429,6 +469,7 @@ abstract class RevolutePinballExample({
   @override
   void update(double dt) {
     super.update(dt);
+    _sounds?.nextFrame();
     _trails.removeWhere((_, trail) => trail.over);
     _scoreText.text = 'SCORE $score';
     _dropsText.text = 'DROP $_drops';
@@ -449,6 +490,7 @@ abstract class RevolutePinballExample({
     final gone = [...svgBodies.where(drained), ...balls.where(drained)];
     if (gone.isNotEmpty) {
       drainedArea += gone.fold(0.0, (sum, body) => sum + area(body));
+      play(PinballSound.drain);
       removeBodies(gone);
     }
     for (final bucket in _buckets) {
@@ -496,8 +538,11 @@ abstract class RevolutePinballExample({
     return KeyEventResult.handled;
   }
 
-  void _hold(int flipper, Object holder) =>
-      _flippers.elementAtOrNull(flipper)?.hold(holder);
+  void _hold(int flipper, Object holder) {
+    if (_flippers.elementAtOrNull(flipper)?.hold(holder) ?? false) {
+      play(PinballSound.flip);
+    }
+  }
 
   void _release(Object holder) {
     for (final flipper in _flippers) {

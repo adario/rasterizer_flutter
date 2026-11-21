@@ -150,6 +150,7 @@ class BucketComponent(final Rect inner)
             .round();
       }
       _arrivals.removeWhere(atRest);
+      _game.play(PinballSound.score);
       _show('${(100 * share).round()}%', below: true);
     }
     if (!full &&
@@ -163,7 +164,7 @@ class BucketComponent(final Rect inner)
   /// Frees the drained area that [bodies] take, and shrinks them from the
   /// bottom up.
   void _startEmptying(List<BodyComponent> bodies) {
-    final game = _game;
+    final game = _game..play(PinballSound.empty);
     game.drainedArea = math.max(
       0,
       game.drainedArea -
