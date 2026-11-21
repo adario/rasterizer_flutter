@@ -1,4 +1,6 @@
-import 'package:flame/components.dart' show Component;
+import 'package:flame/components.dart' show Component, Vector2;
+import 'package:flame/extensions.dart';
+import 'package:flame_rasterizer_example/commons/example_colors.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/game_story.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
@@ -125,6 +127,46 @@ void main() {
     await pumpFrames(tester, 60);
     expect(left.kicking, isFalse);
     expect(left.body.angle, closeTo(rest, 0.1));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a body counts in a bucket after 1 s in it, and then scores', (
+    tester,
+  ) async {
+    final game = await pumpGame(tester);
+    final bucket = partsOf<BucketComponent>(game).first;
+    Ball ball() => Ball(
+      bucket.inner.center.toVector2(),
+      Vector2.zero(),
+      radius: 1,
+      color: ExampleColors.slate,
+    );
+    Iterable<String> texts() =>
+        bucket.children.whereType<VectorTextComponent>().map((t) => t.text);
+
+    // One that leaves before 1 s never counts, nor scores.
+    final passing = ball();
+    game.addBody(passing);
+    await pumpFrames(tester, 30);
+    expect(bucket.counts(passing), isFalse);
+    passing.body.setTransform(Vector2.zero(), passing.body.rotation);
+    await pumpFrames(tester, 60);
+    expect(bucket.counts(passing), isFalse);
+    expect(texts(), isEmpty);
+
+    final staying = ball();
+    game.addBody(staying);
+    await pumpFrames(tester, 70);
+    expect(bucket.counts(staying), isTrue);
+    expect(texts(), contains('1'));
+    expect(game.score, 0);
+    // It rocks in the bucket's bottom for a while.
+    for (var i = 0; i < 600 && game.score == 0; i++) {
+      await pumpFrames(tester, 1);
+    }
+    await pumpFrames(tester, 2);
+    expect(game.score, greaterThan(0));
+    expect(texts().where((t) => t.endsWith('%')), hasLength(1));
     await tester.pumpWidget(const SizedBox());
   });
 

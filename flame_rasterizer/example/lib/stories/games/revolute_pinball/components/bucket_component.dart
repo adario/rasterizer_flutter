@@ -12,22 +12,25 @@ import 'package:flame_rasterizer_example/stories/games/revolute_pinball/componen
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 
 /// An open-top bucket around [inner], a U path that collides as its convex
-/// pieces, which glows once it's [full]. As a body comes in, its count fades
-/// in above it for a while; once that body is at rest, so does [_share], as a
-/// percentage, below it.
+/// pieces, which glows once it's [full]. Once a body has stayed in it for
+/// [_countTime], its count fades in above it for a while; once all its bodies
+/// are at rest, so does [_share], as a percentage, below it.
 class BucketComponent(final Rect inner)
     extends BodyComponent
     with GlowingBody, Outlined {
   this : super(paint: Paint()..color = ExampleColors.slate);
 
-  /// It's full with at least [_fullCount] bodies, all at rest, whose
-  /// bounding box is at least [_fullShare] of its height.
+  /// It's full with at least [_fullCount] bodies, all at rest, whose area is
+  /// at least [_fullShare] of its own.
   static const _fullCount = 2;
-  static const _fullShare = 0.85;
+  static const _fullShare = 0.5;
+
+  /// How long a body stays in it to count, in seconds.
+  static const _countTime = 1.0;
 
   /// The score for each square meter of a body coming to rest in it, times
   /// its share.
-  static const _scorePerArea = 40;
+  static const _scorePerArea = 400;
 
   static const _countCap = 2.4;
 
@@ -72,11 +75,14 @@ class BucketComponent(final Rect inner)
     ];
   }();
 
-  /// Its bodies, with how long each has been still, null before the first
-  /// [track].
-  Map<BodyComponent, double>? _bodies;
+  /// Its bodies, with how long each has been in it, and still.
+  var _inside = <BodyComponent, double>{};
+  var _still = <BodyComponent, double>{};
 
-  /// The bodies that came in and aren't at rest yet.
+  /// How many bodies counted at the last [track], null before the first.
+  int? _count;
+
+  /// The bodies that count and haven't scored yet.
   final _arrivals = <BodyComponent>{};
 
   /// Whether it's full, and so emptying.
@@ -97,75 +103,79 @@ class BucketComponent(final Rect inner)
   double _emptyClock = 0;
 
   bool _atRest(BodyComponent b) =>
-      _bodies![b]! >= RevolutePinballExample.restTime;
+      _still[b]! >= RevolutePinballExample.restTime;
 
-  /// The height of its bodies at rest, as a share of its own.
-  double get level =>
-      _bodies == null ? 0 : _shareOf(_bodies!.keys.where(_atRest));
+  /// Whether [body] has stayed in it for [_countTime].
+  bool counts(BodyComponent body) => (_inside[body] ?? 0) >= _countTime;
+
+  /// The area of its bodies at rest, as a share of its own.
+  double get level => _shareOf(_inside.keys.where(_atRest));
 
   /// The texts above and below it.
   final _texts = <bool, VectorTextComponent>{};
 
-  /// The height of [bodies]' bounding box, as a share of its own.
-  double _shareOf(Iterable<BodyComponent> bodies) {
-    var top = double.infinity;
-    var bottom = double.negativeInfinity;
-    for (final b in bodies) {
-      for (final shape in b.body.shapes) {
-        final box = shape.aabb;
-        top = math.min(top, box.lowerBound.y);
-        bottom = math.max(bottom, box.upperBound.y);
-      }
-    }
-    return top > bottom ? 0 : (bottom - top) / inner.height;
-  }
+  /// Its inner area: a rectangle above a half ellipse.
+  late final _area =
+      inner.width * (inner.height - _ry) + math.pi * _rx * _ry / 2;
 
-  double get _share => _shareOf(_bodies!.keys);
+  /// The area of [bodies], as a share of its own.
+  double _shareOf(Iterable<BodyComponent> bodies) =>
+      bodies.fold(0.0, (sum, b) => sum + RevolutePinballExample.area(b)) /
+      _area;
+
+  double get _share => _shareOf(_inside.keys);
 
   static double _bottom(BodyComponent b) =>
       b.body.shapes.map((s) => s.aabb.upperBound.y).reduce(math.max);
 
-  /// Updates its bodies from [bodies], after [dt] more seconds: scores those
-  /// that came to rest, and starts emptying once full.
+  /// Updates its bodies from [bodies], after [dt] more seconds: once they're
+  /// all at rest, scores those that came in, and starts emptying once full.
   void track(Iterable<BodyComponent> bodies, double dt) {
     _empty(dt);
-    final last = _bodies;
-    final now = _bodies = {
-      for (final b in bodies)
-        if (b.isLoaded &&
-            !_emptying.containsKey(b) &&
-            holds(b.body.position.toOffset()))
-          b: _game.settled.remove(b)
-              ? RevolutePinballExample.restTime
-              : RevolutePinballExample.isStill(b.body)
-              ? (last?[b] ?? 0) + dt
-              : 0,
-    };
-    final atRest = _atRest;
-    if (last != null) {
-      _arrivals.addAll(
-        now.keys.where((b) => !last.containsKey(b) && !atRest(b)),
-      );
-      if (now.length > last.length) {
-        _show('${now.length}', below: false);
+    final inside = <BodyComponent, double>{};
+    final still = <BodyComponent, double>{};
+    for (final b in bodies) {
+      if (!b.isLoaded ||
+          _emptying.containsKey(b) ||
+          !holds(b.body.position.toOffset())) {
+        continue;
+      }
+      if (_game.settled.remove(b)) {
+        inside[b] = _countTime;
+        still[b] = RevolutePinballExample.restTime;
+        continue;
+      }
+      final time = inside[b] = (_inside[b] ?? 0) + dt;
+      still[b] = RevolutePinballExample.isStill(b.body)
+          ? (_still[b] ?? 0) + dt
+          : 0;
+      if (time >= _countTime && time - dt < _countTime) {
+        _arrivals.add(b);
       }
     }
-    _arrivals.removeWhere((b) => !now.containsKey(b));
-    if (_arrivals.any(atRest)) {
-      final share = _share;
-      for (final b in _arrivals.where(atRest)) {
+    _inside = inside;
+    _still = still;
+    _arrivals.removeWhere((b) => !inside.containsKey(b));
+    final count = inside.keys.where(counts).length;
+    if (_count case final last? when count > last) {
+      _show('$count', below: false);
+    }
+    _count = count;
+    if (inside.isEmpty || !inside.keys.every((b) => counts(b) && _atRest(b))) {
+      return;
+    }
+    final share = _share;
+    if (_arrivals.isNotEmpty) {
+      for (final b in _arrivals) {
         _game.score += (_scorePerArea * RevolutePinballExample.area(b) * share)
             .round();
       }
-      _arrivals.removeWhere(atRest);
+      _arrivals.clear();
       _game.play(PinballSound.score);
       _show('${(100 * share).round()}%', below: true);
     }
-    if (!full &&
-        now.length >= _fullCount &&
-        now.keys.every(atRest) &&
-        _share >= _fullShare) {
-      _startEmptying(now.keys.toList());
+    if (!full && inside.length >= _fullCount && share >= _fullShare) {
+      _startEmptying(inside.keys.toList());
     }
   }
 
@@ -186,7 +196,9 @@ class BucketComponent(final Rect inner)
       _emptying[b] = _Shrink(b, i * step);
     }
     _emptyClock = 0;
-    _bodies = {};
+    _inside = {};
+    _still = {};
+    _count = 0;
     _arrivals.clear();
   }
 

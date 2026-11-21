@@ -481,8 +481,8 @@ abstract class RevolutePinballExample({
     }
   }
 
-  /// Whether [body] is gone through the drain, is in a bucket, or has been at
-  /// rest for [restTime], after [dt] more seconds.
+  /// Whether [body] is gone through the drain, counts in a bucket, or has
+  /// been at rest for [restTime], after [dt] more seconds.
   bool _done(BodyComponent body, double dt) {
     if (body.isRemoving || body.isRemoved) {
       return true;
@@ -490,8 +490,7 @@ abstract class RevolutePinballExample({
     if (!body.isLoaded) {
       return false;
     }
-    final position = body.body.position.toOffset();
-    if (_buckets.any((bucket) => bucket.holds(position))) {
+    if (_buckets.any((bucket) => bucket.counts(body))) {
       return true;
     }
     final time = _current[body] = isStill(body.body) ? _current[body]! + dt : 0;

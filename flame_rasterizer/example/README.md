@@ -386,14 +386,16 @@ A pinball with Revolute Joint Svgs' bodies, wheel and walls, in a `Forge2DGame` 
 window, and is built again when the window is resized:
 
 - **Drops.** A key or a tap starts the game, and drops 10 bodies over the wheel, half balls and half SVGs. Once each is
-  in a bucket, gone through the drain, or at rest for 0.5 s, the wheel turns the other way, amber until it's at full
-  speed, and the next 10 drop, up to 200 bodies on the table.
+  in a bucket for 1 s, gone through the drain, or at rest for 0.5 s, the wheel turns the other way, amber until it's at
+  full speed, and the next 10 drop, up to 200 bodies on the table.
 - **Flippers.** Left or A, Right or D, or a tap in the bottom third's left or right half kicks a flipper, which a motor
   holds up while the key or the finger is down. A kicked body leaves a trail that fades out in 1 s, as does a body
   hitting the wheel.
-- **Buckets.** Two, at the top left and right. A body coming to rest in one scores by its area and the bucket's fill. A
-  bucket whose bodies, at least 2, are at rest and fill 85% of its height is full: it turns green, gives their area
-  back to the energy, and empties in 5 s, shrinking its bodies to a fifth from the bottom up.
+- **Buckets.** Two, at the top left and right. A body counts in one once it has stayed in for 1 s, and its count shows
+  above it. Once all its bodies are at rest, those that came in score by their area and the bucket's fill, their area
+  against the bucket's, shown below it. A bucket whose bodies, at least 2, are at rest and fill 50% of its area is
+  full: it turns green, gives their area back to the energy, and empties in 5 s, shrinking its bodies to a fifth from
+  the bottom up.
 - **Energy.** Drained bodies take energy, by their area against a fifth of the table's. At 0, the game is over and the
   world stops, until a key or a tap starts a new game.
 - **Texts.** In `VectorFont`, 12 logical pixels high: the energy, from green to red, and the fuller bucket's fill, at
@@ -456,8 +458,9 @@ Its knobs pick:
   game on each level draws no path with the canvas fallback.
 - `revolute_pinball_test.dart`: Revolute Pinball loads with each renderer at READY, with 2 flippers, 2 buckets, the
   wheel and its texts at 100% energy. A key starts it and drops 10 bodies. Left kicks the left flipper, which falls
-  back once released. Drained energy ends the game and stops the world, and a key starts a new one. A new renderer
-  goes on with the same bodies, wheel, drop and score. A resize builds the table again. A body hitting the wheel trails.
+  back once released. A body leaving a bucket within 1 s never counts; one staying counts after 1 s, and scores once
+  at rest. Drained energy ends the game and stops the world, and a key starts a new one. A new renderer goes on with
+  the same bodies, wheel, drop and score. A resize builds the table again. A body hitting the wheel trails.
 
 The integration tests, in `integration_test/`, run on a device, with
 `flutter test integration_test/<file> -d <macos | an iPhone's UDID | emulator-5554>`:
