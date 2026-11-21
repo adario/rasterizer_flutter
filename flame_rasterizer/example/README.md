@@ -386,9 +386,9 @@ The status bar shows the paths made a second, after the renderer's numbers. Thin
 A pinball with Revolute Joint Svgs' bodies, wheel and walls, in a `Forge2DGame` at 10 pixels a meter. The table fits the
 window, and is built again when the window is resized:
 
-- **Drops.** A key or a tap starts the game, and drops 15 bodies over the wheel, half balls and half SVGs. Once each is
+- **Drops.** A key or a tap starts the game, and drops 10 bodies over the wheel, half balls and half SVGs. Once each is
   in a bucket, gone through the drain, or at rest for 0.5 s, the wheel turns the other way, amber until it's at full
-  speed, and the next 15 drop, up to 100 bodies on the table.
+  speed, and the next 10 drop, up to 200 bodies on the table.
 - **Flippers.** Left or A, Right or D, or a tap in the bottom third's left or right half kicks a flipper, which a motor
   holds up while the key or the finger is down. A kicked body leaves a trail that fades out in 1 s.
 - **Buckets.** Two, at the top left and right. A body coming to rest in one scores by its area and the bucket's fill. A
@@ -453,7 +453,7 @@ Its knobs pick:
   READY, the purge, the rounds, the drop, the texts and Game Over each have a test, with the numbers above. A whole
   game on each level draws no path with the canvas fallback.
 - `revolute_pinball_test.dart`: Revolute Pinball loads with each renderer at READY, with 2 flippers, 2 buckets, the
-  wheel and its texts at 100% energy. A key starts it and drops 15 bodies. Left kicks the left flipper, which falls
+  wheel and its texts at 100% energy. A key starts it and drops 10 bodies. Left kicks the left flipper, which falls
   back once released. Drained energy ends the game and stops the world, and a key starts a new one. A resize builds
   the table again.
 

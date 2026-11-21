@@ -61,9 +61,9 @@ abstract class RevolutePinballExample({
 
   static const description = '''
     A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
-    it, and drops 15 bodies over a wheel. Once each is in a bucket, gone
+    it, and drops 10 bodies over a wheel. Once each is in a bucket, gone
     through the drain, or at rest, the wheel turns the other way, amber until
-    it's at full speed, and the next 15 drop. Left or A, Right or D, or a tap
+    it's at full speed, and the next 10 drop. Left or A, Right or D, or a tap
     in the bottom third's left or right half flips a flipper. A body coming
     to rest in a bucket scores by its area and the bucket's fill. Drained
     bodies take energy, until the game is over. A full bucket gives its

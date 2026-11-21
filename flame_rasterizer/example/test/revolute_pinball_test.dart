@@ -89,13 +89,13 @@ void main() {
     });
   }
 
-  testWidgets('a key starts the game, and drops 15 bodies', (tester) async {
+  testWidgets('a key starts the game, and drops 10 bodies', (tester) async {
     final game = await pumpGame(tester);
     await press(tester, LogicalKeyboardKey.space);
     await pumpFrames(tester, 30);
     expect(textsOf(game), isNot(contains('READY')));
     expect(textsOf(game), contains('DROP 1'));
-    expect(bodiesOf(game), 15);
+    expect(bodiesOf(game), 10);
     await tester.pumpWidget(const SizedBox());
   });
 
