@@ -1,23 +1,22 @@
 import 'package:flame_audio/flame_audio.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/sounds.dart';
 
-/// The game's sounds on native platforms, which audioplayers plays: a
+/// A game's sounds on native platforms, which audioplayers plays: a
 /// [SoundPool] for each sound.
-class SoundBank._(final Map<Sound, SoundPool> _pools) {
-  /// Loads every sound into [size] players.
-  static Future<SoundBank> load({required int size}) async {
-    await FlameAudio.audioCache.loadAll([
-      for (final sound in Sound.values) sound.path,
-    ]);
+class SoundBank._(final Map<String, SoundPool> _pools) {
+  /// Loads the sounds at [paths], each into [size] players.
+  static Future<SoundBank> load(
+    List<String> paths, {
+    required int size,
+  }) async {
+    await FlameAudio.audioCache.loadAll(paths);
     return SoundBank._({
-      for (final sound in Sound.values)
-        sound: await SoundPool.load(sound, size: size),
+      for (final path in paths) path: await SoundPool.load(path, size: size),
     });
   }
 
-  /// Plays [sound] with one of its players that isn't busy, if any:
-  /// otherwise, skips it.
-  void play(Sound sound) => _pools[sound]!.play();
+  /// Plays the sound at [path] with one of its players that isn't busy, if
+  /// any: otherwise, skips it.
+  void play(String path) => _pools[path]!.play();
 
   /// Releases the players, which can't be used anymore.
   Future<void> dispose() {
@@ -36,8 +35,8 @@ class SoundPool._(final List<AudioPlayer> _players) {
   /// The players asked to play, which haven't started yet.
   final Set<AudioPlayer> _starting = {};
 
-  /// Loads [sound] into [size] players.
-  static Future<SoundPool> load(Sound sound, {required int size}) async {
+  /// Loads the sound at [path] into [size] players.
+  static Future<SoundPool> load(String path, {required int size}) async {
     final players = <AudioPlayer>[];
     for (var i = 0; i < size; i++) {
       final player = AudioPlayer()
@@ -48,7 +47,7 @@ class SoundPool._(final List<AudioPlayer> _players) {
       await player.setAudioContext(_audioContext);
       // Back to the start when it ends, ready to play again.
       await player.setReleaseMode(ReleaseMode.stop);
-      await player.setSource(AssetSource(sound.path));
+      await player.setSource(AssetSource(path));
       players.add(player);
     }
     return SoundPool._(players);

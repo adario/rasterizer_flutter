@@ -5,6 +5,7 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
+import 'package:flame_rasterizer_example/commons/game_sounds.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/bolts_component.dart';
@@ -463,19 +464,21 @@ abstract class TubeShooterExample({
   }
 
   /// The sounds, once [sound] was on.
-  TubeSounds? _sounds;
+  GameSounds? _sounds;
 
   /// Loads the sounds, unless they're loaded or loading.
   Future<void> _loadSounds() async {
     if (_sounds == null) {
-      await (_sounds = TubeSounds()).load();
+      await (_sounds = GameSounds([
+        for (final sound in Sound.values) sound.path,
+      ])).load();
     }
   }
 
   /// Plays [sound], if the Sound knob is on and the sounds are loaded.
   void _play(Sound sound) {
     if (_sound) {
-      _sounds?.play(sound);
+      _sounds?.play(sound.path);
     }
   }
 
