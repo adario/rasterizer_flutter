@@ -105,8 +105,8 @@ abstract class RevolutePinballExample({
     LogicalKeyboardKey.keyD: 1,
   };
 
-  static const _dropped = 15;
-  static const _maxBodies = 100;
+  static const _dropped = 10;
+  static const _maxBodies = 200;
 
   /// How long a body below [_restSpeed] stays so to be at rest, in seconds.
   static const restTime = 0.5;
