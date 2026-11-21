@@ -614,6 +614,21 @@ class RevolutePinballWorld()
         flipper.touching.forEach(gameRef._kicked);
       }
     }
+    // A body hitting the wheel trails as if kicked.
+    if (gameRef._wheel case final wheel? when wheel.isLoaded) {
+      for (final event in events.begin) {
+        final a = event.shapeA;
+        final b = event.shapeB;
+        if (!a.isValid || !b.isValid) {
+          continue;
+        }
+        if (a.body == wheel.body) {
+          gameRef._kicked(b.body);
+        } else if (b.body == wheel.body) {
+          gameRef._kicked(a.body);
+        }
+      }
+    }
   }
 
   @override

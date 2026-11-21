@@ -389,7 +389,8 @@ window, and is built again when the window is resized:
   in a bucket, gone through the drain, or at rest for 0.5 s, the wheel turns the other way, amber until it's at full
   speed, and the next 10 drop, up to 200 bodies on the table.
 - **Flippers.** Left or A, Right or D, or a tap in the bottom third's left or right half kicks a flipper, which a motor
-  holds up while the key or the finger is down. A kicked body leaves a trail that fades out in 1 s.
+  holds up while the key or the finger is down. A kicked body leaves a trail that fades out in 1 s, as does a body
+  hitting the wheel.
 - **Buckets.** Two, at the top left and right. A body coming to rest in one scores by its area and the bucket's fill. A
   bucket whose bodies, at least 2, are at rest and fill 85% of its height is full: it turns green, gives their area
   back to the energy, and empties in 5 s, shrinking its bodies to a fifth from the bottom up.
@@ -456,7 +457,7 @@ Its knobs pick:
 - `revolute_pinball_test.dart`: Revolute Pinball loads with each renderer at READY, with 2 flippers, 2 buckets, the
   wheel and its texts at 100% energy. A key starts it and drops 10 bodies. Left kicks the left flipper, which falls
   back once released. Drained energy ends the game and stops the world, and a key starts a new one. A new renderer
-  goes on with the same bodies, wheel, drop and score. A resize builds the table again.
+  goes on with the same bodies, wheel, drop and score. A resize builds the table again. A body hitting the wheel trails.
 
 The integration tests, in `integration_test/`, run on a device, with
 `flutter test integration_test/<file> -d <macos | an iPhone's UDID | emulator-5554>`:

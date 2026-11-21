@@ -6,6 +6,7 @@ import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/bucket_component.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/flipper_component.dart';
+import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/trail_component.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,6 +97,16 @@ void main() {
     expect(textsOf(game), isNot(contains('READY')));
     expect(textsOf(game), contains('DROP 1'));
     expect(bodiesOf(game), 10);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a body hitting the wheel trails', (tester) async {
+    final game = await pumpGame(tester);
+    await press(tester, LogicalKeyboardKey.space);
+    for (var i = 0; i < 300 && partsOf<TrailComponent>(game).isEmpty; i++) {
+      await pumpFrames(tester, 1);
+    }
+    expect(partsOf<TrailComponent>(game), isNotEmpty);
     await tester.pumpWidget(const SizedBox());
   });
 
