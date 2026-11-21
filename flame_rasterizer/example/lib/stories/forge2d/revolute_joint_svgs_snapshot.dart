@@ -4,8 +4,8 @@ part of 'revolute_joint_svgs_example.dart';
 /// dropped, where they are and how they move, and the next body's color.
 typedef RevoluteJointSvgsSnapshot = ({
   BodySnapshot? wheel,
-  List<({double radius, Color color, BodySnapshot body})> balls,
-  List<({String name, int side, Color color, BodySnapshot body})> svgBodies,
+  List<BallSnapshot> balls,
+  List<SvgBodySnapshot> svgBodies,
   int tint,
 });
 
@@ -25,22 +25,11 @@ extension RevoluteJointSvgsSnapshots on RevoluteJointSvgsExample {
     },
     balls: [
       for (final ball in balls)
-        if (ball.isLoaded)
-          (
-            radius: ball.radius,
-            color: ball.paint.color,
-            body: ball.body.snapshot,
-          ),
+        if (ball.isLoaded) ball.snapshot,
     ],
     svgBodies: [
       for (final svgBody in svgBodies)
-        if (svgBody.isLoaded)
-          (
-            name: svgBody.name,
-            side: svgBody.side,
-            color: svgBody.color,
-            body: svgBody.body.snapshot,
-          ),
+        if (svgBody.isLoaded) svgBody.snapshot,
     ],
     tint: tint,
   );
@@ -49,30 +38,8 @@ extension RevoluteJointSvgsSnapshots on RevoluteJointSvgsExample {
   /// were.
   void _restoreBodies() {
     if (_from case final from?) {
-      for (final ball in from.balls) {
-        balls.add(
-          Ball(
-            ball.body.position,
-            ball.body.linearVelocity,
-            radius: ball.radius,
-            color: ball.color,
-            from: ball.body,
-          ),
-        );
-      }
-      for (final svgBody in from.svgBodies) {
-        svgBodies.add(
-          createSvgBody(
-            svgBody.name,
-            svgBody.side,
-            svgBody.body.position,
-            svgBody.body.linearVelocity,
-            angle: svgBody.body.rotation.angle,
-            color: svgBody.color,
-            from: svgBody.body,
-          ),
-        );
-      }
+      balls.addAll(from.balls.map(Ball.from));
+      svgBodies.addAll(from.svgBodies.map(svgBodyFrom));
       world.addAll([...balls, ...svgBodies]);
       tint = from.tint;
     }

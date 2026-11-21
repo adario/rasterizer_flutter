@@ -280,6 +280,17 @@ extension BodySnapshots on Body {
   }
 }
 
+/// What a [Ball] in a game with another renderer goes on from.
+typedef BallSnapshot = ({double radius, Color color, BodySnapshot body});
+
+/// What an [SvgBody] in a game with another renderer goes on from.
+typedef SvgBodySnapshot = ({
+  String name,
+  int side,
+  Color color,
+  BodySnapshot body,
+});
+
 /// A ball with a radius of [radius] meters, in `color`, which starts at
 /// [_position], moving at [_velocity], or goes on from [from], if any.
 class Ball(
@@ -290,6 +301,19 @@ class Ball(
   final BodySnapshot? from,
 }) extends BodyComponent with GlowingBody {
   this : super(paint: Paint()..color = color);
+
+  /// A ball that goes on from [from].
+  factory Ball.from(BallSnapshot from) => Ball(
+    from.body.position,
+    from.body.linearVelocity,
+    radius: from.radius,
+    color: from.color,
+    from: from.body,
+  );
+
+  /// What a ball in a game with another renderer goes on from.
+  BallSnapshot get snapshot =>
+      (radius: radius, color: paint.color, body: body.snapshot);
 
   /// The balls' paths, by radius, so that the balls of a size share one.
   static final _paths = <double, Path>{};
@@ -704,6 +728,17 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     );
   }
 
+  /// Creates an SVG's body that goes on from [from].
+  SvgBody svgBodyFrom(SvgBodySnapshot from) => createSvgBody(
+    from.name,
+    from.side,
+    from.body.position,
+    from.body.linearVelocity,
+    angle: from.body.rotation.angle,
+    color: from.color,
+    from: from.body,
+  );
+
   /// Returns the size and convex pieces of the SVG [name] at its [side]th size,
   /// worked out once.
   _SizedPieces _sizeAndPieces(
@@ -749,6 +784,10 @@ class SvgBody(
 
   /// The component that draws its pieces, while the game shows them.
   PathComponent? _piecesOutline;
+
+  /// What it goes on from in a game with another renderer.
+  SvgBodySnapshot get snapshot =>
+      (name: name, side: side, color: color, body: body.snapshot);
 
   @override
   Future<void> onLoad() async {
