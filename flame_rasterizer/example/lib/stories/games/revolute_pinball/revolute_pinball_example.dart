@@ -350,6 +350,7 @@ abstract class RevolutePinballExample({
     ];
     final bucketWidth = math.max(0.2 * a.width, 2 * SvgBodies.maxSide);
     final bucketHeight = 0.2 * small;
+    final bucketTop = a.top + 0.15 * a.height;
     final table = TableComponent([
       Wall(Vector2(a.left, a.top), Vector2(a.right, a.top)),
       Wall(Vector2(a.left, a.top), Vector2(a.left, a.bottom)),
@@ -361,7 +362,8 @@ abstract class RevolutePinballExample({
           FlipperComponent(Vector2(-side * pivot.x, pivot.y), flipper, side),
       ],
       _wheel = CircleShuffler(
-        Vector2(0, a.top + 0.35 * a.height),
+        // Level with the buckets' bottom.
+        Vector2(0, bucketTop + bucketHeight + BucketComponent.thickness),
         scale: 0.15 * small / CircleShuffler.reach,
         color: ExampleColors.dynamicColor(0),
         from: wheel,
@@ -372,7 +374,7 @@ abstract class RevolutePinballExample({
             Rect.fromCenter(
               center: Offset(
                 side * (a.right - 0.06 * a.width - bucketWidth / 2),
-                a.top + 0.15 * a.height + bucketHeight / 2,
+                bucketTop + bucketHeight / 2,
               ),
               width: bucketWidth,
               height: bucketHeight,

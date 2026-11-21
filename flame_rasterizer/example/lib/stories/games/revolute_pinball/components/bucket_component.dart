@@ -31,7 +31,8 @@ class BucketComponent(final Rect inner)
 
   static const _countCap = 2.4;
 
-  static const _thickness = 0.6;
+  /// Its walls' thickness, outside [inner].
+  static const thickness = 0.6;
 
   /// How many segments make each of the bottom's half ellipses.
   static const _segments = 48;
@@ -52,7 +53,7 @@ class BucketComponent(final Rect inner)
   /// Straight sides down to the bottom's half ellipse.
   @override
   late final outline = () {
-    const w = _thickness;
+    const w = thickness;
     List<Vector2> arc(double rx, double ry, {required bool leftToRight}) =>
         List.generate(_segments + 1, (i) {
           final a = (leftToRight ? _segments - i : i) * math.pi / _segments;
@@ -224,7 +225,7 @@ class BucketComponent(final Rect inner)
             ..position = Vector2(
               inner.center.dx,
               below
-                  ? inner.bottom + _thickness + 0.5 + _countCap / 2
+                  ? inner.bottom + thickness + 0.5 + _countCap / 2
                   : inner.top - 0.5 - _countCap / 2,
             )
             ..opacity = 0
