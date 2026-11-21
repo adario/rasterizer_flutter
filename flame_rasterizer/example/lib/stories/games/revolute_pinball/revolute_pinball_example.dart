@@ -295,14 +295,19 @@ abstract class RevolutePinballExample({
   @override
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
-    if (isLoaded) {
+    // A rebuilt widget resizes the game to the same size.
+    if (isLoaded && size != _tableSize) {
       _buildTable();
     }
   }
 
+  /// The game's size that the table was built for.
+  final _tableSize = Vector2.zero();
+
   /// Rebuilds the walls, the guides, the flippers, the wheel and the buckets
   /// for the arena's size. The wheel goes on from [wheel], if any.
   void _buildTable({BodySnapshot? wheel}) {
+    _tableSize.setFrom(size);
     final a = _arena;
     final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
     final flipper = 0.18 * a.width;
