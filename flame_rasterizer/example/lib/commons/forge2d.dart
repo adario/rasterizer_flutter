@@ -568,6 +568,9 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// The larger side of the largest SVGs, in meters.
   static const maxSide = _minSide + (_sides - 1) / 10;
 
+  /// The SVG bodies' density, in kilograms a square meter.
+  double get svgDensity => 1;
+
   math.Random get random;
 
   /// Whether the SVG bodies' convex pieces draw over them.
@@ -724,6 +727,7 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
       name: name,
       side: side,
       angularVelocity: angularVelocity,
+      density: svgDensity,
       from: from,
     );
   }
@@ -778,6 +782,7 @@ class SvgBody(
   /// The index of the SVG's size, for a game with another renderer.
   required final int side,
   final double _angularVelocity = 0,
+  final double density = 1,
   final BodySnapshot? from,
 }) extends BodyComponent {
   this : super(renderBody: false, priority: 1);
@@ -822,6 +827,7 @@ class SvgBody(
       ),
     );
     final shapeDef = ShapeDef(
+      density: density,
       material: SurfaceMaterial(restitution: 0.4, friction: 0.5),
     );
     for (final piece in pieces) {
@@ -925,6 +931,8 @@ class CircleShuffler(
       density: 50,
       material: SurfaceMaterial(friction: 0.4, restitution: 0.6),
       filter: Filter(maskBits: Filter.allCategories & ~Wall.category),
+      // So that a game can tell which bodies hit it.
+      enableContactEvents: true,
     );
     for (var i = 0; i < pieces; i++) {
       final angle = 2 * math.pi * i / pieces;
