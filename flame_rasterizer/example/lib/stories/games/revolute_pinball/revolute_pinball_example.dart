@@ -50,8 +50,10 @@ abstract class RevolutePinballExample({
     it, and drops 15 bodies over a wheel. Once each is in a bucket, gone
     through the drain, or at rest, the wheel turns the other way, amber until
     it's at full speed, and the next 15 drop. Left or A, Right or D, or a tap
-    in the bottom third's left or right half flips a flipper. Fill both
-    buckets.
+    in the bottom third's left or right half flips a flipper. A body coming
+    to rest in a bucket scores by its area and the bucket's fill. Drained
+    bodies take energy, until the game is over. A full bucket gives its
+    bodies' area back, and empties.
   ''';
 
   static final _flipperKeys = {
@@ -72,6 +74,16 @@ abstract class RevolutePinballExample({
   /// How long a body below [_restSpeed] stays so to be at rest, in seconds.
   static const _restTime = 0.5;
   static const _restSpeed = 0.5;
+
+  /// The game ends once the drained bodies' area reaches [_drainShare] of
+  /// the arena's.
+  static const _drainShare = 0.2;
+
+  /// The score for each square meter of a body coming to rest in a bucket,
+  /// times the bucket's share.
+  static const _scorePerArea = 40;
+
+  static const _hudCap = 12.0;
 
   /// The flippers' angle at rest, and the guides' slope.
   static const _restAngle = math.pi / 6;
@@ -150,6 +162,49 @@ abstract class RevolutePinballExample({
     text: 'READY',
     capHeight: VectorTextComponent.maxCapHeight,
   );
+  final _gameOver = VectorTextComponent(
+    text: 'GAME OVER',
+    capHeight: VectorTextComponent.maxCapHeight,
+  );
+  final _energyText = VectorTextComponent(
+    capHeight: _hudCap,
+    line: 0,
+    left: true,
+  );
+  final _targetText = VectorTextComponent(
+    capHeight: _hudCap,
+    line: 1,
+    left: true,
+  );
+  final _dropsText = VectorTextComponent(capHeight: _hudCap, line: 1);
+  final _scoreText = VectorTextComponent(capHeight: _hudCap, line: 0);
+
+  /// The energy's colors from 0% to 100%.
+  static const _energyColors = [
+    Color(0xFFF87171),
+    Color(0xFFFB923C),
+    Color(0xFFFDE047),
+    Color(0xFF34D399),
+  ];
+
+  var _score = 0;
+  var _drops = 0;
+
+  /// The area of the bodies gone through the drain, in square meters.
+  var _drained = 0.0;
+
+  var _over = false;
+
+  /// The world's speed before the game ended.
+  var _speed = 1.0;
+
+  double get _energy => math.max(
+    0,
+    1 - _drained / (_drainShare * _arena.width * _arena.height),
+  );
+
+  static double _area(BodyComponent body) =>
+      body.body.mass / body.body.shapes.first.density;
 
   /// Whether the next drop waits for the wheel to turn the other way.
   var _queued = false;
@@ -178,7 +233,13 @@ abstract class RevolutePinballExample({
     if (!await loadBodySvgs()) {
       return;
     }
-    camera.viewport.add(_ready);
+    camera.viewport.addAll([
+      _ready,
+      _energyText,
+      _targetText,
+      _dropsText,
+      _scoreText,
+    ]);
     _buildTable();
     startStatus();
   }
@@ -269,17 +330,43 @@ abstract class RevolutePinballExample({
   var _started = false;
 
   void _start() {
-    if (!_started && isLoaded) {
+    if (_over) {
+      _newGame();
+    } else if (!_started && isLoaded) {
       _started = true;
       _ready.removeFromParent();
       spawn();
     }
   }
 
+  /// Freezes the world and shows GAME OVER until a key or a tap.
+  void _endGame() {
+    _over = true;
+    _speed = world.timeScale;
+    world.timeScale = 0;
+    camera.viewport.add(_gameOver);
+  }
+
+  /// Clears the bodies and the score, and waits at READY.
+  void _newGame() {
+    _over = false;
+    _started = false;
+    _gameOver.removeFromParent();
+    world.timeScale = _speed;
+    removeBodies([...svgBodies, ...balls]);
+    _current = {};
+    _queued = false;
+    _score = 0;
+    _drops = 0;
+    _drained = 0;
+    camera.viewport.add(_ready);
+  }
+
   void spawn() {
     if (!isLoaded) {
       return;
     }
+    _drops++;
     final spawn = Vector2(0, _arena.top + 0.1 * _arena.height);
     final ballsFirst = random.nextBool();
     final bodies = [
@@ -346,15 +433,33 @@ abstract class RevolutePinballExample({
   void update(double dt) {
     super.update(dt);
     _trails.removeWhere((_, trail) => trail.over);
+    _scoreText.text = 'SCORE $_score';
+    _dropsText.text = 'DROP $_drops';
+    final energy = _energy;
+    final x = energy * (_energyColors.length - 1);
+    final i = math.min(x.floor(), _energyColors.length - 2);
+    _energyText
+      ..text = 'ENERGY ${(100 * energy).round()}%'
+      ..tint = Color.lerp(_energyColors[i], _energyColors[i + 1], x - i);
+    final target = _buckets.map((b) => b.level).fold(0.0, math.max);
+    _targetText.text = 'TARGET ${(100 * target).round()}%';
+    if (_over) {
+      return;
+    }
     final bottom = _arena.bottom + SvgBodies.maxSide;
     bool drained(BodyComponent body) =>
         body.isLoaded && body.body.position.y > bottom;
     final gone = [...svgBodies.where(drained), ...balls.where(drained)];
     if (gone.isNotEmpty) {
+      _drained += gone.fold(0.0, (sum, body) => sum + _area(body));
       removeBodies(gone);
     }
     for (final bucket in _buckets) {
       bucket.track([...svgBodies, ...balls], dt);
+    }
+    if (_started && _energy < 0.005) {
+      _endGame();
+      return;
     }
     final done = [for (final body in _current.keys.toList()) _done(body, dt)];
     if (_started &&
@@ -375,7 +480,7 @@ abstract class RevolutePinballExample({
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
-    if (!_started) {
+    if (!_started || _over) {
       if (event is KeyDownEvent) {
         _start();
       }
@@ -406,7 +511,7 @@ abstract class RevolutePinballExample({
 
 class RevolutePinballWorld()
     extends Forge2DExampleWorld
-    with TapCallbacks, HasGameRef<RevolutePinballExample>, BodiesHud {
+    with TapCallbacks, HasGameRef<RevolutePinballExample> {
   @override
   void update(double dt) {
     super.update(dt);
@@ -422,7 +527,7 @@ class RevolutePinballWorld()
   @override
   void onTapDown(TapDownEvent event) {
     super.onTapDown(event);
-    if (!gameRef._started) {
+    if (!gameRef._started || gameRef._over) {
       gameRef._start();
       return;
     }
@@ -455,17 +560,6 @@ class _Table(final List<Component> _parts)
   _Table? next;
 
   bool get _ready => isMounted && children.length == _parts.length;
-
-  /// Counts its bodies in the world's body count.
-  @override
-  void onChildrenChanged(Component child, ChildrenChangeType type) {
-    super.onChildrenChanged(child, type);
-    if (child is BodyComponent) {
-      (gameRef.world as BodiesHud).countBodies(
-        type == ChildrenChangeType.added ? 1 : -1,
-      );
-    }
-  }
 
   @override
   void update(double dt) {
@@ -576,34 +670,62 @@ class _Bucket(final Rect inner)
 
   int get count => _bodies?.length ?? 0;
 
-  bool full = false;
+  /// Whether it's full, and so emptying.
+  bool get full => _emptying.isNotEmpty;
+
+  RevolutePinballExample get _game => findGame()! as RevolutePinballExample;
+
+  /// How long emptying takes, and each body's share of it, in seconds.
+  static const _emptyTime = 5.0;
+  static const _shrinkTime = 2.0;
+
+  /// The bodies emptying, which shrink from the bottom up, and the time since
+  /// it started.
+  final _emptying = <BodyComponent, _Shrink>{};
+  double _emptyClock = 0;
+
+  bool _atRest(BodyComponent b) =>
+      _bodies![b]! >= RevolutePinballExample._restTime;
+
+  /// The height of its bodies at rest, as a share of its own.
+  double get level =>
+      _bodies == null ? 0 : _shareOf(_bodies!.keys.where(_atRest));
 
   /// The texts above and below it.
   final _texts = <bool, VectorTextComponent>{};
 
-  /// The height of its bodies' bounding box, as a share of its own.
-  double get _share {
+  /// The height of [bodies]' bounding box, as a share of its own.
+  double _shareOf(Iterable<BodyComponent> bodies) {
     var top = double.infinity;
     var bottom = double.negativeInfinity;
-    for (final b in _bodies!.keys) {
+    for (final b in bodies) {
       for (final shape in b.body.shapes) {
         final box = shape.aabb;
         top = math.min(top, box.lowerBound.y);
         bottom = math.max(bottom, box.upperBound.y);
       }
     }
-    return count == 0 ? 0 : (bottom - top) / inner.height;
+    return top > bottom ? 0 : (bottom - top) / inner.height;
   }
 
-  /// Updates its bodies from [bodies], after [dt] more seconds.
+  double get _share => _shareOf(_bodies!.keys);
+
+  static double _bottom(BodyComponent b) =>
+      b.body.shapes.map((s) => s.aabb.upperBound.y).reduce(math.max);
+
+  /// Updates its bodies from [bodies], after [dt] more seconds: scores those
+  /// that came to rest, and starts emptying once full.
   void track(Iterable<BodyComponent> bodies, double dt) {
+    _empty(dt);
     final last = _bodies;
     final now = _bodies = {
       for (final b in bodies)
-        if (b.isLoaded && holds(b.body.position.toOffset()))
+        if (b.isLoaded &&
+            !_emptying.containsKey(b) &&
+            holds(b.body.position.toOffset()))
           b: RevolutePinballExample._still(b.body) ? (last?[b] ?? 0) + dt : 0,
     };
-    bool atRest(BodyComponent b) => now[b]! >= RevolutePinballExample._restTime;
+    final atRest = _atRest;
     if (last != null) {
       _arrivals.addAll(now.keys.where((b) => !last.containsKey(b)));
       if (now.length > last.length) {
@@ -612,13 +734,61 @@ class _Bucket(final Rect inner)
     }
     _arrivals.removeWhere((b) => !now.containsKey(b));
     if (_arrivals.any(atRest)) {
+      final share = _share;
+      for (final b in _arrivals.where(atRest)) {
+        _game._score +=
+            (RevolutePinballExample._scorePerArea *
+                    RevolutePinballExample._area(b) *
+                    share)
+                .round();
+      }
       _arrivals.removeWhere(atRest);
-      _show('${(100 * _share).round()}%', below: true);
+      _show('${(100 * share).round()}%', below: true);
     }
-    full =
+    if (!full &&
         now.length >= RevolutePinballExample._fullCount &&
         now.keys.every(atRest) &&
-        _share >= RevolutePinballExample._fullShare;
+        _share >= RevolutePinballExample._fullShare) {
+      _startEmptying(now.keys.toList());
+    }
+  }
+
+  /// Frees the drained area that [bodies] take, and shrinks them from the
+  /// bottom up.
+  void _startEmptying(List<BodyComponent> bodies) {
+    final game = _game;
+    game._drained = math.max(
+      0,
+      game._drained -
+          bodies.fold(0.0, (sum, b) => sum + RevolutePinballExample._area(b)),
+    );
+    bodies.sort((a, b) => _bottom(b).compareTo(_bottom(a)));
+    final step = bodies.length < 2
+        ? 0.0
+        : (_emptyTime - _shrinkTime) / (bodies.length - 1);
+    for (final (i, b) in bodies.indexed) {
+      _emptying[b] = _Shrink(b, i * step);
+    }
+    _emptyClock = 0;
+    _bodies = {};
+    _arrivals.clear();
+  }
+
+  /// Shrinks the emptying bodies [dt] seconds further, and removes them once
+  /// done.
+  void _empty(double dt) {
+    _emptying.removeWhere((b, _) => b.isRemoving || b.isRemoved);
+    if (_emptying.isEmpty) {
+      return;
+    }
+    _emptyClock += dt;
+    for (final shrink in _emptying.values) {
+      shrink.update((_emptyClock - shrink.start) / _shrinkTime);
+    }
+    if (_emptyClock >= _emptyTime) {
+      _game.removeBodies(_emptying.keys.toList());
+      _emptying.clear();
+    }
   }
 
   @override
@@ -943,4 +1113,69 @@ class FlameSvgRevolutePinballExample({
     // Its polygons aren't used.
     sampling: path.getBounds().longestSide,
   );
+}
+
+/// Shrinks [_body], its shapes and its drawing, as it empties from a bucket,
+/// [start] seconds after the emptying starts.
+class _Shrink(final BodyComponent _body, final double start) {
+  static const _smallest = 0.2;
+
+  /// Its shapes and drawing at full size, saved before the first shrink.
+  late final _shapes = [
+    for (final shape in _body.body.shapes)
+      (
+        geometry: shape.geometry,
+        def: ShapeDef(
+          density: shape.density,
+          material: SurfaceMaterial(
+            friction: shape.friction,
+            restitution: shape.restitution,
+          ),
+          filter: shape.filter,
+          enableContactEvents: shape.contactEventsEnabled,
+        ),
+      ),
+  ];
+  late final _children = [
+    for (final c in _body.children.whereType<PositionComponent>())
+      (component: c, position: c.position.clone(), scale: c.scale.clone()),
+  ];
+
+  var _scale = 1.0;
+
+  /// Scales it for [progress] from 0 to 1, by recreating its shapes.
+  void update(double progress) {
+    final scale = 1 + (_smallest - 1) * progress.clamp(0, 1);
+    if (scale == _scale) {
+      return;
+    }
+    final shapes = _shapes;
+    _scale = scale;
+    final body = _body.body;
+    for (final shape in body.shapes) {
+      shape.destroy();
+    }
+    for (final (:geometry, :def) in shapes) {
+      final scaled = switch (geometry) {
+        Circle(:final center, :final radius) => Circle(
+          center: center * scale,
+          radius: radius * scale,
+        ),
+        Polygon(:final points?, :final radius) => Polygon([
+          for (final p in points) p * scale,
+        ], radius: radius * scale),
+        _ => geometry,
+      };
+      try {
+        body.createShape(scaled, def);
+      } on ArgumentError {
+        // Too small for a hull: it goes.
+      }
+    }
+    for (final (:component, :position, :scale) in _children) {
+      component
+        ..position = position * _scale
+        ..scale = scale * _scale;
+    }
+  }
 }
