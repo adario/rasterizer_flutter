@@ -281,8 +281,10 @@ abstract class RevolutePinballExample({
     1 - drainedArea / (_drainShare * _arena.width * _arena.height),
   );
 
-  static double area(BodyComponent body) =>
-      body.body.mass / body.body.shapes.first.density;
+  static double area(BodyComponent body) => switch (body) {
+    SvgBody(:final area) => area,
+    _ => body.body.mass / body.body.shapes.first.density,
+  };
 
   /// Whether the next drop waits for the wheel to turn the other way.
   var _queued = false;
