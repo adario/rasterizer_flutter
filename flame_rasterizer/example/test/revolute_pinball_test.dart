@@ -416,6 +416,15 @@ void main() {
         expect(point.y, lessThan(hudTop));
       }
     }
+    // The wheel's top is level with the buckets' bottom.
+    final wheel = partsOf<CircleShuffler>(game).single;
+    final wheelTop = wheel.body.position.y - wheel.scale * CircleShuffler.reach;
+    for (final bucket in partsOf<BucketComponent>(game)) {
+      expect(
+        wheelTop,
+        closeTo(bucket.inner.bottom + BucketComponent.thickness, 1e-3),
+      );
+    }
     await tester.pumpWidget(const SizedBox());
   });
 
