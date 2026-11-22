@@ -382,6 +382,49 @@ double pieceSide(List<Vector2> piece) {
   );
 }
 
+/// Returns the area that [pieces] cover together, where they overlap too, as
+/// an SVG's overlapping shapes make them.
+///
+/// It sums the union of the pieces' spans along [rows] horizontal lines.
+double coveredArea(List<List<Vector2>> pieces, {int rows = 400}) {
+  if (pieces.isEmpty) {
+    return 0;
+  }
+  final ys = [for (final piece in pieces) ...piece.map((v) => v.y)];
+  final top = ys.reduce(math.min);
+  final dy = (ys.reduce(math.max) - top) / rows;
+  var area = 0.0;
+  for (var i = 0; i < rows; i++) {
+    final y = top + (i + 0.5) * dy;
+    final spans = [for (final piece in pieces) ?_span(piece, y)]
+      ..sort((a, b) => a.left.compareTo(b.left));
+    var end = double.negativeInfinity;
+    for (final (:left, :right) in spans) {
+      if (right > end) {
+        area += (right - math.max(left, end)) * dy;
+        end = right;
+      }
+    }
+  }
+  return area;
+}
+
+/// Returns where the horizontal line at [y] crosses the convex [piece], if it
+/// does.
+({double left, double right})? _span(List<Vector2> piece, double y) {
+  double? left;
+  double? right;
+  for (final (i, a) in piece.indexed) {
+    final b = piece[(i + 1) % piece.length];
+    if ((a.y <= y) != (b.y <= y)) {
+      final x = a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x);
+      left = math.min(left ?? x, x);
+      right = math.max(right ?? x, x);
+    }
+  }
+  return left == null ? null : (left: left, right: right!);
+}
+
 /// Returns positions around [center] for new bodies whose bounding circles
 /// have [radii].
 ///
@@ -533,11 +576,13 @@ typedef NewBody = ({
   BodyComponent Function(Vector2 position, Vector2 velocity) create,
 });
 
-/// An SVG's size, and its convex pieces at that size, also as one path.
+/// An SVG's size, and its convex pieces at that size, also as one path, and
+/// the area that they cover.
 typedef _SizedPieces = ({
   Vector2 size,
   List<List<Vector2>> pieces,
   Path path,
+  double area,
 });
 
 /// A Forge2D example that drops balls, and SVG bodies from 3 to 3.5 meters at
@@ -651,7 +696,10 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// Creates the component that draws [body]'s convex pieces over its SVG.
   /// The bodies of an SVG's size share its path's import.
   PathComponent piecesOutline(SvgBody body) {
-    final (size: _, pieces: _, :path) = _sizeAndPieces(body.name, body.side);
+    final (size: _, pieces: _, :path, area: _) = _sizeAndPieces(
+      body.name,
+      body.side,
+    );
     return (this as PathComponents).pathComponent(
         path,
         Paint(),
@@ -684,7 +732,7 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   NewBody randomSvg({double spin = 0}) {
     final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
     final side = random.nextInt(_sides);
-    final (:size, pieces: _, path: _) = _sizeAndPieces(name, side);
+    final (:size, pieces: _, path: _, area: _) = _sizeAndPieces(name, side);
     final color = nextColor(name);
     final angle = random.nextDouble() * 2 * math.pi;
     final angularVelocity = (2 * random.nextDouble() - 1) * spin;
@@ -715,13 +763,14 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     double angularVelocity = 0,
     BodySnapshot? from,
   }) {
-    final (:size, :pieces, path: _) = _sizeAndPieces(name, side);
+    final (:size, :pieces, :area, path: _) = _sizeAndPieces(name, side);
     return SvgBody(
       _svgs[name]!,
       size,
       pieces,
       position,
       velocity,
+      area: area,
       angle: angle,
       color: color,
       name: name,
@@ -757,7 +806,7 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     for (final piece in pieces) {
       path.addPolygon([for (final v in piece) v.toOffset()], true);
     }
-    return (size: size, pieces: pieces, path: path);
+    return (size: size, pieces: pieces, path: path, area: coveredArea(pieces));
   }();
 }
 
@@ -773,6 +822,10 @@ class SvgBody(
   final List<List<Vector2>> pieces,
   final Vector2 _position,
   final Vector2 _velocity, {
+
+  /// The area that its [pieces] cover, in square meters. Its mass counts
+  /// their overlaps more than once.
+  required final double area,
   required final double _angle,
   required final Color color,
 
