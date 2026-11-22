@@ -227,6 +227,10 @@ class BucketComponent(final Rect inner)
     _arrivals.clear();
   }
 
+  /// Goes on emptying, [dt] seconds further, without tracking the bodies, for
+  /// a game that's over.
+  void finishEmptying(double dt) => _empty(dt);
+
   /// Shrinks the emptying bodies [dt] seconds further, and removes them once
   /// done.
   void _empty(double dt) {

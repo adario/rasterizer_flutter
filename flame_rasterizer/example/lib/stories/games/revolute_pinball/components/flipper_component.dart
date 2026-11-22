@@ -117,6 +117,9 @@ class FlipperComponent(
     }
   }
 
+  /// Releases it from all its holders.
+  void releaseAll() => _holders.toList().forEach(release);
+
   @override
   Body createBody() {
     const angle = RevolutePinballExample.restAngle;

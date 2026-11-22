@@ -80,9 +80,10 @@ abstract class RevolutePinballExample({
     or Right Shift, or a tap in the bottom third's left or right half flips a
     flipper. On a Steam Deck, Steam Input can bind the triggers to the Shift
     keys. A body coming to rest in a bucket scores by its area and the
-    bucket's fill. Drained bodies take energy, until the game is over. A full
-    bucket gives its bodies' area back, and empties. The Sound knob turns
-    sounds on and off.
+    bucket's fill. Drained bodies take energy, until the game is over: then
+    the table goes on, without the flippers, drops or scores. A full bucket
+    gives its bodies' area back, and empties. The Sound knob turns sounds on
+    and off.
   ''';
 
   /// The Sound knob's value. The sounds load the first time it's on.
@@ -277,9 +278,6 @@ abstract class RevolutePinballExample({
 
   var _over = false;
 
-  /// The world's speed before the game ended.
-  var _speed = 1.0;
-
   double get _energy => math.max(
     0,
     1 - drainedArea / (_drainShare * _arena.width * _arena.height),
@@ -434,11 +432,14 @@ abstract class RevolutePinballExample({
     }
   }
 
-  /// Freezes the world and shows GAME OVER until a key or a tap.
+  /// Releases the flippers and shows GAME OVER until a key or a tap. The
+  /// table goes on, but drained bodies take no energy, and the buckets don't
+  /// score.
   void _endGame() {
     _over = true;
-    _speed = world.timeScale;
-    world.timeScale = 0;
+    for (final flipper in _flippers) {
+      flipper.releaseAll();
+    }
     camera.viewport.add(_gameOver);
   }
 
@@ -447,7 +448,6 @@ abstract class RevolutePinballExample({
     _over = false;
     _started = false;
     _gameOver.removeFromParent();
-    world.timeScale = _speed;
     removeBodies([...svgBodies, ...balls]);
     _current = {};
     _queued = false;
@@ -549,17 +549,23 @@ abstract class RevolutePinballExample({
       ..tint = Color.lerp(_energyColors[i], _energyColors[i + 1], x - i);
     final target = _buckets.map((b) => b.level).fold(0.0, math.max);
     _targetText.text = 'TARGET ${(100 * target).round()}%';
-    if (_over) {
-      return;
-    }
     final bottom = _arena.bottom + SvgBodies.maxSide;
     bool drained(BodyComponent body) =>
         body.isLoaded && body.body.position.y > bottom;
     final gone = [...svgBodies.where(drained), ...balls.where(drained)];
     if (gone.isNotEmpty) {
-      drainedArea += gone.fold(0.0, (sum, body) => sum + area(body));
-      play(PinballSound.drain);
+      // Once the game is over, they go without a sound or energy.
+      if (!_over) {
+        drainedArea += gone.fold(0.0, (sum, body) => sum + area(body));
+        play(PinballSound.drain);
+      }
       removeBodies(gone);
+    }
+    if (_over) {
+      for (final bucket in _buckets) {
+        bucket.finishEmptying(dt);
+      }
+      return;
     }
     for (final bucket in _buckets) {
       bucket.track([...svgBodies, ...balls], dt);

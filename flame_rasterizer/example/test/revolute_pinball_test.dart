@@ -192,12 +192,52 @@ void main() {
     final game = await pumpGame(tester);
     await press(tester, LogicalKeyboardKey.space);
     await pumpFrames(tester, 10);
+    final [left, _] = partsOf<FlipperComponent>(game);
+    final rest = left.body.angle;
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
     game
       ..score = 100
       ..drainedArea = double.maxFinite;
     await pumpFrames(tester, 2);
     expect(textsOf(game), containsAll(['GAME OVER', 'ENERGY 0%']));
-    expect(game.world.timeScale, 0);
+    expect(textsOf(game), contains('DROP 1'));
+
+    // The table goes on: the held flipper falls back, and the bodies move.
+    final positions = [
+      for (final body in game.balls) body.body.position.clone(),
+    ];
+    await pumpFrames(tester, 60);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
+    expect(left.body.angle, closeTo(rest, 0.1));
+    expect([
+      for (final (i, body) in game.balls.indexed)
+        body.body.position != positions[i],
+    ], contains(true));
+
+    // A drained body takes no energy, and a body in a bucket doesn't count.
+    game.drainedArea = 1e6;
+    final bucket = partsOf<BucketComponent>(game).first;
+    final drained = Ball(
+      Vector2(0, game.size.y / 10),
+      Vector2.zero(),
+      radius: 1,
+      color: ExampleColors.slate,
+    );
+    final kept = Ball(
+      bucket.inner.center.toVector2(),
+      Vector2.zero(),
+      radius: 1,
+      color: ExampleColors.slate,
+    );
+    game
+      ..addBody(drained)
+      ..addBody(kept);
+    await pumpFrames(tester, 70);
+    expect(drained.isMounted, isFalse);
+    expect(game.drainedArea, 1e6);
+    expect(bucket.counts(kept), isFalse);
+    expect(game.score, 100);
+    expect(textsOf(game), contains('DROP 1'));
 
     await press(tester, LogicalKeyboardKey.space);
     await pumpFrames(tester, 2);
@@ -206,7 +246,6 @@ void main() {
       containsAll(['READY', 'ENERGY 100%', 'DROP 0', 'SCORE 0']),
     );
     expect(textsOf(game), isNot(contains('GAME OVER')));
-    expect(game.world.timeScale, 1);
     expect(bodiesOf(game), 0);
     await tester.pumpWidget(const SizedBox());
   });
