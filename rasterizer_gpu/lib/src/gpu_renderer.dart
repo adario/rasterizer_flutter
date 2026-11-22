@@ -202,8 +202,8 @@ class GpuRenderer(
 
     // Draws [entry]'s instances with [pipeline]. [fragmentBindings] binds the
     // fragment shader's textures, after the pipeline. A pass's bindings
-    // persist across draws, and binding a slot again doesn't replace the
-    // earlier binding, so each draw clears them first.
+    // persist across draws, and binding a slot replaces only the same
+    // shader's binding, not another shader's, so each draw clears them first.
     void draw(
       gpu.RenderPipeline pipeline,
       gpu.Shader vertex,

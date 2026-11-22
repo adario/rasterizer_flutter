@@ -371,8 +371,9 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
     final vertexShader = mesh.glow
         ? glowVertex
         : (mesh.stroked ? strokedVertex : vertex);
-    // A pass's bindings persist across draws, and binding a slot again doesn't
-    // replace the earlier binding, so each draw clears them first.
+    // A pass's bindings persist across draws, and binding a slot replaces only
+    // the same shader's binding, not another shader's, so each draw clears
+    // them first.
     final pass = _pass
       ..clearBindings()
       ..bindPipeline(
