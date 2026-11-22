@@ -12,6 +12,7 @@ import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/game_sounds.dart';
 import 'package:flame_rasterizer_example/commons/outline_paints.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/commons/vector_font.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/bucket_component.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/flipper_component.dart';
@@ -331,17 +332,26 @@ abstract class RevolutePinballExample({
   /// The last bodies dropped, with how long each has been at rest.
   var _current = <BodyComponent, double>{};
 
-  /// The game's area above the HUD's band, in meters.
+  /// The table's largest width, in its heights.
+  static const _maxAspect = 1.2;
+
+  /// The table: the game's area above the HUD's band, in meters, centered
+  /// and at most [_maxAspect] times as wide as high.
   Rect get _arena {
-    final width = size.x / metersToPixels;
-    final height = size.y / metersToPixels;
-    return Rect.fromLTRB(
+    final height = (size.y - _hudBand) / metersToPixels;
+    final width = math.min(size.x / metersToPixels, _maxAspect * height);
+    return Rect.fromLTWH(
       -width / 2,
-      -height / 2,
-      width / 2,
-      height / 2 - _hudBand / metersToPixels,
+      -size.y / 2 / metersToPixels,
+      width,
+      height,
     );
   }
+
+  /// READY's and GAME OVER's cap height: at most
+  /// [VectorTextComponent.maxCapHeight], and less on a short screen.
+  static double _bannerCap(Vector2 size) =>
+      math.min(VectorTextComponent.maxCapHeight, size.y / 8);
 
   @override
   Future<void> onLoad() async {
@@ -372,6 +382,10 @@ abstract class RevolutePinballExample({
   @override
   void onGameResize(Vector2 size) {
     metersToPixels = _zoomFor(size);
+    final bannerScale = _bannerCap(size) / VectorFont.capHeight;
+    for (final banner in [_ready, _gameOver]) {
+      banner.scale.setAll(bannerScale);
+    }
     super.onGameResize(size);
     // A rebuilt widget resizes the game to the same size.
     if (isLoaded && size != _tableSize) {

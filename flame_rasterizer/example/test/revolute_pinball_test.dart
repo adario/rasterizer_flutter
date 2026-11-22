@@ -376,7 +376,8 @@ void main() {
     addTearDown(tester.view.reset);
     final game = await pumpGame(tester);
     final before = partsOf<FlipperComponent>(game).first.body.position.x;
-    tester.view.physicalSize = const Size(900, 800);
+    // Narrower than the widest table, so that its width changes.
+    tester.view.physicalSize = const Size(700, 800);
     await pumpFrames(tester, 10);
     final flippers = partsOf<FlipperComponent>(game);
     expect(flippers, hasLength(2));
@@ -410,6 +411,31 @@ void main() {
         expect(point.y, lessThan(hudTop));
       }
     }
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('in landscape, the table is narrower than the screen', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(520, 250)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final game = await pumpGame(tester);
+    // The walls are at most 1.2 times the table's height apart.
+    final xs = [
+      for (final wall in partsOf<Wall>(game))
+        for (final end in [wall.start, wall.end]) end.x,
+    ];
+    final width = xs.reduce(math.max) - xs.reduce(math.min);
+    const height = 45.0;
+    expect(width, closeTo(1.2 * height, 1e-3));
+    expect(width * game.metersToPixels, lessThan(game.size.x * 0.6));
+    // READY is scaled down to an eighth of the height.
+    final ready = game.camera.viewport.children
+        .whereType<VectorTextComponent>()
+        .firstWhere((text) => text.text == 'READY');
+    expect(ready.toAbsoluteRect().height, closeTo(game.size.y / 8, 0.5));
     await tester.pumpWidget(const SizedBox());
   });
 }
