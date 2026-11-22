@@ -317,6 +317,13 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   late gpu.BufferView _info;
   late gpu.DeviceBuffer _instances;
 
+  // What the pass's last draw used, so that the next draw sets only what
+  // changes. Each pass starts with none.
+  gpu.RenderPipeline? _lastPipeline;
+  MeshBuffers? _lastMesh;
+  bool? _lastBlend;
+  bool? _lastStrips;
+
   /// Begins [target]'s render pass, which clears it, with the instance records
   /// in [instances].
   void beginPass(MeshTarget target, gpu.DeviceBuffer instances) {
@@ -346,6 +353,7 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
       ),
     );
     _instances = instances;
+    _lastPipeline = _lastMesh = _lastBlend = _lastStrips = null;
   }
 
   /// Draws [mesh] once per instance, for [count] instances from [first].
@@ -371,42 +379,60 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
     final vertexShader = mesh.glow
         ? glowVertex
         : (mesh.stroked ? strokedVertex : vertex);
+    final drawPipeline = mesh.glow
+        ? glowPipeline
+        : mesh.stroked
+        ? (transformed ? strokedTransformedPipeline : strokedPipeline)
+        : (transformed ? transformedPipeline : pipeline);
+    final pass = _pass;
     // A pass's bindings persist across draws, and binding a slot replaces only
-    // the same shader's binding, not another shader's, so each draw clears
-    // them first.
-    final pass = _pass
-      ..clearBindings()
-      ..bindPipeline(
-        mesh.glow
-            ? glowPipeline
-            : mesh.stroked
-            ? (transformed ? strokedTransformedPipeline : strokedPipeline)
-            : (transformed ? transformedPipeline : pipeline),
-      )
-      ..setPrimitiveType(gpu.PrimitiveType.triangle)
-      ..setColorBlendEnable(blend);
-    if (blend) {
-      pass.setColorBlendEquation(_sourceOver);
+    // the same shader's binding, not another shader's. So a draw with another
+    // pipeline than the last clears them first, and one with the same
+    // pipeline binds only what changed. Setting the blend state makes Flutter
+    // GPU look the pipeline up again at the next draw, even with the same
+    // values, so it's set only when it changes. Skipping those calls took
+    // 15-20% off the frames' encode time in the games, on macOS and an iPhone.
+    final samePipeline = identical(drawPipeline, _lastPipeline);
+    final sameMesh = samePipeline && identical(mesh, _lastMesh);
+    if (!samePipeline) {
+      pass
+        ..clearBindings()
+        ..bindPipeline(drawPipeline)
+        ..setPrimitiveType(gpu.PrimitiveType.triangle)
+        ..bindUniform(vertexShader.getUniformSlot('FrameInfo'), _info);
     }
-    pass
-      ..bindVertexBuffer(mesh.vertices)
-      ..bindVertexBuffer(
-        gpu.BufferView(
-          _instances,
-          offsetInBytes: first * instanceBytes,
-          lengthInBytes: count * instanceBytes,
-        ),
-        slot: 1,
-      )
-      ..bindIndexBuffer(
+    if (blend != _lastBlend) {
+      pass.setColorBlendEnable(blend);
+      if (blend) {
+        pass.setColorBlendEquation(_sourceOver);
+      }
+    }
+    if (!sameMesh) {
+      pass
+        ..bindVertexBuffer(mesh.vertices)
+        ..bindTexture(vertexShader.getUniformSlot('paints'), mesh.paints);
+      if (!mesh.glow) {
+        pass.bindTexture(shader.getUniformSlot('paints'), mesh.paints);
+      }
+    }
+    if (!sameMesh || strips != _lastStrips) {
+      pass.bindIndexBuffer(
         strips ? mesh.stripIndices! : mesh.indices,
         mesh.indexType,
-      )
-      ..bindUniform(vertexShader.getUniformSlot('FrameInfo'), _info)
-      ..bindTexture(vertexShader.getUniformSlot('paints'), mesh.paints);
-    if (!mesh.glow) {
-      pass.bindTexture(shader.getUniformSlot('paints'), mesh.paints);
+      );
     }
+    pass.bindVertexBuffer(
+      gpu.BufferView(
+        _instances,
+        offsetInBytes: first * instanceBytes,
+        lengthInBytes: count * instanceBytes,
+      ),
+      slot: 1,
+    );
+    _lastPipeline = drawPipeline;
+    _lastMesh = mesh;
+    _lastBlend = blend;
+    _lastStrips = strips;
     if (colorTransform != null) {
       pass.bindUniform(
         shader.getUniformSlot('TransformInfo'),
