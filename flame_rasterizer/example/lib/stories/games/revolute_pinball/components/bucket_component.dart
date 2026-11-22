@@ -23,7 +23,7 @@ class BucketComponent(final Rect inner)
   /// It's full with at least [_fullCount] bodies, all at rest, whose area is
   /// at least [_fullShare] of its own.
   static const _fullCount = 2;
-  static const _fullShare = 0.5;
+  static const _fullShare = 0.3;
 
   /// How long a body stays in it to count, in seconds.
   static const _countTime = 1.0;

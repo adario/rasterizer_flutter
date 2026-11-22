@@ -393,7 +393,7 @@ window, and is built again when the window is resized:
   hitting the wheel.
 - **Buckets.** Two, at the top left and right. A body counts in one once it has stayed in for 1 s, and its count shows
   above it. Once all its bodies are at rest, those that came in score by their area and the bucket's fill, their area
-  against the bucket's, shown below it. A bucket whose bodies, at least 2, are at rest and fill 50% of its area is
+  against the bucket's, shown below it. A bucket whose bodies, at least 2, are at rest and fill 30% of its area is
   full: it turns green, gives their area back to the energy, and empties in 5 s, shrinking its bodies to a fifth from
   the bottom up.
 - **Energy.** Drained bodies take energy, by their area against a fifth of the table's. At 0, the game is over and the
