@@ -142,6 +142,8 @@ mixin GlowingBody on BodyComponent {
   /// otherwise.
   bool glows = true;
 
+  /// The child that draws [glowPath], once loaded, if it [glows].
+  PathComponent? get glow => _glow;
   PathComponent? _glow;
 
   /// The color it's tinted with.

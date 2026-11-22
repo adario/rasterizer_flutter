@@ -80,10 +80,10 @@ abstract class RevolutePinballExample({
     or Right Shift, or a tap in the bottom third's left or right half flips a
     flipper. On a Steam Deck, Steam Input can bind the triggers to the Shift
     keys. A body coming to rest in a bucket scores by its area and the
-    bucket's fill. Drained bodies take energy, until the game is over: then
-    the table goes on, without the flippers, drops or scores. A full bucket
-    gives its bodies' area back, and empties. The Sound knob turns sounds on
-    and off.
+    bucket's fill, once. Drained bodies take energy, until the game is over:
+    then the table goes on, without the flippers, drops or scores. A full
+    bucket gives its bodies' area back, empties, and kicks the other's bodies
+    up and out. The Sound knob turns sounds on and off.
   ''';
 
   /// The Sound knob's value. The sounds load the first time it's on.
@@ -273,6 +273,20 @@ abstract class RevolutePinballExample({
   int score = 0;
   var _drops = 0;
 
+  /// The bodies that have scored in a bucket, which don't score again.
+  final scored = <BodyComponent>{};
+
+  /// Kicks the bodies in the buckets other than [except], which starts
+  /// emptying.
+  void kickBuckets({required BucketComponent except}) {
+    for (final bucket in _buckets) {
+      if (bucket != except) {
+        bucket.kick();
+      }
+    }
+    play(PinballSound.flip);
+  }
+
   /// The area of the bodies gone through the drain, in square meters.
   double drainedArea = 0.0;
 
@@ -451,6 +465,7 @@ abstract class RevolutePinballExample({
     removeBodies([...svgBodies, ...balls]);
     _current = {};
     _queued = false;
+    scored.clear();
     score = 0;
     _drops = 0;
     drainedArea = 0;
@@ -539,6 +554,7 @@ abstract class RevolutePinballExample({
     _sinceDrop += dt;
     _sounds?.nextFrame();
     _trails.removeWhere((_, trail) => trail.over);
+    scored.removeWhere((body) => body.isRemoved);
     _scoreText.text = 'SCORE $score';
     _dropsText.text = 'DROP $_drops';
     final energy = _energy;

@@ -15,7 +15,8 @@ import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute
 /// pieces, which glows once it's [full]. Once a body has stayed in it for
 /// [_countTime], its count fades in above it for a while; once all its bodies
 /// are at rest, so does how close they are to filling it, as a percentage,
-/// below it.
+/// below it. A body scores only once. Once another bucket starts emptying,
+/// it [kick]s its bodies up and out.
 class BucketComponent(final Rect inner)
     extends BodyComponent
     with GlowingBody, Outlined {
@@ -37,6 +38,19 @@ class BucketComponent(final Rect inner)
   static const _refund = 2.0;
 
   static const _countCap = 2.4;
+
+  /// How high a kick throws its bodies, in times its inner height; their
+  /// sideways speed, up to a share of the upward one; and their spin, up to
+  /// radians a second.
+  static const _kickHeight = 2.0;
+  static const _kickSpread = 0.15;
+  static const _kickSpin = 2.0;
+
+  /// How far a kick jolts its drawing up, in times its inner height, and for
+  /// how long up and back, in seconds.
+  static const _jolt = 0.08;
+  static const _joltUp = 0.05;
+  static const _joltBack = 0.15;
 
   /// Its walls' thickness, outside [inner].
   static const thickness = 0.6;
@@ -114,7 +128,8 @@ class BucketComponent(final Rect inner)
 
   /// The area of its bodies when its share last showed, as a share of what
   /// fills it, up to 1, or 0 once it has emptied. The bodies from a game
-  /// with another renderer set it without showing it.
+  /// with another renderer set it without showing it, and so do those left
+  /// after a [kick], once at rest.
   double get level => _level ?? 0;
   double? _level;
 
@@ -186,12 +201,19 @@ class BucketComponent(final Rect inner)
       _stale = false;
     }
     if (_arrivals.isNotEmpty) {
+      final game = _game;
+      var scored = false;
       for (final b in _arrivals) {
-        _game.score += (_scorePerArea * RevolutePinballExample.area(b) * share)
-            .round();
+        if (game.scored.add(b)) {
+          game.score += (_scorePerArea * RevolutePinballExample.area(b) * share)
+              .round();
+          scored = true;
+        }
       }
       _arrivals.clear();
-      _game.play(PinballSound.score);
+      if (scored) {
+        game.play(PinballSound.score);
+      }
       _show('${(100 * _levelOf(share)).round()}%', below: true);
     }
     if (!full && inside.length >= _fullCount && share >= _fullShare) {
@@ -199,10 +221,38 @@ class BucketComponent(final Rect inner)
     }
   }
 
-  /// Frees [_refund] times the drained area that [bodies] take, and shrinks
-  /// them from the bottom up.
+  /// Kicks its bodies up and out, as if hit at its bottom, and jolts its
+  /// drawing.
+  void kick() {
+    final game = _game;
+    final random = game.random;
+    final speed = math.sqrt(
+      2 * game.world.gravity.y * _kickHeight * inner.height,
+    );
+    for (final b in _inside.keys) {
+      final spread = (2 * random.nextDouble() - 1) * _kickSpread * speed;
+      b.body
+        ..applyLinearImpulse(Vector2(spread, -speed) * b.body.mass)
+        ..angularVelocity += (2 * random.nextDouble() - 1) * _kickSpin;
+    }
+    // The bodies left in it set its level once at rest, unless it's emptying.
+    if (!full) {
+      _level = null;
+    }
+    glow?.add(
+      MoveByEffect(
+        Vector2(0, -_jolt * inner.height),
+        EffectController(duration: _joltUp, reverseDuration: _joltBack),
+      ),
+    );
+  }
+
+  /// Frees [_refund] times the drained area that [bodies] take, kicks the
+  /// other buckets, and shrinks the bodies from the bottom up.
   void _startEmptying(List<BodyComponent> bodies) {
-    final game = _game..play(PinballSound.empty);
+    final game = _game
+      ..play(PinballSound.empty)
+      ..kickBuckets(except: this);
     game.drainedArea = math.max(
       0,
       game.drainedArea -

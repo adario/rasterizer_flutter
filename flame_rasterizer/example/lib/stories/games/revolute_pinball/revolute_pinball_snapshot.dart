@@ -1,15 +1,15 @@
 part of 'revolute_pinball_example.dart';
 
 /// What a game for another renderer goes on from: the wheel, the bodies with
-/// how long the last ones dropped have been at rest, the next body's color,
-/// and the HUD's values.
+/// how long the last ones dropped have been at rest and whether they've
+/// scored, the next body's color, and the HUD's values.
 ///
 /// It leaves out the trails, the kicks, and the bodies that a bucket empties.
 /// The bodies in a bucket are at rest in the new game.
 typedef RevolutePinballSnapshot = ({
   WheelSnapshot? wheel,
-  List<({BallSnapshot ball, double? rest})> balls,
-  List<({SvgBodySnapshot svgBody, double? rest})> svgBodies,
+  List<({BallSnapshot ball, double? rest, bool scored})> balls,
+  List<({SvgBodySnapshot svgBody, double? rest, bool scored})> svgBodies,
   int tint,
   int score,
   int drops,
@@ -31,12 +31,21 @@ extension RevolutePinballSnapshots on RevolutePinballExample {
       },
       balls: [
         for (final ball in balls)
-          if (kept(ball)) (ball: ball.snapshot, rest: _current[ball]),
+          if (kept(ball))
+            (
+              ball: ball.snapshot,
+              rest: _current[ball],
+              scored: scored.contains(ball),
+            ),
       ],
       svgBodies: [
         for (final svgBody in svgBodies)
           if (kept(svgBody))
-            (svgBody: svgBody.snapshot, rest: _current[svgBody]),
+            (
+              svgBody: svgBody.snapshot,
+              rest: _current[svgBody],
+              scored: scored.contains(svgBody),
+            ),
       ],
       tint: tint,
       score: score,
@@ -51,10 +60,18 @@ extension RevolutePinballSnapshots on RevolutePinballExample {
   /// Adds the snapshot's bodies again, and its values. Call it once the table
   /// is built.
   void _goOnFrom(RevolutePinballSnapshot from) {
-    void add(BodyComponent body, BodySnapshot snapshot, double? rest) {
+    void add(
+      BodyComponent body,
+      BodySnapshot snapshot,
+      double? rest, {
+      required bool hasScored,
+    }) {
       addBody(body);
       if (rest != null) {
         _current[body] = rest;
+      }
+      if (hasScored) {
+        scored.add(body);
       }
       final position = snapshot.position.toOffset();
       if (_buckets.any((bucket) => bucket.holds(position))) {
@@ -62,11 +79,11 @@ extension RevolutePinballSnapshots on RevolutePinballExample {
       }
     }
 
-    for (final (:ball, :rest) in from.balls) {
-      add(Ball.from(ball), ball.body, rest);
+    for (final (:ball, :rest, :scored) in from.balls) {
+      add(Ball.from(ball), ball.body, rest, hasScored: scored);
     }
-    for (final (:svgBody, :rest) in from.svgBodies) {
-      add(svgBodyFrom(svgBody), svgBody.body, rest);
+    for (final (:svgBody, :rest, :scored) in from.svgBodies) {
+      add(svgBodyFrom(svgBody), svgBody.body, rest, hasScored: scored);
     }
     tint = from.tint;
     score = from.score;

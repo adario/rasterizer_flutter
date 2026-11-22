@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flame/components.dart' show Component, Vector2;
 import 'package:flame/extensions.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
@@ -183,6 +185,63 @@ void main() {
     await pumpFrames(tester, 2);
     expect(game.score, greaterThan(0));
     expect(texts().where((t) => t.endsWith('%')), hasLength(1));
+
+    // Once out and back in, it doesn't score again.
+    final score = game.score;
+    staying.body
+      ..setTransform(Vector2.zero(), staying.body.rotation)
+      ..linearVelocity = Vector2.zero();
+    await pumpFrames(tester, 10);
+    staying.body
+      ..setTransform(bucket.inner.center.toVector2(), staying.body.rotation)
+      ..linearVelocity = Vector2.zero();
+    await pumpFrames(tester, 300);
+    expect(bucket.counts(staying), isTrue);
+    expect(game.score, score);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("a bucket emptying kicks the other's bodies up and out", (
+    tester,
+  ) async {
+    final game = await pumpGame(tester);
+    final [left, right] = partsOf<BucketComponent>(game);
+    Ball ball(Vector2 position, double radius) => Ball(
+      position,
+      Vector2.zero(),
+      radius: radius,
+      color: ExampleColors.slate,
+    );
+    final kicked = ball(right.inner.center.toVector2(), 1);
+    game.addBody(kicked);
+    await pumpFrames(tester, 70);
+    expect(right.counts(kicked), isTrue);
+
+    // Two balls of a quarter of the left bucket's area each fill it.
+    final inner = left.inner;
+    final rx = inner.width / 2;
+    final ry = math.min(rx, inner.height);
+    final area = inner.width * (inner.height - ry) + math.pi * rx * ry / 2;
+    final radius = math.sqrt(area / 4 / math.pi);
+    for (final side in [-1, 1]) {
+      game.addBody(
+        ball(
+          inner.center.toVector2() + Vector2(side * 1.1 * radius, 0),
+          radius,
+        ),
+      );
+    }
+    for (var i = 0; i < 600 && !left.full; i++) {
+      await pumpFrames(tester, 1);
+    }
+    expect(left.full, isTrue);
+    expect(kicked.body.linearVelocity.y, lessThan(0));
+    var out = false;
+    for (var i = 0; i < 60 && !out; i++) {
+      await pumpFrames(tester, 1);
+      out = kicked.body.position.y < right.inner.top;
+    }
+    expect(out, isTrue);
     await tester.pumpWidget(const SizedBox());
   });
 
