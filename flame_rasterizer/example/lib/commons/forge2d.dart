@@ -957,6 +957,14 @@ class CircleShuffler(
   /// Slows the wheel down, then turns it the other way.
   void reverse() => _targetSpeed = -_targetSpeed;
 
+  /// The brake left, in seconds: it turns at 1 / (1 + [_brake]) of its speed,
+  /// and the brake wears off by a second each second.
+  double _brake = 0;
+  static const _maxBrake = 3.0;
+
+  /// Slows it down for [seconds] more, up to [_maxBrake].
+  void brake(double seconds) => _brake = math.min(_maxBrake, _brake + seconds);
+
   /// Whether it's turning the other way after [reverse], until it's at full
   /// speed.
   bool get reversing => _motorSpeed != _targetSpeed;
@@ -967,9 +975,13 @@ class CircleShuffler(
     final speed = _motorSpeed;
     if (speed != _targetSpeed) {
       final step = 2 * _speed * dt / _reverseTime;
-      _joint.motorSpeed = _motorSpeed = (_targetSpeed - speed).abs() <= step
+      _motorSpeed = (_targetSpeed - speed).abs() <= step
           ? _targetSpeed
           : speed + step * (_targetSpeed - speed).sign;
+    }
+    if (_motorSpeed != speed || _brake > 0) {
+      _brake = math.max(0, _brake - dt);
+      _joint.motorSpeed = _motorSpeed / (1 + _brake);
     }
     paint.color = reversing ? _reversingColor : _color;
   }
@@ -984,8 +996,9 @@ class CircleShuffler(
       density: 50,
       material: SurfaceMaterial(friction: 0.4, restitution: 0.6),
       filter: Filter(maskBits: Filter.allCategories & ~Wall.category),
-      // So that a game can tell which bodies hit it.
+      // So that a game can tell which bodies hit it, and how hard.
       enableContactEvents: true,
+      enableHitEvents: true,
     );
     for (var i = 0; i < pieces; i++) {
       final angle = 2 * math.pi * i / pieces;
