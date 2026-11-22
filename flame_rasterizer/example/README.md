@@ -390,7 +390,8 @@ window, and is built again when the window is resized:
   full speed, and the next 10 drop, up to 200 bodies on the table.
 - **Flippers.** Left or A, Right or D, or a tap in the bottom third's left or right half kicks a flipper, which a motor
   holds up while the key or the finger is down. A kicked body leaves a trail that fades out in 1 s, as does a body
-  hitting the wheel.
+  hitting the wheel, which then slows down for 0.05 s for each m/s of the hit, up to 3 s, at 1 / (1 + the time left) of
+  its speed, unless the hit comes within 2.5 s of a drop.
 - **Buckets.** Two, at the top left and right. A body counts in one once it has stayed in for 1 s, and its count shows
   above it. Once all its bodies are at rest, those that came in score by their area and the bucket's fill, their area
   against the bucket's, and how close they are to filling it shows below it. A bucket whose bodies, at least 2, are at

@@ -461,6 +461,7 @@ abstract class RevolutePinballExample({
       return;
     }
     _drops++;
+    _sinceDrop = 0;
     final spawn = Vector2(0, _arena.top + 0.1 * _arena.height);
     final ballsFirst = random.nextBool();
     final bodies = [
@@ -507,21 +508,31 @@ abstract class RevolutePinballExample({
       body.angularVelocity.abs() < _restSpeed;
 
   /// Starts a trail behind [body]'s component, unless its last one is still
-  /// going.
-  void _kicked(Body body) {
+  /// going, and returns whether it did.
+  bool _kicked(Body body) {
     for (final component in [...svgBodies, ...balls]) {
       if (component.isLoaded && component.body == body) {
         if (_trails[component]?.over ?? true) {
           world.add(_trails[component] = TrailComponent(component));
+          return true;
         }
-        return;
+        return false;
       }
     }
+    return false;
   }
+
+  /// How long a body that hits the wheel and trails slows it down, in
+  /// seconds for each meter a second that it hits it with, once
+  /// [_dropGrace] seconds have passed since the last drop.
+  static const _brakePerSpeed = 0.05;
+  static const _dropGrace = 2.5;
+  var _sinceDrop = double.infinity;
 
   @override
   void update(double dt) {
     super.update(dt);
+    _sinceDrop += dt;
     _sounds?.nextFrame();
     _trails.removeWhere((_, trail) => trail.over);
     _scoreText.text = 'SCORE $score';
@@ -618,18 +629,29 @@ class RevolutePinballWorld()
         flipper.touching.forEach(gameRef._kicked);
       }
     }
-    // A body hitting the wheel trails as if kicked.
+    // A body hitting the wheel trails as if kicked, and slows it down by how
+    // hard it hit it.
     if (gameRef._wheel case final wheel? when wheel.isLoaded) {
-      for (final event in events.begin) {
-        final a = event.shapeA;
-        final b = event.shapeB;
-        if (!a.isValid || !b.isValid) {
-          continue;
+      Body? other(Shape a, Shape b) => !a.isValid || !b.isValid
+          ? null
+          : a.body == wheel.body
+          ? b.body
+          : b.body == wheel.body
+          ? a.body
+          : null;
+      final speeds = <Body, double>{};
+      for (final hit in events.hit) {
+        if (other(hit.shapeA, hit.shapeB) case final body?) {
+          speeds[body] = math.max(speeds[body] ?? 0, hit.approachSpeed);
         }
-        if (a.body == wheel.body) {
-          gameRef._kicked(b.body);
-        } else if (b.body == wheel.body) {
-          gameRef._kicked(a.body);
+      }
+      for (final event in events.begin) {
+        if (other(event.shapeA, event.shapeB) case final body?
+            when gameRef._kicked(body) &&
+                gameRef._sinceDrop >= RevolutePinballExample._dropGrace) {
+          wheel.brake(
+            RevolutePinballExample._brakePerSpeed * (speeds[body] ?? 0),
+          );
         }
       }
     }
