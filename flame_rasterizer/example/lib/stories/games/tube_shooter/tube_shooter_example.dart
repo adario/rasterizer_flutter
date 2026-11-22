@@ -75,7 +75,11 @@ abstract class TubeShooterExample({
   final int firstLevel = 0,
   TubeShooterSnapshot? from,
 }) extends ExampleGame
-    with DragCallbacks, KeyboardEvents, PathComponents<ExampleWorld> {
+    with
+        DragCallbacks,
+        ScrollCallbacks,
+        KeyboardEvents,
+        PathComponents<ExampleWorld> {
   /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
   /// SVG, which goes on from [from], if any, at its first level and pace.
   factory TubeShooterExample.of(
@@ -104,8 +108,10 @@ abstract class TubeShooterExample({
     a Flutter Path. RasterizerPathComponent draws them with the renderer that
     the Renderer knob picks; with Flame SVG, Flame's PathComponent does.
 
-    Move the ship round the rim of the tube with the arrow keys, A and D, or by
-    dragging left and right. Fire down its lane with the space bar, or while
+    Move the ship round the rim of the tube with the arrow keys, A and D, by
+    dragging left and right, or a lane per scroll of the mouse wheel. On a
+    Steam Deck, a trackpad set to Steam Input's Scroll Wheel mode turns it
+    round as a finger circles. Fire down its lane with the space bar, or while
     dragging. Enter, or a double tap, purges the tube once a round. Tap or
     press a key to start a round, and to go on after losing a ship.
 
@@ -1182,6 +1188,23 @@ abstract class TubeShooterExample({
     _drags.remove(event.pointerId);
     _waitPointers.remove(event.pointerId);
     super.onDragCancel(event);
+  }
+
+  /// Moves the ship a lane for each scroll, whatever its size: clockwise for
+  /// a scroll down, and as a drag would for one sideways. Scrolling in circles
+  /// on a Steam Deck trackpad set to Steam Input's Scroll Wheel mode turns it
+  /// round the tube.
+  @override
+  void onScroll(ScrollEvent event) {
+    final delta = event.raw.scrollDelta;
+    if (canMove) {
+      if (delta.dy != 0) {
+        player.moveBy(-delta.dy.sign);
+      } else if (delta.dx != 0) {
+        player.moveBy(delta.dx.sign);
+      }
+    }
+    super.onScroll(event);
   }
 
   /// Ends a wait: starts a new game once it's over, or else the round.

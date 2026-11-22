@@ -527,6 +527,35 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('the ship moves a lane a scroll, whatever its size, clockwise '
+      'for a scroll down', (tester) async {
+    final game = await playing(tester);
+    final player = game.player;
+    final tube = game.view.tube;
+    final from = player.lane;
+    final pointer = TestPointer(1, ui.PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(
+      pointer.hover(
+        tester.getCenter(find.byType(GameWidget<TubeShooterExample>)),
+      ),
+    );
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, 120)));
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, 1)));
+    await tester.pump();
+    final to = player.lane;
+    expect(to, (from - 2) % tube.laneCount);
+    // With y down, a turn from one lane's middle to the next is clockwise on
+    // screen where their cross product is positive.
+    final a = tube.middles[from];
+    final b = tube.middles[(from - 1) % tube.laneCount];
+    expect(a.dx * b.dy - a.dy * b.dx, greaterThan(0));
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, -53)));
+    await tester.sendEventToBinding(pointer.scroll(const Offset(30, 0)));
+    await tester.pump();
+    expect(player.lane, from);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('shots cross the tube down the ship lane, 8 at most', (
     tester,
   ) async {
