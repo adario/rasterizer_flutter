@@ -14,7 +14,8 @@ import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute
 /// An open-top bucket around [inner], a U path that collides as its convex
 /// pieces, which glows once it's [full]. Once a body has stayed in it for
 /// [_countTime], its count fades in above it for a while; once all its bodies
-/// are at rest, so does [_share], as a percentage, below it.
+/// are at rest, so does how close they are to filling it, as a percentage,
+/// below it.
 class BucketComponent(final Rect inner)
     extends BodyComponent
     with GlowingBody, Outlined {
@@ -23,7 +24,7 @@ class BucketComponent(final Rect inner)
   /// It's full with at least [_fullCount] bodies, all at rest, whose area is
   /// at least [_fullShare] of its own.
   static const _fullCount = 2;
-  static const _fullShare = 0.3;
+  static const _fullShare = 0.4;
 
   /// How long a body stays in it to count, in seconds.
   static const _countTime = 1.0;
@@ -137,6 +138,9 @@ class BucketComponent(final Rect inner)
 
   double get _share => _shareOf(_inside.keys);
 
+  /// How close [share] is to filling it, up to 1.
+  static double _levelOf(double share) => math.min(1, share / _fullShare);
+
   static double _bottom(BodyComponent b) =>
       b.body.shapes.map((s) => s.aabb.upperBound.y).reduce(math.max);
 
@@ -178,7 +182,7 @@ class BucketComponent(final Rect inner)
     }
     final share = _share;
     if (_arrivals.isNotEmpty || _level == null) {
-      _level = math.min(1, share / _fullShare);
+      _level = _levelOf(share);
       _stale = false;
     }
     if (_arrivals.isNotEmpty) {
@@ -188,7 +192,7 @@ class BucketComponent(final Rect inner)
       }
       _arrivals.clear();
       _game.play(PinballSound.score);
-      _show('${(100 * share).round()}%', below: true);
+      _show('${(100 * _levelOf(share)).round()}%', below: true);
     }
     if (!full && inside.length >= _fullCount && share >= _fullShare) {
       _startEmptying(inside.keys.toList());
