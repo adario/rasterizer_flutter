@@ -18,6 +18,13 @@ The example runs on Flame's main: flame 2.0.0-dev, flame_svg 3.0.0-dev and flame
 workspace's dependency overrides (the root `pubspec.yaml`), as Flame's examples do. On web, flame_rasterizer draws with
 the canvas renderer.
 
+## Games on their own
+
+A game can also run on its own, outside the Widgetbook, with a renderer menu in the bar above it and its status bar
+under it, but no other knobs:
+
+- Tube Shooter: `flutter run -t lib/main_tube_shooter.dart`.
+
 ## Shared knobs and SVGs
 
 Every use case has a Renderer knob (see [Svg Renderers](#svg--svg-renderers)) and a status bar under the game. They also
