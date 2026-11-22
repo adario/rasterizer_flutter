@@ -5,9 +5,6 @@ import 'package:widgetbook/widgetbook.dart';
 /// The Renderer knob's label, which also names its field in the URL.
 const _label = 'Renderer';
 
-/// The knob's GPU entries, in the order of the first choice.
-const _gpus = [SvgRenderer.rasterizer, SvgRenderer.rasterizerAtlas];
-
 /// Returns the Renderer knob: a dropdown of the [SvgRenderer]s.
 ///
 /// A GPU entry is inactive where its renderer isn't [SvgRenderer.supported]:
@@ -22,20 +19,13 @@ const _gpus = [SvgRenderer.rasterizer, SvgRenderer.rasterizerAtlas];
 /// and in every use case.
 SvgRenderer rendererKnob(BuildContext context, {bool svgs = true}) {
   final renderer = context.knobs.onKnobAdded(
-    _RendererKnob(initialValue: _firstChoice(), svgs: svgs),
+    _RendererKnob(initialValue: SvgRenderer.firstChoice, svgs: svgs),
   );
   // A link can pick a GPU entry where it's inactive: Canvas draws then.
   return renderer == null || !renderer.supported
       ? SvgRenderer.rasterizerCanvas
       : renderer;
 }
-
-/// Returns the Renderer knob's first choice: the first active entry of [_gpus],
-/// else Canvas.
-SvgRenderer _firstChoice() => _gpus.firstWhere(
-  (renderer) => renderer.supported,
-  orElse: () => SvgRenderer.rasterizerCanvas,
-);
 
 /// Returns the Zoom knob: the camera's zoom, from 0.25 to 5, on a continuous
 /// slider.
@@ -120,10 +110,6 @@ class _RendererField({
   this
     : super(values: SvgRenderer.values, labelBuilder: (value) => value.label);
 
-  /// Returns what the entry for [renderer] shows.
-  String _text(SvgRenderer renderer) =>
-      renderer == SvgRenderer.flameSvg && !svgs ? 'Flame' : renderer.text;
-
   /// Builds Widgetbook's dropdown, with the GPU entries inactive where their
   /// renderers aren't supported, and each entry's text. The URL has the
   /// entry's label, from [labelBuilder].
@@ -143,7 +129,7 @@ class _RendererField({
         for (final renderer in values)
           DropdownMenuEntry(
             value: renderer,
-            label: _text(renderer),
+            label: renderer.entryText(svgs: svgs),
             enabled: renderer.supported,
           ),
       ],

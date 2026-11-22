@@ -99,6 +99,22 @@ enum SvgRenderer(final String label) {
   /// screen.
   flameSvg('Flame SVG');
 
+  /// The GPU entries, in the order of the [firstChoice].
+  static const _gpus = [rasterizer, rasterizerAtlas];
+
+  /// The first renderer to offer: the first [supported] GPU entry, else
+  /// [rasterizerCanvas].
+  static SvgRenderer get firstChoice => _gpus.firstWhere(
+    (renderer) => renderer.supported,
+    orElse: () => rasterizerCanvas,
+  );
+
+  /// What a renderer menu shows for it: its [text], or, without [svgs], for
+  /// a game that draws no SVGs, Flame for [flameSvg], as Flame's own
+  /// components draw then.
+  String entryText({required bool svgs}) =>
+      this == flameSvg && !svgs ? 'Flame' : text;
+
   /// The GPU renderer that flame_rasterizer tries for this entry, as
   /// [HasRasterizer.rasterizerGpu]: the atlas renderer for [rasterizerAtlas],
   /// else the mesh renderer.
