@@ -7,9 +7,9 @@
 // and a failure switches the renderers to r16g16b16a16Float, which it then
 // checks too. There, support also checks that textures can be 4096 pixels
 // wide, and a renderer whose pipelines don't compile in time falls back to
-// the canvas renderer. Elsewhere, no renderer runs the probe, so the test runs it on its
-// own, as it must pass there too. defer_test.dart checks that the renderers
-// draw before the first frame.
+// the canvas renderer. Elsewhere, no renderer runs the probe, so the test runs
+// it on its own, as it must pass there too. defer_test.dart checks that the
+// renderers draw before the first frame.
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';

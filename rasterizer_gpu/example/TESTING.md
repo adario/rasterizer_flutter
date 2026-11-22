@@ -21,6 +21,12 @@ file or variants found for asset". `flutter run` and `flutter build` don't have 
 The tests run in the app, because `flutter_tester`'s Impeller doesn't render as the app does. It also runs Flutter GPU
 on Metal, but its antialiasing differs from the app's in about 2% of pixels.
 
+For a quick check with no app build, `flutter test --enable-impeller --enable-flutter-gpu` gives `flutter_tester` a
+Flutter GPU context on macOS, where both GPU renderers are then supported and render. Without the flags, their
+support is `noImpeller`. Such a test must be in a package that depends on rasterizer_gpu, as this one is. In
+rasterizer_gpu's own `test/`, the shader bundle's asset key has no `packages/rasterizer_gpu/` prefix, so the
+renderers fail with "Failed to initialize ShaderLibrary".
+
 - **Cases** (`lib/goldens.dart`):
   - the tiger fitted, with and without curves, and the sweep's checkpoints, with and without curves;
   - the sweep of a 4×4 grid of tigers, with curves;
