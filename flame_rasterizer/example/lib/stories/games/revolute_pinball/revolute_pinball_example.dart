@@ -130,9 +130,10 @@ abstract class RevolutePinballExample({
   static const restTime = 0.5;
   static const _restSpeed = 0.5;
 
-  /// The game ends once the drained bodies' area reaches [_drainShare] of
-  /// the arena's.
+  /// The game ends once [drainedArea] reaches [_drainShare] of the arena's
+  /// area. A drained body adds [_drainCost] times its area to it.
   static const _drainShare = 0.1;
+  static const _drainCost = 2.0;
 
   static const _hudCap = 12.0;
 
@@ -287,7 +288,9 @@ abstract class RevolutePinballExample({
     play(PinballSound.flip);
   }
 
-  /// The area of the bodies gone through the drain, in square meters.
+  /// The energy that the bodies gone through the drain took, as
+  /// [_drainCost] times their area, less what full buckets gave back, in
+  /// square meters.
   double drainedArea = 0.0;
 
   var _over = false;
@@ -572,7 +575,8 @@ abstract class RevolutePinballExample({
     if (gone.isNotEmpty) {
       // Once the game is over, they go without a sound or energy.
       if (!_over) {
-        drainedArea += gone.fold(0.0, (sum, body) => sum + area(body));
+        drainedArea +=
+            _drainCost * gone.fold(0.0, (sum, body) => sum + area(body));
         play(PinballSound.drain);
       }
       removeBodies(gone);
