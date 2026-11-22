@@ -9,10 +9,10 @@ environment:
 
 dependencies:
   # zlib for the goldens' PNGs (lib/png.dart), on web too.
-  archive: ^4.6.0
+  archive: ^4.7.1
   flutter:
     sdk: flutter
-  material_ui: ^1.11.0
+  material_ui: ^1.11.1
   rasterizer_gpu:
     path: ../
 

@@ -18,8 +18,8 @@ dependencies:
   flame_svg: ^3.0.0-dev.1
   flutter:
     sdk: flutter
-  url_launcher: ^6.3.0
-  web: ^1.1.0
+  url_launcher: ^6.3.3
+  web: ^1.1.2
   widgetbook: ^3.25.0
 
 dev_dependencies:
