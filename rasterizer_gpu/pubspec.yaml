@@ -45,4 +45,6 @@ flutter:
         ffiPlugin: true
   assets:
     # Written by hook/build.dart, and loaded as packages/rasterizer_gpu/build/shaderbundles/rasterizer.shaderbundle.
-    - build/shaderbundles/rasterizer.shaderbundle
+    # The web has no Flutter GPU, so web builds leave it out.
+    - path: build/shaderbundles/rasterizer.shaderbundle
+      platforms: [android, ios, linux, macos, windows]
