@@ -385,4 +385,31 @@ void main() {
     expect(flippers.first.body.position.x, isNot(closeTo(before, 0.1)));
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('on a phone, it zooms out, and the HUD sits below the table', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(411, 860)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final game = await pumpGame(tester);
+    // At least 60 meters wide.
+    expect(game.metersToPixels, closeTo(game.size.x / 60, 1e-6));
+    // The flippers' lowest points are above the HUD's lines.
+    final hud = [
+      for (final text
+          in game.camera.viewport.children.whereType<VectorTextComponent>())
+        if (text.text != 'READY') text.toAbsoluteRect(),
+    ];
+    expect(hud, hasLength(4));
+    final hudTop = hud.map((rect) => rect.top).reduce(math.min);
+    for (final flipper in partsOf<FlipperComponent>(game)) {
+      for (final v in flipper.outline) {
+        final point = game.worldToScreen(flipper.body.worldPoint(v));
+        expect(point.y, lessThan(hudTop));
+      }
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
 }

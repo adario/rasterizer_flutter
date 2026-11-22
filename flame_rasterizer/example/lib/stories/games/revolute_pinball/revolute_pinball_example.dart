@@ -7,6 +7,7 @@ import 'package:flame/extensions.dart';
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_colors.dart';
+import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/commons/game_sounds.dart';
 import 'package:flame_rasterizer_example/commons/outline_paints.dart';
@@ -136,6 +137,25 @@ abstract class RevolutePinballExample({
   static const _drainCost = 2.0;
 
   static const _hudCap = 12.0;
+
+  /// The room below the table for the HUD's 2 lines, in logical pixels.
+  static const _hudBand =
+      2 * StoryGame.hudMargin + (1 + VectorTextComponent.lineSpacing) * _hudCap;
+
+  /// The pixels a meter: 10, as in Flame's examples, or fewer on a small
+  /// screen, so that the arena is at least [_minWidth] by [_minHeight]
+  /// meters.
+  static const _maxZoom = 10.0;
+  static const _minWidth = 60.0;
+  static const _minHeight = 45.0;
+
+  static double _zoomFor(Vector2 size) => math.min(
+    _maxZoom,
+    math.min(
+      size.x / _minWidth,
+      math.max(1, size.y - _hudBand) / _minHeight,
+    ),
+  );
 
   /// The flippers' angle at rest, and the guides' slope.
   static const restAngle = math.pi / 6;
@@ -311,11 +331,17 @@ abstract class RevolutePinballExample({
   /// The last bodies dropped, with how long each has been at rest.
   var _current = <BodyComponent, double>{};
 
-  Rect get _arena => Rect.fromCenter(
-    center: Offset.zero,
-    width: size.x / metersToPixels,
-    height: size.y / metersToPixels,
-  );
+  /// The game's area above the HUD's band, in meters.
+  Rect get _arena {
+    final width = size.x / metersToPixels;
+    final height = size.y / metersToPixels;
+    return Rect.fromLTRB(
+      -width / 2,
+      -height / 2,
+      width / 2,
+      height / 2 - _hudBand / metersToPixels,
+    );
+  }
 
   @override
   Future<void> onLoad() async {
@@ -345,6 +371,7 @@ abstract class RevolutePinballExample({
 
   @override
   void onGameResize(Vector2 size) {
+    metersToPixels = _zoomFor(size);
     super.onGameResize(size);
     // A rebuilt widget resizes the game to the same size.
     if (isLoaded && size != _tableSize) {
@@ -361,7 +388,7 @@ abstract class RevolutePinballExample({
     _tableSize.setFrom(size);
     final a = _arena;
     final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
-    final flipper = 0.18 * a.width;
+    final flipper = 0.24 * a.width;
     final small = math.min(a.width, a.height);
     // The left flipper and guide, mirrored for the right ones: the tip ends
     // at the drain, and the guide's recess under it at the bottom.
