@@ -76,11 +76,13 @@ abstract class RevolutePinballExample({
     A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
     it, and drops 10 bodies over a wheel. Once each is in a bucket, gone
     through the drain, or at rest, the wheel turns the other way, amber until
-    it's at full speed, and the next 10 drop. Left or A, Right or D, or a tap
-    in the bottom third's left or right half flips a flipper. A body coming
-    to rest in a bucket scores by its area and the bucket's fill. Drained
-    bodies take energy, until the game is over. A full bucket gives its
-    bodies' area back, and empties. The Sound knob turns sounds on and off.
+    it's at full speed, and the next 10 drop. Left, A or Left Shift, Right, D
+    or Right Shift, or a tap in the bottom third's left or right half flips a
+    flipper. On a Steam Deck, Steam Input can bind the triggers to the Shift
+    keys. A body coming to rest in a bucket scores by its area and the
+    bucket's fill. Drained bodies take energy, until the game is over. A full
+    bucket gives its bodies' area back, and empties. The Sound knob turns
+    sounds on and off.
   ''';
 
   /// The Sound knob's value. The sounds load the first time it's on.
@@ -114,8 +116,10 @@ abstract class RevolutePinballExample({
   static final _flipperKeys = {
     LogicalKeyboardKey.arrowLeft: 0,
     LogicalKeyboardKey.keyA: 0,
+    LogicalKeyboardKey.shiftLeft: 0,
     LogicalKeyboardKey.arrowRight: 1,
     LogicalKeyboardKey.keyD: 1,
+    LogicalKeyboardKey.shiftRight: 1,
   };
 
   static const _dropped = 10;

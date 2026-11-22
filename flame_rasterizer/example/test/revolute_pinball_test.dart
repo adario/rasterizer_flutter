@@ -130,6 +130,22 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets("each Shift key kicks its side's flipper", (tester) async {
+    final game = await pumpGame(tester);
+    await press(tester, LogicalKeyboardKey.space);
+    final [left, right] = partsOf<FlipperComponent>(game);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftRight);
+    await pumpFrames(tester, 2);
+    expect(left.kicking, isFalse);
+    expect(right.kicking, isTrue);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftRight);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await pumpFrames(tester, 2);
+    expect(left.kicking, isTrue);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('a body counts in a bucket after 1 s in it, and then scores', (
     tester,
   ) async {
