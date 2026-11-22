@@ -24,6 +24,7 @@ A game can also run on its own, outside the Widgetbook, with a renderer menu in 
 under it, but no other knobs:
 
 - Tube Shooter: `flutter run -t lib/main_tube_shooter.dart`.
+- Revolute Pinball: `flutter run -t lib/main_revolute_pinball.dart`.
 
 ## Shared knobs and SVGs
 

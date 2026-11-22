@@ -2,7 +2,9 @@ import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/main_revolute_pinball.dart';
 import 'package:flame_rasterizer_example/main_tube_shooter.dart';
+import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:widgetbook/widgetbook.dart';
@@ -50,6 +52,26 @@ void main() {
     expect(flameGame, isNot(same(game)));
     expect(flameGame.isLoaded, isTrue);
     expect(find.textContaining("Flame's PathComponent"), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  // Not switched to Flame SVG: flame_svg games with random SVGs need a test
+  // file of their own (see cache_knobs_test.dart).
+  testWidgets('Revolute Pinball runs on its own, with its status bar', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(1000, 700)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const RevolutePinballApp(sound: false));
+    await pumpFrames(tester, 30);
+    expect(find.byType(Widgetbook), findsNothing);
+    expect(find.text('Revolute Pinball'), findsOneWidget);
+    final game = gameOf<RevolutePinballExample>(tester);
+    expect(game.isLoaded, isTrue);
+    expect(game.descendants().whereType<FpsTextComponent>(), isNotEmpty);
+    expect(find.textContaining(RegExp(r'^canvas \(.*render ')), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 }
