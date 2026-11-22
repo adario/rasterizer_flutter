@@ -416,7 +416,16 @@ void main() {
         expect(point.y, lessThan(hudTop));
       }
     }
-    // The wheel's top is level with the buckets' bottom.
+    // The buckets are a fifth of the table's height deep, and the wheel's top
+    // is level with their bottom.
+    final ys = [
+      for (final wall in partsOf<Wall>(game))
+        for (final end in [wall.start, wall.end]) end.y,
+    ];
+    final height = ys.reduce(math.max) - ys.reduce(math.min);
+    for (final bucket in partsOf<BucketComponent>(game)) {
+      expect(bucket.inner.height, closeTo(0.2 * height, 1e-3));
+    }
     final wheel = partsOf<CircleShuffler>(game).single;
     final wheelTop = wheel.body.position.y - wheel.scale * CircleShuffler.reach;
     for (final bucket in partsOf<BucketComponent>(game)) {

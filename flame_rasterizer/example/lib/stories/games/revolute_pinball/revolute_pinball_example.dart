@@ -460,7 +460,9 @@ abstract class RevolutePinballExample({
       Vector2(a.left, a.bottom),
     ];
     final bucketWidth = math.max(0.2 * a.width, 2 * SvgBodies.maxSide);
-    final bucketHeight = 0.2 * small;
+    // As deep on a table taller than wide, for as many bodies as on a wider
+    // one, where its height is the smaller side.
+    final bucketHeight = 0.2 * a.height;
     final bucketTop = a.top + 0.15 * a.height;
     final bucketBottom = bucketTop + bucketHeight + BucketComponent.thickness;
     final wheelReach = 0.15 * small;
