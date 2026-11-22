@@ -144,6 +144,15 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
       gpu: gpu,
       meshSamples: rasterizerMeshSamples,
     );
+    if (support == RasterizerSupport.supported &&
+        state.support == RasterizerSupport.warmUpTimeout &&
+        !kReleaseMode) {
+      debugPrint(
+        "flame_rasterizer: rasterizer_gpu's "
+        '${gpu == RasterizerBackend.mesh ? 'mesh' : 'atlas'} renderer timed '
+        'out (${state.supportDetail}), so its canvas renderer draws',
+      );
+    }
     if (removals != _removals) {
       renderer.dispose();
       return renderer;

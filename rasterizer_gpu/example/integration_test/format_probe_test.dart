@@ -6,7 +6,8 @@
 // IMPELLER_BACKEND=opengles, the first GPU renderer created runs the probe,
 // and a failure switches the renderers to r16g16b16a16Float, which it then
 // checks too. There, support also checks that textures can be 4096 pixels
-// wide. Elsewhere, no renderer runs the probe, so the test runs it on its
+// wide, and a renderer whose pipelines don't compile in time falls back to
+// the canvas renderer. Elsewhere, no renderer runs the probe, so the test runs it on its
 // own, as it must pass there too. defer_test.dart checks that the renderers
 // draw before the first frame.
 import 'package:flutter/widgets.dart';
@@ -271,6 +272,30 @@ void main() {
       } finally {
         RasterizerGpu.allowOpenGles = true;
       }
+    });
+
+    test("where a renderer's pipelines don't compile in time, its support "
+        'times out, and the canvas renderer draws', () async {
+      // The GPU runs the warm-up's draws after the timer fires.
+      RasterizerGpu.warmUpTimeout = Duration.zero;
+      try {
+        for (final gpu in [RasterizerBackend.gpu, RasterizerBackend.mesh]) {
+          final renderer = await RasterizerRenderer.create(slots: 1, gpu: gpu);
+          expect(renderer.backend, RasterizerBackend.canvas);
+          renderer.dispose();
+          final state = RasterizerGpu.of(gpu);
+          expect(state.support, RasterizerSupport.warmUpTimeout);
+          expect(state.backend, RasterizerBackend.canvas);
+          expect(
+            state.supportDetail,
+            "OpenGL ES: the pipelines didn't compile within 0 ms",
+          );
+        }
+      } finally {
+        RasterizerGpu.warmUpTimeout = const Duration(seconds: 5);
+        RasterizerGpu.debugResetSupport();
+      }
+      expect(mesh.support, RasterizerSupport.supported);
     });
   } else {
     test('no renderer runs the probe on Metal and Vulkan', () async {

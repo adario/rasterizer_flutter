@@ -338,17 +338,38 @@ RasterizerScene parseScene(Uint8List bytes) =>
 /// RasterizerRenderer.create only calls this where the renderer is supported.
 /// On OpenGL ES, the first one starts the format probe, with [fail] as
 /// [probeFormat]'s, and each compiles its pipelines as it's made, and
-/// completes once the GPU has run them ([GpuRenderer.warmUp]).
-Future<RasterizerRenderer> createRenderer(int slots, Set<String> fail) async {
+/// completes once the GPU has run them ([GpuRenderer.warmUp]). If it hasn't
+/// within [timeout], it disposes of the renderer and throws
+/// [TimeoutException].
+Future<RasterizerRenderer> createRenderer(
+  int slots,
+  Set<String> fail,
+  Duration timeout,
+) async {
   final library = await _library();
   if (openGles) {
     formatProbe ??= probeFormat(library, fail);
   }
   final renderer = AtlasRenderer._(library, slots);
   if (openGles) {
-    await renderer._gpu.warmUp();
+    await _warmUp(renderer, renderer._gpu.warmUp(), timeout);
   }
   return renderer;
+}
+
+/// Waits for [warmUp], [renderer]'s, for up to [timeout], else disposes of
+/// [renderer] and throws [TimeoutException].
+Future<void> _warmUp(
+  RasterizerRenderer renderer,
+  Future<void> warmUp,
+  Duration timeout,
+) async {
+  try {
+    await warmUp.timeout(timeout);
+  } on TimeoutException {
+    renderer.dispose();
+    rethrow;
+  }
 }
 
 /// Imports an SVG's [bytes] as a scene for the mesh renderer.
@@ -422,11 +443,16 @@ List<ra.PathDraw> _pathDraws(ScenePaths paths) => [
 /// Its targets have [samples] per pixel where offscreen MSAA is supported.
 /// It's only called where the renderer is supported, as [createRenderer] is.
 /// On OpenGL ES, it compiles its pipelines as it's made, and completes once
-/// the GPU has run them ([MeshGpu.warmUp]).
-Future<RasterizerRenderer> createMeshRenderer(int slots, int samples) async {
+/// the GPU has run them ([MeshGpu.warmUp]), or throws as [createRenderer]
+/// does after [timeout].
+Future<RasterizerRenderer> createMeshRenderer(
+  int slots,
+  int samples,
+  Duration timeout,
+) async {
   final renderer = MeshRenderer(await _library(), slots, samples);
   if (openGles) {
-    await renderer.warmUp();
+    await _warmUp(renderer, renderer.warmUp(), timeout);
   }
   return renderer;
 }

@@ -91,7 +91,8 @@ have only run on the Android emulator's OpenGL ES and on Mesa's llvmpipe.
   as the renderer is made, the rest on the raster thread right after, and making the renderer completes once both have
   run, so that an app can show a loader meanwhile, and its first frame doesn't pay for them. For the GPU renderer,
   that's 110 ms then 50-90 ms on the Android emulator, and 550 ms then 150 ms on llvmpipe (release builds, no shader
-  cache).
+  cache). If the GPU hasn't reported running them within 5 s (`RasterizerGpu.warmUpTimeout`), the canvas renderer
+  draws instead, so that a lost completion doesn't keep the app waiting. A draw that blocks the UI thread still hangs.
 - **Nothing waits for a frame.** With Flutter 3.50.0, Flutter GPU's calls don't block before the first rasterized frame
   on OpenGL ES, so renderers can be made before `runApp`.
 

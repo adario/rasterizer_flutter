@@ -28,6 +28,7 @@
 /// ```
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -79,6 +80,11 @@ enum RasterizerSupport() {
   /// Impeller renders with OpenGL ES, but can't make textures 4096 pixels
   /// wide, as both GPU renderers need. OpenGL ES only guarantees 2048.
   smallTextures,
+
+  /// Impeller renders with OpenGL ES, and a renderer made for it didn't
+  /// finish compiling its pipelines within [RasterizerGpu.warmUpTimeout], so
+  /// [RasterizerRenderer.create] made the canvas renderer instead.
+  warmUpTimeout,
 }
 
 /// Which renderer parses and draws scenes.
@@ -181,13 +187,22 @@ abstract final class RasterizerGpu() {
   /// the GPU renderers need. OpenGL ES only guarantees 2048. Where they can't,
   /// support is [RasterizerSupport.smallTextures], and the canvas renderer
   /// draws. Nothing else is checked. A driver that draws wrongly, in either
-  /// format, draws wrongly, with
-  /// no fallback to the canvas renderer, and one that crashes crashes the app.
+  /// format, draws wrongly, with no fallback to the canvas renderer, and one
+  /// that crashes crashes the app. One that never finishes compiling the
+  /// pipelines falls back to the canvas renderer after [warmUpTimeout],
+  /// unless it holds the UI thread meanwhile.
   /// Both GPU renderers have only been tried on the Android emulator's OpenGL
   /// ES and on Mesa's llvmpipe on Linux, not on a device's own driver. Turn it
   /// off to draw with the canvas renderer on OpenGL ES. Scenes and renderers
   /// read it as they're made, so set it before.
   static bool allowOpenGles = true;
+
+  /// How long [RasterizerRenderer.create] waits for a GPU renderer to compile
+  /// its pipelines on OpenGL ES ([allowOpenGles]).
+  ///
+  /// If they haven't compiled by then, it makes the canvas renderer instead,
+  /// and that GPU renderer's support becomes [RasterizerSupport.warmUpTimeout].
+  static Duration warmUpTimeout = const Duration(seconds: 5);
 
   /// For tests: what the format probe treats as failing.
   ///
@@ -218,6 +233,7 @@ abstract final class RasterizerGpu() {
   @visibleForTesting
   static void debugResetSupport() {
     _contextSupport = null;
+    _gpu._timedOut = _mesh._timedOut = null;
     native.contextError = null;
     native.resetFormatProbe();
   }
@@ -266,13 +282,22 @@ final class RasterizerGpuBackend._(
   /// Whether it can render here.
   ///
   /// On OpenGL ES, it's [RasterizerSupport.supported] while
-  /// [RasterizerGpu.allowOpenGles] is on, else [RasterizerSupport.openGles].
+  /// [RasterizerGpu.allowOpenGles] is on, else [RasterizerSupport.openGles],
+  /// or [RasterizerSupport.warmUpTimeout] once a renderer made for it timed
+  /// out.
   RasterizerSupport get support {
     final context = RasterizerGpu._context;
-    return context == RasterizerSupport.openGles && RasterizerGpu.allowOpenGles
+    if (context != RasterizerSupport.openGles || !RasterizerGpu.allowOpenGles) {
+      return context;
+    }
+    return _timedOut == null
         ? RasterizerSupport.supported
-        : context;
+        : RasterizerSupport.warmUpTimeout;
   }
+
+  /// The [RasterizerGpu.warmUpTimeout] that a renderer made for it exceeded,
+  /// if any.
+  Duration? _timedOut;
 
   /// More about [support].
   ///
@@ -287,6 +312,9 @@ final class RasterizerGpuBackend._(
     RasterizerSupport.smallTextures => native.contextError,
     RasterizerSupport.openGles when !RasterizerGpu.allowOpenGles =>
       'OpenGL ES: set RasterizerGpu.allowOpenGles',
+    RasterizerSupport.openGles when _timedOut != null =>
+      "OpenGL ES: the pipelines didn't compile within "
+          '${_timedOut!.inMilliseconds} ms',
     RasterizerSupport.openGles =>
       'OpenGL ES, ${switch (gpu) {
         RasterizerBackend.mesh => native.meshDetail,
@@ -645,7 +673,12 @@ abstract class RasterizerRenderer() {
   ///
   /// On OpenGL ES, a GPU renderer compiles its pipelines as it's made, and
   /// the future completes once they've compiled, on the UI thread and then
-  /// on the raster thread ([RasterizerGpu.allowOpenGles]).
+  /// on the raster thread ([RasterizerGpu.allowOpenGles]). If they haven't
+  /// within [RasterizerGpu.warmUpTimeout], it completes with the canvas
+  /// renderer, and the GPU renderer's support becomes
+  /// [RasterizerSupport.warmUpTimeout], so that scenes made after without a
+  /// backend are for the canvas renderer. Scenes made before are for the GPU
+  /// renderer, which the canvas renderer can't draw: make them after.
   static Future<RasterizerRenderer> create({
     int slots = 2,
     RasterizerBackend? backend,
@@ -670,9 +703,19 @@ abstract class RasterizerRenderer() {
         '${detail == null ? '' : ': $detail'}',
       );
     }
-    return chosen == RasterizerBackend.mesh
-        ? native.createMeshRenderer(slots, meshSamples)
-        : native.createRenderer(slots, RasterizerGpu.debugFailFormatProbe);
+    final timeout = RasterizerGpu.warmUpTimeout;
+    try {
+      return await (chosen == RasterizerBackend.mesh
+          ? native.createMeshRenderer(slots, meshSamples, timeout)
+          : native.createRenderer(
+              slots,
+              RasterizerGpu.debugFailFormatProbe,
+              timeout,
+            ));
+    } on TimeoutException {
+      state._timedOut = timeout;
+      return CanvasRenderer(slots);
+    }
   }
 
   /// The most that the GPU renderer's atlas pages, and so its viewports,

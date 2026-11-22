@@ -29,8 +29,11 @@ Future<String?> debugProbeFormat(Set<String> fail) async =>
 RasterizerScene parseScene(Uint8List bytes) =>
     throw UnsupportedError('rasterizer_gpu: no GPU renderer without dart:ffi');
 
-Future<RasterizerRenderer> createRenderer(int slots, Set<String> fail) =>
-    throw UnsupportedError('rasterizer_gpu: no GPU renderer without dart:ffi');
+Future<RasterizerRenderer> createRenderer(
+  int slots,
+  Set<String> fail,
+  Duration timeout,
+) => throw UnsupportedError('rasterizer_gpu: no GPU renderer without dart:ffi');
 
 RasterizerScene parseMeshScene(Uint8List bytes, double maxSize) =>
     throw UnsupportedError('rasterizer_gpu: no mesh renderer without dart:ffi');
@@ -41,5 +44,9 @@ RasterizerScene importPathScene(ScenePaths paths, double maxSize) =>
 RasterizerScene importPathMeshScene(ScenePaths paths, double maxSize) =>
     throw UnsupportedError('rasterizer_gpu: no mesh renderer without dart:ffi');
 
-Future<RasterizerRenderer> createMeshRenderer(int slots, int samples) =>
+Future<RasterizerRenderer> createMeshRenderer(
+  int slots,
+  int samples,
+  Duration timeout,
+) =>
     throw UnsupportedError('rasterizer_gpu: no mesh renderer without dart:ffi');
