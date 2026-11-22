@@ -394,12 +394,12 @@ window, and is built again when the window is resized:
 - **Buckets.** Two, at the top left and right. A body counts in one once it has stayed in for 1 s, and its count shows
   above it. Once all its bodies are at rest, those that came in score by their area and the bucket's fill, their area
   against the bucket's, shown below it. A bucket whose bodies, at least 2, are at rest and fill 30% of its area is
-  full: it turns green, gives their area back to the energy, and empties in 5 s, shrinking its bodies to a fifth from
-  the bottom up.
-- **Energy.** Drained bodies take energy, by their area against a fifth of the table's. At 0, the game is over and the
-  world stops, until a key or a tap starts a new game.
-- **Texts.** In `VectorFont`, 12 logical pixels high: the energy, from green to red, and the fuller bucket's fill, at
-  the bottom left; the drop and the score at the bottom right.
+  full: it turns green, gives twice their area back to the energy, and empties in 5 s, shrinking its bodies to a
+  fifth from the bottom up.
+- **Energy.** Drained bodies take energy, by their area against 10% of the table's, and full buckets give it back, up
+  to 100%. At 0, the game is over and the world stops, until a key or a tap starts a new game.
+- **Texts.** In `VectorFont`, 12 logical pixels high: the energy, from green to red, and how close the fuller bucket
+  was to full when its fill last showed, as TARGET, at the bottom left; the drop and the score at the bottom right.
 - **Sounds.** Kicks, bodies coming to rest in a bucket, full buckets, the drain and game over each have a sound, which
   `tool/make_sounds.py` synthesizes, played as Tube Shooter's are (`commons/game_sounds.dart`), 2 a sound.
 

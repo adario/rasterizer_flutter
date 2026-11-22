@@ -32,6 +32,9 @@ class BucketComponent(final Rect inner)
   /// its share.
   static const _scorePerArea = 400;
 
+  /// How many times its bodies' area it gives back to the energy once full.
+  static const _refund = 2.0;
+
   static const _countCap = 2.4;
 
   /// Its walls' thickness, outside [inner].
@@ -108,8 +111,17 @@ class BucketComponent(final Rect inner)
   /// Whether [body] has stayed in it for [_countTime].
   bool counts(BodyComponent body) => (_inside[body] ?? 0) >= _countTime;
 
-  /// The area of its bodies at rest, as a share of its own.
-  double get level => _shareOf(_inside.keys.where(_atRest));
+  /// The area of its bodies when its share last showed, as a share of what
+  /// fills it, up to 1, or 0 once it has emptied. The bodies from a game
+  /// with another renderer set it without showing it.
+  double get level => _level ?? 0;
+  double? _level;
+
+  /// Sets [level] back to 0, for a new game.
+  void restart() => _level = 0;
+
+  /// Whether [level] still counts the bodies that it empties.
+  var _stale = false;
 
   /// The texts above and below it.
   final _texts = <bool, VectorTextComponent>{};
@@ -165,6 +177,10 @@ class BucketComponent(final Rect inner)
       return;
     }
     final share = _share;
+    if (_arrivals.isNotEmpty || _level == null) {
+      _level = math.min(1, share / _fullShare);
+      _stale = false;
+    }
     if (_arrivals.isNotEmpty) {
       for (final b in _arrivals) {
         _game.score += (_scorePerArea * RevolutePinballExample.area(b) * share)
@@ -179,14 +195,18 @@ class BucketComponent(final Rect inner)
     }
   }
 
-  /// Frees the drained area that [bodies] take, and shrinks them from the
-  /// bottom up.
+  /// Frees [_refund] times the drained area that [bodies] take, and shrinks
+  /// them from the bottom up.
   void _startEmptying(List<BodyComponent> bodies) {
     final game = _game..play(PinballSound.empty);
     game.drainedArea = math.max(
       0,
       game.drainedArea -
-          bodies.fold(0.0, (sum, b) => sum + RevolutePinballExample.area(b)),
+          _refund *
+              bodies.fold(
+                0.0,
+                (sum, b) => sum + RevolutePinballExample.area(b),
+              ),
     );
     bodies.sort((a, b) => _bottom(b).compareTo(_bottom(a)));
     final step = bodies.length < 2
@@ -196,6 +216,7 @@ class BucketComponent(final Rect inner)
       _emptying[b] = _Shrink(b, i * step);
     }
     _emptyClock = 0;
+    _stale = true;
     _inside = {};
     _still = {};
     _count = 0;
@@ -216,6 +237,9 @@ class BucketComponent(final Rect inner)
     if (_emptyClock >= _emptyTime) {
       _game.removeBodies(_emptying.keys.toList());
       _emptying.clear();
+      if (_stale) {
+        _level = 0;
+      }
     }
   }
 

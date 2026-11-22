@@ -127,7 +127,7 @@ abstract class RevolutePinballExample({
 
   /// The game ends once the drained bodies' area reaches [_drainShare] of
   /// the arena's.
-  static const _drainShare = 0.2;
+  static const _drainShare = 0.1;
 
   static const _hudCap = 12.0;
 
@@ -450,6 +450,9 @@ abstract class RevolutePinballExample({
     score = 0;
     _drops = 0;
     drainedArea = 0;
+    for (final bucket in _buckets) {
+      bucket.restart();
+    }
     camera.viewport.add(_ready);
   }
 
