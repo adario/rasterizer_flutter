@@ -143,6 +143,22 @@ abstract class RevolutePinballExample({
   static const _hudBand =
       2 * StoryGame.hudMargin + (1 + VectorTextComponent.lineSpacing) * _hudCap;
 
+  /// The room beside the table for the HUD's widest line, in logical
+  /// pixels: ENERGY 100% or a 5-digit score, with a margin on each side.
+  static final _hudWidth =
+      VectorFont.widthOf('ENERGY 100%') * _hudCap / VectorFont.capHeight +
+      2 * StoryGame.hudMargin;
+
+  /// The table's smallest width, in its heights, for the HUD to go beside
+  /// it.
+  static const _minAspect = 0.9;
+
+  /// The band below the table for the HUD: none if the table, narrowed to
+  /// leave room for the HUD beside it, is still [_minAspect] times as wide
+  /// as high, as in landscape.
+  static double _bandFor(Vector2 size) =>
+      size.x - 2 * _hudWidth >= _minAspect * size.y ? 0 : _hudBand;
+
   /// The pixels a meter: 10, as in Flame's examples, or fewer on a small
   /// screen, so that the arena is at least [_minWidth] by [_minHeight]
   /// meters.
@@ -154,7 +170,7 @@ abstract class RevolutePinballExample({
     _maxZoom,
     math.min(
       size.x / _minWidth,
-      math.max(1, size.y - _hudBand) / _minHeight,
+      math.max(1, size.y - _bandFor(size)) / _minHeight,
     ),
   );
 
@@ -335,11 +351,14 @@ abstract class RevolutePinballExample({
   /// The table's largest width, in its heights.
   static const _maxAspect = 1.2;
 
-  /// The table: the game's area above the HUD's band, in meters, centered
-  /// and at most [_maxAspect] times as wide as high.
+  /// The table: the game's area above the HUD's band, or between the HUD's
+  /// sides without the band, in meters, centered and at most [_maxAspect]
+  /// times as wide as high.
   Rect get _arena {
-    final height = (size.y - _hudBand) / metersToPixels;
-    final width = math.min(size.x / metersToPixels, _maxAspect * height);
+    final band = _bandFor(size);
+    final room = band == 0 ? size.x - 2 * _hudWidth : size.x;
+    final height = (size.y - band) / metersToPixels;
+    final width = math.min(room / metersToPixels, _maxAspect * height);
     return Rect.fromLTWH(
       -width / 2,
       -size.y / 2 / metersToPixels,

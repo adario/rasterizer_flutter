@@ -204,6 +204,11 @@ void main() {
   testWidgets("a bucket emptying kicks the other's bodies up and out", (
     tester,
   ) async {
+    // Wide enough for the two balls that fill a bucket to sit side by side.
+    tester.view
+      ..physicalSize = const Size(1000, 600)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final game = await pumpGame(tester);
     final [left, right] = partsOf<BucketComponent>(game);
     Ball ball(Vector2 position, double radius) => Ball(
@@ -414,7 +419,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('in landscape, the table is narrower than the screen', (
+  testWidgets('in landscape, the HUD sits beside a narrower table', (
     tester,
   ) async {
     tester.view
@@ -422,15 +427,26 @@ void main() {
       ..devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final game = await pumpGame(tester);
-    // The walls are at most 1.2 times the table's height apart.
+    // The walls are 0.9 to 1.2 times the table's height apart.
     final xs = [
       for (final wall in partsOf<Wall>(game))
         for (final end in [wall.start, wall.end]) end.x,
     ];
     final width = xs.reduce(math.max) - xs.reduce(math.min);
     const height = 45.0;
-    expect(width, closeTo(1.2 * height, 1e-3));
+    expect(width, inInclusiveRange(0.9 * height, 1.2 * height));
     expect(width * game.metersToPixels, lessThan(game.size.x * 0.6));
+    // The HUD fits beside the table, so the table takes the whole height.
+    expect(game.metersToPixels, closeTo(game.size.y / height, 1e-6));
+    final left = game.worldToScreen(Vector2(xs.reduce(math.min), 0)).x;
+    final right = game.worldToScreen(Vector2(xs.reduce(math.max), 0)).x;
+    for (final text
+        in game.camera.viewport.children.whereType<VectorTextComponent>()) {
+      if (text.text != 'READY') {
+        final rect = text.toAbsoluteRect();
+        expect(rect.right < left || rect.left > right, isTrue);
+      }
+    }
     // READY is scaled down to an eighth of the height.
     final ready = game.camera.viewport.children
         .whereType<VectorTextComponent>()
