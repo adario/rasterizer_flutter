@@ -81,16 +81,16 @@ final class PathContours._(
     );
   }
 
-  /// Takes closed polygons as one path's contours, as they are: [points], x
-  /// then y, polygon after polygon, and each polygon's [pointCounts].
+  /// Takes closed polygons as one path's contours, as they are: [vertices],
+  /// x then y, polygon after polygon, and each polygon's [vertexCounts].
   ///
   /// It keeps both lists, which mustn't change.
-  factory PathContours.polygons(Float32List points, Int32List pointCounts) =>
+  factory PathContours.polygons(Float32List vertices, Int32List vertexCounts) =>
       PathContours._(
-        points,
-        pointCounts,
-        Uint8List(pointCounts.length)..fillRange(0, pointCounts.length, 1),
-        Int32List.fromList([pointCounts.length]),
+        vertices,
+        vertexCounts,
+        Uint8List(vertexCounts.length)..fillRange(0, vertexCounts.length, 1),
+        Int32List.fromList([vertexCounts.length]),
       );
 }
 

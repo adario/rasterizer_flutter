@@ -263,8 +263,8 @@ final star = RasterizerScene.fromPaths([
   measures the radius in line widths instead, and gives fills a core too. Only the mesh renderer draws a glow, as
   triangles made at import, with no layer or pass. The GPU and canvas renderers draw the same paths without it.
 - **Polygons:** `RasterizerScene.fromPolygons` takes `RasterizerPolygons` instead of paths: closed polygons with
-  straight edges, their corners in a `Float32List`, x then y, and each polygon's number of corners. The GPU renderers
-  take the corners as they are, without flattening a path, and the canvas renderer draws the polygons' `path`. Fills
+  straight edges, their vertices in a `Float32List`, x then y, and each polygon's number of vertices. The GPU renderers
+  take the vertices as they are, without flattening a path, and the canvas renderer draws the polygons' `path`. Fills
   are non-zero. It's for shapes made often, such as every frame. With `separate: true`, the mesh renderer fills each
   polygon on its own rather than their union: a convex one as a fan of triangles, any other tessellated alone. Where
   they overlap, their triangles do too, which shows through an opacity, or colors or glows that aren't opaque. Other

@@ -268,7 +268,10 @@ class ScenePaths._(
       if (kept != null) {
         return kept.contours;
       }
-      final contours = PathContours.polygons(shape.points, shape.pointCounts);
+      final contours = PathContours.polygons(
+        shape.vertices,
+        shape.vertexCounts,
+      );
       _contours[shape] = (tolerance: 0, contours: contours);
       return contours;
     }

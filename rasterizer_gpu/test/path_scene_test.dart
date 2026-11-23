@@ -600,11 +600,11 @@ void main() {
   });
 
   group('fromPolygons', () {
-    /// Returns polygons of [corners], x then y, polygon after polygon.
-    RasterizerPolygons polygons(List<List<double>> corners) =>
+    /// Returns polygons of [vertices], x then y, polygon after polygon.
+    RasterizerPolygons polygons(List<List<double>> vertices) =>
         RasterizerPolygons(
-          Float32List.fromList([for (final c in corners) ...c]),
-          Int32List.fromList([for (final c in corners) c.length ~/ 2]),
+          Float32List.fromList([for (final c in vertices) ...c]),
+          Int32List.fromList([for (final c in vertices) c.length ~/ 2]),
         );
 
     // Two squares of 1600 that overlap by 400, and an L of 1200 apart from
@@ -624,7 +624,7 @@ void main() {
           separate: separate,
         ) as MeshScene).debugMesh!;
 
-    test('throws for a polygon of fewer than 3 corners, or counts that '
+    test('throws for a polygon of fewer than 3 vertices, or counts that '
         "don't add up", () {
       expect(
         () => polygons([
@@ -663,12 +663,12 @@ void main() {
       }
     });
 
-    test('takes the corners as they are, for every scene of them', () {
+    test('takes the vertices as they are, for every scene of them', () {
       final first = ScenePaths.polygons([(polygons: shapes, paint: blue)]);
       final second = ScenePaths.polygons([(polygons: shapes, paint: blue)]);
       final contours = first.contours(512).single;
-      expect(contours.points, same(shapes.points));
-      expect(contours.pointCounts, same(shapes.pointCounts));
+      expect(contours.points, same(shapes.vertices));
+      expect(contours.pointCounts, same(shapes.vertexCounts));
       expect(contours.closed, [1, 1, 1]);
       expect(second.contours(1024).single, same(contours));
       expect(first.isEvenOdd(0), isFalse);

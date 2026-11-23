@@ -150,7 +150,7 @@ class MyGame extends FlameGame with HasRasterizer {
     does, with its `paint` over them. That ends the run.
 - **`RasterizerPolygonsComponent`** draws `RasterizerPolygons`, closed polygons with straight edges, as a
   `RasterizerPathComponent` without paint layers draws a path. It's for shapes a game makes often, such as every frame:
-  the GPU renderers take the corners as they are, without flattening a path, and it makes no hit-test polygons, as
+  the GPU renderers take the vertices as they are, without flattening a path, and it makes no hit-test polygons, as
   Flame's `PathComponent` does. Its size is the polygons' bounds. `separate: true` makes the mesh renderer fill each
   polygon on its own, much faster than their union, but overlaps then show through an opacity (see rasterizer_gpu's
   README, Paths). Components made with the same polygons share an import.

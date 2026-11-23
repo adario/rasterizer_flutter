@@ -478,43 +478,43 @@ typedef RasterizerPaintedPath = ({ui.Path path, ui.Paint paint});
 /// [RasterizerScene.fromPolygons]: a path that the GPU renderers needn't
 /// flatten.
 ///
-/// [points] holds their corners, x then y, polygon after polygon, x right
-/// and y down. [pointCounts] holds each polygon's number of corners. A
-/// polygon doesn't repeat its first corner at its end. Both lists are kept
+/// [vertices] holds each vertex's x then y, polygon after polygon, x right
+/// and y down. [vertexCounts] holds each polygon's number of vertices. A
+/// polygon doesn't repeat its first vertex at its end. Both lists are kept
 /// as they are, so they must not change, as a path imported mustn't.
 class RasterizerPolygons(
-  final Float32List points,
-  final Int32List pointCounts,
+  final Float32List vertices,
+  final Int32List vertexCounts,
 ) {
-  /// Takes [points] and [pointCounts].
+  /// Takes [vertices] and [vertexCounts].
   ///
-  /// Throws [ArgumentError] if a polygon has fewer than 3 corners, or if the
-  /// counts don't add up to the points.
+  /// Throws [ArgumentError] if a polygon has fewer than 3 vertices, or if the
+  /// counts don't add up to [vertices].
   this {
     var total = 0;
-    for (final count in pointCounts) {
+    for (final count in vertexCounts) {
       if (count < 3) {
-        throw ArgumentError.value(count, 'pointCounts', 'Fewer than 3');
+        throw ArgumentError.value(count, 'vertexCounts', 'Fewer than 3');
       }
       total += count;
     }
-    if (2 * total != points.length) {
+    if (2 * total != vertices.length) {
       throw ArgumentError.value(
-        points.length,
-        'points',
-        'Not twice the ${pointCounts.length} polygons\' $total corners',
+        vertices.length,
+        'vertices',
+        'Not twice the ${vertexCounts.length} polygons\' $total vertices',
       );
     }
   }
 
-  /// The corners' bounds, or [ui.Rect.zero] without polygons.
+  /// The vertices' bounds, or [ui.Rect.zero] without polygons.
   late final ui.Rect bounds = () {
-    if (points.isEmpty) {
+    if (vertices.isEmpty) {
       return ui.Rect.zero;
     }
-    var left = points[0], right = left, top = points[1], bottom = top;
-    for (var i = 2; i < points.length; i += 2) {
-      final x = points[i], y = points[i + 1];
+    var left = vertices[0], right = left, top = vertices[1], bottom = top;
+    for (var i = 2; i < vertices.length; i += 2) {
+      final x = vertices[i], y = vertices[i + 1];
       if (x < left) {
         left = x;
       } else if (x > right) {
@@ -534,10 +534,10 @@ class RasterizerPolygons(
   late final ui.Path path = () {
     final path = ui.Path();
     var offset = 0;
-    for (final count in pointCounts) {
+    for (final count in vertexCounts) {
       path.addPolygon([
         for (var k = offset; k < offset + 2 * count; k += 2)
-          ui.Offset(points[k], points[k + 1]),
+          ui.Offset(vertices[k], vertices[k + 1]),
       ], true);
       offset += 2 * count;
     }
@@ -659,7 +659,7 @@ abstract class RasterizerScene {
   /// Creates a scene of polygons, each drawn with its paint, in paint order,
   /// as [fromPaths] does with paths.
   ///
-  /// The GPU renderers take the polygons' corners as they are, rather than
+  /// The GPU renderers take the polygons' vertices as they are, rather than
   /// flattening a path's contours. Fills are non-zero. The canvas renderer
   /// draws each [RasterizerPolygons.path].
   ///
