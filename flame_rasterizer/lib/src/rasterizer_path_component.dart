@@ -7,6 +7,7 @@ import 'package:flame_rasterizer/src/has_rasterizer.dart';
 import 'package:flame_rasterizer/src/internal.dart';
 import 'package:flame_rasterizer/src/rasterizer_svg.dart';
 import 'package:flame_rasterizer/src/rasterizer_svg_component.dart';
+import 'package:flame_rasterizer/src/shared_scenes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
@@ -91,6 +92,7 @@ class RasterizerPathComponent({
         'Not a positive finite number',
       );
     }
+    onReleaseScenes(this, _releaseAll);
   }
 
   /// The largest size, in device pixels, at which it draws its path's longer
@@ -117,19 +119,16 @@ class RasterizerPathComponent({
   final Path _source = path;
   final Offset _topLeft = path.getBounds().topLeft;
 
-  // The imports of each path, shared by the components made with it.
-  static final _scenes = Expando<List<_SharedScene>>('shared scenes');
-
   // The game's GPU renderer, once the component is mounted in a game with
   // HasRasterizer.
   RasterizerBackend? _gpu;
 
-  _SharedScene? _shared;
+  SharedScene? _shared;
 
   // The fields of the paint layers that its import is for, or that couldn't
   // be imported. Without paint layers, the fields of its paint that draw as a
   // layer's. Empty before it's first drawn.
-  List<_PaintFields> _fields = const [];
+  List<PaintFields> _fields = const [];
 
   // The glow when [_fields] were kept.
   RasterizerGlow? _glow;
@@ -141,7 +140,7 @@ class RasterizerPathComponent({
   // Copies of its paint layers, which [_drawPaths] fades or filters, and the
   // fields they were copied from. A layer's change makes new copies.
   List<Paint> _copies = const [];
-  List<_PaintFields> _copied = const [];
+  List<PaintFields> _copied = const [];
 
   // The canvas layer through which a color transform filters the pixels of a
   // paint layer that has its own filter.
@@ -242,7 +241,7 @@ class RasterizerPathComponent({
     }
     if (changed) {
       _copies = [for (final layer in layers) Paint.from(layer)];
-      _copied = [for (final layer in layers) _PaintFields(layer)];
+      _copied = [for (final layer in layers) PaintFields(layer)];
     }
     return _copies;
   }
@@ -270,29 +269,31 @@ class RasterizerPathComponent({
       // Kept first, so that an import that can't be made isn't tried again
       // each frame.
       _fields = layers == null
-          ? [_PaintFields(paint, layerOnly: true)]
-          : [for (final layer in layers) _PaintFields(layer)];
+          ? [PaintFields(paint, layerOnly: true)]
+          : [for (final layer in layers) PaintFields(layer)];
       _glow = glow;
       _release();
       final paints = layers == null
-          ? [_layerOf(paint)]
+          ? [layerOf(paint)]
           : [for (final layer in layers) _filtered(layer)];
       if (paints.every(RasterizerScene.canDraw)) {
-        _shared = _acquire(gpu, paints);
+        _shared = acquireScene(
+          _source,
+          gpu,
+          maxSize,
+          glow,
+          paints,
+          () => RasterizerScene.fromPaths(
+            [for (final p in paints) (path: _source, paint: p)],
+            gpu: gpu,
+            maxSize: maxSize,
+            glow: glow,
+          ),
+        );
       }
     }
     return _shared?.scene;
   }
-
-  /// Returns the layer that [paint] draws as, without paint layers: its fields
-  /// except those that apply over the import, with its color opaque.
-  static Paint _layerOf(Paint paint) => Paint.from(paint)
-    ..color = paint.color.withValues(alpha: 1)
-    ..blendMode = BlendMode.srcOver
-    ..colorFilter = null
-    ..imageFilter = null
-    ..maskFilter = null
-    ..invertColors = false;
 
   /// Returns [layer], or, if its color filter is one that
   /// [RasterizerColorTransform] made, a copy without the filter, its color
@@ -310,35 +311,6 @@ class RasterizerPathComponent({
       ..color = transform.apply(layer.color);
   }
 
-  /// Returns the import of its path with [paints] and [glow], for [gpu] and
-  /// [maxSize]: one that another component made, or a new one.
-  _SharedScene _acquire(RasterizerBackend gpu, List<Paint> paints) {
-    final scenes = _scenes[_source] ??= [];
-    // The backend a new import gets: the canvas renderer where the GPU
-    // renderer isn't supported, or with RasterizerGpu.forceCanvas.
-    final backend = RasterizerGpu.of(gpu).backend;
-    for (final shared in scenes) {
-      if (shared.matches(gpu, maxSize, backend, glow, paints)) {
-        shared.users++;
-        return shared;
-      }
-    }
-    final shared = _SharedScene(
-      gpu,
-      maxSize,
-      glow,
-      [for (final p in paints) _PaintFields(p)],
-      RasterizerScene.fromPaths(
-        [for (final p in paints) (path: _source, paint: p)],
-        gpu: gpu,
-        maxSize: maxSize,
-        glow: glow,
-      ),
-    );
-    scenes.add(shared);
-    return shared;
-  }
-
   /// Stops using its import, and frees it if no other component uses it.
   ///
   /// It frees the import [now], or else at its next update, once the frames
@@ -349,14 +321,14 @@ class RasterizerPathComponent({
       return;
     }
     _shared = null;
-    if (--shared.users > 0) {
+    final scene = releaseScene(_source, shared);
+    if (scene == null) {
       return;
     }
-    _scenes[_source]!.remove(shared);
     if (now) {
-      shared.scene.dispose();
+      scene.dispose();
     } else {
-      _retired.add(shared.scene);
+      _retired.add(scene);
     }
   }
 
@@ -369,7 +341,7 @@ class RasterizerPathComponent({
 
   /// Stops using its import, and frees now what no other component uses.
   ///
-  /// [onRemove] and [releasePathScenes] call it outside a frame, as the
+  /// [onRemove] and `releaseScenes` call it outside a frame, as the
   /// component or its game is removed.
   /// Drawn again, the component imports its path again.
   void _releaseAll() {
@@ -383,105 +355,5 @@ class RasterizerPathComponent({
     _releaseAll();
     _gpu = null;
     super.onRemove();
-  }
-}
-
-/// Releases the imports of the [RasterizerPathComponent]s in [game]'s tree,
-/// as the game is removed.
-///
-/// Flame doesn't remove the game's components then.
-void releasePathScenes(Component game) {
-  for (final component
-      in game.descendants().whereType<RasterizerPathComponent>()) {
-    component._releaseAll();
-  }
-}
-
-/// A path's import for a renderer, a maximum size, a glow and paints, which
-/// [users] components draw.
-class _SharedScene(
-  final RasterizerBackend gpu,
-  final double maxSize,
-  final RasterizerGlow? glow,
-  final List<_PaintFields> fields,
-  final RasterizerScene scene,
-) {
-  int users = 1;
-
-  /// Returns whether it's the import for [gpu], [maxSize], [glow] and [paints],
-  /// now that [gpu]'s imports are for [backend].
-  bool matches(
-    RasterizerBackend gpu,
-    double maxSize,
-    RasterizerBackend backend,
-    RasterizerGlow? glow,
-    List<Paint> paints,
-  ) {
-    if (gpu != this.gpu ||
-        maxSize != this.maxSize ||
-        backend != scene.backend ||
-        glow != this.glow ||
-        paints.length != fields.length) {
-      return false;
-    }
-    for (var i = 0; i < paints.length; i++) {
-      if (!fields[i].matches(paints[i])) {
-        return false;
-      }
-    }
-    return true;
-  }
-}
-
-/// The fields of a paint that a [RasterizerPathComponent] imports its path
-/// with, or that decide whether it can import it ([RasterizerScene.canDraw]),
-/// as they were then.
-///
-/// With [layerOnly], [matches] compares only the fields that a
-/// [RasterizerPathComponent]'s paint, without paint layers, draws as a
-/// layer's, except its color's alpha.
-class _PaintFields(Paint paint, {final bool layerOnly = false}) {
-  final Color _color = paint.color;
-  final PaintingStyle _style = paint.style;
-  final double _strokeWidth = paint.strokeWidth;
-  final StrokeCap _strokeCap = paint.strokeCap;
-  final StrokeJoin _strokeJoin = paint.strokeJoin;
-
-  // The getter's value, which isn't the real limit in Flutter 3.47.
-  // rasterizer_gpu corrects it when it imports the path. Comparing two
-  // getter values still finds a change.
-  final double _strokeMiterLimit = paint.strokeMiterLimit;
-  final BlendMode _blendMode = paint.blendMode;
-  final bool _isAntiAlias = paint.isAntiAlias;
-  final bool _invertColors = paint.invertColors;
-  final Shader? _shader = paint.shader;
-  final ColorFilter? _colorFilter = paint.colorFilter;
-  final MaskFilter? _maskFilter = paint.maskFilter;
-  final ImageFilter? _imageFilter = paint.imageFilter;
-
-  /// Returns whether [paint]'s fields are these.
-  bool matches(Paint paint) {
-    final color = paint.color;
-    if (!(layerOnly
-            ? color.r == _color.r &&
-                  color.g == _color.g &&
-                  color.b == _color.b &&
-                  color.colorSpace == _color.colorSpace
-            : color == _color) ||
-        paint.style != _style ||
-        paint.strokeWidth != _strokeWidth ||
-        paint.strokeCap != _strokeCap ||
-        paint.strokeJoin != _strokeJoin ||
-        paint.strokeMiterLimit != _strokeMiterLimit ||
-        paint.isAntiAlias != _isAntiAlias ||
-        paint.shader != _shader) {
-      return false;
-    }
-    return layerOnly ||
-        paint.blendMode == _blendMode &&
-            paint.invertColors == _invertColors &&
-            paint.colorFilter == _colorFilter &&
-            paint.maskFilter == _maskFilter &&
-            paint.imageFilter == _imageFilter;
   }
 }

@@ -52,6 +52,7 @@ export 'package:rasterizer_gpu/rasterizer_gpu.dart'
         RasterizerGlow,
         RasterizerGpu,
         RasterizerGpuBackend,
+        RasterizerPolygons,
         RasterizerRenderer,
         RasterizerRun,
         RasterizerScene,
@@ -61,6 +62,7 @@ export 'package:rasterizer_gpu/rasterizer_gpu.dart'
 
 export 'src/has_rasterizer.dart';
 export 'src/rasterizer_path_component.dart' show RasterizerPathComponent;
+export 'src/rasterizer_polygons_component.dart';
 export 'src/rasterizer_svg.dart';
 export 'src/rasterizer_svg_component.dart';
 export 'src/svg_hitbox.dart';
