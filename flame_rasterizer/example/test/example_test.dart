@@ -244,7 +244,7 @@ void main() {
         .initialSelection!;
 
     // The knob names each level by its tube, so no two levels share one.
-    expect({for (final level in levels) level.tube.name}, hasLength(8));
+    expect({for (final level in levels) level.tube.name}, hasLength(10));
     await settle();
     final first = game();
     await pumpWhileLoading(tester, () => !first.isLoaded);
