@@ -410,7 +410,9 @@ window, and is built again when the window is resized:
 - **Texts.** In `VectorFont`, 12 logical pixels high: the energy, from green to red, and how close the fuller bucket
   was to full when its fill last showed, as TARGET, at the bottom left; the drop and the score at the bottom right.
 - **Sounds.** Kicks, bodies coming to rest in a bucket, full buckets, the drain and game over each have a sound, which
-  `tool/make_sounds.py` synthesizes, played as Tube Shooter's are (`commons/game_sounds.dart`), 2 a sound.
+  `tool/make_sounds.py` synthesizes, played as Tube Shooter's are (`commons/game_sounds.dart`), 3 a sound. So do
+  bodies that trail off the wheel, a softer flip, and bodies that hit a bucket, a knock, or a wall or a slide, a soft
+  tick, at 2 m/s or more.
 
 The table's paths are imported once, and stay on the fast path: the flippers, guides and buckets draw their outlines
 and glows as paths, as the bodies do, but for the flame, drawn as its SVG, and the spaceship and the robot, drawn as

@@ -192,6 +192,40 @@ def drain():
                       for i, s in enumerate(tone)], 0.25)
 
 
+def wheel():
+    """The flip, softer and smoother: lower, longer, with a duller click."""
+    length = 0.1
+    n = int(RATE * length)
+    thump = sweep(220, 80, length, tri, n)
+    click = noise(n, 900)
+    return normalize([(k + 0.2 * c) * env(i / RATE, length, 0.004)
+                      for i, (k, c) in enumerate(zip(thump, click))], 0.25)
+
+
+def bucket():
+    """A hollow knock: two inharmonic partials ringing briefly."""
+    length = 0.12
+    n = int(RATE * length)
+    knock = noise(n, 2000)
+    out = []
+    for i in range(n):
+        t = i / RATE
+        ring = (math.sin(2 * math.pi * 330 * t)
+                + 0.6 * math.sin(2 * math.pi * 517 * t))
+        out.append((ring + 0.3 * knock[i]) * env(t, length, 0.001))
+    return normalize(out, 0.3)
+
+
+def bump():
+    """A very soft, short tick."""
+    length = 0.03
+    n = int(RATE * length)
+    thud = sweep(200, 120, length, tri, n)
+    tick = noise(n, 2500)
+    return normalize([(k + 0.4 * c) * env(i / RATE, length, 0.001)
+                      for i, (k, c) in enumerate(zip(thud, tick))], 0.12)
+
+
 SOUNDS = {
     'fire': fire,
     'enemy_fire': enemy_fire,
@@ -207,6 +241,9 @@ SOUNDS = {
     'score': lambda: chime([1320, 1760], 0.06, 0.25, 0.3),
     'empty': lambda: chime([523, 659, 784, 1047, 1319], 0.09, 0.4, 0.4),
     'drain': drain,
+    'wheel': wheel,
+    'bucket': bucket,
+    'bump': bump,
 }
 
 if __name__ == '__main__':

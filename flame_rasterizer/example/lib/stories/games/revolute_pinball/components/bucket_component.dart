@@ -338,7 +338,13 @@ class BucketComponent(final Rect inner)
   @override
   Body createBody() {
     final body = world.createBody(BodyDef());
-    addPieces(body, ShapeDef(material: SurfaceMaterial(friction: 0.5)));
+    addPieces(
+      body,
+      ShapeDef(
+        material: SurfaceMaterial(friction: 0.5),
+        enableHitEvents: true,
+      ),
+    );
     return body;
   }
 }

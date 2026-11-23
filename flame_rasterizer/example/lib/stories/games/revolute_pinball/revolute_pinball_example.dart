@@ -30,7 +30,10 @@ enum PinballSound(final String file) {
   score('score'),
   empty('empty'),
   drain('drain'),
-  over('crash');
+  over('crash'),
+  wheel('wheel'),
+  bucket('bucket'),
+  bump('bump');
 
   String get path => 'assets/audio/$file.wav';
 }
@@ -95,10 +98,10 @@ abstract class RevolutePinballExample({
   set sound(bool value) {
     _sound = value;
     if (value && _sounds == null) {
-      // At most 2 of each sound at once, so 10 at most.
+      // At most 3 of each sound at once, as in Tube Shooter, so 24 at most.
       (_sounds = GameSounds([
         for (final sound in PinballSound.values) sound.path,
-      ], size: 2)).load();
+      ])).load();
     }
   }
 
@@ -488,9 +491,13 @@ abstract class RevolutePinballExample({
     final bucketBottom = bucketTop + bucketHeight + BucketComponent.thickness;
     final wheelReach = 0.15 * small;
     final table = TableComponent([
-      Wall(Vector2(a.left, a.top), Vector2(a.right, a.top)),
-      Wall(Vector2(a.left, a.top), Vector2(a.left, a.bottom)),
-      Wall(Vector2(a.right, a.top), Vector2(a.right, a.bottom)),
+      Wall(Vector2(a.left, a.top), Vector2(a.right, a.top), hitEvents: true),
+      Wall(Vector2(a.left, a.top), Vector2(a.left, a.bottom), hitEvents: true),
+      Wall(
+        Vector2(a.right, a.top),
+        Vector2(a.right, a.bottom),
+        hitEvents: true,
+      ),
       GuideComponent(guide),
       GuideComponent([for (final v in guide.reversed) Vector2(-v.x, v.y)]),
       ..._flippers = [
@@ -635,6 +642,10 @@ abstract class RevolutePinballExample({
   /// [_dropGrace] seconds have passed since the last drop.
   static const _brakePerSpeed = 0.05;
   static const _dropGrace = 2.5;
+
+  /// How fast a body must hit a wall, a slide or a bucket to sound, in
+  /// meters a second.
+  static const _minHitSpeed = 2.0;
   var _sinceDrop = double.infinity;
 
   @override
@@ -745,6 +756,25 @@ class RevolutePinballWorld()
         flipper.touching.forEach(gameRef._kicked);
       }
     }
+    // Besides the wheel's, hits come from the walls, the slides and the
+    // buckets, which alone report them.
+    final wheelBody = gameRef._wheel?.isLoaded ?? false
+        ? gameRef._wheel!.body
+        : null;
+    for (final hit in events.hit) {
+      if (!hit.shapeA.isValid ||
+          !hit.shapeB.isValid ||
+          hit.approachSpeed < RevolutePinballExample._minHitSpeed) {
+        continue;
+      }
+      final bodies = [hit.shapeA.body, hit.shapeB.body];
+      if (!bodies.contains(wheelBody)) {
+        final bucket = gameRef._buckets.any(
+          (bucket) => bucket.isLoaded && bodies.contains(bucket.body),
+        );
+        gameRef.play(bucket ? PinballSound.bucket : PinballSound.bump);
+      }
+    }
     // A body hitting the wheel trails as if kicked, and slows it down by how
     // hard it hit it.
     if (gameRef._wheel case final wheel? when wheel.isLoaded) {
@@ -763,11 +793,13 @@ class RevolutePinballWorld()
       }
       for (final event in events.begin) {
         if (other(event.shapeA, event.shapeB) case final body?
-            when gameRef._kicked(body) &&
-                gameRef._sinceDrop >= RevolutePinballExample._dropGrace) {
-          wheel.brake(
-            RevolutePinballExample._brakePerSpeed * (speeds[body] ?? 0),
-          );
+            when gameRef._kicked(body)) {
+          gameRef.play(PinballSound.wheel);
+          if (gameRef._sinceDrop >= RevolutePinballExample._dropGrace) {
+            wheel.brake(
+              RevolutePinballExample._brakePerSpeed * (speeds[body] ?? 0),
+            );
+          }
         }
       }
     }

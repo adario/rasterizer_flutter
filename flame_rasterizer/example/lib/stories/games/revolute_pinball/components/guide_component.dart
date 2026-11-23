@@ -14,7 +14,13 @@ class GuideComponent(@override final List<Vector2> outline)
   @override
   Body createBody() {
     final body = world.createBody(BodyDef());
-    addPieces(body, ShapeDef(material: SurfaceMaterial(friction: 0.3)));
+    addPieces(
+      body,
+      ShapeDef(
+        material: SurfaceMaterial(friction: 0.3),
+        enableHitEvents: true,
+      ),
+    );
     return body;
   }
 }
