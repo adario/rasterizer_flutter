@@ -206,10 +206,13 @@ mixin GlowingBody on BodyComponent {
   }
 }
 
-/// A wall from [start] to [end], in meters.
-class Wall(final Vector2 start, final Vector2 end)
-    extends BodyComponent
-    with GlowingBody {
+/// A wall from [start] to [end], in meters, which reports the bodies that
+/// hit it if [hitEvents].
+class Wall(
+  final Vector2 start,
+  final Vector2 end, {
+  final bool hitEvents = false,
+}) extends BodyComponent with GlowingBody {
   this : super(paint: Paint()..color = ExampleColors.slate);
 
   /// Its width as drawn, in meters.
@@ -242,7 +245,10 @@ class Wall(final Vector2 start, final Vector2 end)
   Body createBody() => world.createBody(BodyDef())
     ..createShape(
       Segment(point1: start, point2: end),
-      ShapeDef(filter: Filter(categoryBits: category)),
+      ShapeDef(
+        filter: Filter(categoryBits: category),
+        enableHitEvents: hitEvents,
+      ),
     );
 }
 
