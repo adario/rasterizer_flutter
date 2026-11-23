@@ -25,7 +25,8 @@ void main() {
         },
       ),
     );
-    expect(find.text('Game'), findsOneWidget);
+    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, 'Game');
+    expect(find.byType(AppBar), findsNothing);
     expect(renderers.last, SvgRenderer.firstChoice);
     await pick(tester, 'Flame SVG');
     expect(renderers.last, SvgRenderer.flameSvg);

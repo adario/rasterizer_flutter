@@ -38,6 +38,9 @@ class const GameStory<G extends StoryGame, S extends Object>({
 
   /// The world's speed, from 0, which stands still, to 2.
   final double speed = 1,
+
+  /// How many lines tall the status bar is.
+  final int statusLines = 2,
   super.key,
 }) extends StatefulWidget {
   @override
@@ -108,18 +111,20 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
             ),
           ),
         ),
-        _StatusBar(_status),
+        _StatusBar(_status, widget.statusLines),
       ],
     );
   }
 }
 
-/// The status bar, which shows the status in at most two lines.
+/// The status bar, which shows the status in at most [lines] lines.
 ///
-/// The bar is always two lines tall, from the first frame and whatever the
-/// status, so that the game keeps its size.
-class const _StatusBar(final ValueListenable<String> status)
-    extends StatelessWidget {
+/// The bar is always [lines] lines tall, from the first frame and whatever
+/// the status, so that the game keeps its size.
+class const _StatusBar(
+  final ValueListenable<String> status,
+  final int lines,
+) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -129,18 +134,21 @@ class const _StatusBar(final ValueListenable<String> status)
     return ColoredBox(
       color: theme.colorScheme.surfaceContainerHighest,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: lines == 1 ? 2 : 6,
+        ),
         child: Stack(
           children: [
-            // Two empty lines set the bar's height. The status draws over
-            // them, so it can't change the height.
-            Text('\n', style: style),
+            // Empty lines set the bar's height. The status draws over them,
+            // so it can't change the height.
+            Text('\n' * (lines - 1), style: style),
             Positioned.fill(
               child: ValueListenableBuilder<String>(
                 valueListenable: status,
                 builder: (context, text, _) => Text(
                   text,
-                  maxLines: 2,
+                  maxLines: lines,
                   overflow: TextOverflow.ellipsis,
                   style: style,
                 ),

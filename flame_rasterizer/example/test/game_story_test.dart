@@ -125,4 +125,33 @@ void main() {
     expect(games.last.from, first.count);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('the status bar is as many lines tall as asked', (
+    tester,
+  ) async {
+    final heights = <int, double>{};
+    for (final lines in [1, 2]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameStory<_CountingGame, int>(
+            key: ValueKey(lines),
+            renderer: SvgRenderer.rasterizerCanvas,
+            create: (status, from) =>
+                _CountingGame(from, Future.value(), status: status)
+                  ..status.value = 'status ' * 200,
+            statusLines: lines,
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 16));
+      final status = tester.widget<Text>(find.textContaining('status'));
+      expect(status.maxLines, lines);
+      final game = find.byWidgetPredicate((w) => w is GameWidget);
+      heights[lines] = 600 - tester.getSize(game).height;
+    }
+    // A line plus 2 pixels above and below, and two lines plus 6.
+    final line = heights[1]! - 4;
+    expect(heights[2], moreOrLessEquals(2 * line + 12));
+    await tester.pumpWidget(const SizedBox());
+  });
 }
