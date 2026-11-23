@@ -256,6 +256,7 @@ struct RasterizerMesh {
         subpaths.clear();
         return index.forEachContour(path, [&](const float *p, uint32_t n, bool closed) {
             subpaths.emplace_back();
+            subpaths.back().points.reserve(n);     // Once, rather than at each doubling: most of the import of small contours
             for (uint32_t k = 0; k < n; k++)
                 addPoint(subpaths.back(), roundf(p[2 * k] / grid) * grid, roundf(p[2 * k + 1] / grid) * grid);
             subpaths.back().closed = closed;

@@ -11,6 +11,9 @@
   its alpha, rather than splitting the draw wherever entries start or stop
   keeping it. So many entries of one scene at different opacities, such as
   a star field, take a few draws rather than one for each change.
+- The mesh renderer imports paths and polygons with many small contours a
+  third faster, as it no longer grows each contour's points as it reads
+  them.
 
 - The GPU renderers draw on Windows too, on Impeller's OpenGL ES through
   ANGLE, where the app's runner turns Flutter GPU on. The build hook builds
