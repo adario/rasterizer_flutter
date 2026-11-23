@@ -9,7 +9,6 @@ import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,7 +16,7 @@ import 'pump_while_loading.dart';
 
 void main() {
   test('the rings stay square to the axis on a long flight', () {
-    final tube = EndlessTube(Tubes.hexagon);
+    final tube = EndlessTube();
     for (var distance = 0.0; distance < 20000; distance += 0.37) {
       tube.advanceTo(distance);
     }

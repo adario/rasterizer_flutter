@@ -8,6 +8,7 @@ import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:widgetbook/widgetbook.dart';
 
@@ -85,9 +86,17 @@ WidgetbookComponent gamesStories() {
         builder: (context) {
           // Its paths are drawn by Flame's own components with Flame SVG.
           final renderer = rendererKnob(context, svgs: false);
+          final tube = context.knobs.object.dropdown(
+            label: 'Tube',
+            options: TubeRunnerExample.tubes,
+            initialOption: Tubes.hexagon,
+            labelBuilder: (tube) => tube.name,
+          );
           return GameStory<TubeRunnerExample, Object>(
             renderer: renderer,
-            create: (status, _) => TubeRunnerExample.of(renderer, status),
+            create: (status, _) =>
+                TubeRunnerExample.of(renderer, status, tube: tube),
+            update: (game) => game.tube = tube,
             zoom: zoomKnob(context),
             speed: speedKnob(context),
           );

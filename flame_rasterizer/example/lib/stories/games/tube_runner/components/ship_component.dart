@@ -6,6 +6,7 @@ import 'package:flame/components.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
 /// The ship, which moves round the tube's ring at the ship as Tube Shooter's
 /// moves round the rim: see [PlayerComponent], whose numbers it shares.
@@ -66,22 +67,45 @@ class ShipComponent()
     gameRef.keepStroke(drawing);
   }
 
+  /// Moves it onto the view's tube, to the step nearest the angle round the
+  /// axis at which it was on [from], its tube before, and places it there.
+  void switchFrom(Tube from) {
+    final angle = _pointAt(from, step).direction;
+    final tube = gameRef.view.tube;
+    var nearest = 0;
+    var least = double.infinity;
+    for (var i = 0; i < stepsPerLane * tube.laneCount; i++) {
+      final turn =
+          (_pointAt(tube, i).direction - angle + math.pi) % (2 * math.pi);
+      final off = (turn - math.pi).abs();
+      if (off < least) {
+        nearest = i;
+        least = off;
+      }
+    }
+    step = nearest;
+    _partStep = 0;
+    place();
+  }
+
   /// Places it on the ring at the ship, at the angle of
   /// [PlayerComponent.headingOn].
   void place() {
     final view = gameRef.view;
     final tube = view.tube;
-    final lane = this.lane;
-    final along = (step % stepsPerLane + 0.5) / stepsPerLane;
-    final at =
-        Offset.lerp(
-          tube.points[lane],
-          tube.points[tube.pointAfter(lane)],
-          along,
-        )! *
-        view.rimScale;
+    final at = _pointAt(tube, step) * view.rimScale;
     position.setValues(at.dx, at.dy);
     angle = PlayerComponent.headingOn(tube, step);
     scale.splat(tube.laneWidth * view.rimScale);
+  }
+
+  /// Returns where [step] is on [tube]'s outline, in tube units.
+  static Offset _pointAt(Tube tube, int step) {
+    final lane = step ~/ stepsPerLane;
+    return Offset.lerp(
+      tube.points[lane],
+      tube.points[tube.pointAfter(lane)],
+      (step % stepsPerLane + 0.5) / stepsPerLane,
+    )!;
   }
 }

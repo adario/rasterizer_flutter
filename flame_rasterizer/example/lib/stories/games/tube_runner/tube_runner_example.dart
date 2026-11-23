@@ -25,6 +25,7 @@ import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
 abstract class TubeRunnerExample({
   required super.status,
   math.Random? random,
+  Tube? tube,
 }) extends ExampleGame
     with
         DragCallbacks,
@@ -32,18 +33,27 @@ abstract class TubeRunnerExample({
         KeyboardEvents,
         PathComponents<ExampleWorld> {
   /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
-  /// SVG.
+  /// SVG, down [tube], one of [tubes], or the hexagon.
   factory TubeRunnerExample.of(
     SvgRenderer renderer,
     ValueNotifier<String> status, {
     math.Random? random,
+    Tube? tube,
   }) => renderer == SvgRenderer.flameSvg
-      ? FlameTubeRunnerExample(status: status, random: random)
+      ? FlameTubeRunnerExample(status: status, random: random, tube: tube)
       : RasterizerTubeRunnerExample(
           status: status,
           renderer: renderer,
           random: random,
+          tube: tube,
         );
+
+  /// The tubes it can fly down: Tube Shooter's closed ones, as the ship
+  /// goes round and round.
+  static final tubes = [
+    for (final tube in Tubes.all)
+      if (!tube.isOpen) tube,
+  ];
 
   static const description = '''
     A prototype of an endless runner in vector lines, where running is flying.
@@ -54,7 +64,9 @@ abstract class TubeRunnerExample({
     PathComponent draws them all.
 
     Move the ship round the tube with the arrow keys, A and D, by dragging
-    left and right, or a lane per scroll of the mouse wheel.
+    left and right, or a lane per scroll of the mouse wheel. The Tube knob
+    picks one of Tube Shooter's closed tubes, which the ship goes on down
+    without a stop.
 
     The game makes the tube's quads again every frame. The mesh renderer fills
     each quad on its own, as a fan of triangles, rather than their union. The
@@ -70,9 +82,25 @@ abstract class TubeRunnerExample({
 
   final math.Random random = random ?? math.Random();
 
-  final view = TubeView()..tube = Tubes.hexagon;
+  final view = TubeView()..tube = tube ?? Tubes.hexagon;
 
-  late final endlessTube = EndlessTube(view.tube);
+  final endlessTube = EndlessTube();
+
+  /// The tube it flies down, one of [tubes].
+  Tube get tube => view.tube;
+
+  /// Changes the tube where the ship is, without a stop: the ship goes on at
+  /// the same angle round the axis, in the new tube's nearest step.
+  set tube(Tube value) {
+    final from = view.tube;
+    if (value == from) {
+      return;
+    }
+    view.tube = value;
+    if (ship.isLoaded) {
+      ship.switchFrom(from);
+    }
+  }
 
   final tubeGroup = Component();
   final ship = ShipComponent();
@@ -284,6 +312,7 @@ class RasterizerTubeRunnerExample({
   required super.status,
   @override required final SvgRenderer renderer,
   super.random,
+  super.tube,
 }) extends TubeRunnerExample
     with
         HasRasterizer,
@@ -307,9 +336,11 @@ class RasterizerTubeRunnerExample({
 }
 
 /// The example with Flame: Flame's [PathComponent]s draw its paths.
-class FlameTubeRunnerExample({required super.status, super.random})
-    extends TubeRunnerExample
-    with FlamePathComponents<ExampleWorld> {
+class FlameTubeRunnerExample({
+  required super.status,
+  super.random,
+  super.tube,
+}) extends TubeRunnerExample with FlamePathComponents<ExampleWorld> {
   @override
   String get rendererText => "Flame's PathComponent";
 

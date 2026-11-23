@@ -42,18 +42,20 @@ class const Ring(
   Point3 place(Offset point) => center + right * point.dx + down * point.dy;
 }
 
-/// An endless [tube], made as the ship flies along it.
+/// An endless tube, made as the ship flies along it.
 ///
-/// Its axis bends as [axisAt] says. It's cut into rings [step] apart along
-/// the axis, from [behind] behind the ship to [ahead] in front of it. Each
-/// [advanceTo] makes the rings that come into that span, and drops those
-/// that leave it. Each ring turns from the one before as little as the axis
-/// lets it, so that the outline doesn't spin about the axis.
+/// Its outline is the view's tube, which [quadsAt] takes, so it can change
+/// from one frame to the next. Its axis bends as [axisAt] says. It's cut into
+/// rings [step] apart along the axis, from [behind] behind the ship to [ahead]
+/// in front of it. Each [advanceTo] makes the rings that come into that span,
+/// and drops those that leave it. Each ring turns from the one before as
+/// little as the axis lets it, so that the outline doesn't spin about the
+/// axis.
 ///
 /// The eye looks along the axis at the ship's ring, from [Tube.eye] behind
 /// it, so that ring is always where Tube Shooter's rim is on screen, and the
 /// tube ahead bends away from it.
-class EndlessTube(final Tube tube) {
+class EndlessTube() {
   /// The distance between two rings along the axis, in tube units.
   static const step = 0.5;
 
@@ -128,13 +130,14 @@ class EndlessTube(final Tube tube) {
   }
 
   /// Returns the tube's lines, as quads to fill, as the eye sees them with the
-  /// ship [distance] along the axis.
+  /// ship [distance] along the axis, round the outline of [view]'s tube.
   ///
   /// Each point of the outline draws a line along the tube, and every
   /// [ringSpacing] a ring goes across it. Lines get thinner with distance, as
   /// [TubeView.lineWidthOf] says, and the view clips them closer than
   /// [TubeView.near].
   RasterizerPolygons quadsAt(double distance, TubeView view) {
+    final tube = view.tube;
     final ship = ringAt(distance);
     final eye = ship.center - ship.forward * Tube.eye;
     // Each ring's outline, from the eye: across, down and along its line of
