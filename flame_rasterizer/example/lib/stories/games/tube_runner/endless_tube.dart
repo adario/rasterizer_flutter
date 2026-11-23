@@ -136,6 +136,9 @@ class EndlessTube() {
   /// [ringSpacing] a ring goes across it. Lines get thinner with distance, as
   /// [TubeView.lineWidthOf] says, and the view clips them closer than
   /// [TubeView.near].
+  ///
+  /// A closed tube leaves out the lines between faces that the eye sees from
+  /// outside: from inside the tube, other faces always hide those.
   RasterizerPolygons quadsAt(double distance, TubeView view) {
     final tube = view.tube;
     final ship = ringAt(distance);
@@ -149,6 +152,34 @@ class EndlessTube() {
             _fromEye(ring.place(point), eye, ship),
         ],
     ];
+    // Twice the outline's signed area: its sign says which way it turns.
+    var turn = 0.0;
+    for (var i = 0; i < tube.laneCount; i++) {
+      final point = tube.points[i];
+      final next = tube.points[tube.pointAfter(i)];
+      turn += point.dx * next.dy - point.dy * next.dx;
+    }
+    // Whether the eye sees each lane's face, from a ring to the next, from
+    // inside the tube, by ring and lane.
+    final facing = [
+      for (var k = 0; k + 1 < _rings.length; k++)
+        [
+          for (var i = 0; i < tube.laneCount; i++)
+            tube.isOpen ||
+                _facesEye(
+                  seen[k][i],
+                  seen[k][tube.pointAfter(i)],
+                  seen[k + 1][i],
+                  turn,
+                ),
+        ],
+    ];
+    bool faces(int k, int lane) =>
+        k >= 0 &&
+        k < facing.length &&
+        lane >= 0 &&
+        lane < tube.laneCount &&
+        facing[k][lane];
     final lines = _Lines(view);
     final every = (ringSpacing / step).round();
     for (var k = 0; k < _rings.length; k++) {
@@ -156,16 +187,37 @@ class EndlessTube() {
       if (k + 1 < _rings.length) {
         final next = seen[k + 1];
         for (var i = 0; i < outline.length; i++) {
-          lines.add(outline[i], next[i]);
+          final before = tube.isOpen
+              ? i - 1
+              : (i + tube.laneCount - 1) % tube.laneCount;
+          if (faces(k, before) || faces(k, i)) {
+            lines.add(outline[i], next[i]);
+          }
         }
       }
       if (_rings[k].index % every == 0) {
         for (var i = 0; i < tube.laneCount; i++) {
-          lines.add(outline[i], outline[tube.pointAfter(i)]);
+          if (faces(k - 1, i) || faces(k, i)) {
+            lines.add(outline[i], outline[tube.pointAfter(i)]);
+          }
         }
       }
     }
     return lines.quads;
+  }
+
+  /// Returns whether the eye, at the origin, sees from inside the tube the
+  /// face from [corner] to [along], the next point of its outline, and to
+  /// [ahead], the same point of the next ring, for an outline whose signed
+  /// area has [turn]'s sign.
+  static bool _facesEye(
+    Point3 corner,
+    Point3 along,
+    Point3 ahead,
+    double turn,
+  ) {
+    final outward = (along - corner).cross(ahead - corner) * turn;
+    return outward.dot(corner) > 0;
   }
 
   /// Returns [point] as the eye at [eye] sees it, looking as [ship] faces:
