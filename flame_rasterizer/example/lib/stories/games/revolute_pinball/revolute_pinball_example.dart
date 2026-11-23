@@ -153,11 +153,24 @@ abstract class RevolutePinballExample({
   /// it.
   static const _minAspect = 0.9;
 
-  /// The band below the table for the HUD: none if the table, narrowed to
-  /// leave room for the HUD beside it, is still [_minAspect] times as wide
-  /// as high, as in landscape.
+  /// Whether the table fills the game, with the HUD over its bottom corners:
+  /// on a desktop, in a game at least as wide as high.
+  static bool _fills(Vector2 size) =>
+      size.x >= size.y &&
+      switch (defaultTargetPlatform) {
+        TargetPlatform.macOS ||
+        TargetPlatform.windows ||
+        TargetPlatform.linux => true,
+        _ => false,
+      };
+
+  /// The band below the table for the HUD: none if the table [_fills] the
+  /// game, or if, narrowed to leave room for the HUD beside it, it's still
+  /// [_minAspect] times as wide as high, as in landscape on a phone.
   static double _bandFor(Vector2 size) =>
-      size.x - 2 * _hudWidth >= _minAspect * size.y ? 0 : _hudBand;
+      _fills(size) || size.x - 2 * _hudWidth >= _minAspect * size.y
+      ? 0
+      : _hudBand;
 
   /// The pixels a meter: 10, as in Flame's examples, or fewer on a small
   /// screen, so that the arena is at least [_minWidth] by [_minHeight]
@@ -351,10 +364,17 @@ abstract class RevolutePinballExample({
   /// The table's largest width, in its heights.
   static const _maxAspect = 1.2;
 
-  /// The table: the game's area above the HUD's band, or between the HUD's
-  /// sides without the band, in meters, centered and at most [_maxAspect]
-  /// times as wide as high.
+  /// The table, in meters: the whole game if it [_fills] the game. Else the
+  /// game's area above the HUD's band, or between the HUD's sides without
+  /// the band, centered and at most [_maxAspect] times as wide as high.
   Rect get _arena {
+    if (_fills(size)) {
+      return Rect.fromCenter(
+        center: Offset.zero,
+        width: size.x / metersToPixels,
+        height: size.y / metersToPixels,
+      );
+    }
     final band = _bandFor(size);
     final room = band == 0 ? size.x - 2 * _hudWidth : size.x;
     final height = (size.y - band) / metersToPixels;
@@ -421,7 +441,8 @@ abstract class RevolutePinballExample({
     _tableSize.setFrom(size);
     final a = _arena;
     final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
-    final flipper = 0.24 * a.width;
+    // Longer on a table narrowed for a phone.
+    final flipper = (_fills(size) ? 0.18 : 0.24) * a.width;
     final small = math.min(a.width, a.height);
     // The left flipper and guide, mirrored for the right ones: the tip ends
     // at the drain, and the guide's recess under it at the bottom.

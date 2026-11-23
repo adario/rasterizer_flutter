@@ -472,4 +472,48 @@ void main() {
     expect(ready.toAbsoluteRect().height, closeTo(game.size.y / 8, 0.5));
     await tester.pumpWidget(const SizedBox());
   });
+
+  /// Returns the span of the walls' ends, in screen pixels.
+  Rect wallsOnScreen(RevolutePinballExample game) {
+    final ends = [
+      for (final wall in partsOf<Wall>(game))
+        for (final end in [wall.start, wall.end]) game.worldToScreen(end),
+    ];
+    return Rect.fromLTRB(
+      ends.map((end) => end.x).reduce(math.min),
+      ends.map((end) => end.y).reduce(math.min),
+      ends.map((end) => end.x).reduce(math.max),
+      ends.map((end) => end.y).reduce(math.max),
+    );
+  }
+
+  testWidgets(
+    'on a desktop, a wide table fills the game, and a tall one sits '
+    'above the HUD',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(765, 654)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      var game = await pumpGame(tester);
+      expect(game.metersToPixels, 10);
+      final walls = wallsOnScreen(game);
+      expect(walls.left, closeTo(0, 1e-3));
+      expect(walls.top, closeTo(0, 1e-3));
+      expect(walls.right, closeTo(game.size.x, 1e-3));
+      expect(walls.bottom, closeTo(game.size.y, 1e-3));
+      await tester.pumpWidget(const SizedBox());
+
+      tester.view.physicalSize = const Size(600, 800);
+      game = await pumpGame(tester);
+      final hudTop = game.camera.viewport.children
+          .whereType<VectorTextComponent>()
+          .where((text) => text.text != 'READY')
+          .map((text) => text.toAbsoluteRect().top)
+          .reduce(math.min);
+      expect(wallsOnScreen(game).bottom, lessThan(hudTop));
+      await tester.pumpWidget(const SizedBox());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
 }
