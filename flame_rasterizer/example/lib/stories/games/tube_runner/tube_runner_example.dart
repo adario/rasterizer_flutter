@@ -10,6 +10,7 @@ import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/flight_stars_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ship_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flutter/foundation.dart';
@@ -49,10 +50,10 @@ abstract class TubeRunnerExample({
         );
 
   /// The tubes it can fly down: Tube Shooter's closed ones, as the ship
-  /// goes round and round.
+  /// goes round and round, in the order of its levels.
   static final tubes = [
-    for (final tube in Tubes.all)
-      if (!tube.isOpen) tube,
+    for (final level in levels)
+      if (!level.tube.isOpen) level.tube,
   ];
 
   static const description = '''
