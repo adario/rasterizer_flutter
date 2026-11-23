@@ -139,10 +139,9 @@ class EndlessTube() {
   ///
   /// A closed tube leaves out the lines between faces that the eye sees from
   /// outside: from inside the tube, other faces always hide those. It also
-  /// cuts its lines to the window through which the eye sees past the rings
-  /// before them, so that where the tube bends, its nearer walls hide what's
-  /// beyond. Each ring hides as its outline's convex hull, so a concave
-  /// outline's ridges hide less than they would.
+  /// cuts out what the rings before each line hide of it, as [_Hiders] says,
+  /// so that where the tube bends, its nearer walls and ridges hide what's
+  /// beyond.
   RasterizerPolygons quadsAt(double distance, TubeView view) {
     final tube = view.tube;
     final ship = ringAt(distance);
@@ -184,23 +183,18 @@ class EndlessTube() {
         lane >= 0 &&
         lane < tube.laneCount &&
         facing[k][lane];
-    final hull = tube.isOpen ? null : _hullOf(tube.points, turn);
-    // Where the eye sees past the rings so far, as seen from 1 away from it:
-    // null while none hides anything.
-    List<Offset>? window;
+    _Hiders? hiders;
+    if (!tube.isOpen) {
+      if (_hiders?.tube != tube) {
+        _hiders = _Hiders(tube, turn);
+      }
+      hiders = _hiders!..reset();
+    }
     final lines = _Lines(view);
     final every = (ringSpacing / step).round();
     for (var k = 0; k < _rings.length; k++) {
       final outline = seen[k];
-      final nearer = window;
-      if (hull != null && hull.every((i) => outline[i].z > TubeView.near)) {
-        final middle = _sight(_fromEye(_rings[k].center, eye, ship));
-        final ring = [
-          for (final i in hull)
-            middle + (_sight(outline[i]) - middle) * _windowSlack,
-        ];
-        window = nearer == null ? ring : _intersect(nearer, ring);
-      }
+      hiders?.pass(outline, _fromEye(_rings[k].center, eye, ship));
       if (k + 1 < _rings.length) {
         final next = seen[k + 1];
         for (var i = 0; i < outline.length; i++) {
@@ -208,20 +202,28 @@ class EndlessTube() {
               ? i - 1
               : (i + tube.laneCount - 1) % tube.laneCount;
           if (faces(k, before) || faces(k, i)) {
-            lines.add(outline[i], next[i], window);
+            lines.add(outline[i], next[i], hiders: hiders);
           }
         }
       }
       if (_rings[k].index % every == 0) {
         for (var i = 0; i < tube.laneCount; i++) {
           if (faces(k - 1, i) || faces(k, i)) {
-            lines.add(outline[i], outline[tube.pointAfter(i)], nearer);
+            lines.add(
+              outline[i],
+              outline[tube.pointAfter(i)],
+              hiders: hiders,
+              nearer: true,
+            );
           }
         }
       }
     }
     return lines.quads;
   }
+
+  /// What the rings hide, for the last closed tube that [quadsAt] drew.
+  _Hiders? _hiders;
 
   /// How much bigger than each ring the window lets the eye see through it,
   /// so that the ring's own lines, on its edge, stay whole.
@@ -261,36 +263,6 @@ class EndlessTube() {
       }
     } while (dropped);
     return hull;
-  }
-
-  /// Returns the part of convex [polygon] inside convex [clip], both with a
-  /// positive signed area: the Sutherland-Hodgman algorithm.
-  static List<Offset> _intersect(List<Offset> polygon, List<Offset> clip) {
-    var result = polygon;
-    for (var e = 0; e < clip.length && result.isNotEmpty; e++) {
-      final from = clip[e];
-      final edge = clip[(e + 1) % clip.length] - from;
-      final points = result;
-      // How far inside the edge each point is, scaled by the edge's length.
-      final sides = [for (final point in points) _cross(edge, point - from)];
-      result = [];
-      for (var i = 0; i < points.length; i++) {
-        final j = (i + 1) % points.length;
-        if (sides[i] >= 0) {
-          result.add(points[i]);
-        }
-        if ((sides[i] >= 0) != (sides[j] >= 0)) {
-          result.add(
-            Offset.lerp(
-              points[i],
-              points[j],
-              sides[i] / (sides[i] - sides[j]),
-            )!,
-          );
-        }
-      }
-    }
-    return result;
   }
 
   /// Returns whether the eye, at the origin, sees from inside the tube the
@@ -382,10 +354,15 @@ class _Lines(final TubeView view) {
   ///
   /// Each end is [TubeView.lineWidthOf] its distance wide, and extends by
   /// half that width, so that lines meeting at a corner close it. It clips
-  /// the line closer than [TubeView.near], and outside [window], a convex
-  /// polygon with a positive signed area as `EndlessTube._sight` places it,
-  /// if any.
-  void add(Point3 from, Point3 to, [List<Offset>? window]) {
+  /// the line closer than [TubeView.near], and leaves out what [hiders]
+  /// hide of it, if any: what the rings before it hide, or [nearer] those
+  /// before the last ring passed to them, for a line on that ring.
+  void add(
+    Point3 from,
+    Point3 to, {
+    _Hiders? hiders,
+    bool nearer = false,
+  }) {
     var (a, b) = (from, to);
     if (a.z < TubeView.near && b.z < TubeView.near) {
       return;
@@ -395,79 +372,35 @@ class _Lines(final TubeView view) {
     } else if (b.z < TubeView.near) {
       b = b + (a - b) * ((TubeView.near - b.z) / (a.z - b.z));
     }
-    if (window != null) {
-      final span = _spanIn(
-        window,
-        EndlessTube._sight(a),
-        EndlessTube._sight(b),
-      );
-      if (span == null) {
-        return;
-      }
-      // The eye sees 1 / z change evenly along a line.
-      Point3 at(double t) {
-        final inverse = (1 - t) / a.z + t / b.z;
-        return a + (b - a) * (t / b.z / inverse);
-      }
-
-      final start = at(span.start);
-      b = at(span.end);
-      a = start;
+    if (hiders == null) {
+      _addLine(a, b);
+      return;
     }
-    _addQuad(
-      _project(a),
-      view.lineWidthOf(a.z),
-      _project(b),
-      view.lineWidthOf(b.z),
+    final count = hiders.spansOf(
+      EndlessTube._sight(a),
+      EndlessTube._sight(b),
+      nearer: nearer,
     );
+    final spans = hiders.spans;
+    // The eye sees 1 / z change evenly along a line.
+    Point3 at(double t) {
+      final inverse = (1 - t) / a.z + t / b.z;
+      return a + (b - a) * (t / b.z / inverse);
+    }
+
+    for (var s = 0; s < count; s++) {
+      _addLine(at(spans[2 * s]), at(spans[2 * s + 1]));
+    }
   }
 
-  /// The least squared length of a window's edge that [_spanIn] clips to:
-  /// rounding errors leave shorter ones, which point any way.
-  static const _leastEdgeSquared = 1e-14;
-
-  /// Returns the part of the line from [a] to [b] inside convex [window],
-  /// whose signed area is positive, from 0 at [a] to 1 at [b]: null if none.
-  ///
-  /// This is the Cyrus-Beck algorithm.
-  static ({double start, double end})? _spanIn(
-    List<Offset> window,
-    Offset a,
-    Offset b,
-  ) {
-    if (window.isEmpty) {
-      return null;
-    }
-    var start = 0.0;
-    var end = 1.0;
-    final line = b - a;
-    for (var e = 0; e < window.length; e++) {
-      final from = window[e];
-      final edge = window[(e + 1) % window.length] - from;
-      if (edge.distanceSquared < _leastEdgeSquared) {
-        continue;
-      }
-      // How far inside the edge a is, and how fast the line goes inward.
-      final inside = _cross(edge, a - from);
-      final inward = _cross(edge, line);
-      if (inward == 0) {
-        if (inside < 0) {
-          return null;
-        }
-        continue;
-      }
-      final t = -inside / inward;
-      if (inward > 0) {
-        start = math.max(start, t);
-      } else {
-        end = math.min(end, t);
-      }
-      if (start > end) {
-        return null;
-      }
-    }
-    return (start: start, end: end);
-  }
+  /// Adds a line from [a] to [b], both at least [TubeView.near] away, as a
+  /// quad.
+  void _addLine(Point3 a, Point3 b) => _addQuad(
+    _project(a),
+    view.lineWidthOf(a.z),
+    _project(b),
+    view.lineWidthOf(b.z),
+  );
 
   /// Returns where [point] lands in the world.
   Offset _project(Point3 point) =>
@@ -493,6 +426,454 @@ class _Lines(final TubeView view) {
         ..add(corner.dx)
         ..add(corner.dy);
     }
+  }
+}
+
+/// What the rings of a closed tube hide of the lines beyond them, as the eye
+/// sees them from 1 away: all but the window through which it sees past the
+/// rings so far, and the notches between each ring's outline and its convex
+/// hull, behind the tube's ridges.
+///
+/// `EndlessTube.quadsAt` passes it the rings from the eye out, and asks it
+/// which spans of each line the eye sees. It keeps its buffers from one frame
+/// to the next, so that it allocates nothing per line.
+class _Hiders(final Tube tube, final double turn) {
+  /// The outline's convex hull, as indices in an order whose signed area is
+  /// positive.
+  late final _hull = EndlessTube._hullOf(tube.points, turn);
+
+  /// The outline's notches, as [_notchesOf] returns them.
+  late final _notches = _notchesOf(tube.points, _hull, turn);
+
+  /// Where the eye sees each point of the ring last passed, grown about the
+  /// ring's middle by `EndlessTube._windowSlack`: x then y.
+  late final _ring = Float64List(2 * tube.points.length);
+
+  /// The window, as the points of a convex polygon with a positive signed
+  /// area, x then y, and how many: -1 while no ring hides anything.
+  var _window = Float64List(64);
+  var _windowLength = -1;
+
+  /// The window's bounds: left, top, right and bottom.
+  final _windowBounds = Float64List(4);
+
+  /// Where [_intersectRing] puts each step's result, and how far inside an
+  /// edge each point is, scaled by the edge's length.
+  var _spare = Float64List(64);
+  var _sides = Float64List(32);
+
+  /// The window, how many points it has and how many notches were live
+  /// before the ring last passed, for the lines across that ring.
+  var _nearerWindow = Float64List(64);
+  var _nearerLength = -1;
+  var _nearerCount = 0;
+
+  /// How many numbers a notch takes in [_notchPoints]: 2 for each point of
+  /// the longest one.
+  late final _stride =
+      2 * _notches.fold<int>(3, (most, notch) => math.max(most, notch.length));
+
+  /// The notches made so far this frame, by slot: their points, x then y,
+  /// [_stride] apart, how many points each has, and their bounds (left, top,
+  /// right and bottom).
+  var _notchPoints = Float64List(0);
+  var _notchLengths = Int32List(0);
+  var _notchBounds = Float64List(0);
+  var _slots = 0;
+
+  /// The slots of the notches whose bounds still overlap the window's,
+  /// nearest first, and how many.
+  var _live = Int32List(0);
+  var _liveCount = 0;
+
+  /// The spans of the line that [spansOf] last returned the count of: where
+  /// each starts and ends, from 0 to 1 along the line.
+  Float64List spans = Float64List(2);
+  var _spareSpans = Float64List(2);
+
+  /// The span that [_clip] narrows: where it starts and ends.
+  var _start = 0.0;
+  var _end = 1.0;
+
+  /// Starts a new frame, before the nearest ring.
+  void reset() {
+    _windowLength = -1;
+    _nearerLength = -1;
+    _nearerCount = 0;
+    _slots = 0;
+    _liveCount = 0;
+  }
+
+  /// Passes the next ring from the eye: its [outline] and [center], from the
+  /// eye.
+  ///
+  /// A ring hides something only when all of its outline is at least
+  /// [TubeView.near] away. Only the rings nearest the eye aren't, and before
+  /// them nothing hides anything anyway.
+  void pass(List<Point3> outline, Point3 center) {
+    _prune();
+    _nearerLength = _windowLength;
+    if (_windowLength > 0) {
+      _nearerWindow = _fit(_nearerWindow, 2 * _windowLength);
+      _nearerWindow.setRange(0, 2 * _windowLength, _window);
+    }
+    _nearerCount = _liveCount;
+    for (final i in _hull) {
+      if (outline[i].z <= TubeView.near) {
+        return;
+      }
+    }
+    final middleX = center.x / center.z;
+    final middleY = center.y / center.z;
+    for (var i = 0; i < outline.length; i++) {
+      final point = outline[i];
+      _ring[2 * i] =
+          middleX + (point.x / point.z - middleX) * EndlessTube._windowSlack;
+      _ring[2 * i + 1] =
+          middleY + (point.y / point.z - middleY) * EndlessTube._windowSlack;
+    }
+    _intersectRing();
+    if (_windowLength > 0) {
+      _boundsOf(_window, 0, _windowLength, _windowBounds, 0);
+      _addNotches();
+    }
+  }
+
+  /// Returns how many [spans] of the line from [a] to [b] the eye sees past
+  /// the rings passed so far, or [nearer] those before the last one.
+  int spansOf(Offset a, Offset b, {required bool nearer}) {
+    final windowLength = nearer ? _nearerLength : _windowLength;
+    final count = nearer ? _nearerCount : _liveCount;
+    final line = b - a;
+    _start = 0;
+    _end = 1;
+    if (windowLength == 0) {
+      return 0;
+    }
+    if (windowLength > 0 &&
+        !_clip(nearer ? _nearerWindow : _window, 0, windowLength, a, line)) {
+      return 0;
+    }
+    var spans = this.spans;
+    var spare = _spareSpans;
+    spans[0] = _start;
+    spans[1] = _end;
+    var length = 1;
+    final left = math.min(a.dx, b.dx);
+    final right = math.max(a.dx, b.dx);
+    final top = math.min(a.dy, b.dy);
+    final bottom = math.max(a.dy, b.dy);
+    final bounds = _notchBounds;
+    for (var c = 0; c < count && length > 0; c++) {
+      final slot = _live[c];
+      final o = 4 * slot;
+      if (bounds[o] > right ||
+          bounds[o + 1] > bottom ||
+          bounds[o + 2] < left ||
+          bounds[o + 3] < top) {
+        continue;
+      }
+      _start = spans[0];
+      _end = spans[2 * length - 1];
+      if (!_clip(_notchPoints, _stride * slot, _notchLengths[slot], a, line)) {
+        continue;
+      }
+      // Cuts the notch's span out of each span.
+      var cut = 0;
+      for (var s = 0; s < length; s++) {
+        final start = spans[2 * s];
+        final end = spans[2 * s + 1];
+        if (_end <= start || _start >= end) {
+          spare[2 * cut] = start;
+          spare[2 * cut + 1] = end;
+          cut++;
+          continue;
+        }
+        if (_start > start) {
+          spare[2 * cut] = start;
+          spare[2 * cut + 1] = _start;
+          cut++;
+        }
+        if (_end < end) {
+          spare[2 * cut] = _end;
+          spare[2 * cut + 1] = end;
+          cut++;
+        }
+      }
+      final swap = spans;
+      spans = spare;
+      spare = swap;
+      length = cut;
+    }
+    this.spans = spans;
+    _spareSpans = spare;
+    return length;
+  }
+
+  /// Drops the notches whose bounds no longer overlap the window's: as the
+  /// window only shrinks, they hide nothing that it doesn't.
+  void _prune() {
+    if (_windowLength < 0) {
+      return;
+    }
+    if (_windowLength == 0) {
+      _liveCount = 0;
+      return;
+    }
+    var kept = 0;
+    for (var c = 0; c < _liveCount; c++) {
+      final slot = _live[c];
+      if (_overlapsWindow(_notchBounds, 4 * slot)) {
+        _live[kept++] = slot;
+      }
+    }
+    _liveCount = kept;
+  }
+
+  /// Narrows the window to the hull of the ring last passed: the
+  /// Sutherland-Hodgman algorithm.
+  void _intersectRing() {
+    final hull = _hull;
+    if (_windowLength < 0) {
+      _window = _fit(_window, 2 * hull.length);
+      for (var h = 0; h < hull.length; h++) {
+        _window[2 * h] = _ring[2 * hull[h]];
+        _window[2 * h + 1] = _ring[2 * hull[h] + 1];
+      }
+      _windowLength = hull.length;
+      return;
+    }
+    for (var e = 0; e < hull.length && _windowLength > 0; e++) {
+      final fromX = _ring[2 * hull[e]];
+      final fromY = _ring[2 * hull[e] + 1];
+      final next = hull[(e + 1) % hull.length];
+      final edgeX = _ring[2 * next] - fromX;
+      final edgeY = _ring[2 * next + 1] - fromY;
+      final points = _window;
+      final length = _windowLength;
+      if (_sides.length < length) {
+        _sides = Float64List(2 * length);
+      }
+      final sides = _sides;
+      for (var i = 0; i < length; i++) {
+        sides[i] =
+            edgeX * (points[2 * i + 1] - fromY) -
+            edgeY * (points[2 * i] - fromX);
+      }
+      // Clipping a convex polygon to an edge adds at most one point.
+      final result = _spare = _fit(_spare, 2 * (length + 1));
+      var count = 0;
+      for (var i = 0; i < length; i++) {
+        final j = (i + 1) % length;
+        if (sides[i] >= 0) {
+          result[2 * count] = points[2 * i];
+          result[2 * count + 1] = points[2 * i + 1];
+          count++;
+        }
+        if ((sides[i] >= 0) != (sides[j] >= 0)) {
+          final t = sides[i] / (sides[i] - sides[j]);
+          result[2 * count] =
+              points[2 * i] + (points[2 * j] - points[2 * i]) * t;
+          result[2 * count + 1] =
+              points[2 * i + 1] + (points[2 * j + 1] - points[2 * i + 1]) * t;
+          count++;
+        }
+      }
+      _spare = points;
+      _window = result;
+      _windowLength = count;
+    }
+  }
+
+  /// Adds the notches of the ring last passed whose bounds overlap the
+  /// window's.
+  void _addNotches() {
+    _grow(_slots + _notches.length);
+    for (final notch in _notches) {
+      final o = _stride * _slots;
+      for (var j = 0; j < notch.length; j++) {
+        _notchPoints[o + 2 * j] = _ring[2 * notch[j]];
+        _notchPoints[o + 2 * j + 1] = _ring[2 * notch[j] + 1];
+      }
+      _boundsOf(_notchPoints, o, notch.length, _notchBounds, 4 * _slots);
+      if (_overlapsWindow(_notchBounds, 4 * _slots)) {
+        _notchLengths[_slots] = notch.length;
+        _live[_liveCount++] = _slots++;
+      }
+    }
+  }
+
+  /// Makes room for [slots] notches, and for the spans they can cut a line
+  /// into.
+  void _grow(int slots) {
+    if (_notchLengths.length >= slots) {
+      return;
+    }
+    final room = math.max(slots, 2 * _notchLengths.length);
+    _notchPoints = Float64List(_stride * room)..setAll(0, _notchPoints);
+    _notchLengths = Int32List(room)..setAll(0, _notchLengths);
+    _notchBounds = Float64List(4 * room)..setAll(0, _notchBounds);
+    _live = Int32List(room)..setAll(0, _live);
+    // Each notch cuts at most one span in two.
+    spans = Float64List(2 * (room + 1));
+    _spareSpans = Float64List(2 * (room + 1));
+  }
+
+  /// Returns whether the bounds at [offset] in [bounds] overlap the
+  /// window's.
+  bool _overlapsWindow(Float64List bounds, int offset) =>
+      bounds[offset] <= _windowBounds[2] &&
+      bounds[offset + 1] <= _windowBounds[3] &&
+      bounds[offset + 2] >= _windowBounds[0] &&
+      bounds[offset + 3] >= _windowBounds[1];
+
+  /// Narrows the span from [_start] to [_end] of the line from [a], going
+  /// [line], to the part inside the convex polygon of [length] points at
+  /// [offset] in [points], whose signed area is positive. Returns false if
+  /// none is left: the Cyrus-Beck algorithm.
+  bool _clip(
+    Float64List points,
+    int offset,
+    int length,
+    Offset a,
+    Offset line,
+  ) {
+    var start = _start;
+    var end = _end;
+    for (var e = 0; e < length; e++) {
+      final from = offset + 2 * e;
+      final to = offset + 2 * ((e + 1) % length);
+      final fromX = points[from];
+      final fromY = points[from + 1];
+      final edgeX = points[to] - fromX;
+      final edgeY = points[to + 1] - fromY;
+      if (edgeX * edgeX + edgeY * edgeY < _leastEdgeSquared) {
+        continue;
+      }
+      // How far inside the edge a is, and how fast the line goes inward.
+      final inside = edgeX * (a.dy - fromY) - edgeY * (a.dx - fromX);
+      final inward = edgeX * line.dy - edgeY * line.dx;
+      if (inward == 0) {
+        if (inside < 0) {
+          return false;
+        }
+        continue;
+      }
+      final t = -inside / inward;
+      if (inward > 0) {
+        start = math.max(start, t);
+      } else {
+        end = math.min(end, t);
+      }
+      if (start >= end) {
+        return false;
+      }
+    }
+    _start = start;
+    _end = end;
+    return true;
+  }
+
+  /// The least squared length of an edge that [_clip] clips to: rounding
+  /// errors leave shorter ones, which point any way.
+  static const _leastEdgeSquared = 1e-14;
+
+  /// Returns [list] if it holds at least [length] numbers, else a longer
+  /// one, whose numbers are all 0.
+  static Float64List _fit(Float64List list, int length) => list.length >= length
+      ? list
+      : Float64List(math.max(length, 2 * list.length));
+
+  /// Puts the bounds of the [length] points at [offset] in [points] into
+  /// [bounds] at [at]: left, top, right and bottom.
+  static void _boundsOf(
+    Float64List points,
+    int offset,
+    int length,
+    Float64List bounds,
+    int at,
+  ) {
+    var left = points[offset];
+    var top = points[offset + 1];
+    var right = left;
+    var bottom = top;
+    for (var i = 1; i < length; i++) {
+      final x = points[offset + 2 * i];
+      final y = points[offset + 2 * i + 1];
+      left = math.min(left, x);
+      top = math.min(top, y);
+      right = math.max(right, x);
+      bottom = math.max(bottom, y);
+    }
+    bounds[at] = left;
+    bounds[at + 1] = top;
+    bounds[at + 2] = right;
+    bounds[at + 3] = bottom;
+  }
+
+  /// Returns the notches between [points], a closed outline whose signed
+  /// area has [turn]'s sign, and its convex [hull]: each as the indices of a
+  /// convex polygon whose signed area is positive.
+  ///
+  /// Each notch runs along the outline from one point of the hull to the
+  /// next, and back along the hull. It leaves out the points where a notch
+  /// goes straight on, and the notches that aren't convex, which hide
+  /// nothing then: none of the tubes' are.
+  static List<List<int>> _notchesOf(
+    List<Offset> points,
+    List<int> hull,
+    double turn,
+  ) {
+    final count = points.length;
+    final way = turn < 0 ? count - 1 : 1;
+    final notches = <List<int>>[];
+    for (var h = 0; h < hull.length; h++) {
+      final to = hull[(h + 1) % hull.length];
+      final notch = [hull[h]];
+      while (notch.last != to) {
+        notch.add((notch.last + way) % count);
+      }
+      var dropped = false;
+      do {
+        dropped = false;
+        for (var k = 0; k < notch.length && notch.length > 2; k++) {
+          final before = points[notch[(k + notch.length - 1) % notch.length]];
+          final point = points[notch[k]];
+          final after = points[notch[(k + 1) % notch.length]];
+          if (_cross(point - before, after - point).abs() <
+              EndlessTube._leastTurn) {
+            notch.removeAt(k);
+            k--;
+            dropped = true;
+          }
+        }
+      } while (dropped);
+      if (notch.length < 3) {
+        continue;
+      }
+      var area = 0.0;
+      for (var k = 0; k < notch.length; k++) {
+        area += _cross(
+          points[notch[k]],
+          points[notch[(k + 1) % notch.length]],
+        );
+      }
+      final positive = area < 0 ? notch.reversed.toList() : notch;
+      var convex = true;
+      for (var k = 0; k < positive.length; k++) {
+        final before =
+            points[positive[(k + positive.length - 1) % positive.length]];
+        final point = points[positive[k]];
+        final after = points[positive[(k + 1) % positive.length]];
+        if (_cross(point - before, after - point) < 0) {
+          convex = false;
+        }
+      }
+      if (convex) {
+        notches.add(positive);
+      }
+    }
+    return notches;
   }
 }
 
