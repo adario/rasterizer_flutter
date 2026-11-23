@@ -645,7 +645,7 @@ abstract class RevolutePinballExample({
 
   /// How fast a body must hit a wall, a slide or a bucket to sound, in
   /// meters a second.
-  static const _minHitSpeed = 2.0;
+  static const _minHitSpeed = 4.0;
   var _sinceDrop = double.infinity;
 
   @override
