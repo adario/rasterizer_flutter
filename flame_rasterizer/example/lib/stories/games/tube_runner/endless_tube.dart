@@ -1,6 +1,8 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flame_rasterizer/flame_rasterizer.dart' show RasterizerPolygons;
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
 /// A point or a direction in 3D, in tube units: x to the right, y down and z
@@ -125,14 +127,14 @@ class EndlessTube(final Tube tube) {
     return _turnTo(_rings[index - _rings.first.index], distance, index);
   }
 
-  /// Returns the tube's lines, as filled quads, as the eye sees them with the
-  /// ship [distance] along the axis, and how many quads they are.
+  /// Returns the tube's lines, as quads to fill, as the eye sees them with the
+  /// ship [distance] along the axis.
   ///
   /// Each point of the outline draws a line along the tube, and every
   /// [ringSpacing] a ring goes across it. Lines get thinner with distance, as
   /// [TubeView.lineWidthOf] says, and the view clips them closer than
   /// [TubeView.near].
-  ({Path path, int quads}) pathAt(double distance, TubeView view) {
+  RasterizerPolygons quadsAt(double distance, TubeView view) {
     final ship = ringAt(distance);
     final eye = ship.center - ship.forward * Tube.eye;
     // Each ring's outline, from the eye: across, down and along its line of
@@ -160,7 +162,7 @@ class EndlessTube(final Tube tube) {
         }
       }
     }
-    return (path: lines.path, quads: lines.quads);
+    return lines.quads;
   }
 
   /// Returns [point] as the eye at [eye] sees it, looking as [ship] faces:
@@ -215,13 +217,20 @@ class EndlessTube(final Tube tube) {
   }
 }
 
-/// Lines in 3D, from the eye, added to [path] as filled quads, as Tube
-/// Shooter's `TubeView` adds its own.
+/// Lines in 3D, from the eye, made into [quads] to fill, as Tube Shooter's
+/// `TubeView` makes its own.
 class _Lines(final TubeView view) {
-  final path = Path();
+  /// The quads' corners, x then y.
+  final _corners = <double>[];
 
-  /// How many quads it added.
-  int quads = 0;
+  /// The quads added so far.
+  RasterizerPolygons get quads {
+    final count = _corners.length ~/ 8;
+    return RasterizerPolygons(
+      Float32List.fromList(_corners),
+      Int32List(count)..fillRange(0, count, 4),
+    );
+  }
 
   /// How far it moves the lines right and down: a sixteenth of a device
   /// pixel, as `TubeView` does, and for the same reason.
@@ -254,7 +263,7 @@ class _Lines(final TubeView view) {
   Offset _project(Point3 point) =>
       Offset(point.x, point.y) * view.scaleOf(point.z) + _lineOffset;
 
-  /// Adds a filled quad from [a], [aWidth] wide, to [b], [bWidth] wide.
+  /// Adds a quad from [a], [aWidth] wide, to [b], [bWidth] wide.
   void _addQuad(Offset a, double aWidth, Offset b, double bWidth) {
     final length = (b - a).distance;
     if (length == 0) {
@@ -264,12 +273,15 @@ class _Lines(final TubeView view) {
     final across = Offset(-along.dy, along.dx);
     final start = a - along * (aWidth / 2);
     final end = b + along * (bWidth / 2);
-    path.addPolygon([
+    for (final corner in [
       start + across * (aWidth / 2),
       end + across * (bWidth / 2),
       end - across * (bWidth / 2),
       start - across * (aWidth / 2),
-    ], false);
-    quads++;
+    ]) {
+      _corners
+        ..add(corner.dx)
+        ..add(corner.dy);
+    }
   }
 }

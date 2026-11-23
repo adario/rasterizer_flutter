@@ -48,16 +48,18 @@ abstract class TubeRunnerExample({
   static const description = '''
     A prototype of an endless runner in vector lines, where running is flying.
     The ship flies down an endless tube that bends as it goes, and that the
-    game makes as the ship gets there. Everything in the game is a Flutter
-    Path. RasterizerPathComponent draws them with the renderer that the
-    Renderer knob picks; with Flame SVG, Flame's PathComponent does.
+    game makes as the ship gets there. RasterizerPolygonsComponent draws the
+    tube's quads, and RasterizerPathComponent the other paths, with the
+    renderer that the Renderer knob picks; with Flame SVG, Flame's
+    PathComponent draws them all.
 
     Move the ship round the tube with the arrow keys, A and D, by dragging
     left and right, or a lane per scroll of the mouse wheel.
 
-    The game makes the tube's path again every frame. The bar under the game
-    shows the renderer, the frame times, the renderer's own numbers, the
-    quads in the tube's path and the paths made each second.
+    The game makes the tube's quads again every frame. The mesh renderer fills
+    each quad on its own, as a fan of triangles, rather than their union. The
+    bar under the game shows the renderer, the frame times, the renderer's own
+    numbers, the tube's quads and the paths made each second.
   ''';
 
   /// How fast the ship flies, in tube units a second.
@@ -81,7 +83,7 @@ abstract class TubeRunnerExample({
   double _flown = 0;
 
   /// The component that draws the tube.
-  PathComponent? _tube;
+  PositionComponent? _tube;
 
   /// How far the ship had flown, and the view's version, as the tube's path
   /// was made last.
@@ -196,24 +198,24 @@ abstract class TubeRunnerExample({
     }
     _tubeFlown = _flown;
     _tubeVersion = view.version;
-    final (:path, :quads) = endlessTube.pathAt(_flown, view);
-    _quads = quads;
+    final quads = endlessTube.quadsAt(_flown, view);
+    _quads = quads.pointCounts.length;
     _tube?.removeFromParent();
     _tube = null;
-    final bounds = path.getBounds();
-    if (bounds.isEmpty) {
+    if (quads.bounds.isEmpty) {
       return;
     }
     _paths++;
-    tubeGroup.add(
-      _tube = pathComponent(
-        path,
-        Paint()..color = TubeColors.tube,
-        position: Vector2(bounds.left, bounds.top),
-        maxSize: math.max(bounds.width, bounds.height) / view.devicePixel,
-      ),
-    );
+    tubeGroup.add(_tube = quadsComponent(quads, TubeColors.tube));
   }
+
+  /// Creates a component that fills [quads] in [color], where they are in
+  /// the world.
+  PositionComponent quadsComponent(RasterizerPolygons quads, Color color);
+
+  /// Returns the most device pixels that [quads]' longer side spans.
+  double maxSizeOf(RasterizerPolygons quads) =>
+      math.max(quads.bounds.width, quads.bounds.height) / view.devicePixel;
 
   /// Fits the ring at the ship in 90% of the game's shorter side, as Tube
   /// Shooter fits its rim, with its lines' widths in device pixels, whatever
@@ -290,6 +292,18 @@ class RasterizerTubeRunnerExample({
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
   }
+
+  /// Fills the quads separate, which the mesh renderer imports much faster
+  /// than their union. The tube is opaque, so their overlaps don't show.
+  @override
+  PositionComponent quadsComponent(RasterizerPolygons quads, Color color) =>
+      RasterizerPolygonsComponent(
+        polygons: quads,
+        paint: Paint()..color = color,
+        position: Vector2(quads.bounds.left, quads.bounds.top),
+        maxSize: maxSizeOf(quads),
+        separate: true,
+      );
 }
 
 /// The example with Flame: Flame's [PathComponent]s draw its paths.
@@ -302,4 +316,25 @@ class FlameTubeRunnerExample({required super.status, super.random})
   /// None: Flame's PathComponents keep no numbers to show.
   @override
   Iterable<String> get rendererStats => const [];
+
+  /// Fills a path of the quads.
+  ///
+  /// Its contours stay open, as the fill closes them anyway. Flame's
+  /// `PathComponent` would walk each closed contour into a polygon, which the
+  /// game doesn't use, as [RasterizerPolygons.path]'s are.
+  @override
+  PositionComponent quadsComponent(RasterizerPolygons quads, Color color) {
+    final path = Path();
+    final points = quads.points;
+    for (var i = 0; i < points.length; i += 8) {
+      path.addPolygon([
+        for (var k = i; k < i + 8; k += 2) Offset(points[k], points[k + 1]),
+      ], false);
+    }
+    return pathComponent(
+      path,
+      Paint()..color = color,
+      position: Vector2(quads.bounds.left, quads.bounds.top),
+    );
+  }
 }
