@@ -6,6 +6,11 @@
   closed polygons whose corners the GPU renderers take as they are, without
   flattening a path. With `separate: true`, the mesh renderer fills each
   polygon on its own, a convex one as a fan, rather than their union.
+- The mesh renderer draws consecutive entries of an opaque scene without
+  strips or gradients in one blended draw, unless 8 or more in a row keep
+  its alpha, rather than splitting the draw wherever entries start or stop
+  keeping it. So many entries of one scene at different opacities, such as
+  a star field, take a few draws rather than one for each change.
 
 - The GPU renderers draw on Windows too, on Impeller's OpenGL ES through
   ANGLE, where the app's runner turns Flutter GPU on. The build hook builds
