@@ -6,6 +6,7 @@ import 'package:flame_rasterizer_example/commons/renderer_knob.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:widgetbook/widgetbook.dart';
@@ -78,6 +79,21 @@ WidgetbookComponent gamesStories() {
         },
         codeLink: baseLink('games/revolute_pinball'),
         info: RevolutePinballExample.description,
+      ),
+      ExampleUseCase(
+        name: 'Tube Runner',
+        builder: (context) {
+          // Its paths are drawn by Flame's own components with Flame SVG.
+          final renderer = rendererKnob(context, svgs: false);
+          return GameStory<TubeRunnerExample, Object>(
+            renderer: renderer,
+            create: (status, _) => TubeRunnerExample.of(renderer, status),
+            zoom: zoomKnob(context),
+            speed: speedKnob(context),
+          );
+        },
+        codeLink: baseLink('games/tube_runner'),
+        info: TubeRunnerExample.description,
       ),
     ],
   );
