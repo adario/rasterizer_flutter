@@ -1,13 +1,18 @@
-// The plain paths and paints that RasterizerScene.fromPaths copies. The
-// canvas renderer draws them with dart:ui. The GPU renderers flatten them once
-// into contours.
+// The plain paths or polygons, and paints, that RasterizerScene.fromPaths and
+// fromPolygons copy. The canvas renderer draws them with dart:ui. The GPU
+// renderers flatten paths once into contours, and take polygons as they are.
 //
 // This file uses no dart:ffi, as the canvas renderer also draws on the web.
 
 import 'dart:math' show max;
 import 'dart:ui' as ui;
 
-import '../../rasterizer_gpu.dart' show RasterizerGlow, RasterizerPaintedPath;
+import '../../rasterizer_gpu.dart'
+    show
+        RasterizerGlow,
+        RasterizerPaintedPath,
+        RasterizerPaintedPolygons,
+        RasterizerPolygons;
 import '../canvas_paths.dart';
 import '../svg_paths/svg_paths.dart';
 import 'path_contours.dart';
@@ -52,25 +57,30 @@ String? undrawable(ui.Paint paint) {
   return null;
 }
 
-/// A path scene's paths and paints, in paint order.
+/// A path scene's paths or polygons, and their paints, in paint order.
 ///
 /// It keeps a copy of each paint, which the canvas renderer draws with, and
-/// each distinct path once, to flatten into contours.
+/// each distinct path or polygons once, to make into contours.
 class ScenePaths._(
-  /// The distinct paths, in the order they're first drawn.
-  final List<ui.Path> paths,
+  /// The distinct shapes, in the order they're first drawn: each a [ui.Path]
+  /// or [RasterizerPolygons].
+  final List<Object> shapes,
 
-  /// Each draw's path, as its index in [paths].
+  /// Each draw's shape, as its index in [shapes].
   final List<int> pathIndices,
 
-  /// Each draw: its path and a copy of its paint, a fill or a stroke.
-  final List<VectorPath> draws,
+  /// Each draw's copy of its paint, a fill or a stroke.
+  final List<ui.Paint> paints,
   @override final ui.Rect viewBox,
   @override final ui.Rect bounds,
   @override final ui.Rect paintedBounds,
 
   /// The glow around the paths. Only the mesh renderer's import reads it.
   final RasterizerGlow? glow,
+
+  /// Whether the mesh renderer fills each polygon on its own, rather than
+  /// their union (see `RasterizerScene.fromPolygons`).
+  final bool separate,
 ) implements CanvasPaths {
   /// Keeps [paths]' paths and copies their paints.
   ///
@@ -79,24 +89,58 @@ class ScenePaths._(
   factory ScenePaths(
     List<RasterizerPaintedPath> paths, {
     RasterizerGlow? glow,
-  }) {
-    final distinct = <ui.Path>[];
-    final indices = Map<ui.Path, int>.identity();
+  }) => ScenePaths._of(
+    [for (final (:path, :paint) in paths) (shape: path, paint: paint)],
+    (shape) => (shape as ui.Path).getBounds(),
+    'paths',
+    glow,
+    false,
+  );
+
+  /// Keeps [polygons]' polygons and copies their paints, as [ScenePaths.new]
+  /// does with paths.
+  factory ScenePaths.polygons(
+    List<RasterizerPaintedPolygons> polygons, {
+    RasterizerGlow? glow,
+    bool separate = false,
+  }) => ScenePaths._of(
+    [
+      for (final (:polygons, :paint) in polygons)
+        (shape: polygons, paint: paint),
+    ],
+    (shape) => (shape as RasterizerPolygons).bounds,
+    'polygons',
+    glow,
+    separate,
+  );
+
+  /// Keeps [draws]' shapes, whose bounds [boundsOf] returns, and copies their
+  /// paints. A paint that the GPU renderers can't draw throws, naming its
+  /// draw in [name].
+  factory ScenePaths._of(
+    List<({Object shape, ui.Paint paint})> draws,
+    ui.Rect Function(Object shape) boundsOf,
+    String name,
+    RasterizerGlow? glow,
+    bool separate,
+  ) {
+    final distinct = <Object>[];
+    final indices = Map<Object, int>.identity();
     final pathIndices = <int>[];
-    final draws = <VectorPath>[];
+    final paints = <ui.Paint>[];
     ui.Rect? viewBox, bounds, painted;
-    for (final (i, (:path, :paint)) in paths.indexed) {
+    for (final (i, (:shape, :paint)) in draws.indexed) {
       final reason = undrawable(paint);
       if (reason != null) {
         throw ArgumentError.value(
           paint,
-          'paths[$i]',
+          '$name[$i]',
           '$reason, which the GPU renderers can\'t draw',
         );
       }
       pathIndices.add(
-        indices.putIfAbsent(path, () {
-          distinct.add(path);
+        indices.putIfAbsent(shape, () {
+          distinct.add(shape);
           return distinct.length - 1;
         }),
       );
@@ -107,18 +151,11 @@ class ScenePaths._(
         ..strokeCap = paint.strokeCap
         ..strokeJoin = paint.strokeJoin
         ..strokeMiterLimit = miterLimitOf(paint);
+      paints.add(copy);
       final stroke = copy.style == ui.PaintingStyle.stroke ? copy : null;
-      draws.add(
-        VectorPath(
-          path,
-          stroke == null
-              ? VectorPaint(fill: copy)
-              : VectorPaint(stroke: stroke),
-        ),
-      );
-      // An empty path's bounds are zero, so they would stretch the bounds to
+      // An empty shape's bounds are zero, so they would stretch the bounds to
       // the origin.
-      final b = path.getBounds();
+      final b = boundsOf(shape);
       if (b == ui.Rect.zero) {
         continue;
       }
@@ -131,24 +168,49 @@ class ScenePaths._(
     return ScenePaths._(
       distinct,
       pathIndices,
-      draws,
+      paints,
       viewBox ?? ui.Rect.zero,
       bounds ?? ui.Rect.zero,
       painted ?? ui.Rect.zero,
       glow,
+      separate,
     );
   }
 
   /// Each path's contours, at the last tolerance it was flattened to, kept
-  /// while the path lives.
+  /// while the path lives. Polygons' contours fit any tolerance.
   ///
-  /// This takes paths as immutable.
+  /// This takes paths and polygons as immutable.
   static final _contours = Expando<({double tolerance, PathContours contours})>(
     'contours',
   );
 
+  /// Each draw: its path and its paint, for the canvas renderer, made the
+  /// first time it's read. Polygons make their path then.
+  late final List<VectorPath> draws = [
+    for (final (i, paint) in paints.indexed)
+      VectorPath(
+        _pathOf(shapes[pathIndices[i]]),
+        paint.style == ui.PaintingStyle.stroke
+            ? VectorPaint(stroke: paint)
+            : VectorPaint(fill: paint),
+      ),
+  ];
+
+  /// Returns whether draw [i] fills with the even-odd rule. Polygons fill
+  /// with the non-zero one.
+  bool isEvenOdd(int i) => switch (shapes[pathIndices[i]]) {
+    final ui.Path path => path.fillType == ui.PathFillType.evenOdd,
+    _ => false,
+  };
+
+  static ui.Path _pathOf(Object shape) => switch (shape) {
+    final ui.Path path => path,
+    _ => (shape as RasterizerPolygons).path,
+  };
+
   @override
-  int get drawCount => draws.length;
+  int get drawCount => paints.length;
 
   @override
   void draw(
@@ -171,8 +233,10 @@ class ScenePaths._(
   /// those, or never finish.
   double tolerance(double maxSize) {
     var side = max(viewBox.width, viewBox.height);
-    for (final draw in draws) {
-      side = max(side, draw.paint.stroke?.strokeWidth ?? 0);
+    for (final paint in paints) {
+      if (paint.style == ui.PaintingStyle.stroke) {
+        side = max(side, paint.strokeWidth);
+      }
     }
     final farthest = [
       bounds.left,
@@ -188,23 +252,31 @@ class ScenePaths._(
   /// Float32s hold the contours' points and the meshes' vertices.
   static const _floatSteps = 16 / (1 << 23);
 
-  /// Returns the contours of each of [paths], flattened to the [tolerance] for
-  /// [maxSize].
+  /// Returns the contours of each of [shapes]: a path's flattened to the
+  /// [tolerance] for [maxSize], and polygons' as they are.
   ///
   /// A path already flattened to the same tolerance, for any scene, reuses
-  /// its contours.
+  /// its contours, as polygons always do.
   List<PathContours> contours(double maxSize) {
     final tolerance = this.tolerance(maxSize);
-    return [for (final path in paths) _contoursOf(path, tolerance)];
+    return [for (final shape in shapes) _contoursOf(shape, tolerance)];
   }
 
-  static PathContours _contoursOf(ui.Path path, double tolerance) {
-    final kept = _contours[path];
+  static PathContours _contoursOf(Object shape, double tolerance) {
+    final kept = _contours[shape];
+    if (shape is RasterizerPolygons) {
+      if (kept != null) {
+        return kept.contours;
+      }
+      final contours = PathContours.polygons(shape.points, shape.pointCounts);
+      _contours[shape] = (tolerance: 0, contours: contours);
+      return contours;
+    }
     if (kept != null && kept.tolerance == tolerance) {
       return kept.contours;
     }
-    final contours = PathContours([path], tolerance: tolerance);
-    _contours[path] = (tolerance: tolerance, contours: contours);
+    final contours = PathContours([shape as ui.Path], tolerance: tolerance);
+    _contours[shape] = (tolerance: tolerance, contours: contours);
     return contours;
   }
 }

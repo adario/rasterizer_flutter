@@ -27,7 +27,7 @@ static_assert(sizeof(RaMeshPath) == 68 && offsetof(RaMeshPath, r) == 20 && offse
 static_assert(sizeof(RaMeshData) == 120 && offsetof(RaMeshData, bounds) == 88, "RaMeshData's layout, which Dart reads");
 static_assert(RA_ENTRY_BLEND_INSTANCES == Ra::Buffer::kBlendInstances && RA_ENTRY_OPAQUES == Ra::Buffer::kOpaques, "RA_ENTRY_* mirror Ra::Buffer::Type");
 static_assert(sizeof(RaContours) == 40 && offsetof(RaContours, pathCount) == 32, "RaContours' layout, which Dart writes");
-static_assert(sizeof(RaPathDraw) == 20 && offsetof(RaPathDraw, cap) == 16, "RaPathDraw's layout, which Dart writes");
+static_assert(sizeof(RaPathDraw) == 24 && offsetof(RaPathDraw, cap) == 16 && offsetof(RaPathDraw, separate) == 20, "RaPathDraw's layout, which Dart writes");
 static_assert(sizeof(RaGlow) == 16 && offsetof(RaGlow, hasColor) == 12, "RaGlow's layout, which Dart writes");
 static_assert(RA_CAP_ROUND == NSVG_CAP_ROUND && RA_CAP_SQUARE == NSVG_CAP_SQUARE && RA_JOIN_ROUND == NSVG_JOIN_ROUND && RA_JOIN_BEVEL == NSVG_JOIN_BEVEL,
               "RA_CAP_* & RA_JOIN_* mirror NanoSVG's");

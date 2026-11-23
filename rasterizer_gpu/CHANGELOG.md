@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `RasterizerScene.fromPolygons` makes a scene of `RasterizerPolygons`,
+  closed polygons whose corners the GPU renderers take as they are, without
+  flattening a path. With `separate: true`, the mesh renderer fills each
+  polygon on its own, a convex one as a fan, rather than their union.
+
 - The GPU renderers draw on Windows too, on Impeller's OpenGL ES through
   ANGLE, where the app's runner turns Flutter GPU on. The build hook builds
   the native library there with MSVC. Not tested on Windows yet.

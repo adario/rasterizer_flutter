@@ -262,6 +262,15 @@ final star = RasterizerScene.fromPaths([
   fades out from the path's edge, and a core over each stroke, near white down its middle. `RasterizerGlow.widths`
   measures the radius in line widths instead, and gives fills a core too. Only the mesh renderer draws a glow, as
   triangles made at import, with no layer or pass. The GPU and canvas renderers draw the same paths without it.
+- **Polygons:** `RasterizerScene.fromPolygons` takes `RasterizerPolygons` instead of paths: closed polygons with
+  straight edges, their corners in a `Float32List`, x then y, and each polygon's number of corners. The GPU renderers
+  take the corners as they are, without flattening a path, and the canvas renderer draws the polygons' `path`. Fills
+  are non-zero. It's for shapes made often, such as every frame. With `separate: true`, the mesh renderer fills each
+  polygon on its own rather than their union: a convex one as a fan of triangles, any other tessellated alone. Where
+  they overlap, their triangles do too, which shows through an opacity, or colors or glows that aren't opaque. Other
+  renderers ignore it. Tube Runner remakes its tube of about 600 overlapping quads every frame: on an M1 Mac, in
+  profile mode, that cost the mesh renderer 9.4 ms a frame as a path, and 0.25 ms as separate polygons. It cost the
+  atlas renderer 2.9 ms as a path, mostly flattening it, and nothing measurable as polygons.
 - **Below them:** the internal `lib/src/core.dart` has `PathContours`, the flattened contours, `PathDraw`, and
   `Scene.fromPaths` and `Mesh.fromPaths`, over the C API's `ra_scene_from_paths` and `ra_mesh_from_paths`.
 

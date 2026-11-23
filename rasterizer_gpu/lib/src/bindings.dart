@@ -341,6 +341,8 @@ final class RaPathDraw extends Struct {
   external int evenOdd;
   @Uint8()
   external int hairline;
+  @Uint8()
+  external int separate;
 }
 
 @Native<

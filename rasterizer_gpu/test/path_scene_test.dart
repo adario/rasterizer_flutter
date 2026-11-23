@@ -8,6 +8,7 @@
 // the `paths` golden, in example/lib/goldens.dart.
 
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -221,7 +222,7 @@ void main() {
 
     test('flattens a path once for a tolerance, for each scene of it', () {
       final first = ScenePaths(paths), second = ScenePaths(paths);
-      expect(first.paths, [square, line]);
+      expect(first.shapes, [square, line]);
       expect(first.pathIndices, [0, 0, 1]);
       final contours = first.contours(512);
       expect(second.contours(512), [for (final c in contours) same(c)]);
@@ -595,6 +596,146 @@ void main() {
         ),
         throwsArgumentError,
       );
+    });
+  });
+
+  group('fromPolygons', () {
+    /// Returns polygons of [corners], x then y, polygon after polygon.
+    RasterizerPolygons polygons(List<List<double>> corners) =>
+        RasterizerPolygons(
+          Float32List.fromList([for (final c in corners) ...c]),
+          Int32List.fromList([for (final c in corners) c.length ~/ 2]),
+        );
+
+    // Two squares of 1600 that overlap by 400, and an L of 1200 apart from
+    // them, which isn't convex.
+    final shapes = polygons([
+      [10, 10, 50, 10, 50, 50, 10, 50],
+      [30, 30, 70, 30, 70, 70, 30, 70],
+      [0, 80, 40, 80, 40, 100, 20, 100, 20, 120, 0, 120],
+    ]);
+    final blue = ui.Paint()..color = const ui.Color(0xff0000ff);
+
+    Mesh meshOf(RasterizerPolygons polygons, {bool separate = false}) =>
+        (RasterizerScene.fromPolygons(
+          [(polygons: polygons, paint: blue)],
+          backend: RasterizerBackend.mesh,
+          maxSize: 512,
+          separate: separate,
+        ) as MeshScene).debugMesh!;
+
+    test('throws for a polygon of fewer than 3 corners, or counts that '
+        "don't add up", () {
+      expect(
+        () => polygons([
+          [0, 0, 1, 1],
+        ]),
+        throwsArgumentError,
+      );
+      expect(
+        () => RasterizerPolygons(
+          Float32List.fromList([0, 0, 1, 0, 1, 1]),
+          Int32List.fromList([4]),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('has its bounds, and a path of its polygons', () {
+      expect(shapes.bounds, const ui.Rect.fromLTRB(0, 10, 70, 120));
+      expect(shapes.path.getBounds(), shapes.bounds);
+      expect(shapes.path.contains(const ui.Offset(10, 110)), isTrue);
+      expect(shapes.path.contains(const ui.Offset(30, 110)), isFalse);
+    });
+
+    test('has the polygons\' bounds on every backend', () {
+      for (final backend in RasterizerBackend.values) {
+        final scene = RasterizerScene.fromPolygons(
+          [(polygons: shapes, paint: blue)],
+          backend: backend,
+          maxSize: 512,
+        );
+        expect(scene.backend, backend);
+        expect(scene.viewBox, shapes.bounds, reason: backend.name);
+        expect(scene.bounds, shapes.bounds, reason: backend.name);
+        expect(scene.pathCount, 1, reason: backend.name);
+        scene.dispose();
+      }
+    });
+
+    test('takes the corners as they are, for every scene of them', () {
+      final first = ScenePaths.polygons([(polygons: shapes, paint: blue)]);
+      final second = ScenePaths.polygons([(polygons: shapes, paint: blue)]);
+      final contours = first.contours(512).single;
+      expect(contours.points, same(shapes.points));
+      expect(contours.pointCounts, same(shapes.pointCounts));
+      expect(contours.closed, [1, 1, 1]);
+      expect(second.contours(1024).single, same(contours));
+      expect(first.isEvenOdd(0), isFalse);
+    });
+
+    test('a mesh fills their union, or with separate each on its own', () {
+      final union = meshOf(shapes);
+      expect(area(union), closeTo(2800 + 1200, 1e-3));
+      final separate = meshOf(shapes, separate: true);
+      expect(separate.paths, hasLength(1));
+      // The overlap counts twice.
+      expect(area(separate), closeTo(3200 + 1200, 1e-3));
+      // Each square is a fan of 2 triangles, before the L's.
+      final squares = triangles(separate, 0).take(4).toList();
+      expect(squares[0], [10, 10, 50, 10, 50, 50]);
+      expect(squares[1], [10, 10, 50, 50, 10, 50]);
+      expect(squares[2], [30, 30, 70, 30, 70, 70]);
+      expect(squares[3], [30, 30, 70, 70, 30, 70]);
+    });
+
+    test('a separate polygon that crosses itself fills non-zero', () {
+      // A bow tie: two triangles of 100 each, which meet at (10, 10).
+      final bowTie = polygons([
+        [0, 0, 20, 20, 20, 0, 0, 20],
+      ]);
+      expect(area(meshOf(bowTie, separate: true)), closeTo(200, 1e-3));
+    });
+
+    test('a separate polygon that winds twice fills non-zero', () {
+      // A pentagram, whose turns all go one way.
+      final star = polygons([
+        [
+          for (var k = 0; k < 5; k++) ...[
+            50 + 40 * math.cos(4 * math.pi * k / 5),
+            50 + 40 * math.sin(4 * math.pi * k / 5),
+          ],
+        ],
+      ]);
+      final path = ui.Path()
+        ..addPolygon([
+          for (var k = 0; k < 5; k++)
+            ui.Offset(
+              50 + 40 * math.cos(4 * math.pi * k / 5),
+              50 + 40 * math.sin(4 * math.pi * k / 5),
+            ),
+        ], true);
+      // Its points go on another grid, for another tolerance.
+      final union = mesh([path], const [PathDraw(path: 0, color: 0xff0000ff)]);
+      expect(area(meshOf(star, separate: true)), closeTo(area(union), 0.1));
+    });
+
+    test('the canvas renderer draws their path', () async {
+      final scene = RasterizerScene.fromPolygons(
+        [(polygons: shapes, paint: blue)],
+        backend: RasterizerBackend.canvas,
+        maxSize: 512,
+      );
+      final recorder = ui.PictureRecorder();
+      scene.drawPaths(ui.Canvas(recorder));
+      final image = await recorder.endRecording().toImage(100, 130);
+      final bytes = (await image.toByteData())!.buffer.asUint8List();
+      image.dispose();
+      List<int> pixel(int x, int y) =>
+          bytes.sublist(4 * (y * 100 + x), 4 * (y * 100 + x) + 4);
+      expect(pixel(40, 40), [0, 0, 0xff, 0xff]);
+      expect(pixel(10, 110), [0, 0, 0xff, 0xff]);
+      expect(pixel(30, 110), [0, 0, 0, 0]);
     });
   });
 }

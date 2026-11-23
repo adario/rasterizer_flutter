@@ -474,6 +474,84 @@ class const RasterizerGlow._(
 /// A path and the paint to draw it with, for [RasterizerScene.fromPaths].
 typedef RasterizerPaintedPath = ({ui.Path path, ui.Paint paint});
 
+/// Closed polygons, with straight edges only, for
+/// [RasterizerScene.fromPolygons]: a path that the GPU renderers needn't
+/// flatten.
+///
+/// [points] holds their corners, x then y, polygon after polygon, x right
+/// and y down. [pointCounts] holds each polygon's number of corners. A
+/// polygon doesn't repeat its first corner at its end. Both lists are kept
+/// as they are, so they must not change, as a path imported mustn't.
+class RasterizerPolygons(
+  final Float32List points,
+  final Int32List pointCounts,
+) {
+  /// Takes [points] and [pointCounts].
+  ///
+  /// Throws [ArgumentError] if a polygon has fewer than 3 corners, or if the
+  /// counts don't add up to the points.
+  this {
+    var total = 0;
+    for (final count in pointCounts) {
+      if (count < 3) {
+        throw ArgumentError.value(count, 'pointCounts', 'Fewer than 3');
+      }
+      total += count;
+    }
+    if (2 * total != points.length) {
+      throw ArgumentError.value(
+        points.length,
+        'points',
+        'Not twice the ${pointCounts.length} polygons\' $total corners',
+      );
+    }
+  }
+
+  /// The corners' bounds, or [ui.Rect.zero] without polygons.
+  late final ui.Rect bounds = () {
+    if (points.isEmpty) {
+      return ui.Rect.zero;
+    }
+    var left = points[0], right = left, top = points[1], bottom = top;
+    for (var i = 2; i < points.length; i += 2) {
+      final x = points[i], y = points[i + 1];
+      if (x < left) {
+        left = x;
+      } else if (x > right) {
+        right = x;
+      }
+      if (y < top) {
+        top = y;
+      } else if (y > bottom) {
+        bottom = y;
+      }
+    }
+    return ui.Rect.fromLTRB(left, top, right, bottom);
+  }();
+
+  /// The polygons as a path, made the first time it's read, for the canvas
+  /// renderer and other dart:ui drawing.
+  late final ui.Path path = () {
+    final path = ui.Path();
+    var offset = 0;
+    for (final count in pointCounts) {
+      path.addPolygon([
+        for (var k = offset; k < offset + 2 * count; k += 2)
+          ui.Offset(points[k], points[k + 1]),
+      ], true);
+      offset += 2 * count;
+    }
+    return path;
+  }();
+}
+
+/// Polygons and the paint to draw them with, for
+/// [RasterizerScene.fromPolygons].
+typedef RasterizerPaintedPolygons = ({
+  RasterizerPolygons polygons,
+  ui.Paint paint,
+});
+
 /// An SVG's paths, or plain paths with their paints, that any number of a
 /// frame's entries can draw, each with its own transform.
 ///
@@ -571,14 +649,60 @@ abstract class RasterizerScene {
         'Not a positive finite number',
       );
     }
-    final scenePaths = ScenePaths(paths, glow: glow);
-    final chosen = backend ?? RasterizerGpu.of(gpu).backend;
-    return switch (chosen) {
-      RasterizerBackend.mesh => native.importPathMeshScene(scenePaths, maxSize),
-      RasterizerBackend.gpu => native.importPathScene(scenePaths, maxSize),
-      RasterizerBackend.canvas => CanvasScene.fromPaths(scenePaths),
-    };
+    return _fromScenePaths(
+      ScenePaths(paths, glow: glow),
+      backend ?? RasterizerGpu.of(gpu).backend,
+      maxSize,
+    );
   }
+
+  /// Creates a scene of polygons, each drawn with its paint, in paint order,
+  /// as [fromPaths] does with paths.
+  ///
+  /// The GPU renderers take the polygons' corners as they are, rather than
+  /// flattening a path's contours. Fills are non-zero. The canvas renderer
+  /// draws each [RasterizerPolygons.path].
+  ///
+  /// With [separate], the mesh renderer fills each polygon on its own, rather
+  /// than the polygons' union, which is much faster for many polygons: a
+  /// convex one is a fan of triangles. So where polygons overlap, their
+  /// triangles do too, and the overlaps show where a scene is drawn with an
+  /// opacity, or with colors or glows that aren't opaque. Other renderers
+  /// ignore [separate].
+  ///
+  /// Throws [ArgumentError] as [fromPaths] does.
+  factory RasterizerScene.fromPolygons(
+    List<RasterizerPaintedPolygons> polygons, {
+    RasterizerBackend? backend,
+    RasterizerBackend gpu = RasterizerBackend.gpu,
+    required double maxSize,
+    RasterizerGlow? glow,
+    bool separate = false,
+  }) {
+    if (!(maxSize > 0) || !maxSize.isFinite) {
+      throw ArgumentError.value(
+        maxSize,
+        'maxSize',
+        'Not a positive finite number',
+      );
+    }
+    return _fromScenePaths(
+      ScenePaths.polygons(polygons, glow: glow, separate: separate),
+      backend ?? RasterizerGpu.of(gpu).backend,
+      maxSize,
+    );
+  }
+
+  /// Imports [paths] for [backend].
+  static RasterizerScene _fromScenePaths(
+    ScenePaths paths,
+    RasterizerBackend backend,
+    double maxSize,
+  ) => switch (backend) {
+    RasterizerBackend.mesh => native.importPathMeshScene(paths, maxSize),
+    RasterizerBackend.gpu => native.importPathScene(paths, maxSize),
+    RasterizerBackend.canvas => CanvasScene.fromPaths(paths),
+  };
 
   /// Returns whether the GPU renderers can draw a path with [paint], in
   /// [fromPaths].

@@ -80,6 +80,18 @@ final class PathContours._(
       Int32List.fromList(contourCounts),
     );
   }
+
+  /// Takes closed polygons as one path's contours, as they are: [points], x
+  /// then y, polygon after polygon, and each polygon's [pointCounts].
+  ///
+  /// It keeps both lists, which mustn't change.
+  factory PathContours.polygons(Float32List points, Int32List pointCounts) =>
+      PathContours._(
+        points,
+        pointCounts,
+        Uint8List(pointCounts.length)..fillRange(0, pointCounts.length, 1),
+        Int32List.fromList([pointCounts.length]),
+      );
 }
 
 /// The sampling step, as a multiple of the tolerance.
