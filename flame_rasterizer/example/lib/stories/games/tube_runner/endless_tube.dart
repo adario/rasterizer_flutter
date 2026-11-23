@@ -138,7 +138,11 @@ class EndlessTube() {
   /// [TubeView.near].
   ///
   /// A closed tube leaves out the lines between faces that the eye sees from
-  /// outside: from inside the tube, other faces always hide those.
+  /// outside: from inside the tube, other faces always hide those. It also
+  /// cuts its lines to the window through which the eye sees past the rings
+  /// before them, so that where the tube bends, its nearer walls hide what's
+  /// beyond. Each ring hides as its outline's convex hull, so a concave
+  /// outline's ridges hide less than they would.
   RasterizerPolygons quadsAt(double distance, TubeView view) {
     final tube = view.tube;
     final ship = ringAt(distance);
@@ -180,10 +184,23 @@ class EndlessTube() {
         lane >= 0 &&
         lane < tube.laneCount &&
         facing[k][lane];
+    final hull = tube.isOpen ? null : _hullOf(tube.points, turn);
+    // Where the eye sees past the rings so far, as seen from 1 away from it:
+    // null while none hides anything.
+    List<Offset>? window;
     final lines = _Lines(view);
     final every = (ringSpacing / step).round();
     for (var k = 0; k < _rings.length; k++) {
       final outline = seen[k];
+      final nearer = window;
+      if (hull != null && hull.every((i) => outline[i].z > TubeView.near)) {
+        final middle = _sight(_fromEye(_rings[k].center, eye, ship));
+        final ring = [
+          for (final i in hull)
+            middle + (_sight(outline[i]) - middle) * _windowSlack,
+        ];
+        window = nearer == null ? ring : _intersect(nearer, ring);
+      }
       if (k + 1 < _rings.length) {
         final next = seen[k + 1];
         for (var i = 0; i < outline.length; i++) {
@@ -191,19 +208,89 @@ class EndlessTube() {
               ? i - 1
               : (i + tube.laneCount - 1) % tube.laneCount;
           if (faces(k, before) || faces(k, i)) {
-            lines.add(outline[i], next[i]);
+            lines.add(outline[i], next[i], window);
           }
         }
       }
       if (_rings[k].index % every == 0) {
         for (var i = 0; i < tube.laneCount; i++) {
           if (faces(k - 1, i) || faces(k, i)) {
-            lines.add(outline[i], outline[tube.pointAfter(i)]);
+            lines.add(outline[i], outline[tube.pointAfter(i)], nearer);
           }
         }
       }
     }
     return lines.quads;
+  }
+
+  /// How much bigger than each ring the window lets the eye see through it,
+  /// so that the ring's own lines, on its edge, stay whole.
+  static const _windowSlack = 1.002;
+
+  /// The least turn at a point that [_hullOf] keeps it for, so that rounding
+  /// errors don't keep points where the outline goes straight on.
+  static const _leastTurn = 1e-9;
+
+  /// Returns where the eye, at the origin, sees [point], as seen from 1 away
+  /// from it: across and down.
+  static Offset _sight(Point3 point) =>
+      Offset(point.x / point.z, point.y / point.z);
+
+  /// Returns the indices of the convex hull of [points], a closed outline
+  /// whose signed area has [turn]'s sign, in an order whose signed area is
+  /// positive.
+  ///
+  /// It drops the points where the outline turns in or goes straight on,
+  /// until none is left, which holds for outlines that wind round their
+  /// middle, as the tubes' do.
+  static List<int> _hullOf(List<Offset> points, double turn) {
+    final order = List.generate(points.length, (i) => i);
+    final hull = turn < 0 ? order.reversed.toList() : order;
+    var dropped = false;
+    do {
+      dropped = false;
+      for (var k = 0; k < hull.length && hull.length > 3; k++) {
+        final before = points[hull[(k + hull.length - 1) % hull.length]];
+        final point = points[hull[k]];
+        final after = points[hull[(k + 1) % hull.length]];
+        if (_cross(point - before, after - point) < _leastTurn) {
+          hull.removeAt(k);
+          k--;
+          dropped = true;
+        }
+      }
+    } while (dropped);
+    return hull;
+  }
+
+  /// Returns the part of convex [polygon] inside convex [clip], both with a
+  /// positive signed area: the Sutherland-Hodgman algorithm.
+  static List<Offset> _intersect(List<Offset> polygon, List<Offset> clip) {
+    var result = polygon;
+    for (var e = 0; e < clip.length && result.isNotEmpty; e++) {
+      final from = clip[e];
+      final edge = clip[(e + 1) % clip.length] - from;
+      final points = result;
+      // How far inside the edge each point is, scaled by the edge's length.
+      final sides = [for (final point in points) _cross(edge, point - from)];
+      result = [];
+      for (var i = 0; i < points.length; i++) {
+        final j = (i + 1) % points.length;
+        if (sides[i] >= 0) {
+          result.add(points[i]);
+        }
+        if ((sides[i] >= 0) != (sides[j] >= 0)) {
+          result.add(
+            Offset.lerp(
+              points[i],
+              points[j],
+              sides[i] / (sides[i] - sides[j]),
+            )!,
+          );
+        }
+      }
+    }
+    return result;
   }
 
   /// Returns whether the eye, at the origin, sees from inside the tube the
@@ -295,8 +382,10 @@ class _Lines(final TubeView view) {
   ///
   /// Each end is [TubeView.lineWidthOf] its distance wide, and extends by
   /// half that width, so that lines meeting at a corner close it. It clips
-  /// the line closer than [TubeView.near].
-  void add(Point3 from, Point3 to) {
+  /// the line closer than [TubeView.near], and outside [window], a convex
+  /// polygon with a positive signed area as `EndlessTube._sight` places it,
+  /// if any.
+  void add(Point3 from, Point3 to, [List<Offset>? window]) {
     var (a, b) = (from, to);
     if (a.z < TubeView.near && b.z < TubeView.near) {
       return;
@@ -306,12 +395,78 @@ class _Lines(final TubeView view) {
     } else if (b.z < TubeView.near) {
       b = b + (a - b) * ((TubeView.near - b.z) / (a.z - b.z));
     }
+    if (window != null) {
+      final span = _spanIn(
+        window,
+        EndlessTube._sight(a),
+        EndlessTube._sight(b),
+      );
+      if (span == null) {
+        return;
+      }
+      // The eye sees 1 / z change evenly along a line.
+      Point3 at(double t) {
+        final inverse = (1 - t) / a.z + t / b.z;
+        return a + (b - a) * (t / b.z / inverse);
+      }
+
+      final start = at(span.start);
+      b = at(span.end);
+      a = start;
+    }
     _addQuad(
       _project(a),
       view.lineWidthOf(a.z),
       _project(b),
       view.lineWidthOf(b.z),
     );
+  }
+
+  /// The least squared length of a window's edge that [_spanIn] clips to:
+  /// rounding errors leave shorter ones, which point any way.
+  static const _leastEdgeSquared = 1e-14;
+
+  /// Returns the part of the line from [a] to [b] inside convex [window],
+  /// whose signed area is positive, from 0 at [a] to 1 at [b]: null if none.
+  ///
+  /// This is the Cyrus-Beck algorithm.
+  static ({double start, double end})? _spanIn(
+    List<Offset> window,
+    Offset a,
+    Offset b,
+  ) {
+    if (window.isEmpty) {
+      return null;
+    }
+    var start = 0.0;
+    var end = 1.0;
+    final line = b - a;
+    for (var e = 0; e < window.length; e++) {
+      final from = window[e];
+      final edge = window[(e + 1) % window.length] - from;
+      if (edge.distanceSquared < _leastEdgeSquared) {
+        continue;
+      }
+      // How far inside the edge a is, and how fast the line goes inward.
+      final inside = _cross(edge, a - from);
+      final inward = _cross(edge, line);
+      if (inward == 0) {
+        if (inside < 0) {
+          return null;
+        }
+        continue;
+      }
+      final t = -inside / inward;
+      if (inward > 0) {
+        start = math.max(start, t);
+      } else {
+        end = math.min(end, t);
+      }
+      if (start > end) {
+        return null;
+      }
+    }
+    return (start: start, end: end);
   }
 
   /// Returns where [point] lands in the world.
@@ -340,3 +495,7 @@ class _Lines(final TubeView view) {
     }
   }
 }
+
+/// Returns the cross product of [a] and [b]: positive if [b] turns from [a]
+/// the way the outlines with a positive signed area turn.
+double _cross(Offset a, Offset b) => a.dx * b.dy - a.dy * b.dx;
