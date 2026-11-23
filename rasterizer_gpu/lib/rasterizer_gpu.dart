@@ -474,9 +474,8 @@ class const RasterizerGlow._(
 /// A path and the paint to draw it with, for [RasterizerScene.fromPaths].
 typedef RasterizerPaintedPath = ({ui.Path path, ui.Paint paint});
 
-/// Closed polygons, with straight edges only, for
-/// [RasterizerScene.fromPolygons]: a path that the GPU renderers needn't
-/// flatten.
+/// Polygons, for [RasterizerScene.fromPolygons]: a path that the GPU
+/// renderers needn't flatten.
 ///
 /// [vertices] holds each vertex's x then y, polygon after polygon, x right
 /// and y down. [vertexCounts] holds each polygon's number of vertices. A

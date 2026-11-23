@@ -3,7 +3,7 @@
 ## Unreleased
 
 - `RasterizerScene.fromPolygons` makes a scene of `RasterizerPolygons`,
-  closed polygons whose vertices the GPU renderers take as they are, without
+  polygons whose vertices the GPU renderers take as they are, without
   flattening a path. With `separate: true`, the mesh renderer fills each
   polygon on its own, a convex one as a fan, rather than their union.
 - The mesh renderer draws consecutive entries of an opaque scene without
