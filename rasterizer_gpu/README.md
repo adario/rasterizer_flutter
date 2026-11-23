@@ -268,9 +268,9 @@ final star = RasterizerScene.fromPaths([
   are non-zero. It's for shapes made often, such as every frame. With `separate: true`, the mesh renderer fills each
   polygon on its own rather than their union: a convex one as a fan of triangles, any other tessellated alone. Where
   they overlap, their triangles do too, which shows through an opacity, or colors or glows that aren't opaque. Other
-  renderers ignore it. Tube Runner remakes its tube of about 600 overlapping quads every frame: on an M1 Mac, in
-  profile mode, that cost the mesh renderer 9.4 ms a frame as a path, and 0.25 ms as separate polygons. It cost the
-  atlas renderer 2.9 ms as a path, mostly flattening it, and nothing measurable as polygons.
+  renderers ignore it. A tube of about 600 overlapping quads, remade every frame, cost the mesh renderer 9.4 ms a
+  frame as a path, on an M1 Mac in profile mode, and 0.25 ms as separate polygons. It cost the atlas renderer 2.9 ms
+  as a path, mostly flattening it, and nothing measurable as polygons.
 - **Below them:** the internal `lib/src/core.dart` has `PathContours`, the flattened contours, `PathDraw`, and
   `Scene.fromPaths` and `Mesh.fromPaths`, over the C API's `ra_scene_from_paths` and `ra_mesh_from_paths`.
 

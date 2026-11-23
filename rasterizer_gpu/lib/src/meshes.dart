@@ -560,8 +560,8 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       // or for all of the scene's consecutive entries. Its other entries
       // that keep its alpha draw blended, in the draw of those that don't,
       // which looks the same. A draw costs more to encode than blending a few
-      // entries: the Tube Runner's stars, of one dot at many opacities, took
-      // 69 draws a frame, and 0.2 ms, on an M1.
+      // entries: a star field, of one dot at many opacities, took 69 draws a
+      // frame, and 0.2 ms, on an M1.
       var first = 0;
       for (final (r, run) in _placed.indexed) {
         gpu.beginPass(run._target!, buffer);
