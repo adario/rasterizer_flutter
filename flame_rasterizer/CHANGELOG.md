@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- `RasterizerPolygonsComponent` draws `RasterizerPolygons`, which the GPU
-  renderers import without flattening a path, for shapes made every frame.
+- `RasterizerPolygonsComponent` draws `RasterizerPolygons`, a shape made of
+  polygons that the GPU renderers draw without flattening it into lines. It
+  suits shapes that a game makes every frame.
 
 ## 0.0.1
 

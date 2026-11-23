@@ -16,10 +16,10 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// path without paint layers.
 ///
 /// It's for shapes that a game makes often, such as every frame: the GPU
-/// renderers take the polygons' vertices as they are, without flattening a
-/// path, and the component makes no polygons for hit tests, as a Flame
-/// `PathComponent` does. Its size is the polygons' bounds, which start at its
-/// origin, and it contains a point within those bounds.
+/// renderers draw the polygons without flattening them into lines, and the
+/// component makes no polygons for hit tests, as a Flame `PathComponent`
+/// does. Its size is the polygons' bounds, which start at its origin, and it
+/// contains a point within those bounds.
 ///
 /// Its [paint]'s color's RGB, style and strokes draw the polygons, with
 /// non-zero fills. Its alpha, and its other fields, apply over them, as for a

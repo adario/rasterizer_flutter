@@ -2,10 +2,11 @@
 
 ## Unreleased
 
-- `RasterizerScene.fromPolygons` makes a scene of `RasterizerPolygons`,
-  polygons whose vertices the GPU renderers take as they are, without
-  flattening a path. With `separate: true`, the mesh renderer fills each
-  polygon on its own, a convex one as a fan, rather than their union.
+- `RasterizerPolygons` is a shape made of polygons, which a scene draws as
+  it draws a path, but which the GPU renderers draw without flattening it
+  into lines. `RasterizerScene.fromPolygons` makes a scene of them. With
+  `separate: true`, the mesh renderer fills each polygon on its own, a
+  convex one as a fan, rather than their union.
 - The mesh renderer draws consecutive entries of an opaque scene without
   strips or gradients in one blended draw, unless 8 or more in a row keep
   its alpha, rather than splitting the draw wherever entries start or stop

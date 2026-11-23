@@ -474,8 +474,10 @@ class const RasterizerGlow._(
 /// A path and the paint to draw it with, for [RasterizerScene.fromPaths].
 typedef RasterizerPaintedPath = ({ui.Path path, ui.Paint paint});
 
-/// Polygons, for [RasterizerScene.fromPolygons]: a path that the GPU
-/// renderers needn't flatten.
+/// A shape made of one or more polygons, which a scene draws as it draws a
+/// path. Polygons have no curves, so the GPU renderers draw them without
+/// first flattening them into lines, as they must do with a path.
+/// [RasterizerScene.fromPolygons] makes a scene of them.
 ///
 /// [vertices] holds each vertex's x then y, polygon after polygon, x right
 /// and y down. [vertexCounts] holds each polygon's number of vertices. A
