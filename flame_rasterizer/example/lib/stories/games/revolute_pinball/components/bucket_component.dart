@@ -42,7 +42,7 @@ class BucketComponent(final Rect inner)
   /// How high a kick throws its bodies, in times its inner height; their
   /// sideways speed, up to a share of the upward one; and their spin, up to
   /// radians a second.
-  static const _kickHeight = 2.0;
+  static const _kickHeight = 3.0;
   static const _kickSpread = 0.15;
   static const _kickSpin = 2.0;
 
