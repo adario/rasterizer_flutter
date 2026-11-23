@@ -186,8 +186,8 @@ typedef struct {
 // One draw of a path, in paint order: the index of its path in the contours; its color, as NanoSVG's, r in the low byte & a in
 // the high one, unpremultiplied; its stroke's width, cap, join & miter limit, or a width of 0 for a fill, which closes open
 // contours; whether a fill is even-odd, else non-zero; whether it's a hairline, a stroke of width 0, whatever strokeWidth is,
-// which meshes import & scenes skip; & whether a mesh fills each closed contour on its own, a convex one as a fan, rather than
-// their union, so its triangles may overlap, which scenes ignore
+// which meshes import & scenes skip; & whether a mesh fills each closed contour on its own instead of their union, a convex
+// one as a fan, so that its triangles can overlap, which scenes ignore
 typedef struct {
     uint32_t path, color;
     float strokeWidth, miterLimit;

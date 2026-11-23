@@ -81,10 +81,11 @@ final class PathContours._(
     );
   }
 
-  /// Takes closed polygons as one path's contours, as they are: [vertices],
-  /// x then y, polygon after polygon, and each polygon's [vertexCounts].
+  /// Creates the contours of polygons, as one path's closed contours, without
+  /// changing them: [vertices], x then y, polygon after polygon, and each
+  /// polygon's [vertexCounts].
   ///
-  /// It keeps both lists, which mustn't change.
+  /// It keeps both lists without copying them, so they mustn't change.
   factory PathContours.polygons(Float32List vertices, Int32List vertexCounts) =>
       PathContours._(
         vertices,

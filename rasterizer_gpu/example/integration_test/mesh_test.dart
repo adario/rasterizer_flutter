@@ -237,8 +237,9 @@ void main() {
       const ui.Color(0xFF000000),
       ui.BlendMode.clear,
     );
-    // The red square's first 4 entries make one blended draw, as the entry
-    // that erases it is among too few that keep its alpha to split off.
+    // The red square's first 4 entries make one blended draw. The entry that
+    // erases it keeps its alpha, but too few entries next to it do for them
+    // to get their own draw.
     final pixels = await render([
       entry(redSquare, x: 4, y: 4),
       entry(redSquare, x: 4, y: 4, color: erase),
@@ -270,10 +271,10 @@ void main() {
       0, 0, 0, 1, 0, //
     ]);
     final pixels = await render([
-      // 8 that keep the alpha: a draw without blending.
+      // 8 entries that keep the alpha: one draw without blending.
       for (var x = 0.0; x < size; x += 8) entry(redDot, x: x),
-      // Fading ones with a few that keep the alpha, in one blended draw, in
-      // order.
+      // Fading entries, with a few that keep the alpha among them: one
+      // blended draw, in order.
       entry(redDot, y: 8, opacity: 0.5),
       entry(redDot, x: 8, y: 8),
       entry(redDot, x: 16, y: 8, opacity: 0.5),
@@ -281,11 +282,12 @@ void main() {
       entry(redDot, x: 32, y: 8, color: toGreen),
       entry(redDot, x: 40, y: 8, color: toGreen),
       entry(redDot, x: 40, y: 8, opacity: 0.5),
-      // 8 again, which the blended draw stops before.
+      // 8 more that keep the alpha. The blended draw ends before them.
       for (var x = 0.0; x < size; x += 8)
         entry(redDot, x: x, y: 16, color: toGreen),
       entry(redDot, y: 16, opacity: 0.5),
-      // One alone among other scenes: without blending.
+      // One entry alone between other scenes' entries: a draw without
+      // blending.
       entry(blueDot, y: 32),
       entry(redDot, x: 8, y: 32),
     ]);

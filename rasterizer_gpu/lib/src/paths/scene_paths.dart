@@ -1,6 +1,7 @@
-// The plain paths or polygons, and paints, that RasterizerScene.fromPaths and
-// fromPolygons copy. The canvas renderer draws them with dart:ui. The GPU
-// renderers flatten paths once into contours, and take polygons as they are.
+// The plain paths or polygons, and their paints, that
+// RasterizerScene.fromPaths and fromPolygons copy. The canvas renderer draws
+// them with dart:ui. The GPU renderers flatten each path into contours once,
+// and use polygons as they are.
 //
 // This file uses no dart:ffi, as the canvas renderer also draws on the web.
 
@@ -57,7 +58,7 @@ String? undrawable(ui.Paint paint) {
   return null;
 }
 
-/// A path scene's paths or polygons, and their paints, in paint order.
+/// The paths or polygons of a path scene, and their paints, in paint order.
 ///
 /// It keeps a copy of each paint, which the canvas renderer draws with, and
 /// each distinct path or polygons once, to make into contours.
@@ -69,7 +70,7 @@ class ScenePaths._(
   /// Each draw's shape, as its index in [shapes].
   final List<int> pathIndices,
 
-  /// Each draw's copy of its paint, a fill or a stroke.
+  /// A copy of each draw's paint, a fill or a stroke.
   final List<ui.Paint> paints,
   @override final ui.Rect viewBox,
   @override final ui.Rect bounds,
@@ -78,7 +79,7 @@ class ScenePaths._(
   /// The glow around the paths. Only the mesh renderer's import reads it.
   final RasterizerGlow? glow,
 
-  /// Whether the mesh renderer fills each polygon on its own, rather than
+  /// Whether the mesh renderer fills each polygon on its own instead of
   /// their union (see `RasterizerScene.fromPolygons`).
   final bool separate,
 ) implements CanvasPaths {
@@ -97,8 +98,8 @@ class ScenePaths._(
     false,
   );
 
-  /// Keeps [polygons]' polygons and copies their paints, as [ScenePaths.new]
-  /// does with paths.
+  /// Keeps the polygons of [polygons] and copies their paints, as
+  /// [ScenePaths.new] does with paths.
   factory ScenePaths.polygons(
     List<RasterizerPaintedPolygons> polygons, {
     RasterizerGlow? glow,
@@ -114,9 +115,11 @@ class ScenePaths._(
     separate,
   );
 
-  /// Keeps [draws]' shapes, whose bounds [boundsOf] returns, and copies their
-  /// paints. A paint that the GPU renderers can't draw throws, naming its
-  /// draw in [name].
+  /// Keeps the shapes of [draws] and copies their paints. [boundsOf] returns
+  /// a shape's bounds.
+  ///
+  /// Throws [ArgumentError] for a paint that the GPU renderers can't draw,
+  /// and names its draw as an item of [name].
   factory ScenePaths._of(
     List<({Object shape, ui.Paint paint})> draws,
     ui.Rect Function(Object shape) boundsOf,
@@ -178,15 +181,16 @@ class ScenePaths._(
   }
 
   /// Each path's contours, at the last tolerance it was flattened to, kept
-  /// while the path lives. Polygons' contours fit any tolerance.
+  /// while the path lives. Polygons need no flattening, so their contours
+  /// fit any tolerance.
   ///
-  /// This takes paths and polygons as immutable.
+  /// It assumes that paths and polygons don't change.
   static final _contours = Expando<({double tolerance, PathContours contours})>(
     'contours',
   );
 
-  /// Each draw: its path and its paint, for the canvas renderer, made the
-  /// first time it's read. Polygons make their path then.
+  /// Each draw's path and paint, for the canvas renderer. It's made the first
+  /// time it's read, and so are the paths of polygons.
   late final List<VectorPath> draws = [
     for (final (i, paint) in paints.indexed)
       VectorPath(
@@ -197,8 +201,8 @@ class ScenePaths._(
       ),
   ];
 
-  /// Returns whether draw [i] fills with the even-odd rule. Polygons fill
-  /// with the non-zero one.
+  /// Returns whether draw [i] fills with the even-odd rule. Polygons always
+  /// fill with the non-zero rule.
   bool isEvenOdd(int i) => switch (shapes[pathIndices[i]]) {
     final ui.Path path => path.fillType == ui.PathFillType.evenOdd,
     _ => false,
@@ -252,11 +256,11 @@ class ScenePaths._(
   /// Float32s hold the contours' points and the meshes' vertices.
   static const _floatSteps = 16 / (1 << 23);
 
-  /// Returns the contours of each of [shapes]: a path's flattened to the
-  /// [tolerance] for [maxSize], and polygons' as they are.
+  /// Returns the contours of each of [shapes]. It flattens a path to the
+  /// [tolerance] for [maxSize], and takes polygons as they are.
   ///
-  /// A path already flattened to the same tolerance, for any scene, reuses
-  /// its contours, as polygons always do.
+  /// A path that any scene already flattened to the same tolerance reuses
+  /// its contours. Polygons always reuse theirs.
   List<PathContours> contours(double maxSize) {
     final tolerance = this.tolerance(maxSize);
     return [for (final shape in shapes) _contoursOf(shape, tolerance)];

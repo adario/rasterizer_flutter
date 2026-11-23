@@ -264,14 +264,15 @@ final star = RasterizerScene.fromPaths([
   triangles made at import, with no layer or pass. The GPU and canvas renderers draw the same paths without it.
 - **Polygons:** `RasterizerPolygons` is a shape made of polygons, which a scene draws as it draws a path. Polygons have
   no curves, so the GPU renderers draw them without first flattening them into lines, as they must do with a path. It
-  holds the vertices in a `Float32List`, x then y, and each polygon's number of vertices. `RasterizerScene.fromPolygons`
-  makes a scene of them, as `fromPaths` does of paths, and the canvas renderer draws their `path`. Fills are non-zero.
-  Polygons suit shapes made often, such as every frame. With `separate: true`, the mesh renderer fills each polygon on
-  its own rather than their union: a convex one as a fan of triangles, any other tessellated alone. Where they overlap,
-  their triangles do too, which shows through an opacity, or colors or glows that aren't opaque. Other renderers ignore
-  it. A tube of about 600 overlapping quads, remade every frame, cost the mesh renderer 9.4 ms a frame as a path, on an
-  M1 Mac in profile mode, and 0.25 ms as separate polygons. It cost the atlas renderer 2.9 ms as a path, mostly
-  flattening it, and nothing measurable as polygons.
+  holds the vertices in a `Float32List`, x then y, and the number of vertices of each polygon.
+  `RasterizerScene.fromPolygons` makes a scene of them, as `fromPaths` does of paths. The canvas renderer draws their
+  `path`. Fills use the non-zero rule. Use polygons for shapes that a game rebuilds often, such as every frame. With
+  `separate: true`, the mesh renderer fills each polygon on its own instead of filling their union: a convex polygon as
+  a fan of triangles, and any other polygon tessellated on its own. Where polygons overlap, their triangles overlap too,
+  and the overlap shows through an opacity, or through colors or glows that aren't opaque. The other renderers ignore
+  `separate`. On an M1 Mac in profile mode, a tube of about 600 overlapping quads, rebuilt every frame, cost the mesh
+  renderer 9.4 ms a frame as a path, and 0.25 ms as separate polygons. It cost the atlas renderer 2.9 ms as a path,
+  mostly to flatten it, and too little to measure as polygons.
 - **Below them:** the internal `lib/src/core.dart` has `PathContours`, the flattened contours, `PathDraw`, and
   `Scene.fromPaths` and `Mesh.fromPaths`, over the C API's `ra_scene_from_paths` and `ra_mesh_from_paths`.
 

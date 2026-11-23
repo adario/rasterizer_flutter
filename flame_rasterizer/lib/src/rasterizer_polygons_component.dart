@@ -11,31 +11,34 @@ import 'package:flame_rasterizer/src/shared_scenes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
-/// A [PositionComponent] that draws [RasterizerPolygons] with rasterizer_gpu,
-/// in a game with [HasRasterizer], as a [RasterizerPathComponent] draws a
-/// path without paint layers.
+/// A [PositionComponent] that draws a [RasterizerPolygons] with
+/// rasterizer_gpu, in a game with [HasRasterizer], the way a
+/// [RasterizerPathComponent] without paint layers draws a path.
 ///
-/// It's for shapes that a game makes often, such as every frame: the GPU
-/// renderers draw the polygons without flattening them into lines, and the
-/// component makes no polygons for hit tests, as a Flame `PathComponent`
-/// does. Its size is the polygons' bounds, which start at its origin, and it
-/// contains a point within those bounds.
+/// Use it for shapes that a game rebuilds often, such as every frame. The GPU
+/// renderers draw polygons without flattening them into lines, and the
+/// component doesn't make polygons for hit tests, as a Flame `PathComponent`
+/// does. Its size is the size of the polygons' bounds, and it draws the
+/// polygons moved so that the bounds start at its origin.
 ///
-/// Its [paint]'s color's RGB, style and strokes draw the polygons, with
-/// non-zero fills. Its alpha, and its other fields, apply over them, as for a
-/// [RasterizerPathComponent] without paint layers. So [OpacityEffect],
-/// [ColorEffect], [HueEffect] and `tint` cost no new import.
+/// It draws the polygons with its [paint]'s style, stroke settings and color
+/// without alpha, and fills them with the non-zero rule. Then it applies the
+/// paint's alpha and other fields to the result, as a
+/// [RasterizerPathComponent] without paint layers does. So [OpacityEffect],
+/// [ColorEffect], [HueEffect] and `tint` don't make it import the polygons
+/// again.
 ///
-/// With [separate], the mesh renderer fills each polygon on its own, which is
+/// With [separate], the mesh renderer fills each polygon on its own. That's
 /// much faster for many polygons, but overlaps show through an opacity: see
 /// [RasterizerScene.fromPolygons].
 ///
-/// Components made with the same [polygons] share an import, as
-/// [RasterizerPathComponent]s made with the same path do. Into any canvas but
-/// the game's [RasterizerCanvas], or outside a game with [HasRasterizer], it
-/// draws [RasterizerPolygons.path] with [Canvas.drawPath].
+/// Components made with the same [polygons] share one import, as
+/// [RasterizerPathComponent]s made with the same path do. In a canvas other
+/// than the game's [RasterizerCanvas], or outside a game with
+/// [HasRasterizer], it draws [RasterizerPolygons.path] with
+/// [Canvas.drawPath].
 class RasterizerPolygonsComponent({
-  /// The polygons it draws, which must not change.
+  /// The polygons it draws. They must not change.
   required final RasterizerPolygons polygons,
   double? maxSize,
   RasterizerGlow? glow,
@@ -72,14 +75,16 @@ class RasterizerPolygonsComponent({
     onReleaseScenes(this, _releaseAll);
   }
 
-  /// The largest size, in device pixels, at which it draws the polygons'
-  /// longer side, as [RasterizerPathComponent.maxSize].
+  /// The largest size, in device pixels, that it draws the polygons' longer
+  /// side at, as for [RasterizerPathComponent.maxSize].
   final double maxSize = maxSize ?? RasterizerSvg.defaultMaxSize;
 
-  /// The neon glow around the polygons, as [RasterizerPathComponent.glow].
+  /// The neon glow around the polygons, as for
+  /// [RasterizerPathComponent.glow].
   RasterizerGlow? glow = glow;
 
-  // The polygons' top left, which the import is drawn moved back by.
+  // The top left of the polygons' bounds. The component draws its import
+  // moved back by it, so that the bounds start at its origin.
   late final Offset _topLeft = polygons.bounds.topLeft;
 
   // The game's GPU renderer, once the component is mounted in a game with
@@ -88,13 +93,13 @@ class RasterizerPolygonsComponent({
 
   SharedScene? _shared;
 
-  // The fields of the paint that its import is for, or that couldn't be
-  // imported, and the glow then. Null before it's first drawn.
+  // The paint fields and the glow that it last imported the polygons with,
+  // or failed to. Null before it's first drawn.
   PaintFields? _fields;
   RasterizerGlow? _glow;
 
   // Imports that no component uses any more. The next update frees them,
-  // once the frames that drew them have rendered.
+  // after the frames that drew them have rendered.
   final List<RasterizerScene> _retired = [];
 
   /// For tests: the import it draws, or null before it's drawn into a game's
@@ -142,11 +147,11 @@ class RasterizerPolygonsComponent({
       ..restore();
   }
 
-  /// Returns its import for its paint and [glow] as they are now. It imports
-  /// the polygons again if they changed.
+  /// Returns its import for its current paint and [glow], and imports the
+  /// polygons again if either changed.
   ///
-  /// Null outside a game with [HasRasterizer], or if its paint can't be
-  /// imported.
+  /// Returns null outside a game with [HasRasterizer], or if it can't import
+  /// its paint.
   RasterizerScene? _currentScene() {
     final gpu = _gpu;
     if (gpu == null) {
@@ -154,8 +159,7 @@ class RasterizerPolygonsComponent({
     }
     final fields = _fields;
     if (fields == null || !fields.matches(paint) || glow != _glow) {
-      // Kept first, so that an import that can't be made isn't tried again
-      // each frame.
+      // Set first, so that it doesn't retry a failed import every frame.
       _fields = PaintFields(paint, layerOnly: true);
       _glow = glow;
       _release();
@@ -183,8 +187,8 @@ class RasterizerPolygonsComponent({
 
   /// Stops using its import, and frees it if no other component uses it.
   ///
-  /// It frees the import [now], or else at its next update, once the frames
-  /// that drew it have rendered.
+  /// It frees the import right away if [now], or else at its next update,
+  /// after the frames that drew it have rendered.
   void _release({bool now = false}) {
     final shared = _shared;
     if (shared == null) {
@@ -209,11 +213,12 @@ class RasterizerPolygonsComponent({
     _retired.clear();
   }
 
-  /// Stops using its import, and frees now what no other component uses.
+  /// Stops using its import, and frees right away the imports that no other
+  /// component uses.
   ///
-  /// [onRemove] and `releaseScenes` call it outside a frame, as the component
-  /// or its game is removed. Drawn again, the component imports its polygons
-  /// again.
+  /// [onRemove] and `releaseScenes` call it outside a frame, when the
+  /// component or its game is removed. If the component is drawn again, it
+  /// imports its polygons again.
   void _releaseAll() {
     _release(now: true);
     _freeRetired();

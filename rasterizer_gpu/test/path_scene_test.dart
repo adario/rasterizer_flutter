@@ -600,15 +600,15 @@ void main() {
   });
 
   group('fromPolygons', () {
-    /// Returns polygons of [vertices], x then y, polygon after polygon.
+    /// Returns polygons made of [vertices]: a list for each polygon, x then y.
     RasterizerPolygons polygons(List<List<double>> vertices) =>
         RasterizerPolygons(
           Float32List.fromList([for (final c in vertices) ...c]),
           Int32List.fromList([for (final c in vertices) c.length ~/ 2]),
         );
 
-    // Two squares of 1600 that overlap by 400, and an L of 1200 apart from
-    // them, which isn't convex.
+    // Two squares with areas of 1600 that overlap by 400, and an L-shape with
+    // an area of 1200 away from them. The L isn't convex.
     final shapes = polygons([
       [10, 10, 50, 10, 50, 50, 10, 50],
       [30, 30, 70, 30, 70, 70, 30, 70],
@@ -681,7 +681,7 @@ void main() {
       expect(separate.paths, hasLength(1));
       // The overlap counts twice.
       expect(area(separate), closeTo(3200 + 1200, 1e-3));
-      // Each square is a fan of 2 triangles, before the L's.
+      // Each square is a fan of 2 triangles, and the L's triangles follow.
       final squares = triangles(separate, 0).take(4).toList();
       expect(squares[0], [10, 10, 50, 10, 50, 50]);
       expect(squares[1], [10, 10, 50, 50, 10, 50]);
@@ -690,7 +690,8 @@ void main() {
     });
 
     test('a separate polygon that crosses itself fills non-zero', () {
-      // A bow tie: two triangles of 100 each, which meet at (10, 10).
+      // A bow tie: two triangles with areas of 100 each, which meet at
+      // (10, 10).
       final bowTie = polygons([
         [0, 0, 20, 20, 20, 0, 0, 20],
       ]);
@@ -715,7 +716,8 @@ void main() {
               50 + 40 * math.sin(4 * math.pi * k / 5),
             ),
         ], true);
-      // Its points go on another grid, for another tolerance.
+      // The path's tolerance differs, so its points snap to another grid,
+      // and the areas differ slightly.
       final union = mesh([path], const [PathDraw(path: 0, color: 0xff0000ff)]);
       expect(area(meshOf(star, separate: true)), closeTo(area(union), 0.1));
     });

@@ -3,33 +3,39 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
-// The imports that the package's components share, by the path or polygons
-// they draw. Shared by the package's files, and not exported.
+// The imports that the package's components share, kept by the path or
+// polygons they draw. The package's files use these, and the package doesn't
+// export them.
 
-/// How each component that imports scenes releases them all.
+/// The function that releases all of a component's imports, for each
+/// component that has any.
 final _releases = Expando<void Function()>('scene releases');
 
-/// Registers how [component] releases all its imports, for [releaseScenes].
+/// Registers [release] as the function that releases all of [component]'s
+/// imports, for [releaseScenes].
 void onReleaseScenes(Component component, void Function() release) =>
     _releases[component] = release;
 
-/// Releases the imports of the components in [game]'s tree, as the game is
-/// removed.
+/// Releases the imports of all the components in [game]'s tree, when the
+/// game is removed.
 ///
-/// Flame doesn't remove the game's components then.
+/// Flame doesn't remove the game's components then, so they can't release
+/// their imports themselves.
 void releaseScenes(Component game) {
   for (final component in game.descendants()) {
     _releases[component]?.call();
   }
 }
 
-/// The imports of each path or polygons, shared by the components made with
-/// it.
+/// The imports of each path or polygons, which the components made with it
+/// share.
 final _scenes = Expando<List<SharedScene>>('shared scenes');
 
-/// Returns the import of [source], a path or polygons, with [paints], [glow]
-/// and [separate], for [gpu] and [maxSize]: one that another component made,
-/// or else a new one that [import] makes.
+/// Returns an import of [source], a path or polygons, with [paints], [glow]
+/// and [separate], for [gpu] and [maxSize].
+///
+/// It returns an import that another component made, if one matches, or else
+/// a new one that [import] makes.
 SharedScene acquireScene(
   Object source,
   RasterizerBackend gpu,
@@ -40,7 +46,7 @@ SharedScene acquireScene(
   bool separate = false,
 }) {
   final scenes = _scenes[source] ??= [];
-  // The backend a new import gets: the canvas renderer where the GPU
+  // The backend that a new import gets: the canvas renderer where the GPU
   // renderer isn't supported, or with RasterizerGpu.forceCanvas.
   final backend = RasterizerGpu.of(gpu).backend;
   for (final shared in scenes) {
@@ -61,8 +67,10 @@ SharedScene acquireScene(
   return shared;
 }
 
-/// Stops a component's use of [shared], an import of [source]. Returns its
-/// scene if no other component uses it, for the caller to free.
+/// Stops a component from using [shared], an import of [source].
+///
+/// Returns the import's scene if no other component uses it, so that the
+/// caller can free it.
 RasterizerScene? releaseScene(Object source, SharedScene shared) {
   if (--shared.users > 0) {
     return null;
@@ -71,22 +79,24 @@ RasterizerScene? releaseScene(Object source, SharedScene shared) {
   return shared.scene;
 }
 
-/// A path's or polygons' import for a renderer, a maximum size, a glow,
-/// whether it's separate and paints, which [users] components draw.
+/// An import of a path or polygons, which [users] components draw.
+///
+/// Components share it only if they draw it with the same renderer, maximum
+/// size, glow, [separate] setting and paints.
 class SharedScene(
-  /// The game's GPU renderer that it's imported for.
+  /// The game's GPU renderer that the import is for.
   final RasterizerBackend gpu,
 
-  /// The size it's imported for.
+  /// The maximum size that the import is for.
   final double maxSize,
 
-  /// The glow it's imported with.
+  /// The glow of the import.
   final RasterizerGlow? glow,
 
-  /// Whether polygons are imported separate.
+  /// Whether the import fills each polygon on its own.
   final bool separate,
 
-  /// The fields of the paints it's imported with.
+  /// The fields of the paints of the import.
   final List<PaintFields> fields,
 
   /// The import.
@@ -125,19 +135,21 @@ class SharedScene(
   }
 }
 
-/// The fields of a paint that a component imports its path or polygons with,
-/// or that decide whether it can import them ([RasterizerScene.canDraw]), as
-/// they were then.
+/// A copy of the paint fields that a component imported its path or
+/// polygons with.
 ///
-/// With [layerOnly], [matches] compares only the fields that a component's
-/// paint, without paint layers, draws as a layer's, except its color's alpha.
+/// It also copies the fields that decide whether the component can import
+/// them at all ([RasterizerScene.canDraw]).
+///
+/// With [layerOnly], [matches] compares only the fields that a component
+/// without paint layers draws its layer with, and ignores the color's alpha.
 class PaintFields(
   Paint paint, {
 
-  /// Whether [matches] compares only the fields that draw as a layer's.
+  /// Whether [matches] compares only the fields that a layer draws with.
   final bool layerOnly = false,
 }) {
-  /// Keeps [paint]'s fields.
+  /// Copies [paint]'s fields.
   this;
 
   final Color _color = paint.color;
@@ -158,7 +170,7 @@ class PaintFields(
   final MaskFilter? _maskFilter = paint.maskFilter;
   final ImageFilter? _imageFilter = paint.imageFilter;
 
-  /// Returns whether [paint]'s fields are these.
+  /// Returns whether [paint]'s fields match these.
   bool matches(Paint paint) {
     final color = paint.color;
     if (!(layerOnly
@@ -185,8 +197,11 @@ class PaintFields(
   }
 }
 
-/// Returns the layer that [paint] draws as, without paint layers: its fields
-/// except those that apply over the import, with its color opaque.
+/// Returns the paint that a component without paint layers draws its layer
+/// with.
+///
+/// It's [paint] with an opaque color, and without the fields that the
+/// component applies to the layer afterwards.
 Paint layerOf(Paint paint) => Paint.from(paint)
   ..color = paint.color.withValues(alpha: 1)
   ..blendMode = BlendMode.srcOver

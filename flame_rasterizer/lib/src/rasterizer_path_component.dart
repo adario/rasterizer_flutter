@@ -339,11 +339,12 @@ class RasterizerPathComponent({
     _retired.clear();
   }
 
-  /// Stops using its import, and frees now what no other component uses.
+  /// Stops using its import, and frees right away the imports that no other
+  /// component uses.
   ///
-  /// [onRemove] and `releaseScenes` call it outside a frame, as the
-  /// component or its game is removed.
-  /// Drawn again, the component imports its path again.
+  /// [onRemove] and `releaseScenes` call it outside a frame, when the
+  /// component or its game is removed. If the component is drawn again, it
+  /// imports its path again.
   void _releaseAll() {
     _release(now: true);
     _freeRetired();

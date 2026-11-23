@@ -479,15 +479,17 @@ typedef RasterizerPaintedPath = ({ui.Path path, ui.Paint paint});
 /// first flattening them into lines, as they must do with a path.
 /// [RasterizerScene.fromPolygons] makes a scene of them.
 ///
-/// [vertices] holds each vertex's x then y, polygon after polygon, x right
-/// and y down. [vertexCounts] holds each polygon's number of vertices. A
-/// polygon doesn't repeat its first vertex at its end. Both lists are kept
-/// as they are, so they must not change, as a path imported mustn't.
+/// [vertices] holds the x and then the y of each vertex, polygon after
+/// polygon, with x to the right and y down. [vertexCounts] holds the number
+/// of vertices of each polygon. Each polygon closes by itself, so don't
+/// repeat its first vertex at its end. The class keeps both lists without
+/// copying them, so don't change them, just as you mustn't change a path
+/// after importing it.
 class RasterizerPolygons(
   final Float32List vertices,
   final Int32List vertexCounts,
 ) {
-  /// Takes [vertices] and [vertexCounts].
+  /// Creates polygons from [vertices] and [vertexCounts].
   ///
   /// Throws [ArgumentError] if a polygon has fewer than 3 vertices, or if the
   /// counts don't add up to [vertices].
@@ -508,7 +510,7 @@ class RasterizerPolygons(
     }
   }
 
-  /// The vertices' bounds, or [ui.Rect.zero] without polygons.
+  /// The bounds of the vertices, or [ui.Rect.zero] if there are no polygons.
   late final ui.Rect bounds = () {
     if (vertices.isEmpty) {
       return ui.Rect.zero;
@@ -530,8 +532,8 @@ class RasterizerPolygons(
     return ui.Rect.fromLTRB(left, top, right, bottom);
   }();
 
-  /// The polygons as a path, made the first time it's read, for the canvas
-  /// renderer and other dart:ui drawing.
+  /// The polygons as a path, for the canvas renderer and other dart:ui
+  /// drawing. It's made the first time it's read.
   late final ui.Path path = () {
     final path = ui.Path();
     var offset = 0;
@@ -660,16 +662,16 @@ abstract class RasterizerScene {
   /// Creates a scene of polygons, each drawn with its paint, in paint order,
   /// as [fromPaths] does with paths.
   ///
-  /// The GPU renderers take the polygons' vertices as they are, rather than
-  /// flattening a path's contours. Fills are non-zero. The canvas renderer
+  /// The GPU renderers use the polygons' vertices directly, without
+  /// flattening anything. Fills use the non-zero rule. The canvas renderer
   /// draws each [RasterizerPolygons.path].
   ///
-  /// With [separate], the mesh renderer fills each polygon on its own, rather
-  /// than the polygons' union, which is much faster for many polygons: a
-  /// convex one is a fan of triangles. So where polygons overlap, their
-  /// triangles do too, and the overlaps show where a scene is drawn with an
-  /// opacity, or with colors or glows that aren't opaque. Other renderers
-  /// ignore [separate].
+  /// With [separate], the mesh renderer fills each polygon on its own instead
+  /// of filling their union, and fills a convex polygon as a fan of
+  /// triangles. That's much faster for many polygons. But where polygons
+  /// overlap, their triangles overlap too, and the overlap shows when an
+  /// entry draws the scene with an opacity, or with colors or glows that
+  /// aren't opaque. The other renderers ignore [separate].
   ///
   /// Throws [ArgumentError] as [fromPaths] does.
   factory RasterizerScene.fromPolygons(

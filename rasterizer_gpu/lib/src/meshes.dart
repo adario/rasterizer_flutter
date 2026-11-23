@@ -555,13 +555,14 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       // having a color transform, or change it. Only entries with one read it
       // for each fragment, as their draw's uniform.
       //
-      // An opaque mesh without strips or gradients splits off only its
-      // entries that keep its alpha for [_leastUnblended] entries or more,
-      // or for all of the scene's consecutive entries. Its other entries
-      // that keep its alpha draw blended, in the draw of those that don't,
-      // which looks the same. A draw costs more to encode than blending a few
-      // entries: a star field, of one dot at many opacities, took 69 draws a
-      // frame, and 0.2 ms, on an M1.
+      // An opaque mesh without strips or gradients gives its own unblended
+      // draw only to a run of [_leastUnblended] or more entries that keep its
+      // alpha, or to a run of all the scene's consecutive entries. Its
+      // shorter runs join the blended draw of the entries around them. That
+      // looks the same, as blending an opaque color changes nothing, and a
+      // draw costs more to encode than blending a few entries. A star field
+      // of one dot at many opacities would take 69 draws a frame, and 0.2 ms
+      // on an M1, if each change of alpha started a new draw.
       var first = 0;
       for (final (r, run) in _placed.indexed) {
         gpu.beginPass(run._target!, buffer);
@@ -672,12 +673,12 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     return true;
   }
 
-  /// The fewest consecutive entries of an opaque mesh without strips or
-  /// gradients that keep its alpha and split off into a draw without
-  /// blending, among others that don't.
+  /// The fewest consecutive entries that keep the alpha of an opaque mesh
+  /// without strips or gradients, among entries that don't, that get their
+  /// own draw without blending.
   static const _leastUnblended = 8;
 
-  /// Returns how many consecutive entries of [entries], from [j], show
+  /// Returns how many consecutive entries of [entries], from [j] on, show
   /// [scene] and keep its alpha.
   int _keeping(List<int> entries, int j, MeshScene scene) {
     var n = 0;

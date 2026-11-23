@@ -80,9 +80,10 @@ class const PathDraw({
   /// Only [Mesh.fromPaths] imports hairlines. [Scene.fromPaths] skips them.
   final bool hairline = false,
 
-  /// Whether [Mesh.fromPaths] fills each closed contour on its own, rather
-  /// than their union: a convex one as a fan of triangles. Its triangles may
-  /// then overlap. [Scene.fromPaths] ignores it.
+  /// Whether [Mesh.fromPaths] fills each closed contour on its own instead
+  /// of filling their union, and fills a convex contour as a fan of
+  /// triangles. The triangles can then overlap. [Scene.fromPaths] ignores
+  /// it.
   final bool separate = false,
 });
 

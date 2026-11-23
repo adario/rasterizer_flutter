@@ -2,11 +2,12 @@
 // canvas renderer. From this package's folder:
 //   flutter test test/polygons_component_test.dart
 //
-// The component draws its polygons with its paint as a layer, into the
-// game's runs, as a RasterizerPathComponent without paint layers does. Its
-// size is the polygons' bounds. Components of the same polygons share an
-// import, and its removal, or its game's, frees it. Outside a game with
-// HasRasterizer, it draws the polygons' path with drawPath.
+// The component draws its polygons into the game's runs, with its paint as a
+// layer, as a RasterizerPathComponent without paint layers does. Its size is
+// the size of the polygons' bounds. Components made with the same polygons
+// share an import, and removing them, or their game, frees it. Outside a
+// game with HasRasterizer, the component draws the polygons' path with
+// drawPath.
 
 import 'dart:typed_data';
 import 'dart:ui';
@@ -90,8 +91,8 @@ RasterizerPolygonsComponent _polygons({
 );
 
 void main() {
-  test("it draws its polygons into the game's runs, its size their "
-      'bounds', () async {
+  test("it draws its polygons into the game's runs, and its size is their "
+      "bounds' size", () async {
     final polygons = _polygons();
     expect(polygons.size, Vector2(20, 10));
     final game = await _game([polygons]);
@@ -107,8 +108,8 @@ void main() {
     game.onRemove();
   });
 
-  test('components of the same polygons share an import, unless they differ '
-      'in separate', () async {
+  test('components made with the same polygons share an import, unless '
+      'their separate settings differ', () async {
     final first = _polygons();
     final second = _polygons();
     final separate = _polygons(separate: true);
@@ -119,8 +120,8 @@ void main() {
     game.onRemove();
   });
 
-  test('its opacity applies over its import, and a new color imports it '
-      'again', () async {
+  test('its opacity applies to its import, and a new color makes it import '
+      'the polygons again', () async {
     final polygons = _polygons();
     final game = await _game([polygons]);
     await _render(game);
