@@ -152,6 +152,9 @@ class const TubeShooterStory({
 
   /// The game's speed, from 0, which stands still, to 2.
   final double speed = 1,
+
+  /// How many lines tall the status bar is.
+  final int statusLines = 2,
   super.key,
 }) extends StatefulWidget {
   @override
@@ -204,6 +207,7 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
         ..sound = widget.sound,
       zoom: widget.zoom,
       speed: widget.speed,
+      statusLines: widget.statusLines,
     );
   }
 }
@@ -215,6 +219,7 @@ class const RevolutePinballStory({
   final double zoom = 1,
   final double speed = 1,
   final SvgCache cache = defaultSvgCache,
+  final int statusLines = 2,
   super.key,
 }) extends StatelessWidget {
   @override
@@ -235,6 +240,7 @@ class const RevolutePinballStory({
         ..sound = sound,
       zoom: zoom,
       speed: speed,
+      statusLines: statusLines,
     );
   }
 }

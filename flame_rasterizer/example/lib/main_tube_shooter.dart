@@ -9,7 +9,8 @@ void main() {
 }
 
 /// Tube Shooter's story, with a renderer menu and no knobs: it starts at the
-/// first level, with drifting stars, without glow, at a zoom and speed of 1.
+/// first level, with drifting stars, without glow, at a zoom and speed of 1,
+/// over a one-line status bar.
 class const TubeShooterApp({
   /// Whether the game plays its sounds.
   final bool sound = true,
@@ -21,7 +22,8 @@ class const TubeShooterApp({
       title: 'Tube Shooter',
       // Its paths are drawn by Flame's own components with Flame SVG.
       svgs: false,
-      builder: (renderer) => TubeShooterStory(renderer: renderer, sound: sound),
+      builder: (renderer) =>
+          TubeShooterStory(renderer: renderer, sound: sound, statusLines: 1),
     );
   }
 }

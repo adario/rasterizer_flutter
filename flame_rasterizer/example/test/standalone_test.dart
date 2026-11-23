@@ -22,6 +22,15 @@ void main() {
       .widget<GameWidget<G>>(find.byWidgetPredicate((w) => w is GameWidget<G>))
       .game!;
 
+  /// Expects the app to be titled [title], with no app bar, and the status
+  /// bar to be one line tall.
+  void expectBars(WidgetTester tester, String title) {
+    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, title);
+    expect(find.byType(AppBar), findsNothing);
+    final status = find.textContaining(RegExp(r'^canvas \('));
+    expect(tester.widget<Text>(status).maxLines, 1);
+  }
+
   /// Opens the renderer menu, and picks the entry that shows [text].
   Future<void> pick(WidgetTester tester, String text) async {
     await tester.tap(find.byType(DropdownButton<SvgRenderer>));
@@ -39,7 +48,7 @@ void main() {
     await tester.pumpWidget(const TubeShooterApp(sound: false));
     await pumpFrames(tester, 30);
     expect(find.byType(Widgetbook), findsNothing);
-    expect(find.text('Tube Shooter'), findsOneWidget);
+    expectBars(tester, 'Tube Shooter');
     final game = gameOf<TubeShooterExample>(tester);
     expect(game.isLoaded, isTrue);
     expect(game.descendants().whereType<FpsTextComponent>(), isNotEmpty);
@@ -67,7 +76,7 @@ void main() {
     await tester.pumpWidget(const RevolutePinballApp(sound: false));
     await pumpFrames(tester, 30);
     expect(find.byType(Widgetbook), findsNothing);
-    expect(find.text('Revolute Pinball'), findsOneWidget);
+    expectBars(tester, 'Revolute Pinball');
     final game = gameOf<RevolutePinballExample>(tester);
     expect(game.isLoaded, isTrue);
     expect(game.descendants().whereType<FpsTextComponent>(), isNotEmpty);

@@ -9,7 +9,8 @@ void main() {
 }
 
 /// Revolute Pinball's story, with a renderer menu and no knobs: its bodies
-/// show no pieces, at a zoom and speed of 1, with flame_svg's default cache.
+/// show no pieces, at a zoom and speed of 1, with flame_svg's default cache,
+/// over a one-line status bar.
 class const RevolutePinballApp({
   /// Whether the game plays its sounds.
   final bool sound = true,
@@ -19,8 +20,12 @@ class const RevolutePinballApp({
   Widget build(BuildContext context) {
     return StandaloneGame(
       title: 'Revolute Pinball',
-      builder: (renderer) =>
-          RevolutePinballStory(renderer: renderer, pieces: false, sound: sound),
+      builder: (renderer) => RevolutePinballStory(
+        renderer: renderer,
+        pieces: false,
+        sound: sound,
+        statusLines: 1,
+      ),
     );
   }
 }
