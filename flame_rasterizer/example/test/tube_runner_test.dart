@@ -47,6 +47,9 @@ void main() {
           .game!;
       await pumpWhileLoading(tester, () => !game.isLoaded);
       final lane = game.ship.lane;
+      // A key starts the game at READY.
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      expect(game.state, RunnerState.play);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
       for (var i = 0; i < 60; i++) {
         await tester.pump(const Duration(milliseconds: 16));

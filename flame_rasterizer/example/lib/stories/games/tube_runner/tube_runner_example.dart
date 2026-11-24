@@ -8,6 +8,7 @@ import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/flight_stars_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_explosion_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_seeder_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ship_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
@@ -17,6 +18,24 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
+
+/// The game's states, as Tube Shooter's. The tube flies down in all of them,
+/// but once the game is over.
+enum RunnerState() {
+  /// READY shows until a tap or a key starts the game, or resumes it after a
+  /// lost ship.
+  ready,
+
+  /// The game is on: seeders come, and touch the ship.
+  play,
+
+  /// The ship was destroyed. Next, it comes back, or the game ends.
+  dying,
+
+  /// The game is over, and stands still until a tap, or Enter, starts a new
+  /// one.
+  over,
+}
 
 /// A prototype of an endless runner, where running is flying: see
 /// [description].
@@ -71,10 +90,16 @@ abstract class TubeRunnerExample({
     without a stop. The ship's lane shows in the ship's colour, as in Tube
     Shooter.
 
-    After 8 seconds, and every 5 seconds from then on, a seeder comes at the
-    farthest ring across the tube, on a lane picked at random. It climbs its lane toward the ship, laying a
-    spike behind it, and goes once it passes the ship; the spike goes once
-    all of it does. Nothing collides yet.
+    READY shows until a tap or a key starts the game. After 8 seconds, and
+    every 5 seconds from then on, a seeder comes at the farthest ring across
+    the tube, on a lane picked at random. It climbs its lane toward the ship,
+    laying a spike behind it, and goes once it passes the ship; the spike
+    goes once all of it does. A seeder or a spike that touches the ship, in
+    its lane at the ship's ring, destroys it, and takes a life, as in Tube
+    Shooter: the seeders and spikes go, and READY shows again. Once the
+    lives are gone, Game Over stops the game until a tap, or Enter, starts a
+    new one. The bottom left shows the tube's name and how long the game has
+    gone on in it, and the bottom right the lives left.
 
     The game makes the tube's quads again every frame. The mesh renderer fills
     each quad on its own, as a fan of triangles, rather than their union. The
@@ -90,6 +115,17 @@ abstract class TubeRunnerExample({
   static const firstSeeder = 8.0;
   static const seederPeriod = 5.0;
 
+  /// The seconds from the ship's destruction to its return, as in Tube
+  /// Shooter.
+  static const respawnTime = 1.5;
+
+  static const startLives = 3;
+
+  /// The cap heights, in logical pixels, of the texts at the bottom, and of
+  /// READY and Game Over, at the middle, as in Tube Shooter.
+  static const hudCap = 12.0;
+  static const bannerCap = VectorTextComponent.maxCapHeight;
+
   /// How far a drag goes to move the ship one lane, in logical pixels.
   static const dragPerLane = 40.0;
 
@@ -104,7 +140,7 @@ abstract class TubeRunnerExample({
 
   /// Changes the tube where the ship is, without a stop: the ship goes on at
   /// the same angle round the axis, in the new tube's nearest step. The
-  /// seeders and spikes go.
+  /// seeders and spikes go, and the time in the tube starts again.
   set tube(Tube value) {
     final from = view.tube;
     if (value == from) {
@@ -114,15 +150,66 @@ abstract class TubeRunnerExample({
     if (ship.isLoaded) {
       ship.switchFrom(from);
     }
-    for (final seeder in _seeders) {
-      seeder.removeFromParent();
-    }
-    _seeders.clear();
-    _spikes.clear();
+    _clearSeeders();
+    _tubeTime = 0;
   }
 
   final tubeGroup = Component();
   final ship = ShipComponent();
+  final explosionGroup = Component(priority: 5);
+
+  RunnerState get state => _state;
+  var _state = RunnerState.ready;
+
+  /// How long the game has been in its state, in seconds of the game.
+  double _stateTime = 0;
+
+  int get lives => _lives;
+  int _lives = startLives;
+
+  /// How long the game has been on in the tube, in seconds of the game: since
+  /// the last change of tube, or the last new game.
+  double get tubeTime => _tubeTime;
+  double _tubeTime = 0;
+
+  final _tubeText = VectorTextComponent(capHeight: hudCap, line: 1, left: true);
+  final _timeText = VectorTextComponent(capHeight: hudCap, line: 0, left: true);
+  final _livesText = VectorTextComponent(capHeight: hudCap, line: 0);
+
+  /// READY, in the camera's viewport while the game waits for the player.
+  final readyText = VectorTextComponent(text: 'READY', capHeight: bannerCap);
+
+  /// Game Over, in the camera's viewport once the game is over.
+  final gameOverText = VectorTextComponent(
+    text: 'GAME OVER',
+    capHeight: bannerCap,
+  );
+
+  /// The Speed knob's value. It sets the world's time scale, except while the
+  /// game is over and the world stands still.
+  @override
+  double get speed => _speed;
+  double _speed = 1;
+
+  @override
+  set speed(double value) {
+    _speed = value;
+    if (_state != RunnerState.over) {
+      world.timeScale = value;
+    }
+  }
+
+  /// Whether the ship moves at the player's will.
+  bool get canMove => _state == RunnerState.play;
+
+  /// Whether a tap ends a wait.
+  bool get _isWaiting =>
+      _state == RunnerState.ready || _state == RunnerState.over;
+
+  /// The pointers that went down while the game waits, at READY or Game
+  /// Over. Each ends the wait when it goes up, as a tap; pointers that were
+  /// already down don't.
+  final _waitPointers = <int>{};
   final stars = FlightStarsComponent();
 
   /// How far the ship has flown along the tube's axis, in tube units.
@@ -167,6 +254,25 @@ abstract class TubeRunnerExample({
   static final _rightKeys = {
     PhysicalKeyboardKey.arrowRight,
     PhysicalKeyboardKey.keyD,
+  };
+
+  static final _newGameKeys = {
+    PhysicalKeyboardKey.enter,
+    PhysicalKeyboardKey.numpadEnter,
+  };
+
+  /// The keys that don't end a wait for the player on their own.
+  static final _modifierKeys = {
+    PhysicalKeyboardKey.shiftLeft,
+    PhysicalKeyboardKey.shiftRight,
+    PhysicalKeyboardKey.controlLeft,
+    PhysicalKeyboardKey.controlRight,
+    PhysicalKeyboardKey.altLeft,
+    PhysicalKeyboardKey.altRight,
+    PhysicalKeyboardKey.metaLeft,
+    PhysicalKeyboardKey.metaRight,
+    PhysicalKeyboardKey.capsLock,
+    PhysicalKeyboardKey.fn,
   };
 
   /// The keys held that went down while the game had the focus.
@@ -218,9 +324,13 @@ abstract class TubeRunnerExample({
     // Before the ship loads: it sizes its import for the view.
     _fitView();
     endlessTube.advanceTo(_flown);
-    world.addAll([tubeGroup, ship]);
+    world.addAll([tubeGroup, ship, explosionGroup]);
     // Under the world, as Tube Shooter's stars are.
     camera.backdrop.add(stars);
+    // In the camera's viewport, as StoryGame's FPS counter is: above the
+    // world, and unzoomed.
+    camera.viewport.addAll([_tubeText, _timeText, _livesText]);
+    _waitForPlayer();
     _updateTube();
     startStatus();
   }
@@ -244,18 +354,128 @@ abstract class TubeRunnerExample({
       HardwareKeyboard.instance.physicalKeysPressed.contains,
     );
     _fitView();
-    _flown += flightSpeed * dt * world.timeScale;
-    _updateSeeders(dt * world.timeScale);
+    final worldDt = dt * world.timeScale;
+    _flown += flightSpeed * worldDt;
+    _step(worldDt);
     endlessTube.advanceTo(_flown);
     _updateTube();
     super.update(dt);
+    _tubeText.text = tube.name.toUpperCase();
+    final seconds = _tubeTime.floor();
+    _timeText.text =
+        'TIME ${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+    _livesText.text = 'LIVES $_lives';
+  }
+
+  void _setState(RunnerState state) {
+    _state = state;
+    _stateTime = 0;
+    _waitPointers.clear();
+  }
+
+  /// Applies the game's rules over [dt] seconds of the world's time, after
+  /// the ship flew.
+  void _step(double dt) {
+    _stateTime += dt;
+    switch (_state) {
+      case RunnerState.play:
+        _tubeTime += dt;
+        _updateSeeders(dt);
+        _collide();
+      case RunnerState.dying:
+        if (_stateTime >= respawnTime) {
+          if (_lives == 0) {
+            _gameOver();
+          } else {
+            ship.revive();
+            _waitForPlayer();
+          }
+        }
+      case RunnerState.ready || RunnerState.over:
+        break;
+    }
+  }
+
+  /// Destroys the ship if a seeder or a spike touches it: one in its lane
+  /// that reaches the ship's ring, however the ship got into the lane. A
+  /// seeder is at its spike's near end, so the spikes say it all.
+  void _collide() {
+    final lane = ship.lane;
+    if (_spikes.any(
+      (spike) =>
+          spike.lane == lane && spike.near <= _flown && _flown <= spike.far,
+    )) {
+      _destroyShip();
+    }
+  }
+
+  /// Blows the ship up, fades it out, and takes a life. The seeders and
+  /// spikes go.
+  void _destroyShip() {
+    _lives--;
+    explosionGroup.add(
+      RunnerExplosionComponent(
+        position: ship.position.clone(),
+        angle: ship.angle,
+        scale: ship.scale.clone(),
+        color: TubeColors.ship,
+      ),
+    );
+    ship.fadeOut();
+    _clearSeeders();
+    _setState(RunnerState.dying);
+  }
+
+  /// Shows READY, until a tap or a key.
+  void _waitForPlayer() {
+    camera.viewport.add(readyText);
+    _setState(RunnerState.ready);
+  }
+
+  /// Starts the game, or resumes it after a lost ship, with the first seeder
+  /// [firstSeeder] away.
+  void _beginPlay() {
+    readyText.removeFromParent();
+    _seederTime = seederPeriod - firstSeeder;
+    _setState(RunnerState.play);
+  }
+
+  /// Stops the world, whatever [speed] is, and shows Game Over until a tap or
+  /// Enter.
+  void _gameOver() {
+    world.timeScale = 0;
+    _setState(RunnerState.over);
+    ship.isVisible = false;
+    camera.viewport.add(gameOverText);
+  }
+
+  /// Starts a new game in this one: no explosions, all lives, the time in the
+  /// tube from 0, and the world at [speed], waiting at READY.
+  void _newGame() {
+    explosionGroup.removeAll(explosionGroup.children.toList());
+    _lives = startLives;
+    _tubeTime = 0;
+    gameOverText.removeFromParent();
+    world.timeScale = _speed;
+    ship.revive();
+    _waitForPlayer();
+  }
+
+  /// Ends a wait: starts a new game once it's over, or else plays.
+  void _endWait() {
+    if (_state == RunnerState.over) {
+      _newGame();
+    } else {
+      _beginPlay();
+    }
   }
 
   /// Makes the tube's paths again if the ship flew or changed lanes, or the
   /// view changed.
   void _updateTube() {
-    // The ship knows its lane once loaded.
-    final lane = ship.isLoaded ? ship.lane : null;
+    // The ship knows its lane once loaded. Its lane shows while it's in play,
+    // as in Tube Shooter.
+    final lane = ship.isLoaded && canMove ? ship.lane : null;
     if (_flown == _tubeFlown &&
         view.version == _tubeVersion &&
         lane == _tubeLane) {
@@ -314,6 +534,15 @@ abstract class TubeRunnerExample({
     _spikes.removeWhere((spike) => spike.far < _flown);
   }
 
+  /// Removes all the seeders and spikes.
+  void _clearSeeders() {
+    for (final seeder in _seeders) {
+      seeder.removeFromParent();
+    }
+    _seeders.clear();
+    _spikes.clear();
+  }
+
   /// Removes [old], if any, and returns a component that fills [quads] in
   /// [color], added to [tubeGroup], if there are any.
   PositionComponent? _replaceQuads(
@@ -359,12 +588,38 @@ abstract class TubeRunnerExample({
     );
   }
 
+  /// Takes note of a pointer that goes down while the game waits, at READY
+  /// or Game Over: it ends the wait when it goes up, as a tap.
+  @override
+  void onDragStart(DragStartEvent event) {
+    if (_isWaiting) {
+      _waitPointers.add(event.pointerId);
+    }
+    super.onDragStart(event);
+  }
+
   /// Moves the ship a lane every [dragPerLane] logical pixels left or right,
   /// whatever the zoom.
   @override
   void onDragUpdate(DragUpdateEvent event) {
-    ship.moveBy(event.canvasDelta.x / dragPerLane);
+    if (canMove) {
+      ship.moveBy(event.canvasDelta.x / dragPerLane);
+    }
     super.onDragUpdate(event);
+  }
+
+  @override
+  void onDragEnd(DragEndEvent event) {
+    if (_waitPointers.remove(event.pointerId)) {
+      _endWait();
+    }
+    super.onDragEnd(event);
+  }
+
+  @override
+  void onDragCancel(DragCancelEvent event) {
+    _waitPointers.remove(event.pointerId);
+    super.onDragCancel(event);
   }
 
   /// Moves the ship a lane for each scroll, whatever its size: clockwise for
@@ -372,22 +627,37 @@ abstract class TubeRunnerExample({
   @override
   void onScroll(ScrollEvent event) {
     final delta = event.raw.scrollDelta;
-    if (delta.dy != 0) {
-      ship.moveBy(-delta.dy.sign);
-    } else if (delta.dx != 0) {
-      ship.moveBy(delta.dx.sign);
+    if (canMove) {
+      if (delta.dy != 0) {
+        ship.moveBy(-delta.dy.sign);
+      } else if (delta.dx != 0) {
+        ship.moveBy(delta.dx.sign);
+      }
     }
     super.onScroll(event);
   }
 
-  /// Counts the keys that move the ship as held while down, and ignores the
-  /// others.
+  /// Handles a key: at READY, any key but a modifier starts the game, and
+  /// once it's over, Enter starts a new one. The keys that move the ship
+  /// count as held while down, and it ignores the others.
   @override
   KeyEventResult onKeyEvent(
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
     final key = event.physicalKey;
+    if (_state == RunnerState.ready &&
+        event is KeyDownEvent &&
+        !_modifierKeys.contains(key)) {
+      _beginPlay();
+      return KeyEventResult.handled;
+    }
+    if (_newGameKeys.contains(key)) {
+      if (event is KeyDownEvent && _state == RunnerState.over) {
+        _newGame();
+      }
+      return KeyEventResult.handled;
+    }
     if (!_leftKeys.contains(key) && !_rightKeys.contains(key)) {
       return KeyEventResult.ignored;
     }

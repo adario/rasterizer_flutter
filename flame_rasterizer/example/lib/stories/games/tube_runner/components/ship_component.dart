@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
@@ -12,10 +13,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// moves round the rim: see [PlayerComponent], whose numbers it shares.
 ///
 /// The eye looks at that ring as Tube Shooter's looks at the rim, so the ship
-/// is where Tube Shooter's is on screen.
+/// is where Tube Shooter's is on screen. It moves only while the game is on,
+/// and fades out when destroyed.
 class ShipComponent()
     extends PositionComponent
-    with HasGameRef<TubeRunnerExample> {
+    with HasGameRef<TubeRunnerExample>, HasVisibility {
   this : super(priority: 4);
 
   static const stepsPerLane = PlayerComponent.stepsPerLane;
@@ -51,7 +53,7 @@ class ShipComponent()
   @override
   void update(double dt) {
     super.update(dt);
-    final direction = gameRef.keyDirection;
+    final direction = gameRef.canMove ? gameRef.keyDirection : 0;
     if (direction != 0) {
       _keyTime += dt;
       final (:first, :most) = PlayerComponent.keySpeed;
@@ -65,6 +67,24 @@ class ShipComponent()
     }
     place();
     gameRef.keepStroke(drawing);
+  }
+
+  /// Fades it out over [PlayerComponent.fadeTime], as Tube Shooter's ship
+  /// does when destroyed.
+  void fadeOut() {
+    drawing.add(
+      OpacityEffect.fadeOut(
+        EffectController(duration: PlayerComponent.fadeTime),
+      ),
+    );
+  }
+
+  /// Shows it again, fully opaque, after [fadeOut].
+  void revive() {
+    isVisible = true;
+    drawing
+      ..removeAll(drawing.children.whereType<OpacityEffect>().toList())
+      ..opacity = 1;
   }
 
   /// Moves it onto the view's tube, to the step nearest the angle round the
