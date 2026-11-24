@@ -8,6 +8,7 @@ import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/flight_stars_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_seeder_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ship_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
@@ -70,6 +71,11 @@ abstract class TubeRunnerExample({
     without a stop. The ship's lane shows in the ship's colour, as in Tube
     Shooter.
 
+    After 8 seconds, and every 5 seconds from then on, a seeder comes at the
+    farthest ring across the tube, on a lane picked at random. It climbs its lane toward the ship, laying a
+    spike behind it, and goes once it passes the ship; the spike goes once
+    all of it does. Nothing collides yet.
+
     The game makes the tube's quads again every frame. The mesh renderer fills
     each quad on its own, as a fan of triangles, rather than their union. The
     bar under the game shows the renderer, the frame times, the renderer's own
@@ -78,6 +84,11 @@ abstract class TubeRunnerExample({
 
   /// How fast the ship flies, in tube units a second.
   static const flightSpeed = 2.0;
+
+  /// When the first seeder comes, and how often the others do, in seconds
+  /// of the game.
+  static const firstSeeder = 8.0;
+  static const seederPeriod = 5.0;
 
   /// How far a drag goes to move the ship one lane, in logical pixels.
   static const dragPerLane = 40.0;
@@ -92,7 +103,8 @@ abstract class TubeRunnerExample({
   Tube get tube => view.tube;
 
   /// Changes the tube where the ship is, without a stop: the ship goes on at
-  /// the same angle round the axis, in the new tube's nearest step.
+  /// the same angle round the axis, in the new tube's nearest step. The
+  /// seeders and spikes go.
   set tube(Tube value) {
     final from = view.tube;
     if (value == from) {
@@ -102,6 +114,11 @@ abstract class TubeRunnerExample({
     if (ship.isLoaded) {
       ship.switchFrom(from);
     }
+    for (final seeder in _seeders) {
+      seeder.removeFromParent();
+    }
+    _seeders.clear();
+    _spikes.clear();
   }
 
   final tubeGroup = Component();
@@ -116,6 +133,15 @@ abstract class TubeRunnerExample({
   /// ship's colour, as Tube Shooter does.
   PositionComponent? _tube;
   PositionComponent? _lane;
+  PositionComponent? _spikesDrawing;
+
+  /// The seeders climbing the tube, and the spikes they laid, nearest first.
+  final _seeders = <RunnerSeederComponent>[];
+  final _spikes = <Spike>[];
+
+  /// How long the game has run since the last seeder came, or since
+  /// [seederPeriod] before [firstSeeder].
+  double _seederTime = seederPeriod - firstSeeder;
 
   /// How far the ship had flown, the view's version and the ship's lane, as
   /// the tube's paths were made last.
@@ -219,6 +245,7 @@ abstract class TubeRunnerExample({
     );
     _fitView();
     _flown += flightSpeed * dt * world.timeScale;
+    _updateSeeders(dt * world.timeScale);
     endlessTube.advanceTo(_flown);
     _updateTube();
     super.update(dt);
@@ -237,10 +264,54 @@ abstract class TubeRunnerExample({
     _tubeFlown = _flown;
     _tubeVersion = view.version;
     _tubeLane = lane;
-    final quads = endlessTube.quadsAt(_flown, view, lane: lane);
-    _quads = quads.tube.vertexCounts.length + quads.lane.vertexCounts.length;
+    final quads = endlessTube.quadsAt(
+      _flown,
+      view,
+      lane: lane,
+      spikes: _spikes,
+    );
+    _quads =
+        quads.tube.vertexCounts.length +
+        quads.lane.vertexCounts.length +
+        quads.spikes.vertexCounts.length;
     _tube = _replaceQuads(_tube, quads.tube, TubeColors.tube);
     _lane = _replaceQuads(_lane, quads.lane, TubeColors.ship);
+    _spikesDrawing = _replaceQuads(
+      _spikesDrawing,
+      quads.spikes,
+      TubeColors.spikes,
+    );
+    for (final seeder in _seeders) {
+      seeder.placeAt(quads.seeders[_spikes.indexOf(seeder.spike)]);
+    }
+  }
+
+  /// Over [dt] seconds of the game: brings a seeder at [firstSeeder], then
+  /// every [seederPeriod], at the farthest ring across the tube, climbs the
+  /// seeders, and drops those past the ship, and the spikes all past it.
+  void _updateSeeders(double dt) {
+    _seederTime += dt;
+    if (_seederTime >= seederPeriod) {
+      _seederTime -= seederPeriod;
+      const spacing = EndlessTube.ringSpacing;
+      final far = ((_flown + EndlessTube.ahead) / spacing).floor() * spacing;
+      final spike = Spike(random.nextInt(tube.laneCount), far);
+      final seeder = RunnerSeederComponent(spike);
+      _spikes.add(spike);
+      _seeders.add(seeder);
+      world.add(seeder);
+    }
+    for (final seeder in _seeders) {
+      seeder.climb(dt);
+    }
+    _seeders.removeWhere((seeder) {
+      final passed = seeder.spike.near < _flown;
+      if (passed) {
+        seeder.removeFromParent();
+      }
+      return passed;
+    });
+    _spikes.removeWhere((spike) => spike.far < _flown);
   }
 
   /// Removes [old], if any, and returns a component that fills [quads] in

@@ -42,6 +42,27 @@ class const Ring(
   Point3 place(Offset point) => center + right * point.dx + down * point.dy;
 }
 
+/// A spike down the middle of a [lane], from [near] to [far] along the
+/// axis, in tube units: [far] where its seeder came, and [near] where the
+/// seeder has laid it to.
+class Spike(final int lane, final double far) {
+  double near = far;
+}
+
+/// Where a seeder shows in the world, at the near end of its spike: its
+/// position, its angle, with its tail along the spike, and its scale, the
+/// lane's width there.
+typedef SeederPlace = ({Offset position, double angle, double scale});
+
+/// What [EndlessTube.quadsAt] makes: the quads of the tube, of the ship's
+/// lane and of the spikes, and where each spike's seeder shows, if it does.
+typedef TubeQuads = ({
+  RasterizerPolygons tube,
+  RasterizerPolygons lane,
+  RasterizerPolygons spikes,
+  List<SeederPlace?> seeders,
+});
+
 /// An endless tube, made as the ship flies along it.
 ///
 /// Its outline is the view's tube, which [quadsAt] takes, so it can change
@@ -144,11 +165,14 @@ class EndlessTube() {
   /// beyond.
   ///
   /// The lines of [lane], if any, go to `lane` instead of `tube`: its two
-  /// edges, and its stretch of each ring across it.
-  ({RasterizerPolygons tube, RasterizerPolygons lane}) quadsAt(
+  /// edges, and its stretch of each ring across it. The [spikes] go to
+  /// `spikes`, walls hiding them as they do the tube's lines, and `seeders`
+  /// says where each spike's seeder shows, or null where the tube hides it.
+  TubeQuads quadsAt(
     double distance,
     TubeView view, {
     int? lane,
+    List<Spike> spikes = const [],
   }) {
     final tube = view.tube;
     final ship = ringAt(distance);
@@ -199,6 +223,15 @@ class EndlessTube() {
     }
     final lines = _Lines(view);
     final laneLines = _Lines(view);
+    final spikeLines = _Lines(view);
+    final seeders = List<SeederPlace?>.filled(spikes.length, null);
+    // Where the eye sees a point of the outline, or the middle of a lane,
+    // [at] along the axis, from ring k.
+    Point3 seenAt(int k, double at, Offset point) => _fromEye(
+      _turnTo(_rings[k], at, _rings[k].index).place(point),
+      eye,
+      ship,
+    );
     final laneEdges = lane == null
         ? const <int>{}
         : {lane, tube.pointAfter(lane)};
@@ -220,6 +253,32 @@ class EndlessTube() {
             );
           }
         }
+        final from = _rings[k].index * step;
+        for (var j = 0; j < spikes.length; j++) {
+          final spike = spikes[j];
+          if (!faces(k, spike.lane)) {
+            continue;
+          }
+          final middle = tube.middles[spike.lane];
+          final start = math.max(spike.near, from);
+          final end = math.min(spike.far, from + step);
+          if (start < end) {
+            spikeLines.add(
+              seenAt(k, start, middle),
+              seenAt(k, end, middle),
+              hiders: hiders,
+            );
+          }
+          if (spike.near >= from && spike.near < from + step) {
+            seeders[j] = _seederPlace(
+              spike,
+              (at, point) => seenAt(k, at, point),
+              tube,
+              lines,
+              hiders,
+            );
+          }
+        }
       }
       if (_rings[k].index % every == 0) {
         for (var i = 0; i < tube.laneCount; i++) {
@@ -234,7 +293,58 @@ class EndlessTube() {
         }
       }
     }
-    return (tube: lines.quads, lane: laneLines.quads);
+    return (
+      tube: lines.quads,
+      lane: laneLines.quads,
+      spikes: spikeLines.quads,
+      seeders: seeders,
+    );
+  }
+
+  /// How far ahead of a seeder, along the axis, [_seederPlace] looks for the
+  /// way its spike goes.
+  static const _seederLook = 0.05;
+
+  /// Returns where [spike]'s seeder shows, or null where [hiders] hide its
+  /// middle, with [seenAt] saying where the eye sees a point of the outline
+  /// some distance along the axis, and [lines] where those land.
+  static SeederPlace? _seederPlace(
+    Spike spike,
+    Point3 Function(double at, Offset point) seenAt,
+    Tube tube,
+    _Lines lines,
+    _Hiders? hiders,
+  ) {
+    final lane = spike.lane;
+    final middle = seenAt(spike.near, tube.middles[lane]);
+    final ahead = seenAt(spike.near + _seederLook, tube.middles[lane]);
+    final corner = seenAt(spike.near, tube.points[lane]);
+    final nextCorner = seenAt(spike.near, tube.points[tube.pointAfter(lane)]);
+    if ([middle, ahead, corner, nextCorner].any((p) => p.z < TubeView.near)) {
+      return null;
+    }
+    if (hiders != null) {
+      final count = hiders.spansOf(
+        _sight(middle),
+        _sight(ahead),
+        nearer: false,
+      );
+      if (count == 0 || hiders.spans[0] > 0) {
+        return null;
+      }
+    }
+    final position = lines._project(middle);
+    return (
+      position: position,
+      // The shape's tail, along its y, points along the spike.
+      angle: (lines._project(ahead) - position).direction - math.pi / 2,
+      // As Tube Shooter's, the same in every lane: [Tube.laneWidth], as far
+      // away as the seeder.
+      scale:
+          (lines._project(nextCorner) - lines._project(corner)).distance *
+          tube.laneWidth /
+          (tube.points[tube.pointAfter(lane)] - tube.points[lane]).distance,
+    );
   }
 
   /// What the rings hide, for the last closed tube that [quadsAt] drew.
