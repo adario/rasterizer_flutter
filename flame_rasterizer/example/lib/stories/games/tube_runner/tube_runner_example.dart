@@ -228,7 +228,7 @@ abstract class TubeRunnerExample({
     _tubeFlown = _flown;
     _tubeVersion = view.version;
     final quads = endlessTube.quadsAt(_flown, view);
-    _quads = quads.pointCounts.length;
+    _quads = quads.vertexCounts.length;
     _tube?.removeFromParent();
     _tube = null;
     if (quads.bounds.isEmpty) {
@@ -357,7 +357,7 @@ class FlameTubeRunnerExample({
   @override
   PositionComponent quadsComponent(RasterizerPolygons quads, Color color) {
     final path = Path();
-    final points = quads.points;
+    final points = quads.vertices;
     for (var i = 0; i < points.length; i += 8) {
       path.addPolygon([
         for (var k = i; k < i + 8; k += 2) Offset(points[k], points[k + 1]),
