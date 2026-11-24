@@ -67,7 +67,8 @@ abstract class TubeRunnerExample({
     Move the ship round the tube with the arrow keys, A and D, by dragging
     left and right, or a lane per scroll of the mouse wheel. The Tube knob
     picks one of Tube Shooter's closed tubes, which the ship goes on down
-    without a stop.
+    without a stop. The ship's lane shows in the ship's colour, as in Tube
+    Shooter.
 
     The game makes the tube's quads again every frame. The mesh renderer fills
     each quad on its own, as a fan of triangles, rather than their union. The
@@ -111,15 +112,18 @@ abstract class TubeRunnerExample({
   double get flown => _flown;
   double _flown = 0;
 
-  /// The component that draws the tube.
+  /// The components that draw the tube, and the ship's lane over it in the
+  /// ship's colour, as Tube Shooter does.
   PositionComponent? _tube;
+  PositionComponent? _lane;
 
-  /// How far the ship had flown, and the view's version, as the tube's path
-  /// was made last.
+  /// How far the ship had flown, the view's version and the ship's lane, as
+  /// the tube's paths were made last.
   double _tubeFlown = double.nan;
   int _tubeVersion = -1;
+  int? _tubeLane;
 
-  /// How many quads the tube's path has.
+  /// How many quads the tube's paths have.
   int _quads = 0;
 
   /// How many paths the game made in the last second, as the status bar
@@ -220,22 +224,40 @@ abstract class TubeRunnerExample({
     super.update(dt);
   }
 
-  /// Makes the tube's path again if the ship flew or the view changed.
+  /// Makes the tube's paths again if the ship flew or changed lanes, or the
+  /// view changed.
   void _updateTube() {
-    if (_flown == _tubeFlown && view.version == _tubeVersion) {
+    // The ship knows its lane once loaded.
+    final lane = ship.isLoaded ? ship.lane : null;
+    if (_flown == _tubeFlown &&
+        view.version == _tubeVersion &&
+        lane == _tubeLane) {
       return;
     }
     _tubeFlown = _flown;
     _tubeVersion = view.version;
-    final quads = endlessTube.quadsAt(_flown, view);
-    _quads = quads.vertexCounts.length;
-    _tube?.removeFromParent();
-    _tube = null;
+    _tubeLane = lane;
+    final quads = endlessTube.quadsAt(_flown, view, lane: lane);
+    _quads = quads.tube.vertexCounts.length + quads.lane.vertexCounts.length;
+    _tube = _replaceQuads(_tube, quads.tube, TubeColors.tube);
+    _lane = _replaceQuads(_lane, quads.lane, TubeColors.ship);
+  }
+
+  /// Removes [old], if any, and returns a component that fills [quads] in
+  /// [color], added to [tubeGroup], if there are any.
+  PositionComponent? _replaceQuads(
+    PositionComponent? old,
+    RasterizerPolygons quads,
+    Color color,
+  ) {
+    old?.removeFromParent();
     if (quads.bounds.isEmpty) {
-      return;
+      return null;
     }
     _paths++;
-    tubeGroup.add(_tube = quadsComponent(quads, TubeColors.tube));
+    final component = quadsComponent(quads, color);
+    tubeGroup.add(component);
+    return component;
   }
 
   /// Creates a component that fills [quads] in [color], where they are in

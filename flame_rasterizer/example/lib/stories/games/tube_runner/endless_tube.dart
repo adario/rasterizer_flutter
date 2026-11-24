@@ -142,7 +142,14 @@ class EndlessTube() {
   /// cuts out what the rings before each line hide of it, as [_Hiders] says,
   /// so that where the tube bends, its nearer walls and ridges hide what's
   /// beyond.
-  RasterizerPolygons quadsAt(double distance, TubeView view) {
+  ///
+  /// The lines of [lane], if any, go to `lane` instead of `tube`: its two
+  /// edges, and its stretch of each ring across it.
+  ({RasterizerPolygons tube, RasterizerPolygons lane}) quadsAt(
+    double distance,
+    TubeView view, {
+    int? lane,
+  }) {
     final tube = view.tube;
     final ship = ringAt(distance);
     final eye = ship.center - ship.forward * Tube.eye;
@@ -191,6 +198,10 @@ class EndlessTube() {
       hiders = _hiders!..reset();
     }
     final lines = _Lines(view);
+    final laneLines = _Lines(view);
+    final laneEdges = lane == null
+        ? const <int>{}
+        : {lane, tube.pointAfter(lane)};
     final every = (ringSpacing / step).round();
     for (var k = 0; k < _rings.length; k++) {
       final outline = seen[k];
@@ -202,14 +213,18 @@ class EndlessTube() {
               ? i - 1
               : (i + tube.laneCount - 1) % tube.laneCount;
           if (faces(k, before) || faces(k, i)) {
-            lines.add(outline[i], next[i], hiders: hiders);
+            (laneEdges.contains(i) ? laneLines : lines).add(
+              outline[i],
+              next[i],
+              hiders: hiders,
+            );
           }
         }
       }
       if (_rings[k].index % every == 0) {
         for (var i = 0; i < tube.laneCount; i++) {
           if (faces(k - 1, i) || faces(k, i)) {
-            lines.add(
+            (i == lane ? laneLines : lines).add(
               outline[i],
               outline[tube.pointAfter(i)],
               hiders: hiders,
@@ -219,7 +234,7 @@ class EndlessTube() {
         }
       }
     }
-    return lines.quads;
+    return (tube: lines.quads, lane: laneLines.quads);
   }
 
   /// What the rings hide, for the last closed tube that [quadsAt] drew.
