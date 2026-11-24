@@ -38,6 +38,13 @@ enum PinballSound(final String file) {
   String get path => 'assets/audio/$file.wav';
 }
 
+/// The bodies that each drop has: balls and SVGs in turn, or only one kind.
+enum PinballDrops(final String label) {
+  mixed('Mixed'),
+  balls('Balls'),
+  svgs('SVGs'),
+}
+
 abstract class RevolutePinballExample({
   @override required var bool pieces,
   required super.status,
@@ -88,8 +95,12 @@ abstract class RevolutePinballExample({
     bucket's fill, once. Drained bodies take energy, until the game is over:
     then the table goes on, without the flippers, drops or scores. A full
     bucket gives its bodies' area back, empties, and kicks the other's bodies
-    up and out. The Sound knob turns sounds on and off.
+    up and out. The Drops knob picks the next drops' bodies: mixed, only
+    balls or only SVGs. The Sound knob turns sounds on and off.
   ''';
+
+  /// The Drops knob's value, for the next drops.
+  PinballDrops drops = PinballDrops.mixed;
 
   /// The Sound knob's value. The sounds load the first time it's on.
   bool get sound => _sound;
@@ -581,7 +592,14 @@ abstract class RevolutePinballExample({
     final ballsFirst = random.nextBool();
     final bodies = [
       for (var i = 0; i < _dropped; i++)
-        if (i.isEven == ballsFirst) randomBall() else randomSvg(spin: 2),
+        if (switch (drops) {
+          PinballDrops.mixed => i.isEven == ballsFirst,
+          PinballDrops.balls => true,
+          PinballDrops.svgs => false,
+        })
+          randomBall()
+        else
+          randomSvg(spin: 2),
     ];
     final positions = spreadAround(
       spawn,

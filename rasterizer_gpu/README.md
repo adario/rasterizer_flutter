@@ -50,14 +50,18 @@ emulator's OpenGL ES, it draws 4× multisampled. On the iPhone, its golden, mesh
 and on the iOS Simulator its golden tests pass against the `macos` set. Its goldens are recorded on macOS, the iPhone,
 the emulator, and in the Linux container, where it draws on llvmpipe.
 
-On the emulator's Vulkan with the Mac's GPU, the canvas renderer, which draws each path, doesn't reliably draw frames of
-a few hundred paths or more. The emulator reports a full descriptor pool as `ErrorFragmentedPool`. Flutter 3.47.9's
-Impeller doesn't replace the pool on that error, as it does on `ErrorOutOfPoolMemory`, so a frame of more than about
-800 draws hangs or crashes the app, with or without this package. Flutter 3.50.0's Impeller replaces it, but such
-frames come out empty or wrong, on screen as in `toImage`, and the heaviest, such as 100 of the example's tigers, of
-301 paths each, make the emulator's memory grow by gigabytes within seconds. The emulator's OpenGL ES, and its software
-GPU (`emulator -avd <name> -gpu swiftshader_indirect`), whose Vulkan reports the full pool, draw them. To test the
-canvas renderer on the emulator, use either.
+On the emulator's Vulkan with the Mac's GPU, the canvas renderer, which draws each path, can't draw the heaviest frames.
+Emulator 37.3 runs that Vulkan on Metal through KosmicKrisp where the Mac supports Metal 4, and through MoltenVK
+otherwise, or with `ANDROID_EMU_VK_SELECT_ICD=moltenvk`. With KosmicKrisp, frames of about 1,500 paths draw, but 100 of
+the example's tigers, of 301 paths each, take seconds per frame and never reach the screen, while the emulator's memory
+grows. Opening a Widgetbook dropdown over 100 SVGs on the canvas renderer has hung the Mac's GPU: macOS resets it, and
+the emulator quits on the lost Vulkan device. With MoltenVK, frames of a few hundred paths or more don't reliably draw.
+The emulator reports a full descriptor pool as `ErrorFragmentedPool`. Flutter 3.47.9's Impeller doesn't replace the
+pool on that error, as it does on `ErrorOutOfPoolMemory`, so a frame of more than about 800 draws hangs or crashes the
+app, with or without this package. Flutter 3.50.0's Impeller replaces it, but such frames come out empty or wrong, on
+screen as in `toImage`, and the heaviest, such as 100 tigers, make the emulator's memory grow by gigabytes within
+seconds. The emulator's OpenGL ES, and its software GPU (`emulator -avd <name> -gpu swiftshader_indirect`), whose Vulkan
+reports the full pool, draw them. To test the canvas renderer on the emulator, use either.
 
 ## App setup
 

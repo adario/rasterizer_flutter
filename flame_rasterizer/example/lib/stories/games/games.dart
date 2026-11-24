@@ -72,6 +72,12 @@ WidgetbookComponent gamesStories() {
           return RevolutePinballStory(
             renderer: renderer,
             pieces: context.knobs.boolean(label: 'Pieces'),
+            drops: context.knobs.object.dropdown(
+              label: 'Drops',
+              options: PinballDrops.values,
+              initialOption: PinballDrops.mixed,
+              labelBuilder: (drops) => drops.label,
+            ),
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
             speed: speedKnob(context),
@@ -241,6 +247,7 @@ class const RevolutePinballStory({
   required final SvgRenderer renderer,
   required final bool pieces,
   required final bool sound,
+  final PinballDrops drops = PinballDrops.mixed,
   final double zoom = 1,
   final double speed = 1,
   final SvgCache cache = defaultSvgCache,
@@ -252,16 +259,20 @@ class const RevolutePinballStory({
     return GameStory<RevolutePinballExample, RevolutePinballSnapshot>(
       renderer: renderer,
       cache: cache,
-      create: (status, from) => RevolutePinballExample.of(
-        renderer,
-        status,
-        pieces: pieces,
-        cache: cache,
-        from: from,
-      )..sound = sound,
+      create: (status, from) =>
+          RevolutePinballExample.of(
+              renderer,
+              status,
+              pieces: pieces,
+              cache: cache,
+              from: from,
+            )
+            ..drops = drops
+            ..sound = sound,
       snapshot: (game) => game.snapshot,
       update: (game) => game
         ..pieces = pieces
+        ..drops = drops
         ..sound = sound,
       zoom: zoom,
       speed: speed,
