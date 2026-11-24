@@ -57,6 +57,7 @@ WidgetbookComponent gamesStories() {
               initialValue: true,
             ),
             glow: context.knobs.boolean(label: 'Glow'),
+            runs: context.knobs.boolean(label: 'Runs'),
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
             speed: speedKnob(context),
@@ -175,6 +176,10 @@ class const TubeShooterStory({
   /// Whether the lines glow: see [TubeShooterExample.glow].
   final bool glow = false,
 
+  /// Whether the ship flies on down a run after a closed tube's drop: see
+  /// [TubeShooterExample.runs].
+  final bool runs = false,
+
   /// Whether the game plays its sounds.
   final bool sound = true,
 
@@ -229,12 +234,14 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
             )
             ..driftingStars = widget.driftingStars
             ..glow = widget.glow
+            ..runs = widget.runs
             ..sound = widget.sound
             ..onLevel = _onLevel,
       snapshot: (game) => game.snapshot,
       update: (game) => game
         ..driftingStars = widget.driftingStars
         ..glow = widget.glow
+        ..runs = widget.runs
         ..sound = widget.sound,
       zoom: widget.zoom,
       speed: widget.speed,

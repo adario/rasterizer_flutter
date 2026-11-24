@@ -1928,7 +1928,14 @@ void main() {
         );
         watch.stop();
         expect(watch.problems, isEmpty);
-        expect(watch.states, TubeState.values.toSet());
+        // All but a run's, which needs the Runs knob.
+        expect(
+          watch.states,
+          TubeState.values.toSet().difference({
+            TubeState.run,
+            TubeState.arrive,
+          }),
+        );
         await tester.pumpWidget(const SizedBox());
       });
     }

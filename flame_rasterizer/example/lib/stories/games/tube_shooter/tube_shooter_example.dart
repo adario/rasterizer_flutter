@@ -8,6 +8,8 @@ import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/game_sounds.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/bolts_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/climber_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/dot_component.dart';
@@ -31,6 +33,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
 
+part 'tube_shooter_run.dart';
 part 'tube_shooter_snapshot.dart';
 
 /// The game's states.
@@ -50,6 +53,14 @@ enum TubeState() {
 
   /// The round's enemies are gone, and the ship drops down its lane.
   drop,
+
+  /// With [TubeShooterExample.runs] on, the ship flies on from the drop, down
+  /// an endless tube.
+  run,
+
+  /// The run is over: the ship flies out of its tube, onto the next round's
+  /// rim.
+  arrive,
 
   /// The game is over, and stands still until a tap, or Enter, starts a new
   /// one.
@@ -127,7 +138,10 @@ abstract class TubeShooterExample({
     glow with them, and the other renderers draw it with a shader over the
     world. The Level knob shows the round's level, and starts a new game at
     the level it picks. The other knobs keep the stars drifting, turn the
-    sounds on and off, zoom the camera and change the game's speed. A new
+    sounds on and off, zoom the camera and change the game's speed. The Runs
+    knob, a prototype, flies the ship on from a closed tube's drop down Tube
+    Runner's endless tube, for 20 seconds, then out of it, onto the next
+    round's rim. A new
     renderer's game goes on with the same round, ship, enemies and shots,
     from where they were. The bar under the game shows the renderer, the
     frame times, the renderer's own numbers and the paths made each second.
@@ -143,6 +157,21 @@ abstract class TubeShooterExample({
 
   /// How long the drop takes, in seconds.
   static const dropTime = 2.0;
+
+  /// How long a run lasts, with [runs] on, once the drop is over, in seconds
+  /// of the game: see [TubeState.run].
+  static const runTime = 20.0;
+
+  /// How far a run's tube eases into its bends, and out of them, in tube
+  /// units.
+  static const runEase = 8.0;
+
+  /// How long the ship takes to arrive on the next round's rim after a run,
+  /// in seconds of the game.
+  static const arriveTime = 4.0;
+
+  /// How long the ship's lane takes to fade in on a run, in seconds.
+  static const laneFadeTime = 0.3;
 
   /// The seconds from the ship's destruction to its return.
   static const respawnTime = 1.5;
@@ -229,6 +258,10 @@ abstract class TubeShooterExample({
   TubeState get state => _state;
   TubeState _state = TubeState.zoom;
   double _stateTime = 0;
+
+  /// The run, from the drop it starts with to the ship's arrival on the next
+  /// round's rim, with [runs] on.
+  _Run? _run;
 
   /// Whether the ship was destroyed on its drop, so that the next round comes
   /// rather than the same one again.
@@ -387,7 +420,9 @@ abstract class TubeShooterExample({
       (_heldKeys.any(_rightKeys.contains) ? 1 : 0) -
       (_heldKeys.any(_leftKeys.contains) ? 1 : 0);
 
-  bool get canMove => _state == TubeState.play;
+  bool get canMove =>
+      _state == TubeState.play ||
+      (_state == TubeState.run && _stateTime < runTime);
   bool get canFire => _state == TubeState.play || _state == TubeState.drop;
 
   /// Whether a tap ends a wait, rather than firing.
@@ -420,6 +455,11 @@ abstract class TubeShooterExample({
       }
     }
   }
+
+  /// The Runs knob's value: whether, after a closed tube's drop, the ship
+  /// flies on down an endless tube for [runTime], before it flies onto the
+  /// next round's rim: see [TubeState.run]. A prototype, off by default.
+  bool runs = false;
 
   /// The Glow knob's value: whether the lines glow.
   ///
@@ -587,6 +627,38 @@ abstract class TubeShooterExample({
     return component;
   }
 
+  /// Creates a component that fills [quads] in [color], where they are in
+  /// the world, at [priority], with [glow] if [rendererGlows]: a path of
+  /// them, by default.
+  ///
+  /// Its contours stay open, as the fill closes them anyway.
+  PositionComponent quadsComponent(
+    RasterizerPolygons quads,
+    Color color, {
+    int? priority,
+    RasterizerGlow? glow,
+  }) {
+    final path = Path();
+    final points = quads.vertices;
+    for (var i = 0; i < points.length; i += 8) {
+      path.addPolygon([
+        for (var k = i; k < i + 8; k += 2) Offset(points[k], points[k + 1]),
+      ], false);
+    }
+    return pathComponent(
+      path,
+      Paint()..color = color,
+      position: Vector2(quads.bounds.left, quads.bounds.top),
+      maxSize: _maxSizeOf(quads),
+      priority: priority,
+      glow: glow,
+    );
+  }
+
+  /// Returns the most device pixels that [quads]' longer side spans.
+  double _maxSizeOf(RasterizerPolygons quads) =>
+      math.max(quads.bounds.width, quads.bounds.height) / view.devicePixel;
+
   @override
   Future<void> onLoad() async {
     // Before the ship loads in addAll: it sizes its import for the view.
@@ -654,6 +726,7 @@ abstract class TubeShooterExample({
     // tube's paths for the view.
     _step(dt * world.timeScale);
     _aimCamera();
+    _drawRun();
     tube.lane = _state == TubeState.play ? player.lane : null;
     // In a still world, where nothing updates, applies a change of the view,
     // such as a resize or a zoom.
@@ -662,8 +735,9 @@ abstract class TubeShooterExample({
     }
     _lastVersion = view.version;
     super.update(dt);
+    _placeArriving();
     _levelText.text = level.tube.name.toUpperCase();
-    _roundText.text = 'ROUND $round';
+    _roundText.text = _state == TubeState.run ? _runClock : 'ROUND $round';
     _livesText.text = 'LIVES $lives';
     _scoreText.text = 'SCORE $score';
     // In real time, so that it goes in a still world too.
@@ -719,6 +793,8 @@ abstract class TubeShooterExample({
     if (driftingStars ||
         _state == TubeState.zoom ||
         _state == TubeState.drop ||
+        _state == TubeState.run ||
+        _state == TubeState.arrive ||
         (_state == TubeState.dying && _dyingOnDrop)) {
       starField.show();
     } else if (world.timeScale == 0) {
@@ -761,14 +837,32 @@ abstract class TubeShooterExample({
           }
           _setState(TubeState.drop);
           _play(Sound.drop);
+          if (runs && !view.tube.isOpen) {
+            _run = _Run(
+              view.tube,
+              level.color,
+              levels[(_levelIndex + 1) % levels.length],
+            );
+          }
         }
       case TubeState.drop:
         final progress = math.min(1.0, _stateTime / dropTime);
-        player.depth = view.eyeShift = Tube.depth * progress * progress;
+        player.depth = view.eyeShift = _run == null
+            ? Tube.depth * progress * progress
+            : _Run.dropDepth(progress);
+        _run?.flown = view.eyeShift;
         _collide();
         if (_state == TubeState.drop && progress == 1) {
-          _nextRound();
+          if (_run == null) {
+            _nextRound();
+          } else {
+            _beginRun();
+          }
         }
+      case TubeState.run:
+        _stepRun();
+      case TubeState.arrive:
+        _stepArrive();
       case TubeState.dying:
         if (_stateTime >= respawnTime) {
           if (lives == 0) {
@@ -1030,6 +1124,7 @@ abstract class TubeShooterExample({
       return;
     }
     _dyingOnDrop = _state == TubeState.drop;
+    _endRun();
     lives--;
     _explode(player, player.depth, color: TubeColors.ship);
     _play(Sound.crash);
@@ -1048,13 +1143,13 @@ abstract class TubeShooterExample({
   }
 
   /// Starts the next round on the next level's tube, or the first round on
-  /// the round's level.
-  void _nextRound() {
+  /// the round's level, [arriving] from a run if so.
+  void _nextRound({bool arriving = false}) {
     if (round > 0) {
       _levelIndex = (_levelIndex + 1) % levels.length;
     }
     round++;
-    _startRound();
+    _startRound(arriving: arriving);
   }
 
   /// Starts the round on its level's tube.
@@ -1062,7 +1157,11 @@ abstract class TubeShooterExample({
   /// The round starts with its enemies at random round the far end, no
   /// spikes, the purge ready, and the ship on the tube's bottom lane. The tube
   /// zooms in through the stars, with the ship hidden until the zoom ends.
-  void _startRound() {
+  ///
+  /// [arriving] from a run, the ship flies onto the rim instead, at the step
+  /// nearest its angle round the axis: see [_beginArrive].
+  void _startRound({bool arriving = false}) {
+    final from = view.tube;
     view.tube = level.tube;
     _lookFrom = _look;
     spikes.clear();
@@ -1083,14 +1182,21 @@ abstract class TubeShooterExample({
     for (final shot in [...shots, ...enemyShots]) {
       discard(shot);
     }
-    player
-      ..revive()
-      ..startOn(view.tube)
-      ..isVisible = false;
-    view.eyeShift = -zoomDistance;
+    player.revive();
+    if (arriving) {
+      player.step = _Run.nearestStep(from, player.step, view.tube);
+      // The eye goes on as fast, with the rim ahead now.
+      starField.shiftEye(-_Run.rim);
+      view.eyeShift = _run!.flown - _Run.rim;
+    } else {
+      player
+        ..startOn(view.tube)
+        ..isVisible = false;
+      view.eyeShift = -zoomDistance;
+    }
     _roundBanner.text = 'ROUND $round';
     camera.viewport.addAll([_roundBanner, _purgeReadyText]);
-    _setState(TubeState.zoom);
+    _setState(arriving ? TubeState.arrive : TubeState.zoom);
     _play(Sound.zoom);
     onLevel?.call(_levelIndex);
   }
@@ -1130,6 +1236,7 @@ abstract class TubeShooterExample({
     lives = startLives;
     gameOverText.removeFromParent();
     world.timeScale = _speed;
+    _endRun();
     _startRound();
   }
 
@@ -1312,6 +1419,24 @@ class RasterizerTubeShooterExample({
   /// lines' glow with them.
   @override
   bool get rendererGlows => renderer == SvgRenderer.rasterizer;
+
+  /// Fills the quads separate, which the mesh renderer imports much faster
+  /// than their union, as Tube Runner does.
+  @override
+  PositionComponent quadsComponent(
+    RasterizerPolygons quads,
+    Color color, {
+    int? priority,
+    RasterizerGlow? glow,
+  }) => RasterizerPolygonsComponent(
+    polygons: quads,
+    paint: Paint()..color = color,
+    position: Vector2(quads.bounds.left, quads.bounds.top),
+    maxSize: _maxSizeOf(quads),
+    priority: priority,
+    glow: glow,
+    separate: true,
+  );
 
   /// Keeps [drawing]'s stroke, and gives it the shapes' glow too. If the Glow
   /// knob changed, it imports the shape again.

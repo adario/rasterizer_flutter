@@ -103,6 +103,15 @@ extension TubeShooterSnapshots on TubeShooterExample {
       enemyShots.add(component);
       shotGroup.add(component);
     }
+    // The prototype's runs don't go on in the new game: the next round starts.
+    if (from.state == TubeState.run) {
+      _nextRound();
+      return;
+    }
+    if (from.state == TubeState.arrive) {
+      _startRound();
+      return;
+    }
     // Before the state, whose stars show at once in a still world.
     if (from.state == TubeState.over) {
       world.timeScale = 0;
@@ -117,7 +126,11 @@ extension TubeShooterSnapshots on TubeShooterExample {
         camera.viewport.add(readyText);
       case TubeState.over:
         camera.viewport.add(gameOverText);
-      case TubeState.play || TubeState.dying || TubeState.drop:
+      case TubeState.play ||
+          TubeState.dying ||
+          TubeState.drop ||
+          TubeState.run ||
+          TubeState.arrive:
         break;
     }
     _purgeLeft = from.purgeLeft;

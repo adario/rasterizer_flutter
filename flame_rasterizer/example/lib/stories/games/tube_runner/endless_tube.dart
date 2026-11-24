@@ -79,8 +79,18 @@ typedef TubeQuads = ({
   RasterizerPolygons halo,
   RasterizerPolygons bolts,
   RasterizerPolygons boltHalo,
+  RasterizerPolygons next,
   List<ShapePlace?> places,
 });
+
+/// Where an [EndlessTube]'s axis bends: from `bendFrom` to `bendTo` along
+/// it, in tube units, easing into its bends over the first `ease` units, and
+/// out of them over the last. Before and after, it goes straight.
+typedef TubeCourse = ({double bendFrom, double bendTo, double ease});
+
+/// A tube of Tube Shooter's, straight on along an [EndlessTube]'s axis, with
+/// its rim `rim` along the axis, in tube units: see [EndlessTube.quadsAt].
+typedef NextTube = ({Tube tube, double rim});
 
 /// An endless tube, made as the ship flies along it.
 ///
@@ -95,7 +105,11 @@ typedef TubeQuads = ({
 /// The eye looks along the axis at the ship's ring, from [Tube.eye] behind
 /// it, so that ring is always where Tube Shooter's rim is on screen, and the
 /// tube ahead bends away from it.
-class EndlessTube() {
+///
+/// Given a [course], the axis bends only along it, and goes straight before
+/// and after, so that Tube Shooter's tube can lead into it, and another
+/// follow it: see [quadsAt].
+class EndlessTube({final TubeCourse? course}) {
   /// The distance between two rings along the axis, in tube units.
   static const step = 0.5;
 
@@ -123,27 +137,88 @@ class EndlessTube() {
   /// The rings from [behind] the ship to [ahead] of it, by index.
   final _rings = <Ring>[];
 
-  /// Returns where the axis is, [distance] along it.
-  static Point3 axisAt(double distance) {
+  /// Returns where the axis is, [distance] along it, with no [course].
+  static Point3 axisAt(double distance) => _axisOf(distance, distance);
+
+  /// Returns the way the axis goes, [distance] along it, with no [course].
+  static Point3 forwardAt(double distance) => _forwardOf(distance, 1);
+
+  /// Returns where the axis is, [distance] along it, as far into its [bends]
+  /// as [bent] says.
+  static Point3 _axisOf(double distance, double bent) {
     final (:across, :down) = bends;
     return Point3(
-      across.amplitude * math.sin(2 * math.pi * distance / across.period),
-      down.amplitude * math.cos(2 * math.pi * distance / down.period),
+      across.amplitude * math.sin(2 * math.pi * bent / across.period),
+      down.amplitude * math.cos(2 * math.pi * bent / down.period),
       distance,
     );
   }
 
-  /// Returns the way the axis goes, [distance] along it.
-  static Point3 forwardAt(double distance) {
+  /// Returns the way the axis goes, [bent] into its [bends], which it goes
+  /// into at [rate] times the distance along it.
+  static Point3 _forwardOf(double bent, double rate) {
     final (:across, :down) = bends;
     final acrossRate = 2 * math.pi / across.period;
     final downRate = 2 * math.pi / down.period;
     return Point3(
-      across.amplitude * acrossRate * math.cos(acrossRate * distance),
-      -down.amplitude * downRate * math.sin(downRate * distance),
+      across.amplitude * acrossRate * math.cos(acrossRate * bent) * rate,
+      -down.amplitude * downRate * math.sin(downRate * bent) * rate,
       1,
     ).normalized;
   }
+
+  /// Returns where the axis is, [distance] along it, along its [course].
+  Point3 _axisAt(double distance) => _axisOf(distance, _bentAt(distance));
+
+  /// Returns the way the axis goes, [distance] along it, along its [course].
+  Point3 _forwardAt(double distance) =>
+      _forwardOf(_bentAt(distance), _rateAt(distance));
+
+  /// Returns how far into its [bends] the axis is, [distance] along it: the
+  /// distance itself, with no [course]. Along one, it's the distance that
+  /// the bends went at [_rateAt], from 0 at its start.
+  double _bentAt(double distance) {
+    final course = this.course;
+    if (course == null) {
+      return distance;
+    }
+    final (:bendFrom, :bendTo, :ease) = course;
+    final into = distance.clamp(bendFrom, bendTo) - bendFrom;
+    final left = bendTo - distance.clamp(bendFrom, bendTo);
+    final full = bendTo - bendFrom - ease;
+    if (into < ease) {
+      return ease * _easedArea(into / ease);
+    }
+    if (left < ease) {
+      return full - ease * _easedArea(left / ease);
+    }
+    return into - ease / 2;
+  }
+
+  /// Returns how fast the axis goes into its [bends], [distance] along it,
+  /// for each unit along it: 1 with no [course], and along one, from 0 to 1
+  /// as [_eased] says over its first `ease` units, and back to 0 over its
+  /// last, and 0 before and after it.
+  double _rateAt(double distance) {
+    final course = this.course;
+    if (course == null) {
+      return 1;
+    }
+    final (:bendFrom, :bendTo, :ease) = course;
+    if (distance <= bendFrom || distance >= bendTo) {
+      return 0;
+    }
+    return _eased(
+      math.min(1, math.min(distance - bendFrom, bendTo - distance) / ease),
+    );
+  }
+
+  /// Returns [t], from 0 to 1, eased in and out with no jump in the way it
+  /// changes, nor in how fast that changes: Ken Perlin's smootherstep.
+  static double _eased(double t) => t * t * t * (t * (6 * t - 15) + 10);
+
+  /// Returns the area under [_eased] from 0 to [t].
+  static double _easedArea(double t) => t * t * t * t * (t * (t - 3) + 2.5);
 
   /// Makes the rings from [behind] the ship to [ahead] of it, with the ship
   /// [distance] along the axis, and drops the others.
@@ -202,6 +277,14 @@ class EndlessTube() {
   ///
   /// The [bolts] go to `bolts`, zigzagging as [_boltCorners] says with
   /// [random], and with [halo], to `boltHalo` too, [halo] times as wide.
+  ///
+  /// The tube's lines start [from] along the axis, and end [until], with no
+  /// ring across at either: Tube Shooter draws its far end where the tube
+  /// starts. The rings past [until] hide nothing, as the tube ends there. A
+  /// [next] tube's lines go to `next`, as Tube Shooter draws them, the
+  /// rings before [until] hiding them: its rim, its far end and the lines
+  /// between. It must be past the [course]'s end, and so must the last ring
+  /// that [advanceTo] made.
   TubeQuads quadsAt(
     double distance,
     TubeView view, {
@@ -213,6 +296,9 @@ class EndlessTube() {
     double? halo,
     List<TubeBolt> bolts = const [],
     math.Random? random,
+    double from = double.negativeInfinity,
+    double until = double.infinity,
+    NextTube? next,
   }) {
     final tube = view.tube;
     final ship = ringAt(distance);
@@ -307,35 +393,48 @@ class EndlessTube() {
         : {flashLane, tube.pointAfter(flashLane)};
     final every = (ringSpacing / step).round();
     for (var k = 0; k < _rings.length; k++) {
+      final near = _rings[k].index * step;
+      if (near > until) {
+        break;
+      }
       final outline = seen[k];
       hiders.pass(outline, _fromEye(_rings[k].center, eye, ship));
       if (k + 1 < _rings.length) {
-        final next = seen[k + 1];
-        for (var i = 0; i < tube.points.length; i++) {
+        final after = seen[k + 1];
+        // The part of the lines from this ring to the next that the tube
+        // spans, as fractions of the way.
+        final lineFrom = (math.max(near, from) - near) / step;
+        final lineTo = (math.min(near + step, until) - near) / step;
+        for (var i = 0; lineFrom < lineTo && i < tube.points.length; i++) {
           final before = tube.isOpen
               ? i - 1
               : (i + tube.laneCount - 1) % tube.laneCount;
           if (faces(k, before) || faces(k, i)) {
+            final a = lineFrom == 0
+                ? outline[i]
+                : _lerp(outline[i], after[i], lineFrom);
+            final b = lineTo == 1
+                ? after[i]
+                : _lerp(outline[i], after[i], lineTo);
             if (flashEdges.contains(i)) {
-              addFlash(flashLines, outline[i], next[i]);
+              addFlash(flashLines, a, b);
             } else {
               (laneEdges.contains(i) ? laneLines : lines).add(
-                outline[i],
-                next[i],
+                a,
+                b,
                 hiders: hiders,
               );
             }
           }
         }
-        final from = _rings[k].index * step;
         for (var j = 0; j < spikes.length; j++) {
           final spike = spikes[j];
           if (!faces(k, spike.lane)) {
             continue;
           }
           final middle = tube.middles[spike.lane];
-          final start = math.max(spike.near, from);
-          final end = math.min(spike.far, from + step);
+          final start = math.max(spike.near, near);
+          final end = math.min(spike.far, near + step);
           if (start < end) {
             final a = seenAt(k, start, middle);
             final b = seenAt(k, end, middle);
@@ -353,7 +452,7 @@ class EndlessTube() {
           final corners = boltCorners[j];
           for (var c = 0; c + 1 < corners.length; c++) {
             final start = corners[c];
-            if (start.at < from || start.at >= from + step) {
+            if (start.at < near || start.at >= near + step) {
               continue;
             }
             final end = corners[c + 1];
@@ -367,8 +466,8 @@ class EndlessTube() {
         }
         for (var j = 0; j < marks.length; j++) {
           final mark = marks[j];
-          if (mark.at >= from &&
-              mark.at < from + step &&
+          if (mark.at >= near &&
+              mark.at < near + step &&
               (faces(k, mark.lane) ||
                   (mark.flip != null && faces(k, mark.flip!.to)))) {
             places[j] = _placeOf(
@@ -381,7 +480,7 @@ class EndlessTube() {
           }
         }
       }
-      if (_rings[k].index % every == 0) {
+      if (_rings[k].index % every == 0 && near > from) {
         for (var i = 0; i < tube.laneCount; i++) {
           if (faces(k - 1, i) || faces(k, i)) {
             final point = outline[i];
@@ -400,6 +499,32 @@ class EndlessTube() {
         }
       }
     }
+    final nextLines = _Lines(view);
+    if (next != null) {
+      // Straight on from the last ring, as the axis is past its course.
+      final last = _rings.last;
+      final lastAt = last.index * step;
+      Point3 seenOn(double at, Offset point) => _fromEye(
+        last.center +
+            last.right * point.dx +
+            last.down * point.dy +
+            last.forward * (at - lastAt),
+        eye,
+        ship,
+      );
+      final (tube: nextTube, :rim) = next;
+      final far = rim + Tube.depth;
+      for (final point in nextTube.points) {
+        nextLines.add(seenOn(rim, point), seenOn(far, point), hiders: hiders);
+      }
+      for (var i = 0; i < nextTube.laneCount; i++) {
+        final point = nextTube.points[i];
+        final after = nextTube.points[nextTube.pointAfter(i)];
+        for (final at in [rim, far]) {
+          nextLines.add(seenOn(at, point), seenOn(at, after), hiders: hiders);
+        }
+      }
+    }
     return (
       tube: lines.quads,
       lane: laneLines.quads,
@@ -409,9 +534,13 @@ class EndlessTube() {
       halo: haloLines.quads,
       bolts: boltLines.quads,
       boltHalo: boltHaloLines.quads,
+      next: nextLines.quads,
       places: places,
     );
   }
+
+  /// Returns the point [t] of the way from [a] to [b].
+  static Point3 _lerp(Point3 a, Point3 b, double t) => a + (b - a) * t;
 
   /// The most a segment of a bolt spans along the axis, in tube units: half
   /// a [step], so that each lies between two rings.
@@ -619,12 +748,12 @@ class EndlessTube() {
   }
 
   /// Returns the ring at [index], whose outline's x goes to the right.
-  static Ring _startRing(int index) {
-    final forward = forwardAt(index * step);
+  Ring _startRing(int index) {
+    final forward = _forwardAt(index * step);
     final right = (const Point3(1, 0, 0) - forward * forward.x).normalized;
     return Ring(
       index,
-      axisAt(index * step),
+      _axisAt(index * step),
       forward,
       right,
       forward.cross(right),
@@ -636,9 +765,9 @@ class EndlessTube() {
   ///
   /// This is the double reflection method for rotation minimizing frames, by
   /// Wang, Jüttler, Zheng and Liu (2008).
-  static Ring _turnTo(Ring from, double distance, int index) {
-    final center = axisAt(distance);
-    final forward = forwardAt(distance);
+  Ring _turnTo(Ring from, double distance, int index) {
+    final center = _axisAt(distance);
+    final forward = _forwardAt(distance);
     final move = center - from.center;
     final moveSquared = move.dot(move);
     if (moveSquared == 0) {

@@ -21,11 +21,12 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// come at that speed instead, with short streaks, and a star wholly off
 /// screen goes back too.
 ///
-/// In play, as the ship moves round the rim, the stars turn about the axis the
-/// other way, easing in over about [turnLag]: round a closed tube, by an even
-/// share for each lane, and along an open one, as the ship turns, so not at
-/// all along a straight. Nearer stars turn more, as with parallax: see
-/// [turnRatio]. Their places turn, not their distances from the eye.
+/// While the ship can move, in play and on a run, as it moves round the
+/// tube, the stars turn about the axis the other way, easing in over about
+/// [turnLag]: round a closed tube, by an even share for each lane, and along
+/// an open one, as the ship turns, so not at all along a straight. Nearer
+/// stars turn more, as with parallax: see [turnRatio]. Their places turn,
+/// not their distances from the eye.
 /// Stars are unseen at the farthest, and at their brightest from [bright] in.
 /// [show] fades them in over [fadeTime], and [hide] fades them out, then
 /// removes them.
@@ -110,6 +111,10 @@ class StarFieldComponent()
   /// Hides the stars, fading them out.
   void hide() => _shown = false;
 
+  /// Follows a shift of the view's eye [by] that doesn't move it, as when the
+  /// tube that the eye shift counts from changes, after a run.
+  void shiftEye(double by) => _eyeShift += by;
+
   /// Removes the stars at once.
   void stop() {
     _shown = false;
@@ -141,11 +146,11 @@ class StarFieldComponent()
     if (!identical(tube, _tube)) {
       _tube = tube;
       _turnPerLane = _turnPerLaneOn(tube);
-    } else if (gameRef.state == TubeState.play && tube.isOpen) {
+    } else if (gameRef.canMove && tube.isOpen) {
       _turnTarget -=
           PlayerComponent.headingOn(tube, step) -
           PlayerComponent.headingOn(tube, _step);
-    } else if (gameRef.state == TubeState.play) {
+    } else if (gameRef.canMove) {
       const stepsPerLane = PlayerComponent.stepsPerLane;
       final steps = stepsPerLane * tube.laneCount;
       var moved = step - _step;

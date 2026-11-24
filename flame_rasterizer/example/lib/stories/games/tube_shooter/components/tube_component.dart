@@ -4,7 +4,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 
 /// Draws the tube's lines, and the ship's [lane] over them in the ship's
-/// colour.
+/// colour, but for while the ship arrives from a run, when the run draws
+/// them.
 ///
 /// flame_rasterizer treats a path as immutable, so whenever the view changes,
 /// this makes both paths again, each with a new component in the game's tube
@@ -24,17 +25,24 @@ class TubeComponent() extends Component with HasGameRef<TubeShooterExample> {
   PathComponent? _lane;
   int _version = -1;
   int? _shownLane;
+  bool _hidden = false;
 
   @override
   void update(double dt) {
     super.update(dt);
     final view = gameRef.view;
-    final changed = view.version != _version;
+    final hidden = gameRef.state == TubeState.arrive;
+    final changed = view.version != _version || hidden != _hidden;
     if (changed) {
       _version = view.version;
-      _tube = gameRef.replacePath(_tube, view.tubePath(), gameRef.level.color);
+      _hidden = hidden;
+      _tube = gameRef.replacePath(
+        _tube,
+        hidden ? null : view.tubePath(),
+        gameRef.level.color,
+      );
     }
-    final lane = this.lane;
+    final lane = hidden ? null : this.lane;
     if (changed || lane != _shownLane) {
       _shownLane = lane;
       _lane = gameRef.replacePath(
