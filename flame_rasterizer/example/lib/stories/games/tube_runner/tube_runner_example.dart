@@ -10,11 +10,16 @@ import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/flight_stars_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_explosion_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_seeder_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_shot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ship_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
@@ -85,26 +90,31 @@ abstract class TubeRunnerExample({
     PathComponent draws them all.
 
     Move the ship round the tube with the arrow keys, A and D, by dragging
-    left and right, or a lane per scroll of the mouse wheel. The Tube knob
-    picks one of Tube Shooter's closed tubes, which the ship goes on down
-    without a stop. The ship's lane shows in the ship's colour, as in Tube
-    Shooter.
+    left and right, or a lane per scroll of the mouse wheel. Fire down its
+    lane with the space bar, or while dragging, as in Tube Shooter. The Tube
+    knob picks one of Tube Shooter's closed tubes, which the ship goes on
+    down without a stop. The ship's lane shows in the ship's colour, as in
+    Tube Shooter.
 
     READY shows until a tap or a key starts the game. After 4 seconds, and
     every 4 seconds from then on, a seeder comes at the farthest ring across
     the tube, on a lane picked at random. For a second and a half, its lane
     flashes in the seeder's colour, added to the ship's in the ship's lane,
     and glows with the seeder and its spike, fading out: the mesh renderer
-    draws the glow with RasterizerGlow, only on them,
-    and with the other renderers, wider, see-through copies of them stand
-    for it. The seeder climbs its lane toward the ship, laying a spike
-    behind it, and goes once it passes the ship; the spike goes once all of
-    it does. A seeder or a spike that touches the ship, in
-    its lane at the ship's ring, destroys it, and takes a life, as in Tube
-    Shooter: the seeders and spikes go, and READY shows again. Once the
-    lives are gone, Game Over stops the game until a tap, or Enter, starts a
-    new one. The bottom left shows the tube's name and how long the game has
-    gone on in it, and the bottom right the lives left.
+    draws the glow with RasterizerGlow, only on them, and with the other
+    renderers, wider, see-through copies of them stand for it. The seeder
+    climbs its lane toward the ship, laying a spike behind it, and goes once
+    it passes the ship; the spike goes once all of it does.
+
+    The ship's shots fly as fast as Tube Shooter's ahead of it, and go 8
+    units down the tube. As in Tube Shooter, a shot destroys a seeder for 50
+    points, and leaves its spike, or cuts a spike back from its near end for
+    2 points. A seeder or a spike that touches the ship, in its lane at the
+    ship's ring, destroys it, and takes a life, as in Tube Shooter: the
+    seeders, spikes and shots go, and READY shows again. Once the lives are
+    gone, Game Over stops the game until a tap, or Enter, starts a new one.
+    The bottom left shows the tube's name and how long the game has gone on
+    in it, and the bottom right the lives left and the score.
 
     The game makes the tube's quads again every frame. The mesh renderer fills
     each quad on its own, as a fan of triangles, rather than their union. The
@@ -155,7 +165,8 @@ abstract class TubeRunnerExample({
 
   /// Changes the tube where the ship is, without a stop: the ship goes on at
   /// the same angle round the axis, in the new tube's nearest step. The
-  /// seeders and spikes go, and the time in the tube starts again.
+  /// seeders, spikes, shots and their explosions go, and the time in the
+  /// tube starts again.
   set tube(Tube value) {
     final from = view.tube;
     if (value == from) {
@@ -166,6 +177,7 @@ abstract class TubeRunnerExample({
       ship.switchFrom(from);
     }
     _clearSeeders();
+    _clearBlasts();
     _tubeTime = 0;
   }
 
@@ -187,9 +199,14 @@ abstract class TubeRunnerExample({
   double get tubeTime => _tubeTime;
   double _tubeTime = 0;
 
+  /// The game's score, from the shots' hits, as in Tube Shooter.
+  int get score => _score;
+  int _score = 0;
+
   final _tubeText = VectorTextComponent(capHeight: hudCap, line: 1, left: true);
   final _timeText = VectorTextComponent(capHeight: hudCap, line: 0, left: true);
-  final _livesText = VectorTextComponent(capHeight: hudCap, line: 0);
+  final _livesText = VectorTextComponent(capHeight: hudCap, line: 1);
+  final _scoreText = VectorTextComponent(capHeight: hudCap, line: 0);
 
   /// READY, in the camera's viewport while the game waits for the player.
   final readyText = VectorTextComponent(text: 'READY', capHeight: bannerCap);
@@ -225,6 +242,15 @@ abstract class TubeRunnerExample({
   /// Over. Each ends the wait when it goes up, as a tap; pointers that were
   /// already down don't.
   final _waitPointers = <int>{};
+
+  /// The pointers that went down while the game didn't wait. The ship fires
+  /// while any of them is down, or while [_fireKey] is held, as in Tube
+  /// Shooter.
+  final _firePointers = <int>{};
+
+  /// How long since the ship last fired, in seconds of the game.
+  double _sinceShot = PlayerComponent.firePeriod;
+
   final stars = FlightStarsComponent();
 
   /// How far the ship has flown along the tube's axis, in tube units.
@@ -246,6 +272,14 @@ abstract class TubeRunnerExample({
   /// The seeders climbing the tube, and the spikes they laid, nearest first.
   final _seeders = <RunnerSeederComponent>[];
   final _spikes = <Spike>[];
+
+  /// The seeders climbing the tube, nearest first.
+  Iterable<RunnerSeederComponent> get seeders => _seeders;
+
+  /// The ship's shots, and the explosions of the seeders they destroyed, in
+  /// [explosionGroup].
+  final _shots = <RunnerShotComponent>[];
+  final _blasts = <PlacedExplosionComponent>[];
 
   /// How long the game has run since the last seeder came, or since
   /// [seederPeriod] before [firstSeeder].
@@ -278,6 +312,7 @@ abstract class TubeRunnerExample({
     PhysicalKeyboardKey.arrowRight,
     PhysicalKeyboardKey.keyD,
   };
+  static const _fireKey = PhysicalKeyboardKey.space;
 
   static final _newGameKeys = {
     PhysicalKeyboardKey.enter,
@@ -373,7 +408,7 @@ abstract class TubeRunnerExample({
     camera.backdrop.add(stars);
     // In the camera's viewport, as StoryGame's FPS counter is: above the
     // world, and unzoomed.
-    camera.viewport.addAll([_tubeText, _timeText, _livesText]);
+    camera.viewport.addAll([_tubeText, _timeText, _livesText, _scoreText]);
     _waitForPlayer();
     _updateTube();
     startStatus();
@@ -409,6 +444,7 @@ abstract class TubeRunnerExample({
     _timeText.text =
         'TIME ${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
     _livesText.text = 'LIVES $_lives';
+    _scoreText.text = 'SCORE $_score';
   }
 
   void _setState(RunnerState state) {
@@ -425,6 +461,8 @@ abstract class TubeRunnerExample({
       case RunnerState.play:
         _tubeTime += dt;
         _updateSeeders(dt);
+        _updateShots(dt);
+        _hit();
         _collide();
       case RunnerState.dying:
         if (_stateTime >= respawnTime) {
@@ -453,8 +491,97 @@ abstract class TubeRunnerExample({
     }
   }
 
-  /// Blows the ship up, fades it out, and takes a life. The seeders and
-  /// spikes go.
+  /// Over [dt] seconds of the game: fires a shot down the ship's lane every
+  /// `PlayerComponent.firePeriod` while it fires, with at most
+  /// `PlayerComponent.maxShots` in the tube, as in Tube Shooter, flies the
+  /// shots, and drops those [RunnerShotComponent.range] ahead of the ship.
+  void _updateShots(double dt) {
+    for (final shot in _shots) {
+      shot.fly(dt);
+    }
+    _shots.removeWhere((shot) {
+      final gone = shot.at > _flown + RunnerShotComponent.range;
+      if (gone) {
+        shot.removeFromParent();
+      }
+      return gone;
+    });
+    _sinceShot += dt;
+    if ((_firePointers.isNotEmpty || _heldKeys.contains(_fireKey)) &&
+        _sinceShot >= PlayerComponent.firePeriod &&
+        _shots.length < PlayerComponent.maxShots) {
+      _sinceShot = 0;
+      final shot = RunnerShotComponent(ship.lane, _flown);
+      _shots.add(shot);
+      world.add(shot);
+      // Places it now, even if nothing else moved.
+      _tubeFlown = double.nan;
+    }
+  }
+
+  /// Resolves the shots' hits, as in Tube Shooter: each shot hits the
+  /// nearest seeder or spike in its lane that it reached or passed since it
+  /// last flew. It destroys a seeder, which leaves its spike, or cuts a spike
+  /// back by `TubeShooterExample.spikeHit` from its near end, and scores.
+  void _hit() {
+    for (final shot in [..._shots]) {
+      Spike? target;
+      for (final spike in _spikes) {
+        if (spike.lane == shot.lane &&
+            spike.near <= shot.at &&
+            spike.far >= shot.previousAt &&
+            (target == null || spike.near < target.near)) {
+          target = spike;
+        }
+      }
+      if (target == null) {
+        continue;
+      }
+      _shots.remove(shot);
+      shot.removeFromParent();
+      final seeder = _seeders
+          .where((seeder) => identical(seeder.spike, target))
+          .firstOrNull;
+      if (seeder != null) {
+        _destroySeeder(seeder);
+      } else {
+        target.near = math.min(
+          target.near + TubeShooterExample.spikeHit,
+          target.far,
+        );
+        _score += TubeShooterExample.spikeScore;
+        if (target.near >= target.far) {
+          _spikes.remove(target);
+        }
+      }
+    }
+  }
+
+  /// Blows [seeder] up where it is along the tube, and adds its score. Its
+  /// spike stays.
+  void _destroySeeder(RunnerSeederComponent seeder) {
+    _seeders.remove(seeder);
+    seeder.removeFromParent();
+    _score += EnemyKind.seeder.score;
+    final blast = PlacedExplosionComponent(
+      seeder.mark,
+      rayColor: TubeColors.seeder,
+    );
+    _blasts.add(blast);
+    explosionGroup.add(blast);
+    _tubeFlown = double.nan;
+  }
+
+  /// Removes the seeders' explosions.
+  void _clearBlasts() {
+    for (final blast in _blasts) {
+      blast.removeFromParent();
+    }
+    _blasts.clear();
+  }
+
+  /// Blows the ship up, fades it out, and takes a life. The seeders, spikes
+  /// and shots go.
   void _destroyShip() {
     _lives--;
     explosionGroup.add(
@@ -494,11 +621,13 @@ abstract class TubeRunnerExample({
   }
 
   /// Starts a new game in this one: no explosions, all lives, the time in the
-  /// tube from 0, and the world at [speed], waiting at READY.
+  /// tube and the score from 0, and the world at [speed], waiting at READY.
   void _newGame() {
     explosionGroup.removeAll(explosionGroup.children.toList());
+    _blasts.clear();
     _lives = startLives;
     _tubeTime = 0;
+    _score = 0;
     gameOverText.removeFromParent();
     world.timeScale = _speed;
     ship.revive();
@@ -515,7 +644,8 @@ abstract class TubeRunnerExample({
   }
 
   /// Makes the tube's paths again if the ship flew or changed lanes, a
-  /// seeder's flash changed, or the view changed.
+  /// seeder's flash changed, or the view changed, and places the seeders,
+  /// shots and explosions where they show.
   ///
   /// As the last seeder comes, its lane flashes: over its
   /// [RunnerSeederComponent.flashTime], the lane fades from the seeder's
@@ -544,11 +674,15 @@ abstract class TubeRunnerExample({
     _tubeLane = lane;
     _tubeFlasher = flasher;
     _tubeFlash = flash;
+    // The explosions remove themselves once they're done.
+    _blasts.removeWhere((blast) => blast.isRemoving || blast.isRemoved);
+    final placed = <TubePlaced>[..._seeders, ..._shots, ..._blasts];
     final quads = endlessTube.quadsAt(
       _flown,
       view,
       lane: lane,
       spikes: _spikes,
+      marks: [for (final shape in placed) shape.mark],
       flash: flasher?.spike,
       halo: rendererGlows ? null : 2 * laneGlowWidths,
     );
@@ -588,8 +722,8 @@ abstract class TubeRunnerExample({
       TubeColors.spikes,
       glow: glow,
     );
-    for (final seeder in _seeders) {
-      seeder.placeAt(quads.seeders[_spikes.indexOf(seeder.spike)]);
+    for (var i = 0; i < placed.length; i++) {
+      placed[i].placeAt(quads.places[i]);
     }
   }
 
@@ -621,13 +755,14 @@ abstract class TubeRunnerExample({
     _spikes.removeWhere((spike) => spike.far < _flown);
   }
 
-  /// Removes all the seeders and spikes.
+  /// Removes all the seeders, spikes and shots.
   void _clearSeeders() {
-    for (final seeder in _seeders) {
-      seeder.removeFromParent();
+    for (final shape in [..._seeders, ..._shots]) {
+      shape.removeFromParent();
     }
     _seeders.clear();
     _spikes.clear();
+    _shots.clear();
   }
 
   /// Returns [base] with [light] added to it, [amount] times as strong, as
@@ -690,11 +825,14 @@ abstract class TubeRunnerExample({
   }
 
   /// Takes note of a pointer that goes down while the game waits, at READY
-  /// or Game Over: it ends the wait when it goes up, as a tap.
+  /// or Game Over: it ends the wait when it goes up, as a tap. Otherwise,
+  /// the ship fires while it's down, as in Tube Shooter.
   @override
   void onDragStart(DragStartEvent event) {
     if (_isWaiting) {
       _waitPointers.add(event.pointerId);
+    } else {
+      _firePointers.add(event.pointerId);
     }
     super.onDragStart(event);
   }
@@ -711,6 +849,7 @@ abstract class TubeRunnerExample({
 
   @override
   void onDragEnd(DragEndEvent event) {
+    _firePointers.remove(event.pointerId);
     if (_waitPointers.remove(event.pointerId)) {
       _endWait();
     }
@@ -719,6 +858,7 @@ abstract class TubeRunnerExample({
 
   @override
   void onDragCancel(DragCancelEvent event) {
+    _firePointers.remove(event.pointerId);
     _waitPointers.remove(event.pointerId);
     super.onDragCancel(event);
   }
@@ -739,8 +879,8 @@ abstract class TubeRunnerExample({
   }
 
   /// Handles a key: at READY, any key but a modifier starts the game, and
-  /// once it's over, Enter starts a new one. The keys that move the ship
-  /// count as held while down, and it ignores the others.
+  /// once it's over, Enter starts a new one. The keys that move the ship or
+  /// fire count as held while down, and it ignores the others.
   @override
   KeyEventResult onKeyEvent(
     KeyEvent event,
@@ -759,7 +899,9 @@ abstract class TubeRunnerExample({
       }
       return KeyEventResult.handled;
     }
-    if (!_leftKeys.contains(key) && !_rightKeys.contains(key)) {
+    if (key != _fireKey &&
+        !_leftKeys.contains(key) &&
+        !_rightKeys.contains(key)) {
       return KeyEventResult.ignored;
     }
     if (event is KeyDownEvent) {

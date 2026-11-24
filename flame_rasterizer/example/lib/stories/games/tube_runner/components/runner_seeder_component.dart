@@ -2,6 +2,7 @@ import 'dart:ui' show StrokeCap, StrokeJoin;
 
 import 'package:flame/components.dart';
 
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
@@ -12,14 +13,15 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 ///
 /// The spike stays where it's laid, so it comes at the ship as the tube does,
 /// and the seeder faster. The game moves it with [climb], and places it with
-/// [placeAt] where the tube says it shows.
+/// [placeAt] where the tube says it shows. A shot destroys it, and leaves its
+/// spike.
 ///
 /// For [flashTime] after it comes, it glows, fading out as [flash] says: with
 /// [TubeRunnerExample.glowShape] if the renderer draws glows, or else under
 /// a wider, see-through copy of its shape, as wide as that glow.
 class RunnerSeederComponent(final Spike spike)
     extends PositionComponent
-    with HasGameRef<TubeRunnerExample>, HasVisibility {
+    with HasGameRef<TubeRunnerExample>, HasVisibility, TubePlaced {
   this : super(priority: 1);
 
   /// How fast it climbs its lane, along the axis, in tube units a second.
@@ -91,20 +93,13 @@ class RunnerSeederComponent(final Spike spike)
     halo.opacity = TubeRunnerExample.haloAlpha * flash;
   }
 
+  /// At its spike's near end.
+  @override
+  TubeMark get mark => (lane: spike.lane, at: spike.near);
+
   /// Climbs its lane over [dt] seconds, laying the spike to where it gets.
   void climb(double dt) {
     _age += dt;
     spike.near -= climbSpeed * dt;
-  }
-
-  /// Shows it at [place], or hides it if null.
-  void placeAt(SeederPlace? place) {
-    isVisible = place != null;
-    if (place == null) {
-      return;
-    }
-    position.setValues(place.position.dx, place.position.dy);
-    angle = place.angle;
-    scale.splat(place.scale);
   }
 }

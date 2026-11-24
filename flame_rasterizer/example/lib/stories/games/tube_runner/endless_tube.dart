@@ -44,19 +44,22 @@ class const Ring(
 
 /// A spike down the middle of a [lane], from [near] to [far] along the
 /// axis, in tube units: [far] where its seeder came, and [near] where the
-/// seeder has laid it to.
+/// seeder has laid it to, or where shots have cut it back to.
 class Spike(final int lane, final double far) {
   double near = far;
 }
 
-/// Where a seeder shows in the world, at the near end of its spike: its
-/// position, its angle, with its tail along the spike, and its scale, the
-/// lane's width there.
-typedef SeederPlace = ({Offset position, double angle, double scale});
+/// A point down the middle of a `lane`, `at` along the axis, in tube units,
+/// where a shape is: a seeder, a shot or an explosion.
+typedef TubeMark = ({int lane, double at});
+
+/// Where a shape at a [TubeMark] shows in the world: its position, its angle,
+/// with its tail away along the lane, and its scale, the lane's width there.
+typedef ShapePlace = ({Offset position, double angle, double scale});
 
 /// What [EndlessTube.quadsAt] makes: the quads of the tube, of the ship's
 /// lane, of the spikes, of the flash's lane and spike, and of their halo,
-/// and where each spike's seeder shows, if it does.
+/// and where a shape at each mark shows, if it does.
 typedef TubeQuads = ({
   RasterizerPolygons tube,
   RasterizerPolygons lane,
@@ -64,7 +67,7 @@ typedef TubeQuads = ({
   RasterizerPolygons flashLane,
   RasterizerPolygons flashSpike,
   RasterizerPolygons halo,
-  List<SeederPlace?> seeders,
+  List<ShapePlace?> places,
 });
 
 /// An endless tube, made as the ship flies along it.
@@ -174,8 +177,8 @@ class EndlessTube() {
   /// The lines of [lane], if any, go to `lane` instead of `tube`: its two
   /// edges, and its stretch of each ring across it. The [spikes] go to
   /// `spikes`, [spikeWidths] as wide as the tube's lines, walls hiding them
-  /// as they do the tube's lines, and `seeders` says where each spike's
-  /// seeder shows, or null where the tube hides it.
+  /// as they do the tube's lines, and `places` says where a shape at each of
+  /// [marks] shows, or null where the tube hides it.
   ///
   /// If [flash], one of [spikes], is given, the lines of its lane go to
   /// `flashLane` instead, even those of [lane], and it goes to `flashSpike`.
@@ -185,6 +188,7 @@ class EndlessTube() {
     TubeView view, {
     int? lane,
     List<Spike> spikes = const [],
+    List<TubeMark> marks = const [],
     Spike? flash,
     double? halo,
   }) {
@@ -241,7 +245,7 @@ class EndlessTube() {
     final flashLines = _Lines(view);
     final flashSpikeLines = _Lines(view);
     final haloLines = _Lines(view);
-    final seeders = List<SeederPlace?>.filled(spikes.length, null);
+    final places = List<ShapePlace?>.filled(marks.length, null);
     // Adds a line of the flash's lane, or [widths] as wide, of its spike, and
     // its halo.
     void addFlash(
@@ -316,9 +320,12 @@ class EndlessTube() {
               spikeLines.add(a, b, hiders: hiders, widths: spikeWidths);
             }
           }
-          if (spike.near >= from && spike.near < from + step) {
-            seeders[j] = _seederPlace(
-              spike,
+        }
+        for (var j = 0; j < marks.length; j++) {
+          final mark = marks[j];
+          if (mark.at >= from && mark.at < from + step && faces(k, mark.lane)) {
+            places[j] = _placeOf(
+              mark,
               (at, point) => seenAt(k, at, point),
               tube,
               lines,
@@ -353,29 +360,29 @@ class EndlessTube() {
       flashLane: flashLines.quads,
       flashSpike: flashSpikeLines.quads,
       halo: haloLines.quads,
-      seeders: seeders,
+      places: places,
     );
   }
 
-  /// How far ahead of a seeder, along the axis, [_seederPlace] looks for the
-  /// way its spike goes.
-  static const _seederLook = 0.05;
+  /// How far ahead of a mark, along the axis, [_placeOf] looks for the way
+  /// its lane goes.
+  static const _look = 0.05;
 
-  /// Returns where [spike]'s seeder shows, or null where [hiders] hide its
+  /// Returns where a shape at [mark] shows, or null where [hiders] hide its
   /// middle, with [seenAt] saying where the eye sees a point of the outline
   /// some distance along the axis, and [lines] where those land.
-  static SeederPlace? _seederPlace(
-    Spike spike,
+  static ShapePlace? _placeOf(
+    TubeMark mark,
     Point3 Function(double at, Offset point) seenAt,
     Tube tube,
     _Lines lines,
     _Hiders? hiders,
   ) {
-    final lane = spike.lane;
-    final middle = seenAt(spike.near, tube.middles[lane]);
-    final ahead = seenAt(spike.near + _seederLook, tube.middles[lane]);
-    final corner = seenAt(spike.near, tube.points[lane]);
-    final nextCorner = seenAt(spike.near, tube.points[tube.pointAfter(lane)]);
+    final (:lane, :at) = mark;
+    final middle = seenAt(at, tube.middles[lane]);
+    final ahead = seenAt(at + _look, tube.middles[lane]);
+    final corner = seenAt(at, tube.points[lane]);
+    final nextCorner = seenAt(at, tube.points[tube.pointAfter(lane)]);
     if ([middle, ahead, corner, nextCorner].any((p) => p.z < TubeView.near)) {
       return null;
     }
@@ -392,10 +399,10 @@ class EndlessTube() {
     final position = lines._project(middle);
     return (
       position: position,
-      // The shape's tail, along its y, points along the spike.
+      // The shape's tail, along its y, points away along the lane.
       angle: (lines._project(ahead) - position).direction - math.pi / 2,
       // As Tube Shooter's, the same in every lane: [Tube.laneWidth], as far
-      // away as the seeder.
+      // away as the mark.
       scale:
           (lines._project(nextCorner) - lines._project(corner)).distance *
           tube.laneWidth /

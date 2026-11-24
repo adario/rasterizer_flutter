@@ -1,6 +1,6 @@
 // Checks the Tube Runner prototype headlessly, with flame_rasterizer's canvas
-// renderer and with Flame's PathComponent: the endless tube's rings, and that
-// the ship flies and moves round the tube.
+// renderer and with Flame's PathComponent: the endless tube's rings, that the
+// ship flies and moves round the tube, and that its shots hit.
 import 'dart:math' as math;
 
 import 'package:flame/game.dart';
@@ -9,6 +9,8 @@ import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -62,6 +64,44 @@ void main() {
       );
       expect(game.ship.lane, isNot(lane));
       expect(game.exampleStats.first, isNot('0 quads'));
+    });
+
+    testWidgets('a shot destroys a seeder, and cuts its spike back, with '
+        '${renderer.name}', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameStory<TubeRunnerExample, Object>(
+            renderer: renderer,
+            create: (status, _) =>
+                TubeRunnerExample.of(renderer, status, random: math.Random(1)),
+          ),
+        ),
+      );
+      final game = tester
+          .widget<GameWidget<TubeRunnerExample>>(
+            find.byWidgetPredicate((w) => w is GameWidget),
+          )
+          .game!;
+      await pumpWhileLoading(tester, () => !game.isLoaded);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      for (var i = 0; i < 400 && game.seeders.isEmpty; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final seeder = game.seeders.single;
+      game.ship.moveBy((seeder.spike.lane - game.ship.lane).toDouble());
+      expect(game.ship.lane, seeder.spike.lane);
+      // Fires until the seeder is gone, and then at its spike.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+      for (var i = 0; i < 300 && game.score <= EnemyKind.seeder.score; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+      expect(game.seeders, isNot(contains(seeder)));
+      expect(
+        game.score,
+        EnemyKind.seeder.score + TubeShooterExample.spikeScore,
+      );
+      expect(game.state, RunnerState.play);
     });
   }
 }
