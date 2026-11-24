@@ -3,8 +3,10 @@ import 'dart:ui' show StrokeCap, StrokeJoin;
 import 'package:flame/components.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 
 /// An enemy of [kind], which comes at the far end of [spawnLane] and climbs
 /// the tube toward the ship, with the shape and colour of Tube Shooter's, and
@@ -108,4 +110,82 @@ abstract class RunnerEnemyComponent(
 
   /// Moves it over [dt] seconds, as its kind does.
   void move(double dt);
+}
+
+/// An enemy that climbs from [at] in [spawnLane], and flips onto a
+/// neighbouring lane after a random time within [flipPeriod], as Tube
+/// Shooter's do, over its first level's flip time: it turns about the corner
+/// the two lanes share, through the inside of the tube.
+abstract class RunnerFlipperComponent(
+  super.kind,
+  super.spawnLane,
+  @override var double at,
+) extends RunnerEnemyComponent {
+  /// The lane it's in, or flips from.
+  late int lane = spawnLane;
+
+  /// The pace of Tube Shooter's first level, which its kind goes at.
+  static final level = levels.first;
+
+  /// The range of times between its flips.
+  Range get flipPeriod;
+
+  /// The lane it flips onto, if it's flipping, how far through the flip it
+  /// is, from 0 to 1, and the angle the whole flip turns by.
+  int? _flipTo;
+  double _flipProgress = 0;
+  double _flipAngle = 0;
+
+  /// Seconds until it flips.
+  late double _untilFlip = between(flipPeriod);
+
+  bool get isFlipping => _flipTo != null;
+
+  /// Halfway through a flip, it's in the lane it flips to, as in Tube
+  /// Shooter.
+  @override
+  int get currentLane {
+    final to = _flipTo;
+    return to != null && _flipProgress >= 0.5 ? to : lane;
+  }
+
+  @override
+  TubeMark get mark => (
+    lane: lane,
+    at: at,
+    flip: switch (_flipTo) {
+      final to? => (to: to, turn: _flipAngle * _flipProgress),
+      null => null,
+    },
+  );
+
+  @override
+  void move(double dt) {
+    at -= RunnerEnemyComponent.climbSpeed * dt;
+    if (_flipTo case final to?) {
+      _flipProgress += dt / level.flipTime;
+      if (_flipProgress >= 1) {
+        lane = to;
+        _flipTo = null;
+      }
+    }
+    _untilFlip -= dt;
+    if (_untilFlip <= 0 && _flipTo == null) {
+      _untilFlip = between(flipPeriod);
+      _flipAside(gameRef.random.nextBool() ? 1 : -1);
+    }
+  }
+
+  /// Starts flipping onto the next lane on [side], 1 or -1.
+  void _flipAside(int side) {
+    final tube = gameRef.tube;
+    final to = (tube.neighbour(lane, side) ?? tube.neighbour(lane, -side))!;
+    _flipTo = to;
+    _flipProgress = 0;
+    _flipAngle = tube.flipAngle(lane, to);
+  }
+
+  /// Returns a random time within [range].
+  double between(Range range) =>
+      range.least + (range.most - range.least) * gameRef.random.nextDouble();
 }

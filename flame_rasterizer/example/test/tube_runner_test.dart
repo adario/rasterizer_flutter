@@ -167,5 +167,40 @@ void main() {
       expect(game.score, EnemyKind.climber.score);
       expect(game.state, RunnerState.play);
     });
+
+    testWidgets("a zapper's bolt destroys the ship in its lane, with "
+        '${renderer.name}', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameStory<TubeRunnerExample, Object>(
+            renderer: renderer,
+            create: (status, _) =>
+                TubeRunnerExample.of(renderer, status, random: math.Random(1)),
+          ),
+        ),
+      );
+      final game = tester
+          .widget<GameWidget<TubeRunnerExample>>(
+            find.byWidgetPredicate((w) => w is GameWidget),
+          )
+          .game!;
+      await pumpWhileLoading(tester, () => !game.isLoaded);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      final lane = game.tube.neighbour(game.ship.lane, 2)!;
+      game.addEnemy(EnemyKind.zapper, lane);
+      // The first pulse, 2.4 seconds in, before the zapper's first flip, at
+      // 3 seconds or later, leaves the ship in another lane alone.
+      for (var i = 0; i < 300 && !game.isPulsing; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(game.isPulsing, isTrue);
+      expect(game.state, RunnerState.play);
+      game.ship.moveBy(2);
+      expect(game.ship.lane, lane);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(game.state, RunnerState.dying);
+      expect(game.lives, TubeRunnerExample.startLives - 1);
+    });
   }
 }

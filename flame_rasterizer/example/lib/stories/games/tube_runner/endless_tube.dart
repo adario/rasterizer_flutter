@@ -63,9 +63,13 @@ typedef TubeFlip = ({int to, double turn});
 /// with its tail away along the lane, and its scale, the lane's width there.
 typedef ShapePlace = ({Offset position, double angle, double scale});
 
+/// A zapper's bolt, down the middle of a `lane` from the ship's ring to `far`
+/// along the axis, in tube units, where the zapper is.
+typedef TubeBolt = ({int lane, double far});
+
 /// What [EndlessTube.quadsAt] makes: the quads of the tube, of the ship's
-/// lane, of the spikes, of the flash's lane and spike, and of their halo,
-/// and where a shape at each mark shows, if it does.
+/// lane, of the spikes, of the flash's lane and spike, and of their halo, of
+/// the bolts and of theirs, and where a shape at each mark shows, if it does.
 typedef TubeQuads = ({
   RasterizerPolygons tube,
   RasterizerPolygons lane,
@@ -73,6 +77,8 @@ typedef TubeQuads = ({
   RasterizerPolygons flashLane,
   RasterizerPolygons flashSpike,
   RasterizerPolygons halo,
+  RasterizerPolygons bolts,
+  RasterizerPolygons boltHalo,
   List<ShapePlace?> places,
 });
 
@@ -190,6 +196,9 @@ class EndlessTube() {
   /// it's [lane], and [flashSpike], one of [spikes], if given, goes to
   /// `flashSpike`. With [halo], `halo` gets them all again, [halo] times as
   /// wide.
+  ///
+  /// The [bolts] go to `bolts`, zigzagging as [_boltCorners] says with
+  /// [random], and with [halo], to `boltHalo` too, [halo] times as wide.
   TubeQuads quadsAt(
     double distance,
     TubeView view, {
@@ -199,6 +208,8 @@ class EndlessTube() {
     int? flashLane,
     Spike? flashSpike,
     double? halo,
+    List<TubeBolt> bolts = const [],
+    math.Random? random,
   }) {
     final tube = view.tube;
     final ship = ringAt(distance);
@@ -253,7 +264,12 @@ class EndlessTube() {
     final flashLines = _Lines(view);
     final flashSpikeLines = _Lines(view);
     final haloLines = _Lines(view);
+    final boltLines = _Lines(view);
+    final boltHaloLines = _Lines(view);
     final places = List<ShapePlace?>.filled(marks.length, null);
+    final boltCorners = [
+      for (final bolt in bolts) _boltCorners(bolt, distance, tube, random!),
+    ];
     // Adds a line of the flash's lane, or [widths] as wide, of its spike, and
     // its halo.
     void addFlash(
@@ -329,6 +345,25 @@ class EndlessTube() {
             }
           }
         }
+        for (var j = 0; j < bolts.length; j++) {
+          if (!faces(k, bolts[j].lane)) {
+            continue;
+          }
+          final corners = boltCorners[j];
+          for (var c = 0; c + 1 < corners.length; c++) {
+            final start = corners[c];
+            if (start.at < from || start.at >= from + step) {
+              continue;
+            }
+            final end = corners[c + 1];
+            final a = seenAt(k, start.at, start.point);
+            final b = seenAt(k, end.at, end.point);
+            boltLines.add(a, b, hiders: hiders);
+            if (halo != null) {
+              boltHaloLines.add(a, b, hiders: hiders, widths: halo);
+            }
+          }
+        }
         for (var j = 0; j < marks.length; j++) {
           final mark = marks[j];
           if (mark.at >= from &&
@@ -371,8 +406,40 @@ class EndlessTube() {
       flashLane: flashLines.quads,
       flashSpike: flashSpikeLines.quads,
       halo: haloLines.quads,
+      bolts: boltLines.quads,
+      boltHalo: boltHaloLines.quads,
       places: places,
     );
+  }
+
+  /// The most a segment of a bolt spans along the axis, in tube units: half
+  /// a [step], so that each lies between two rings.
+  static const boltStep = step / 2;
+
+  /// Returns the corners of [bolt], from the ship's ring, [near] along the
+  /// axis, to its far end, as Tube Shooter's bolts zigzag: down the middle of
+  /// its lane at both ends, and between, on every [boltStep] along the axis,
+  /// at a place picked with [random] across the middle third of the lane,
+  /// on either side in turn.
+  static List<({double at, Offset point})> _boltCorners(
+    TubeBolt bolt,
+    double near,
+    Tube tube,
+    math.Random random,
+  ) {
+    final (:lane, :far) = bolt;
+    final middle = tube.middles[lane];
+    final across = (tube.points[tube.pointAfter(lane)] - tube.points[lane]) / 6;
+    final corners = [(at: near, point: middle)];
+    for (var i = (near / boltStep).floor() + 1; i * boltStep < far; i++) {
+      final side = i.isEven ? 1 : -1;
+      corners.add((
+        at: i * boltStep,
+        point: middle + across * (side * (0.4 + 0.6 * random.nextDouble())),
+      ));
+    }
+    corners.add((at: far, point: middle));
+    return corners;
   }
 
   /// How far ahead of a mark, along the axis, [_placeOf] looks for the way

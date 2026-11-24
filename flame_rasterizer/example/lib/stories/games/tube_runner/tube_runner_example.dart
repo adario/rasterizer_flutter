@@ -13,6 +13,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ru
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_explosion_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_seeder_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_shot_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_zapper_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ship_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
@@ -100,8 +101,9 @@ abstract class TubeRunnerExample({
 
     READY shows until a tap or a key starts the game. After 4 seconds, and
     every 4 seconds from then on, an enemy comes at the farthest ring across
-    the tube, on a lane picked at random: a seeder at first, and after 30
-    seconds in the tube, a seeder or a climber. For a second and a half, its
+    the tube, on a lane picked at random: a seeder at first, after 30 seconds
+    in the tube, a seeder or a climber, and after 60, a zapper too, of a kind
+    picked at random. For a second and a half, its
     lane flashes in the enemy's colour, added to the ship's in the ship's
     lane, and glows with the enemy and a seeder's spike, fading out: the mesh
     renderer draws the glow with RasterizerGlow, only on them, and with the
@@ -111,14 +113,19 @@ abstract class TubeRunnerExample({
     flips onto a neighbouring lane every 2 to 4 seconds, and fires down its
     lane every 3 to 5 seconds, with at most 2 of its kind's shots in the tube,
     as on Tube Shooter's first level; its shots climb half as fast again as
-    it does.
+    it does. A zapper flips every 3 to 6 seconds, and the zappers pulse
+    together every 3 seconds, for 0.6 of a second, as on Tube Shooter's first
+    level: each flashes white for half a second before, and while they
+    pulse, a bolt zigzags from each down its lane to the ship's ring,
+    glowing, or with wider, see-through copies, as the flash does.
 
     The ship's shots fly as fast as Tube Shooter's ahead of it, and go 8
     units down the tube. As in Tube Shooter, a shot destroys a seeder for 50
     points, and leaves its spike, cuts a spike back from its near end for 2
-    points, destroys a climber for 100, and destroys a climber's shot. An
-    enemy, a spike or a climber's shot that touches the ship, in its lane at
-    the ship's ring, destroys it, and takes a life, as in Tube Shooter: the
+    points, destroys a climber for 100 or a zapper for 200, and destroys a
+    climber's shot. An enemy, a spike or a climber's shot that touches the
+    ship, in its lane at the ship's ring, or a bolt down the ship's lane,
+    destroys it, and takes a life, as in Tube Shooter: the
     enemies, spikes and shots go, and READY shows again. Once the lives are
     gone, Game Over stops the game until a tap, or Enter, starts a new one.
     The bottom left shows the tube's name and how long the game has gone on
@@ -140,7 +147,11 @@ abstract class TubeRunnerExample({
 
   /// The kinds of enemy that come, in the order they join: the first from
   /// the start, and one more after every [unlockTime] seconds in the tube.
-  static const enemyKinds = [EnemyKind.seeder, EnemyKind.climber];
+  static const enemyKinds = [
+    EnemyKind.seeder,
+    EnemyKind.climber,
+    EnemyKind.zapper,
+  ];
   static const unlockTime = 30.0;
 
   /// How far the glow of an enemy's lane and a seeder's spike, and of the
@@ -312,6 +323,32 @@ abstract class TubeRunnerExample({
   int? _tubeLane;
   RunnerEnemyComponent? _tubeFlasher;
   double _tubeFlash = 0;
+  List<TubeBolt> _tubeBolts = const [];
+
+  /// The components that draw the zappers' bolts, and their halo, if the
+  /// renderer doesn't draw glows.
+  PositionComponent? _bolts;
+  PositionComponent? _boltHalo;
+
+  /// For the bolts' zigzags, apart from [random], so that drawing doesn't
+  /// change the game's random sequence, as in Tube Shooter.
+  final _boltRandom = math.Random(0);
+
+  /// Seconds into the zappers' pulse period, as Tube Shooter's first level
+  /// has it. The pulse comes at the period's end.
+  double _pulseClock = 0;
+
+  /// Whether the zappers pulse now.
+  bool get isPulsing => _pulseClock >= _level.pulsePeriod - _level.pulseTime;
+
+  /// Whether the zappers flash white, just before a pulse.
+  bool get isWarning {
+    final pulse = _level.pulsePeriod - _level.pulseTime;
+    return _pulseClock < pulse && _pulseClock >= pulse - _level.pulseWarning;
+  }
+
+  /// Tube Shooter's first level, whose pace the enemies go at.
+  static final _level = levels.first;
 
   /// How many quads the tube's paths have.
   int _quads = 0;
@@ -479,6 +516,7 @@ abstract class TubeRunnerExample({
     switch (_state) {
       case RunnerState.play:
         _tubeTime += dt;
+        _pulseClock = (_pulseClock + dt) % _level.pulsePeriod;
         _updateEnemies(dt);
         _updateShots(dt);
         _hit();
@@ -500,7 +538,8 @@ abstract class TubeRunnerExample({
 
   /// Destroys the ship if an enemy, a spike or a climber's shot touches it:
   /// one in its lane that reaches the ship's ring, however the ship got into
-  /// the lane. Those that passed the ring before went with [_dropPassed].
+  /// the lane. Those that passed the ring before went with [_dropPassed]. A
+  /// zapper's bolt down the ship's lane destroys it too.
   void _collide() {
     final lane = ship.lane;
     if (_spikes.any(
@@ -508,7 +547,11 @@ abstract class TubeRunnerExample({
               spike.lane == lane && spike.near <= _flown && _flown <= spike.far,
         ) ||
         _enemies.any(
-          (enemy) => enemy.currentLane == lane && enemy.at <= _flown,
+          (enemy) =>
+              (enemy.currentLane == lane && enemy.at <= _flown) ||
+              (enemy is RunnerZapperComponent &&
+                  enemy.isZapping &&
+                  enemy.lane == lane),
         ) ||
         _enemyShots.any((shot) => shot.lane == lane && shot.at <= _flown)) {
       _destroyShip();
@@ -744,6 +787,9 @@ abstract class TubeRunnerExample({
   /// the enemy's added, and its lines and a seeder's spike glow, fading out.
   /// With the renderers that don't draw glows, wider, see-through copies of
   /// them in the enemy's colour stand for the glow.
+  ///
+  /// While the zappers pulse, their bolts zigzag down their lanes to the
+  /// ship's ring, glowing in their colour, or with wider, see-through copies.
   void _updateTube() {
     // The ship knows its lane once loaded. Its lane shows while it's in play,
     // as in Tube Shooter.
@@ -753,11 +799,17 @@ abstract class TubeRunnerExample({
     if (flash == 0) {
       flasher = null;
     }
+    final bolts = <TubeBolt>[
+      for (final enemy in _enemies)
+        if (enemy is RunnerZapperComponent && enemy.isZapping)
+          (lane: enemy.lane, far: enemy.at),
+    ];
     if (_flown == _tubeFlown &&
         view.version == _tubeVersion &&
         lane == _tubeLane &&
         flasher == _tubeFlasher &&
-        flash == _tubeFlash) {
+        flash == _tubeFlash &&
+        listEquals(bolts, _tubeBolts)) {
       return;
     }
     _tubeFlown = _flown;
@@ -765,6 +817,7 @@ abstract class TubeRunnerExample({
     _tubeLane = lane;
     _tubeFlasher = flasher;
     _tubeFlash = flash;
+    _tubeBolts = bolts;
     // The explosions remove themselves once they're done.
     _blasts.removeWhere((blast) => blast.isRemoving || blast.isRemoved);
     final placed = <TubePlaced>[
@@ -783,6 +836,8 @@ abstract class TubeRunnerExample({
       flashLane: flasher?.spawnLane,
       flashSpike: flasher is RunnerSeederComponent ? flasher.spike : null,
       halo: rendererGlows ? null : 2 * laneGlowWidths,
+      bolts: bolts,
+      random: _boltRandom,
     );
     _quads =
         quads.tube.vertexCounts.length +
@@ -790,7 +845,9 @@ abstract class TubeRunnerExample({
         quads.spikes.vertexCounts.length +
         quads.flashLane.vertexCounts.length +
         quads.flashSpike.vertexCounts.length +
-        quads.halo.vertexCounts.length;
+        quads.halo.vertexCounts.length +
+        quads.bolts.vertexCounts.length +
+        quads.boltHalo.vertexCounts.length;
     // Under the lines it stands for the glow of, over the others, as a glow
     // is.
     _tube = _replaceQuads(_tube, quads.tube, TubeColors.tube);
@@ -819,6 +876,19 @@ abstract class TubeRunnerExample({
       quads.flashSpike,
       TubeColors.spikes,
       glow: glow,
+    );
+    _boltHalo = _replaceQuads(
+      _boltHalo,
+      quads.boltHalo,
+      TubeColors.bolts.withValues(alpha: haloAlpha),
+    );
+    _bolts = _replaceQuads(
+      _bolts,
+      quads.bolts,
+      TubeColors.bolts,
+      glow: rendererGlows
+          ? flashGlow(laneGlowWidths, 1, TubeColors.bolts)
+          : null,
     );
     for (var i = 0; i < placed.length; i++) {
       placed[i].placeAt(quads.places[i]);
@@ -861,7 +931,9 @@ abstract class TubeRunnerExample({
         enemy = RunnerSeederComponent(spike);
       case EnemyKind.climber:
         enemy = RunnerClimberComponent(lane, far);
-      case EnemyKind.splitter || EnemyKind.zapper || EnemyKind.edgeWalker:
+      case EnemyKind.zapper:
+        enemy = RunnerZapperComponent(lane, far);
+      case EnemyKind.splitter || EnemyKind.edgeWalker:
         throw ArgumentError.value(kind, 'kind', "doesn't come here yet");
     }
     _enemies.add(enemy);
