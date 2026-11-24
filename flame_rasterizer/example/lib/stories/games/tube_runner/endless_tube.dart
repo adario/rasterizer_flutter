@@ -184,7 +184,10 @@ class EndlessTube() {
   /// outside: from inside the tube, other faces always hide those. It also
   /// cuts out what the rings before each line hide of it, as [_Hiders] says,
   /// so that where the tube bends, its nearer walls and ridges hide what's
-  /// beyond.
+  /// beyond. An open tube that goes more than half round the axis does the
+  /// same, with a lid across its gap, as [_lidOf] says. Another open tube
+  /// cuts out what its nearer faces hide, as [_Faces] says, as the eye sees
+  /// past its ends and under its faces.
   ///
   /// The lines of [lane], if any, go to `lane` instead of `tube`: its two
   /// edges, and its stretch of each ring across it. The [spikes] go to
@@ -214,15 +217,6 @@ class EndlessTube() {
     final tube = view.tube;
     final ship = ringAt(distance);
     final eye = ship.center - ship.forward * Tube.eye;
-    // Each ring's outline, from the eye: across, down and along its line of
-    // sight.
-    final seen = [
-      for (final ring in _rings)
-        [
-          for (final point in tube.points)
-            _fromEye(ring.place(point), eye, ship),
-        ],
-    ];
     // Twice the outline's signed area: its sign says which way it turns.
     var turn = 0.0;
     for (var i = 0; i < tube.laneCount; i++) {
@@ -230,6 +224,20 @@ class EndlessTube() {
       final next = tube.points[tube.pointAfter(i)];
       turn += point.dx * next.dy - point.dy * next.dx;
     }
+    if (!identical(_hidingTube, tube)) {
+      _hidingTube = tube;
+      _hiding = _hidingOf(tube, turn);
+    }
+    final hiders = _hiding!..reset();
+    // Each ring's outline, from the eye: across, down and along its line of
+    // sight. A lid's points come after the tube's.
+    final seen = [
+      for (final ring in _rings)
+        [
+          for (final point in hiders.points)
+            _fromEye(ring.place(point), eye, ship),
+        ],
+    ];
     // Whether the eye sees each lane's face, from a ring to the next, from
     // inside the tube, by ring and lane.
     final facing = [
@@ -251,13 +259,6 @@ class EndlessTube() {
         lane >= 0 &&
         lane < tube.laneCount &&
         facing[k][lane];
-    _Hiders? hiders;
-    if (!tube.isOpen) {
-      if (_hiders?.tube != tube) {
-        _hiders = _Hiders(tube, turn);
-      }
-      hiders = _hiders!..reset();
-    }
     final lines = _Lines(view);
     final laneLines = _Lines(view);
     final spikeLines = _Lines(view);
@@ -307,10 +308,10 @@ class EndlessTube() {
     final every = (ringSpacing / step).round();
     for (var k = 0; k < _rings.length; k++) {
       final outline = seen[k];
-      hiders?.pass(outline, _fromEye(_rings[k].center, eye, ship));
+      hiders.pass(outline, _fromEye(_rings[k].center, eye, ship));
       if (k + 1 < _rings.length) {
         final next = seen[k + 1];
-        for (var i = 0; i < outline.length; i++) {
+        for (var i = 0; i < tube.points.length; i++) {
           final before = tube.isOpen
               ? i - 1
               : (i + tube.laneCount - 1) % tube.laneCount;
@@ -458,7 +459,7 @@ class EndlessTube() {
     Point3 Function(double at, Offset point) seenAt,
     Tube tube,
     _Lines lines,
-    _Hiders? hiders,
+    _Hiding hiders,
   ) {
     final (:lane, :at, :flip) = mark;
     final laneMiddle = tube.middles[lane];
@@ -483,15 +484,9 @@ class EndlessTube() {
     ].any((p) => p.z < TubeView.near)) {
       return null;
     }
-    if (hiders != null) {
-      final count = hiders.spansOf(
-        _sight(middle),
-        _sight(ahead),
-        nearer: false,
-      );
-      if (count == 0 || hiders.spans[0] > 0) {
-        return null;
-      }
+    final count = hiders.spansOf(_sight(middle), _sight(ahead), nearer: false);
+    if (count == 0 || hiders.spans[0] > 0) {
+      return null;
     }
     final position = lines._project(middle);
     final laneWay = lines._project(laneAhead) - lines._project(laneAt);
@@ -509,8 +504,54 @@ class EndlessTube() {
     );
   }
 
-  /// What the rings hide, for the last closed tube that [quadsAt] drew.
-  _Hiders? _hiders;
+  /// The last tube that [quadsAt] drew, and what hides its lines.
+  Tube? _hidingTube;
+  _Hiding? _hiding;
+
+  /// Returns what hides the lines of [tube], whose outline's signed area has
+  /// [turn]'s sign: its rings, with a lid if it has one, or else its faces.
+  static _Hiding _hidingOf(Tube tube, double turn) {
+    if (!tube.isOpen) {
+      return _Hiders(tube.points, turn);
+    }
+    final lid = _lidOf(tube);
+    return lid == null ? _Faces(tube) : _Hiders(lid, turn);
+  }
+
+  /// How far from the axis a lid is, in tube units: see [_lidOf].
+  static const _lidRadius = 4.0;
+
+  /// Returns the outline of open [tube] with a lid across its gap, if it
+  /// goes more than half round the axis, as the Horseshoe does: its points,
+  /// then points [_lidRadius] from the axis, at most an eighth of a turn
+  /// apart, round the rest of the way. Else, returns null.
+  ///
+  /// Such a tube's rings hide what lies beyond its walls, as a closed tube's
+  /// do, but would hide what the eye sees through its gap too. With the lid,
+  /// they hide only what it sees through the gap farther out than the lid:
+  /// little, as the tube bends. That costs less than hiding with its faces,
+  /// as [_Faces] does, for about as few mistakes as a closed tube's rings
+  /// make. The lid's lines aren't drawn.
+  static List<Offset>? _lidOf(Tube tube) {
+    final points = tube.points;
+    var sweep = 0.0;
+    for (var i = 0; i + 1 < points.length; i++) {
+      var angle = points[i + 1].direction - points[i].direction;
+      angle -= 2 * math.pi * (angle / (2 * math.pi)).roundToDouble();
+      sweep += angle;
+    }
+    if (sweep.abs() <= math.pi) {
+      return null;
+    }
+    final rest = sweep.sign * (2 * math.pi - sweep.abs());
+    final count = (rest.abs() / (math.pi / 4)).ceil();
+    final start = points.last.direction;
+    return [
+      ...points,
+      for (var i = 0; i <= count; i++)
+        Offset.fromDirection(start + rest * i / count, _lidRadius),
+    ];
+  }
 
   /// How much bigger than each ring the window lets the eye see through it,
   /// so that the ring's own lines, on its edge, stay whole.
@@ -647,7 +688,7 @@ class _Lines(final TubeView view) {
   void add(
     Point3 from,
     Point3 to, {
-    _Hiders? hiders,
+    _Hiding? hiders,
     bool nearer = false,
     double widths = 1,
   }) {
@@ -717,25 +758,146 @@ class _Lines(final TubeView view) {
   }
 }
 
+/// What hides the tube's lines beyond its nearer parts, as the eye sees them
+/// from 1 away.
+///
+/// `EndlessTube.quadsAt` passes it the rings of its [points] from the eye
+/// out, and asks it which spans of each line the eye sees. It keeps its
+/// buffers from one frame to the next, so that it allocates nothing per
+/// line.
+abstract class _Hiding(final List<Offset> points) {
+  /// The spans of the line that [spansOf] last returned the count of: where
+  /// each starts and ends, from 0 to 1 along the line.
+  Float64List spans = Float64List(2);
+  var _spareSpans = Float64List(2);
+
+  /// The span that [_clip] narrows, and that [_cut] cuts out: where it
+  /// starts and ends.
+  var _start = 0.0;
+  var _end = 1.0;
+
+  /// Starts a new frame, before the nearest ring.
+  void reset();
+
+  /// Passes the next ring from the eye: where the eye sees each of [points]
+  /// round it, its [outline], and its [center].
+  void pass(List<Point3> outline, Point3 center);
+
+  /// Returns how many [spans] of the line from [a] to [b] the eye sees past
+  /// the rings passed so far, or [nearer] those before the last one.
+  int spansOf(Offset a, Offset b, {required bool nearer});
+
+  /// Makes room in [spans] for those that [count] hiders can cut a line
+  /// into: each cuts at most one span in two.
+  void _roomForSpans(int count) {
+    if (spans.length >= 2 * (count + 1)) {
+      return;
+    }
+    spans = Float64List(2 * (count + 1));
+    _spareSpans = Float64List(2 * (count + 1));
+  }
+
+  /// Cuts the span from [_start] to [_end] out of each of the first [length]
+  /// [spans], and returns how many are left.
+  int _cut(int length) {
+    final spans = this.spans;
+    final spare = _spareSpans;
+    var cut = 0;
+    for (var s = 0; s < length; s++) {
+      final start = spans[2 * s];
+      final end = spans[2 * s + 1];
+      if (_end <= start || _start >= end) {
+        spare[2 * cut] = start;
+        spare[2 * cut + 1] = end;
+        cut++;
+        continue;
+      }
+      if (_start > start) {
+        spare[2 * cut] = start;
+        spare[2 * cut + 1] = _start;
+        cut++;
+      }
+      if (_end < end) {
+        spare[2 * cut] = _end;
+        spare[2 * cut + 1] = end;
+        cut++;
+      }
+    }
+    this.spans = spare;
+    _spareSpans = spans;
+    return cut;
+  }
+
+  /// Narrows the span from [_start] to [_end] of the line from [a], going
+  /// [line], to the part inside the convex polygon of [length] points at
+  /// [offset] in [points], whose signed area is positive. Returns false if
+  /// none is left: the Cyrus-Beck algorithm.
+  bool _clip(
+    Float64List points,
+    int offset,
+    int length,
+    Offset a,
+    Offset line,
+  ) {
+    var start = _start;
+    var end = _end;
+    for (var e = 0; e < length; e++) {
+      final from = offset + 2 * e;
+      final to = offset + 2 * ((e + 1) % length);
+      final fromX = points[from];
+      final fromY = points[from + 1];
+      final edgeX = points[to] - fromX;
+      final edgeY = points[to + 1] - fromY;
+      if (edgeX * edgeX + edgeY * edgeY < _leastEdgeSquared) {
+        continue;
+      }
+      // How far inside the edge a is, and how fast the line goes inward.
+      final inside = edgeX * (a.dy - fromY) - edgeY * (a.dx - fromX);
+      final inward = edgeX * line.dy - edgeY * line.dx;
+      if (inward == 0) {
+        if (inside < 0) {
+          return false;
+        }
+        continue;
+      }
+      final t = -inside / inward;
+      if (inward > 0) {
+        start = math.max(start, t);
+      } else {
+        end = math.min(end, t);
+      }
+      if (start >= end) {
+        return false;
+      }
+    }
+    _start = start;
+    _end = end;
+    return true;
+  }
+
+  /// The least squared length of an edge that [_clip] clips to: rounding
+  /// errors leave shorter ones, which point any way.
+  static const _leastEdgeSquared = 1e-14;
+}
+
 /// What the rings of a closed tube hide of the lines beyond them, as the eye
 /// sees them from 1 away: all but the window through which it sees past the
 /// rings so far, and the notches between each ring's outline and its convex
 /// hull, behind the tube's ridges.
 ///
-/// `EndlessTube.quadsAt` passes it the rings from the eye out, and asks it
-/// which spans of each line the eye sees. It keeps its buffers from one frame
-/// to the next, so that it allocates nothing per line.
-class _Hiders(final Tube tube, final double turn) {
+/// Its [points] are the closed outline of the tube, or of an open one and
+/// its lid, whose signed area has [turn]'s sign.
+class _Hiders(super.points, final double turn) extends _Hiding {
   /// The outline's convex hull, as indices in an order whose signed area is
   /// positive.
-  late final _hull = EndlessTube._hullOf(tube.points, turn);
+  late final _hull = EndlessTube._hullOf(points, turn);
 
   /// The outline's notches, as [_notchesOf] returns them.
-  late final _notches = _notchesOf(tube.points, _hull, turn);
+  late final _notches = _notchesOf(points, _hull, turn);
 
   /// Where the eye sees each point of the ring last passed, grown about the
   /// ring's middle by `EndlessTube._windowSlack`: x then y.
-  late final _ring = Float64List(2 * tube.points.length);
+  late final _ring = Float64List(2 * points.length);
 
   /// The window, as the points of a convex polygon with a positive signed
   /// area, x then y, and how many: -1 while no ring hides anything.
@@ -774,16 +936,7 @@ class _Hiders(final Tube tube, final double turn) {
   var _live = Int32List(0);
   var _liveCount = 0;
 
-  /// The spans of the line that [spansOf] last returned the count of: where
-  /// each starts and ends, from 0 to 1 along the line.
-  Float64List spans = Float64List(2);
-  var _spareSpans = Float64List(2);
-
-  /// The span that [_clip] narrows: where it starts and ends.
-  var _start = 0.0;
-  var _end = 1.0;
-
-  /// Starts a new frame, before the nearest ring.
+  @override
   void reset() {
     _windowLength = -1;
     _nearerLength = -1;
@@ -792,12 +945,10 @@ class _Hiders(final Tube tube, final double turn) {
     _liveCount = 0;
   }
 
-  /// Passes the next ring from the eye: its [outline] and [center], from the
-  /// eye.
-  ///
   /// A ring hides something only when all of its outline is at least
   /// [TubeView.near] away. Only the rings nearest the eye aren't, and before
   /// them nothing hides anything anyway.
+  @override
   void pass(List<Point3> outline, Point3 center) {
     _prune();
     _nearerLength = _windowLength;
@@ -827,8 +978,7 @@ class _Hiders(final Tube tube, final double turn) {
     }
   }
 
-  /// Returns how many [spans] of the line from [a] to [b] the eye sees past
-  /// the rings passed so far, or [nearer] those before the last one.
+  @override
   int spansOf(Offset a, Offset b, {required bool nearer}) {
     final windowLength = nearer ? _nearerLength : _windowLength;
     final count = nearer ? _nearerCount : _liveCount;
@@ -842,8 +992,6 @@ class _Hiders(final Tube tube, final double turn) {
         !_clip(nearer ? _nearerWindow : _window, 0, windowLength, a, line)) {
       return 0;
     }
-    var spans = this.spans;
-    var spare = _spareSpans;
     spans[0] = _start;
     spans[1] = _end;
     var length = 1;
@@ -863,38 +1011,10 @@ class _Hiders(final Tube tube, final double turn) {
       }
       _start = spans[0];
       _end = spans[2 * length - 1];
-      if (!_clip(_notchPoints, _stride * slot, _notchLengths[slot], a, line)) {
-        continue;
+      if (_clip(_notchPoints, _stride * slot, _notchLengths[slot], a, line)) {
+        length = _cut(length);
       }
-      // Cuts the notch's span out of each span.
-      var cut = 0;
-      for (var s = 0; s < length; s++) {
-        final start = spans[2 * s];
-        final end = spans[2 * s + 1];
-        if (_end <= start || _start >= end) {
-          spare[2 * cut] = start;
-          spare[2 * cut + 1] = end;
-          cut++;
-          continue;
-        }
-        if (_start > start) {
-          spare[2 * cut] = start;
-          spare[2 * cut + 1] = _start;
-          cut++;
-        }
-        if (_end < end) {
-          spare[2 * cut] = _end;
-          spare[2 * cut + 1] = end;
-          cut++;
-        }
-      }
-      final swap = spans;
-      spans = spare;
-      spare = swap;
-      length = cut;
     }
-    this.spans = spans;
-    _spareSpans = spare;
     return length;
   }
 
@@ -1002,9 +1122,7 @@ class _Hiders(final Tube tube, final double turn) {
     _notchLengths = Int32List(room)..setAll(0, _notchLengths);
     _notchBounds = Float64List(4 * room)..setAll(0, _notchBounds);
     _live = Int32List(room)..setAll(0, _live);
-    // Each notch cuts at most one span in two.
-    spans = Float64List(2 * (room + 1));
-    _spareSpans = Float64List(2 * (room + 1));
+    _roomForSpans(room);
   }
 
   /// Returns whether the bounds at [offset] in [bounds] overlap the
@@ -1015,89 +1133,11 @@ class _Hiders(final Tube tube, final double turn) {
       bounds[offset + 2] >= _windowBounds[0] &&
       bounds[offset + 3] >= _windowBounds[1];
 
-  /// Narrows the span from [_start] to [_end] of the line from [a], going
-  /// [line], to the part inside the convex polygon of [length] points at
-  /// [offset] in [points], whose signed area is positive. Returns false if
-  /// none is left: the Cyrus-Beck algorithm.
-  bool _clip(
-    Float64List points,
-    int offset,
-    int length,
-    Offset a,
-    Offset line,
-  ) {
-    var start = _start;
-    var end = _end;
-    for (var e = 0; e < length; e++) {
-      final from = offset + 2 * e;
-      final to = offset + 2 * ((e + 1) % length);
-      final fromX = points[from];
-      final fromY = points[from + 1];
-      final edgeX = points[to] - fromX;
-      final edgeY = points[to + 1] - fromY;
-      if (edgeX * edgeX + edgeY * edgeY < _leastEdgeSquared) {
-        continue;
-      }
-      // How far inside the edge a is, and how fast the line goes inward.
-      final inside = edgeX * (a.dy - fromY) - edgeY * (a.dx - fromX);
-      final inward = edgeX * line.dy - edgeY * line.dx;
-      if (inward == 0) {
-        if (inside < 0) {
-          return false;
-        }
-        continue;
-      }
-      final t = -inside / inward;
-      if (inward > 0) {
-        start = math.max(start, t);
-      } else {
-        end = math.min(end, t);
-      }
-      if (start >= end) {
-        return false;
-      }
-    }
-    _start = start;
-    _end = end;
-    return true;
-  }
-
-  /// The least squared length of an edge that [_clip] clips to: rounding
-  /// errors leave shorter ones, which point any way.
-  static const _leastEdgeSquared = 1e-14;
-
   /// Returns [list] if it holds at least [length] numbers, else a longer
   /// one, whose numbers are all 0.
   static Float64List _fit(Float64List list, int length) => list.length >= length
       ? list
       : Float64List(math.max(length, 2 * list.length));
-
-  /// Puts the bounds of the [length] points at [offset] in [points] into
-  /// [bounds] at [at]: left, top, right and bottom.
-  static void _boundsOf(
-    Float64List points,
-    int offset,
-    int length,
-    Float64List bounds,
-    int at,
-  ) {
-    var left = points[offset];
-    var top = points[offset + 1];
-    var right = left;
-    var bottom = top;
-    for (var i = 1; i < length; i++) {
-      final x = points[offset + 2 * i];
-      final y = points[offset + 2 * i + 1];
-      left = math.min(left, x);
-      top = math.min(top, y);
-      right = math.max(right, x);
-      bottom = math.max(bottom, y);
-    }
-    bounds[at] = left;
-    bounds[at + 1] = top;
-    bounds[at + 2] = right;
-    bounds[at + 3] = bottom;
-  }
 
   /// Returns the notches between [points], a closed outline whose signed
   /// area has [turn]'s sign, and its convex [hull]: each as the indices of a
@@ -1105,8 +1145,9 @@ class _Hiders(final Tube tube, final double turn) {
   ///
   /// Each notch runs along the outline from one point of the hull to the
   /// next, and back along the hull. It leaves out the points where a notch
-  /// goes straight on, and the notches that aren't convex, which hide
-  /// nothing then: none of the tubes' are.
+  /// goes straight on. A notch that isn't convex, as a lid's are beside the
+  /// tube's walls, it splits as [_convexPiecesOf] says: no closed tube's
+  /// notch is.
   static List<List<int>> _notchesOf(
     List<Offset> points,
     List<int> hull,
@@ -1146,23 +1187,278 @@ class _Hiders(final Tube tube, final double turn) {
           points[notch[(k + 1) % notch.length]],
         );
       }
-      final positive = area < 0 ? notch.reversed.toList() : notch;
-      var convex = true;
-      for (var k = 0; k < positive.length; k++) {
-        final before =
-            points[positive[(k + positive.length - 1) % positive.length]];
-        final point = points[positive[k]];
-        final after = points[positive[(k + 1) % positive.length]];
-        if (_cross(point - before, after - point) < 0) {
-          convex = false;
-        }
-      }
-      if (convex) {
-        notches.add(positive);
-      }
+      notches.addAll(
+        _convexPiecesOf(points, area < 0 ? notch.reversed.toList() : notch),
+      );
     }
     return notches;
   }
+
+  /// Returns [polygon], the indices of a simple polygon of [points] whose
+  /// signed area is positive, as convex polygons that cover it, each with a
+  /// positive signed area: itself, if it's convex.
+  ///
+  /// Else, it fans the polygon out from a corner that sees all the others,
+  /// as the corners of a lid's notch see each other from the lid, and joins
+  /// neighbouring triangles of the fan while they stay convex. If no corner
+  /// sees all the others, it returns none, which then hide nothing.
+  static List<List<int>> _convexPiecesOf(
+    List<Offset> points,
+    List<int> polygon,
+  ) {
+    bool turnsLeft(int before, int point, int after) =>
+        _cross(
+          points[point] - points[before],
+          points[after] - points[point],
+        ) >=
+        0;
+    final count = polygon.length;
+    var convex = true;
+    for (var k = 0; k < count && convex; k++) {
+      convex = turnsLeft(
+        polygon[(k + count - 1) % count],
+        polygon[k],
+        polygon[(k + 1) % count],
+      );
+    }
+    if (convex) {
+      return [polygon];
+    }
+    for (var apex = 0; apex < count; apex++) {
+      final origin = polygon[apex];
+      final fan = [for (var k = 1; k < count; k++) polygon[(apex + k) % count]];
+      var seesAll = true;
+      for (var k = 0; k + 1 < fan.length && seesAll; k++) {
+        seesAll =
+            _cross(
+              points[fan[k]] - points[origin],
+              points[fan[k + 1]] - points[origin],
+            ) >
+            0;
+      }
+      if (!seesAll) {
+        continue;
+      }
+      final pieces = <List<int>>[];
+      var piece = [origin, fan[0], fan[1]];
+      for (var k = 2; k < fan.length; k++) {
+        final point = fan[k];
+        if (turnsLeft(piece[piece.length - 2], piece.last, point) &&
+            turnsLeft(piece.last, point, origin) &&
+            turnsLeft(point, origin, piece[1])) {
+          piece.add(point);
+        } else {
+          pieces.add(piece);
+          piece = [origin, piece.last, point];
+        }
+      }
+      return pieces..add(piece);
+    }
+    return const [];
+  }
+}
+
+/// What the faces of an open tube hide of the lines beyond them, as the eye
+/// sees them from 1 away: each lane's face between two rings, as the eye
+/// sees its corners, clipped closer than [TubeView.near].
+///
+/// The eye sees past an open tube's ends, and so under its faces, where they
+/// don't hide what's beyond them as a closed tube's rings do. A line between
+/// two rings is hidden by the faces between the rings before it, nearest
+/// first: as the axis bends, never by those beyond. Within its own two
+/// rings, it isn't, so a ridge's faces don't hide each other there.
+class _Faces(final Tube tube) extends _Hiding {
+  this : super(tube.points);
+
+  /// How many numbers a face takes in [_facePoints]: 2 for each of at most 5
+  /// points, a quad clipped closer than [TubeView.near].
+  static const _stride = 10;
+
+  /// The faces between the rings passed so far, nearest first: their points,
+  /// x then y, [_stride] apart, in an order whose signed area is positive,
+  /// how many points each has, and their bounds (left, top, right and
+  /// bottom).
+  var _facePoints = Float64List(0);
+  var _faceLengths = Int32List(0);
+  var _faceBounds = Float64List(0);
+
+  /// How many faces lie between the rings passed so far, and between those
+  /// before the last one.
+  var _count = 0;
+  var _nearerCount = 0;
+
+  /// The outline of the ring last passed, if any this frame.
+  List<Point3>? _last;
+
+  /// A face's corners, from the eye, x, y and z, and the at most 5 left of
+  /// them closer than [TubeView.near].
+  final _corners = Float64List(12);
+  final _clipped = Float64List(15);
+
+  @override
+  void reset() {
+    _count = 0;
+    _nearerCount = 0;
+    _last = null;
+  }
+
+  @override
+  void pass(List<Point3> outline, Point3 center) {
+    _nearerCount = _count;
+    final last = _last;
+    _last = outline;
+    if (last == null) {
+      return;
+    }
+    _grow(_count + tube.laneCount);
+    for (var i = 0; i < tube.laneCount; i++) {
+      final after = tube.pointAfter(i);
+      _add(last[i], last[after], outline[after], outline[i]);
+    }
+  }
+
+  @override
+  int spansOf(Offset a, Offset b, {required bool nearer}) {
+    final count = nearer ? _nearerCount : _count;
+    final line = b - a;
+    spans[0] = 0;
+    spans[1] = 1;
+    var length = 1;
+    final left = math.min(a.dx, b.dx);
+    final right = math.max(a.dx, b.dx);
+    final top = math.min(a.dy, b.dy);
+    final bottom = math.max(a.dy, b.dy);
+    final bounds = _faceBounds;
+    for (var f = 0; f < count && length > 0; f++) {
+      final o = 4 * f;
+      if (bounds[o] > right ||
+          bounds[o + 1] > bottom ||
+          bounds[o + 2] < left ||
+          bounds[o + 3] < top) {
+        continue;
+      }
+      _start = spans[0];
+      _end = spans[2 * length - 1];
+      if (_clip(_facePoints, _stride * f, _faceLengths[f], a, line)) {
+        length = _cut(length);
+      }
+    }
+    return length;
+  }
+
+  /// Adds the face from [a] to [b], [c] and [d], from the eye, clipped closer
+  /// than [TubeView.near], unless none of it is left.
+  void _add(Point3 a, Point3 b, Point3 c, Point3 d) {
+    final corners = _corners;
+    _put(0, a);
+    _put(1, b);
+    _put(2, c);
+    _put(3, d);
+    // The Sutherland-Hodgman algorithm, against the near plane.
+    final clipped = _clipped;
+    var length = 0;
+    for (var i = 0; i < 4; i++) {
+      final from = 3 * i;
+      final to = 3 * ((i + 1) % 4);
+      final fromIn = corners[from + 2] >= TubeView.near;
+      if (fromIn) {
+        clipped.setRange(3 * length, 3 * length + 3, corners, from);
+        length++;
+      }
+      if (fromIn != (corners[to + 2] >= TubeView.near)) {
+        final t =
+            (TubeView.near - corners[from + 2]) /
+            (corners[to + 2] - corners[from + 2]);
+        for (var j = 0; j < 3; j++) {
+          clipped[3 * length + j] =
+              corners[from + j] + (corners[to + j] - corners[from + j]) * t;
+        }
+        length++;
+      }
+    }
+    if (length < 3) {
+      return;
+    }
+    final points = _facePoints;
+    final o = _stride * _count;
+    var area = 0.0;
+    for (var i = 0; i < length; i++) {
+      final z = clipped[3 * i + 2];
+      points[o + 2 * i] = clipped[3 * i] / z;
+      points[o + 2 * i + 1] = clipped[3 * i + 1] / z;
+    }
+    for (var i = 0; i < length; i++) {
+      final j = (i + 1) % length;
+      area +=
+          points[o + 2 * i] * points[o + 2 * j + 1] -
+          points[o + 2 * j] * points[o + 2 * i + 1];
+    }
+    if (area.abs() < _leastArea) {
+      return;
+    }
+    if (area < 0) {
+      for (var i = 0, j = length - 1; i < j; i++, j--) {
+        for (var k = 0; k < 2; k++) {
+          final swap = points[o + 2 * i + k];
+          points[o + 2 * i + k] = points[o + 2 * j + k];
+          points[o + 2 * j + k] = swap;
+        }
+      }
+    }
+    _boundsOf(points, o, length, _faceBounds, 4 * _count);
+    _faceLengths[_count++] = length;
+  }
+
+  /// Puts [corner] into [_corners] as the corner at [index].
+  void _put(int index, Point3 corner) {
+    _corners[3 * index] = corner.x;
+    _corners[3 * index + 1] = corner.y;
+    _corners[3 * index + 2] = corner.z;
+  }
+
+  /// The least area of a face, as the eye sees it, that hides anything: a
+  /// face seen edge on hides nothing.
+  static const _leastArea = 1e-12;
+
+  /// Makes room for [count] faces, and for the spans they can cut a line
+  /// into.
+  void _grow(int count) {
+    if (_faceLengths.length >= count) {
+      return;
+    }
+    final room = math.max(count, 2 * _faceLengths.length);
+    _facePoints = Float64List(_stride * room)..setAll(0, _facePoints);
+    _faceLengths = Int32List(room)..setAll(0, _faceLengths);
+    _faceBounds = Float64List(4 * room)..setAll(0, _faceBounds);
+    _roomForSpans(room);
+  }
+}
+
+/// Puts the bounds of the [length] points at [offset] in [points] into
+/// [bounds] at [at]: left, top, right and bottom.
+void _boundsOf(
+  Float64List points,
+  int offset,
+  int length,
+  Float64List bounds,
+  int at,
+) {
+  var left = points[offset];
+  var top = points[offset + 1];
+  var right = left;
+  var bottom = top;
+  for (var i = 1; i < length; i++) {
+    final x = points[offset + 2 * i];
+    final y = points[offset + 2 * i + 1];
+    left = math.min(left, x);
+    top = math.min(top, y);
+    right = math.max(right, x);
+    bottom = math.max(bottom, y);
+  }
+  bounds[at] = left;
+  bounds[at + 1] = top;
+  bounds[at + 2] = right;
+  bounds[at + 3] = bottom;
 }
 
 /// Returns the cross product of [a] and [b]: positive if [b] turns from [a]

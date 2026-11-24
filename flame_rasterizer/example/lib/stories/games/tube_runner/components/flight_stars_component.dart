@@ -17,7 +17,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// the ship flew, so they stream outward as streaks. A star that passes the
 /// near plane goes back to the farthest distance, as a dot somewhere else. As
 /// the ship moves round the tube, they turn the other way, as Tube Shooter's
-/// do round a closed tube.
+/// do: by its lanes round a closed tube, and against its heading round an
+/// open one.
 ///
 /// It's in the camera's backdrop, as Tube Shooter's stars are, and draws
 /// through the viewfinder's transform and updates at the world's time scale,
@@ -82,7 +83,8 @@ class FlightStarsComponent()
   /// a star that turns as much as the ship turns over [dt] seconds, clockwise
   /// on screen.
   ///
-  /// When the tube changes, the ship's move onto it doesn't turn them.
+  /// When the tube changes, the ship's move onto it doesn't turn them. On an
+  /// open tube, they turn against the ship's heading, as Tube Shooter's do.
   double _turn(double dt) {
     const stepsPerLane = PlayerComponent.stepsPerLane;
     final tube = gameRef.view.tube;
@@ -90,6 +92,10 @@ class FlightStarsComponent()
     if (!identical(tube, _tube)) {
       _tube = tube;
       _turnPerLane = _turnPerLaneOn(tube);
+    } else if (tube.isOpen) {
+      _turnTarget -=
+          PlayerComponent.headingOn(tube, step) -
+          PlayerComponent.headingOn(tube, _step);
     } else {
       final steps = stepsPerLane * tube.laneCount;
       var moved = step - _step;

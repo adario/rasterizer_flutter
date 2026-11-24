@@ -61,6 +61,79 @@ void main() {
     expect(flipped.angle, closeTo(still.angle + angle, 1e-9));
   });
 
+  for (final tube in [Tubes.floor, Tubes.ridge, Tubes.horseshoe]) {
+    test("an open tube's nearer lanes hide what's beyond them: "
+        '${tube.name}', () {
+      final view = TubeView()
+        ..tube = tube
+        ..fit(720, 1);
+      final endless = EndlessTube();
+      const step = EndlessTube.step;
+      var marks = 0;
+      var hidden = 0;
+      var wrong = 0;
+      for (var distance = 0.0; distance < 2400; distance += 60) {
+        endless.advanceTo(distance);
+        final ship = endless.ringAt(distance);
+        final eye = ship.center - ship.forward * Tube.eye;
+        final first = ((distance - EndlessTube.behind) / step).floor();
+        final last = ((distance + EndlessTube.ahead) / step).ceil();
+        final rings = {
+          for (var k = first; k <= last; k++)
+            k: [
+              for (final point in tube.points)
+                endless.ringAt(k * step).place(point),
+            ],
+        };
+        // A mark at the middle of each face ahead of the ship.
+        final faces = [
+          for (var k = (distance / step).floor() + 1; k < last; k++)
+            for (var lane = 0; lane < tube.laneCount; lane++)
+              (k: k, lane: lane, at: (k + 0.5) * step),
+        ];
+        final places = endless
+            .quadsAt(
+              distance,
+              view,
+              marks: [
+                for (final face in faces)
+                  (lane: face.lane, at: face.at, flip: null),
+              ],
+            )
+            .places;
+        for (final (i, face) in faces.indexed) {
+          final point = endless.ringAt(face.at).place(tube.middles[face.lane]);
+          var behind = false;
+          for (var k = first; k < last && !behind; k++) {
+            for (var lane = 0; lane < tube.laneCount && !behind; lane++) {
+              if (k == face.k && lane == face.lane) {
+                continue;
+              }
+              final after = tube.pointAfter(lane);
+              behind = _hides(eye, point, [
+                rings[k]![lane],
+                rings[k]![after],
+                rings[k + 1]![after],
+                rings[k + 1]![lane],
+              ]);
+            }
+          }
+          marks++;
+          if (behind) {
+            hidden++;
+          }
+          if (behind != (places[i] == null)) {
+            wrong++;
+          }
+        }
+      }
+      // Without hiding, 15% of the Floor's marks, 23% of the Ridge's and
+      // 40% of the Horseshoe's would show through.
+      expect(hidden / marks, greaterThan(0.1));
+      expect(wrong / marks, lessThan(0.015));
+    });
+  }
+
   for (final renderer in [SvgRenderer.rasterizerCanvas, SvgRenderer.flameSvg]) {
     testWidgets('the ship flies and moves with ${renderer.name}', (
       tester,
@@ -255,5 +328,78 @@ void main() {
       expect(game.score, greaterThanOrEqualTo(EnemyKind.splitter.score));
       expect(game.state, RunnerState.play);
     });
+
+    testWidgets('round an open tube, the ship stops at its ends, and a '
+        'splitter at an end splits into a climber that stays, with '
+        '${renderer.name}', (tester) async {
+      final tube = Tubes.floor;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameStory<TubeRunnerExample, Object>(
+            renderer: renderer,
+            create: (status, _) => TubeRunnerExample.of(
+              renderer,
+              status,
+              random: math.Random(1),
+              tube: tube,
+            ),
+          ),
+        ),
+      );
+      final game = tester
+          .widget<GameWidget<TubeRunnerExample>>(
+            find.byWidgetPredicate((w) => w is GameWidget),
+          )
+          .game!;
+      await pumpWhileLoading(tester, () => !game.isLoaded);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      game.ship.moveBy(-2.0 * tube.laneCount);
+      expect(game.ship.lane, 0);
+      game.ship.moveBy(2.0 * tube.laneCount);
+      expect(game.ship.lane, tube.laneCount - 1);
+      game.addEnemy(EnemyKind.splitter, 0);
+      bool splitting() =>
+          game.enemies.whereType<RunnerSplitterComponent>().isNotEmpty;
+      for (var i = 0; i < 300 && splitting(); i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final climbers = game.enemies.whereType<RunnerClimberComponent>();
+      expect(climbers, hasLength(2));
+      expect(climbers.map((climber) => climber.mark.flip?.to).toSet(), {
+        null,
+        1,
+      });
+      expect(climbers.map((climber) => climber.lane), everyElement(0));
+      expect(game.state, RunnerState.play);
+    });
   }
+}
+
+/// Returns whether the quad of [corners] hides [point] from [eye]: whether
+/// one of its two triangles crosses the line of sight between them, by the
+/// Möller-Trumbore algorithm.
+bool _hides(Point3 eye, Point3 point, List<Point3> corners) {
+  final sight = point - eye;
+  for (final [a, b, c] in [
+    [corners[0], corners[1], corners[2]],
+    [corners[0], corners[2], corners[3]],
+  ]) {
+    final ab = b - a;
+    final ac = c - a;
+    final p = sight.cross(ac);
+    final determinant = ab.dot(p);
+    if (determinant.abs() < 1e-12) {
+      continue;
+    }
+    final fromA = eye - a;
+    final u = fromA.dot(p) / determinant;
+    final q = fromA.cross(ab);
+    final v = sight.dot(q) / determinant;
+    final t = ac.dot(q) / determinant;
+    // Short of the point, which lies on a face itself.
+    if (u >= 0 && v >= 0 && u + v <= 1 && t > 1e-6 && t < 1 - 1e-3) {
+      return true;
+    }
+  }
+  return false;
 }

@@ -42,12 +42,17 @@ class ShipComponent()
     place();
   }
 
-  /// Moves it [lanes] round the tube, in whole steps.
+  /// Moves it [lanes] round the tube, in whole steps, stopping at an open
+  /// tube's ends, as [PlayerComponent.moveBy] does.
   void moveBy(double lanes) {
     final moved = _partStep + lanes * stepsPerLane;
     final whole = moved.truncate();
     _partStep = moved - whole;
-    step = (step + whole) % (stepsPerLane * gameRef.view.tube.laneCount);
+    final tube = gameRef.view.tube;
+    final steps = stepsPerLane * tube.laneCount;
+    step = tube.isOpen
+        ? (step + whole).clamp(0, steps - 1)
+        : (step + whole) % steps;
   }
 
   @override

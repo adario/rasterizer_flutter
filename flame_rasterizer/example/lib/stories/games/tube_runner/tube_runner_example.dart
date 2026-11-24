@@ -78,12 +78,8 @@ abstract class TubeRunnerExample({
           tube: tube,
         );
 
-  /// The tubes it can fly down: Tube Shooter's closed ones, as the ship
-  /// goes round and round, in the order of its levels.
-  static final tubes = [
-    for (final level in levels)
-      if (!level.tube.isOpen) level.tube,
-  ];
+  /// The tubes it can fly down: Tube Shooter's, in the order of its levels.
+  static final tubes = [for (final level in levels) level.tube];
 
   static const description = '''
     A prototype of an endless runner in vector lines, where running is flying.
@@ -96,9 +92,11 @@ abstract class TubeRunnerExample({
     Move the ship round the tube with the arrow keys, A and D, by dragging
     left and right, or a lane per scroll of the mouse wheel. Fire down its
     lane with the space bar, or while dragging, as in Tube Shooter. The Tube
-    knob picks one of Tube Shooter's closed tubes, which the ship goes on
-    down without a stop. The ship's lane shows in the ship's colour, as in
-    Tube Shooter.
+    knob picks one of Tube Shooter's tubes, which the ship goes on down
+    without a stop. Round an open tube, the ship stops at its ends, as in
+    Tube Shooter, and where the tube bends, its nearer lanes hide what's
+    beyond them, as a closed tube's walls do. The ship's lane shows in the
+    ship's colour, as in Tube Shooter.
 
     READY shows until a tap or a key starts the game. After 4 seconds, and
     every 4 seconds from then on, an enemy comes at the farthest ring across
@@ -934,17 +932,26 @@ abstract class TubeRunnerExample({
   }
 
   /// Replaces [splitter] with two climbers where it is, which flip from its
-  /// lane onto the lanes on either side, as in Tube Shooter. They don't
-  /// flash, as they didn't come down the tube.
+  /// lane onto the lanes on either side, as in Tube Shooter. A climber with
+  /// no lane on its side, at an open tube's end, stays in the splitter's
+  /// lane. They don't flash, as they didn't come down the tube.
   void _split(RunnerSplitterComponent splitter) {
     final index = _enemies.indexOf(splitter);
     _enemies.removeAt(index);
     splitter.removeFromParent();
-    final climbers = [
-      for (final side in [-1, 1])
-        RunnerClimberComponent(splitter.lane, splitter.at, flashes: false)
-          ..flip(tube.neighbour(splitter.lane, side)!, tube),
-    ];
+    final climbers = <RunnerClimberComponent>[];
+    for (final side in [-1, 1]) {
+      final climber = RunnerClimberComponent(
+        splitter.lane,
+        splitter.at,
+        flashes: false,
+      );
+      final to = tube.neighbour(splitter.lane, side);
+      if (to != null) {
+        climber.flip(to, tube);
+      }
+      climbers.add(climber);
+    }
     // Where the splitter was, so that they stay nearest first.
     _enemies.insertAll(index, climbers);
     world.addAll(climbers);
