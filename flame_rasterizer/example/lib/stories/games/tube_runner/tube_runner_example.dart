@@ -90,11 +90,16 @@ abstract class TubeRunnerExample({
     without a stop. The ship's lane shows in the ship's colour, as in Tube
     Shooter.
 
-    READY shows until a tap or a key starts the game. After 8 seconds, and
-    every 5 seconds from then on, a seeder comes at the farthest ring across
-    the tube, on a lane picked at random. It climbs its lane toward the ship,
-    laying a spike behind it, and goes once it passes the ship; the spike
-    goes once all of it does. A seeder or a spike that touches the ship, in
+    READY shows until a tap or a key starts the game. After 4 seconds, and
+    every 4 seconds from then on, a seeder comes at the farthest ring across
+    the tube, on a lane picked at random. For a second and a half, its lane
+    flashes in the seeder's colour, added to the ship's in the ship's lane,
+    and glows with the seeder and its spike, fading out: the mesh renderer
+    draws the glow with RasterizerGlow, only on them,
+    and with the other renderers, wider, see-through copies of them stand
+    for it. The seeder climbs its lane toward the ship, laying a spike
+    behind it, and goes once it passes the ship; the spike goes once all of
+    it does. A seeder or a spike that touches the ship, in
     its lane at the ship's ring, destroys it, and takes a life, as in Tube
     Shooter: the seeders and spikes go, and READY shows again. Once the
     lives are gone, Game Over stops the game until a tap, or Enter, starts a
@@ -112,8 +117,18 @@ abstract class TubeRunnerExample({
 
   /// When the first seeder comes, and how often the others do, in seconds
   /// of the game.
-  static const firstSeeder = 8.0;
-  static const seederPeriod = 5.0;
+  static const firstSeeder = 4.0;
+  static const seederPeriod = 4.0;
+
+  /// How far the glow of a seeder's lane and spike, and of the seeder, reach
+  /// as it comes, in line widths, as Tube Shooter's `tubeGlow` and `lineGlow`
+  /// do.
+  static const laneGlowWidths = 2.0;
+  static const shapeGlowWidths = 3.0;
+
+  /// The alpha of the wider copies that stand for the glow with the renderers
+  /// that don't draw it, as the seeder comes.
+  static const haloAlpha = 0.3;
 
   /// The seconds from the ship's destruction to its return, as in Tube
   /// Shooter.
@@ -222,6 +237,12 @@ abstract class TubeRunnerExample({
   PositionComponent? _lane;
   PositionComponent? _spikesDrawing;
 
+  /// The components that draw the lane and the spike of the seeder that just
+  /// came, as it flashes, and their halo, if the renderer doesn't draw glows.
+  PositionComponent? _flashLane;
+  PositionComponent? _flashSpike;
+  PositionComponent? _halo;
+
   /// The seeders climbing the tube, and the spikes they laid, nearest first.
   final _seeders = <RunnerSeederComponent>[];
   final _spikes = <Spike>[];
@@ -230,11 +251,13 @@ abstract class TubeRunnerExample({
   /// [seederPeriod] before [firstSeeder].
   double _seederTime = seederPeriod - firstSeeder;
 
-  /// How far the ship had flown, the view's version and the ship's lane, as
-  /// the tube's paths were made last.
+  /// How far the ship had flown, the view's version, the ship's lane, and
+  /// the flashing seeder and its flash, as the tube's paths were made last.
   double _tubeFlown = double.nan;
   int _tubeVersion = -1;
   int? _tubeLane;
+  RunnerSeederComponent? _tubeFlasher;
+  double _tubeFlash = 0;
 
   /// How many quads the tube's paths have.
   int _quads = 0;
@@ -285,14 +308,14 @@ abstract class TubeRunnerExample({
       (_heldKeys.any(_leftKeys.contains) ? 1 : 0);
 
   /// Creates a component that draws [shape], one of `Shapes`, stroked in
-  /// [color] about its origin, as Tube Shooter does.
-  PathComponent shapeComponent(Path shape, Color color) {
+  /// [color] about its origin, as Tube Shooter does, [widths] times as wide.
+  PathComponent shapeComponent(Path shape, Color color, {double widths = 1}) {
     final bounds = shape.getBounds();
     return pathComponent(
       shape,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = view.shapeStroke
+        ..strokeWidth = widths * view.shapeStroke
         ..color = color,
       anchor: Anchor(-bounds.left / bounds.width, -bounds.top / bounds.height),
       maxSize: Tubes.widestLane * view.rimScale / view.devicePixel,
@@ -310,14 +333,35 @@ abstract class TubeRunnerExample({
     maxSize: TubeView.rimPixels,
   );
 
-  /// Gives [drawing], made by [shapeComponent], the view's stroke width. If
-  /// the width changed, this imports the shape again.
-  void keepStroke(PathComponent drawing) {
-    final width = view.shapeStroke;
+  /// Gives [drawing], made by [shapeComponent], the view's stroke width,
+  /// [widths] times as wide. If the width changed, this imports the shape
+  /// again.
+  void keepStroke(PathComponent drawing, {double widths = 1}) {
+    final width = widths * view.shapeStroke;
     if (drawing.paint.strokeWidth != width) {
       drawing.paint.strokeWidth = width;
     }
   }
+
+  /// Whether the renderer draws glows, as the mesh renderer does. Otherwise,
+  /// wider, see-through copies stand for them.
+  bool get rendererGlows => false;
+
+  /// Returns the glow of a seeder that comes, reaching [widths] line widths
+  /// with [strength], in its colour, or none for no [strength].
+  static RasterizerGlow? flashGlow(double widths, double strength) =>
+      strength > 0
+      ? RasterizerGlow.widths(
+          widths,
+          strength: strength,
+          color: TubeColors.seeder,
+        )
+      : null;
+
+  /// Gives [drawing], made by [shapeComponent], the glow of a seeder that
+  /// comes, with [strength], if [rendererGlows]. If the glow changed, this
+  /// imports the shape again.
+  void glowShape(PathComponent drawing, double strength) {}
 
   @override
   Future<void> onLoad() async {
@@ -470,36 +514,79 @@ abstract class TubeRunnerExample({
     }
   }
 
-  /// Makes the tube's paths again if the ship flew or changed lanes, or the
-  /// view changed.
+  /// Makes the tube's paths again if the ship flew or changed lanes, a
+  /// seeder's flash changed, or the view changed.
+  ///
+  /// As the last seeder comes, its lane flashes: over its
+  /// [RunnerSeederComponent.flashTime], the lane fades from the seeder's
+  /// colour to its own, or, if it's the ship's, from the ship's colour with
+  /// the seeder's added, and its lines and spike glow, fading out. With the
+  /// renderers that don't draw glows, wider, see-through copies of them in
+  /// the seeder's colour stand for the glow.
   void _updateTube() {
     // The ship knows its lane once loaded. Its lane shows while it's in play,
     // as in Tube Shooter.
     final lane = ship.isLoaded && canMove ? ship.lane : null;
+    var flasher = _seeders.lastOrNull;
+    final flash = flasher?.flash ?? 0;
+    if (flash == 0) {
+      flasher = null;
+    }
     if (_flown == _tubeFlown &&
         view.version == _tubeVersion &&
-        lane == _tubeLane) {
+        lane == _tubeLane &&
+        flasher == _tubeFlasher &&
+        flash == _tubeFlash) {
       return;
     }
     _tubeFlown = _flown;
     _tubeVersion = view.version;
     _tubeLane = lane;
+    _tubeFlasher = flasher;
+    _tubeFlash = flash;
     final quads = endlessTube.quadsAt(
       _flown,
       view,
       lane: lane,
       spikes: _spikes,
+      flash: flasher?.spike,
+      halo: rendererGlows ? null : 2 * laneGlowWidths,
     );
     _quads =
         quads.tube.vertexCounts.length +
         quads.lane.vertexCounts.length +
-        quads.spikes.vertexCounts.length;
+        quads.spikes.vertexCounts.length +
+        quads.flashLane.vertexCounts.length +
+        quads.flashSpike.vertexCounts.length +
+        quads.halo.vertexCounts.length;
+    // Under the lines it stands for the glow of, over the others, as a glow
+    // is.
     _tube = _replaceQuads(_tube, quads.tube, TubeColors.tube);
     _lane = _replaceQuads(_lane, quads.lane, TubeColors.ship);
     _spikesDrawing = _replaceQuads(
       _spikesDrawing,
       quads.spikes,
       TubeColors.spikes,
+    );
+    _halo = _replaceQuads(
+      _halo,
+      quads.halo,
+      TubeColors.seeder.withValues(alpha: haloAlpha * flash),
+    );
+    final glow = rendererGlows ? flashGlow(laneGlowWidths, flash) : null;
+    _flashLane = _replaceQuads(
+      _flashLane,
+      quads.flashLane,
+      flasher?.spike.lane == lane
+          ? _addLight(TubeColors.ship, TubeColors.seeder, flash)
+          : Color.lerp(TubeColors.seeder, TubeColors.tube, 1 - flash)!,
+      glow: glow,
+    );
+    _flashSpike = _replaceQuads(
+      _flashSpike,
+      quads.flashSpike,
+      TubeColors.spikes,
+      glow: glow,
     );
     for (final seeder in _seeders) {
       seeder.placeAt(quads.seeders[_spikes.indexOf(seeder.spike)]);
@@ -543,26 +630,40 @@ abstract class TubeRunnerExample({
     _spikes.clear();
   }
 
+  /// Returns [base] with [light] added to it, [amount] times as strong, as
+  /// lights add up: channel by channel, up to full.
+  static Color _addLight(Color base, Color light, double amount) => Color.from(
+    alpha: base.a,
+    red: math.min(1, base.r + amount * light.r),
+    green: math.min(1, base.g + amount * light.g),
+    blue: math.min(1, base.b + amount * light.b),
+  );
+
   /// Removes [old], if any, and returns a component that fills [quads] in
-  /// [color], added to [tubeGroup], if there are any.
+  /// [color], with [glow], added to [tubeGroup], if there are any.
   PositionComponent? _replaceQuads(
     PositionComponent? old,
     RasterizerPolygons quads,
-    Color color,
-  ) {
+    Color color, {
+    RasterizerGlow? glow,
+  }) {
     old?.removeFromParent();
     if (quads.bounds.isEmpty) {
       return null;
     }
     _paths++;
-    final component = quadsComponent(quads, color);
+    final component = quadsComponent(quads, color, glow: glow);
     tubeGroup.add(component);
     return component;
   }
 
   /// Creates a component that fills [quads] in [color], where they are in
-  /// the world.
-  PositionComponent quadsComponent(RasterizerPolygons quads, Color color);
+  /// the world, with [glow] if [rendererGlows].
+  PositionComponent quadsComponent(
+    RasterizerPolygons quads,
+    Color color, {
+    RasterizerGlow? glow,
+  });
 
   /// Returns the most device pixels that [quads]' longer side spans.
   double maxSizeOf(RasterizerPolygons quads) =>
@@ -687,16 +788,33 @@ class RasterizerTubeRunnerExample({
   }
 
   /// Fills the quads separate, which the mesh renderer imports much faster
-  /// than their union. The tube is opaque, so their overlaps don't show.
+  /// than their union. The tube is opaque, so their overlaps don't show,
+  /// but where glows overlap, they add up, as in Tube Shooter.
   @override
-  PositionComponent quadsComponent(RasterizerPolygons quads, Color color) =>
-      RasterizerPolygonsComponent(
-        polygons: quads,
-        paint: Paint()..color = color,
-        position: Vector2(quads.bounds.left, quads.bounds.top),
-        maxSize: maxSizeOf(quads),
-        separate: true,
-      );
+  PositionComponent quadsComponent(
+    RasterizerPolygons quads,
+    Color color, {
+    RasterizerGlow? glow,
+  }) => RasterizerPolygonsComponent(
+    polygons: quads,
+    paint: Paint()..color = color,
+    position: Vector2(quads.bounds.left, quads.bounds.top),
+    maxSize: maxSizeOf(quads),
+    glow: glow,
+    separate: true,
+  );
+
+  /// Whether the Renderer knob picked the mesh renderer, which draws glows.
+  @override
+  bool get rendererGlows => renderer == SvgRenderer.rasterizer;
+
+  @override
+  void glowShape(PathComponent drawing, double strength) {
+    (drawing as RasterizerPathComponent).glow = TubeRunnerExample.flashGlow(
+      TubeRunnerExample.shapeGlowWidths,
+      strength,
+    );
+  }
 }
 
 /// The example with Flame: Flame's [PathComponent]s draw its paths.
@@ -712,13 +830,17 @@ class FlameTubeRunnerExample({
   @override
   Iterable<String> get rendererStats => const [];
 
-  /// Fills a path of the quads.
+  /// Fills a path of the quads, without [glow], which Flame doesn't draw.
   ///
   /// Its contours stay open, as the fill closes them anyway. Flame's
   /// `PathComponent` would walk each closed contour into a polygon, which the
   /// game doesn't use, as [RasterizerPolygons.path]'s are.
   @override
-  PositionComponent quadsComponent(RasterizerPolygons quads, Color color) {
+  PositionComponent quadsComponent(
+    RasterizerPolygons quads,
+    Color color, {
+    RasterizerGlow? glow,
+  }) {
     final path = Path();
     final points = quads.vertices;
     for (var i = 0; i < points.length; i += 8) {

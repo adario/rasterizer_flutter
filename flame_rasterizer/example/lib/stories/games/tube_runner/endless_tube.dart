@@ -55,11 +55,15 @@ class Spike(final int lane, final double far) {
 typedef SeederPlace = ({Offset position, double angle, double scale});
 
 /// What [EndlessTube.quadsAt] makes: the quads of the tube, of the ship's
-/// lane and of the spikes, and where each spike's seeder shows, if it does.
+/// lane, of the spikes, of the flash's lane and spike, and of their halo,
+/// and where each spike's seeder shows, if it does.
 typedef TubeQuads = ({
   RasterizerPolygons tube,
   RasterizerPolygons lane,
   RasterizerPolygons spikes,
+  RasterizerPolygons flashLane,
+  RasterizerPolygons flashSpike,
+  RasterizerPolygons halo,
   List<SeederPlace?> seeders,
 });
 
@@ -90,6 +94,9 @@ class EndlessTube() {
   /// The distance between two rings drawn across the tube, in tube units: a
   /// multiple of [step].
   static const ringSpacing = 1.0;
+
+  /// How many times as wide as the tube's lines the spikes are.
+  static const spikeWidths = 2.0;
 
   /// How far the axis bends across and down, in tube units, and over how
   /// long a stretch it bends back and forth once.
@@ -166,13 +173,20 @@ class EndlessTube() {
   ///
   /// The lines of [lane], if any, go to `lane` instead of `tube`: its two
   /// edges, and its stretch of each ring across it. The [spikes] go to
-  /// `spikes`, walls hiding them as they do the tube's lines, and `seeders`
-  /// says where each spike's seeder shows, or null where the tube hides it.
+  /// `spikes`, [spikeWidths] as wide as the tube's lines, walls hiding them
+  /// as they do the tube's lines, and `seeders` says where each spike's
+  /// seeder shows, or null where the tube hides it.
+  ///
+  /// If [flash], one of [spikes], is given, the lines of its lane go to
+  /// `flashLane` instead, even those of [lane], and it goes to `flashSpike`.
+  /// With [halo], `halo` gets them all again, [halo] times as wide.
   TubeQuads quadsAt(
     double distance,
     TubeView view, {
     int? lane,
     List<Spike> spikes = const [],
+    Spike? flash,
+    double? halo,
   }) {
     final tube = view.tube;
     final ship = ringAt(distance);
@@ -224,7 +238,31 @@ class EndlessTube() {
     final lines = _Lines(view);
     final laneLines = _Lines(view);
     final spikeLines = _Lines(view);
+    final flashLines = _Lines(view);
+    final flashSpikeLines = _Lines(view);
+    final haloLines = _Lines(view);
     final seeders = List<SeederPlace?>.filled(spikes.length, null);
+    // Adds a line of the flash's lane, or [widths] as wide, of its spike, and
+    // its halo.
+    void addFlash(
+      _Lines to,
+      Point3 from,
+      Point3 end, {
+      bool nearer = false,
+      double widths = 1,
+    }) {
+      to.add(from, end, hiders: hiders, nearer: nearer, widths: widths);
+      if (halo != null) {
+        haloLines.add(
+          from,
+          end,
+          hiders: hiders,
+          nearer: nearer,
+          widths: halo * widths,
+        );
+      }
+    }
+
     // Where the eye sees a point of the outline, or the middle of a lane,
     // [at] along the axis, from ring k.
     Point3 seenAt(int k, double at, Offset point) => _fromEye(
@@ -235,6 +273,9 @@ class EndlessTube() {
     final laneEdges = lane == null
         ? const <int>{}
         : {lane, tube.pointAfter(lane)};
+    final flashEdges = flash == null
+        ? const <int>{}
+        : {flash.lane, tube.pointAfter(flash.lane)};
     final every = (ringSpacing / step).round();
     for (var k = 0; k < _rings.length; k++) {
       final outline = seen[k];
@@ -246,11 +287,15 @@ class EndlessTube() {
               ? i - 1
               : (i + tube.laneCount - 1) % tube.laneCount;
           if (faces(k, before) || faces(k, i)) {
-            (laneEdges.contains(i) ? laneLines : lines).add(
-              outline[i],
-              next[i],
-              hiders: hiders,
-            );
+            if (flashEdges.contains(i)) {
+              addFlash(flashLines, outline[i], next[i]);
+            } else {
+              (laneEdges.contains(i) ? laneLines : lines).add(
+                outline[i],
+                next[i],
+                hiders: hiders,
+              );
+            }
           }
         }
         final from = _rings[k].index * step;
@@ -263,11 +308,13 @@ class EndlessTube() {
           final start = math.max(spike.near, from);
           final end = math.min(spike.far, from + step);
           if (start < end) {
-            spikeLines.add(
-              seenAt(k, start, middle),
-              seenAt(k, end, middle),
-              hiders: hiders,
-            );
+            final a = seenAt(k, start, middle);
+            final b = seenAt(k, end, middle);
+            if (identical(spike, flash)) {
+              addFlash(flashSpikeLines, a, b, widths: spikeWidths);
+            } else {
+              spikeLines.add(a, b, hiders: hiders, widths: spikeWidths);
+            }
           }
           if (spike.near >= from && spike.near < from + step) {
             seeders[j] = _seederPlace(
@@ -283,12 +330,18 @@ class EndlessTube() {
       if (_rings[k].index % every == 0) {
         for (var i = 0; i < tube.laneCount; i++) {
           if (faces(k - 1, i) || faces(k, i)) {
-            (i == lane ? laneLines : lines).add(
-              outline[i],
-              outline[tube.pointAfter(i)],
-              hiders: hiders,
-              nearer: true,
-            );
+            final point = outline[i];
+            final after = outline[tube.pointAfter(i)];
+            if (i == flash?.lane) {
+              addFlash(flashLines, point, after, nearer: true);
+            } else {
+              (i == lane ? laneLines : lines).add(
+                point,
+                after,
+                hiders: hiders,
+                nearer: true,
+              );
+            }
           }
         }
       }
@@ -297,6 +350,9 @@ class EndlessTube() {
       tube: lines.quads,
       lane: laneLines.quads,
       spikes: spikeLines.quads,
+      flashLane: flashLines.quads,
+      flashSpike: flashSpikeLines.quads,
+      halo: haloLines.quads,
       seeders: seeders,
     );
   }
@@ -477,16 +533,17 @@ class _Lines(final TubeView view) {
 
   /// Adds a line from [from] to [to], as a quad.
   ///
-  /// Each end is [TubeView.lineWidthOf] its distance wide, and extends by
-  /// half that width, so that lines meeting at a corner close it. It clips
-  /// the line closer than [TubeView.near], and leaves out what [hiders]
-  /// hide of it, if any: what the rings before it hide, or [nearer] those
-  /// before the last ring passed to them, for a line on that ring.
+  /// Each end is [widths] times [TubeView.lineWidthOf] its distance wide, and
+  /// extends by half that width, so that lines meeting at a corner close it.
+  /// It clips the line closer than [TubeView.near], and leaves out what
+  /// [hiders] hide of it, if any: what the rings before it hide, or [nearer]
+  /// those before the last ring passed to them, for a line on that ring.
   void add(
     Point3 from,
     Point3 to, {
     _Hiders? hiders,
     bool nearer = false,
+    double widths = 1,
   }) {
     var (a, b) = (from, to);
     if (a.z < TubeView.near && b.z < TubeView.near) {
@@ -498,7 +555,7 @@ class _Lines(final TubeView view) {
       b = b + (a - b) * ((TubeView.near - b.z) / (a.z - b.z));
     }
     if (hiders == null) {
-      _addLine(a, b);
+      _addLine(a, b, widths);
       return;
     }
     final count = hiders.spansOf(
@@ -514,17 +571,17 @@ class _Lines(final TubeView view) {
     }
 
     for (var s = 0; s < count; s++) {
-      _addLine(at(spans[2 * s]), at(spans[2 * s + 1]));
+      _addLine(at(spans[2 * s]), at(spans[2 * s + 1]), widths);
     }
   }
 
   /// Adds a line from [a] to [b], both at least [TubeView.near] away, as a
-  /// quad.
-  void _addLine(Point3 a, Point3 b) => _addQuad(
+  /// quad [widths] times as wide as a tube's line.
+  void _addLine(Point3 a, Point3 b, double widths) => _addQuad(
     _project(a),
-    view.lineWidthOf(a.z),
+    widths * view.lineWidthOf(a.z),
     _project(b),
-    view.lineWidthOf(b.z),
+    widths * view.lineWidthOf(b.z),
   );
 
   /// Returns where [point] lands in the world.
