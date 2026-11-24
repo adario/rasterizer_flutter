@@ -423,6 +423,7 @@ Its knobs pick:
 - **Renderer**: as above. The new game goes on with the same bodies, wheel, score, energy and drop, but without the
   trails, the kicks and the bodies a bucket empties. The bodies in a bucket are at rest in it.
 - **Pieces**: as in Revolute Joint Svgs.
+- **Drops**: Mixed by default, balls and SVGs in turn; Balls or SVGs drop only that kind. It applies from the next drop.
 - **Sound**: as in Tube Shooter.
 - **Zoom** and **Speed**: as in Revolute Joint Svgs.
 - **Cache mode** and **Cache size**: as in Revolute Joint Svgs.
