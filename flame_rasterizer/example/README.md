@@ -512,10 +512,12 @@ On Android, the app leaves Impeller's backend to Flutter, which picks OpenGL ES 
 Vulkan can't work. A debug or profile build with `IMPELLER_BACKEND=vulkan` or `IMPELLER_BACKEND=opengles` asks for that
 backend, through the manifest; release builds ignore it. A backend asked for crashes at launch where it can't start:
 Vulkan on some older GPUs, and any backend below API 29, where Flutter renders with Skia. On the emulator's Vulkan with
-its host GPU, the canvas renderer can't draw 100 SVGs: with Flutter 3.47.9 it hangs, and with Flutter 3.50.0 its
-frames come out empty or wrong (see rasterizer_gpu's README). Widgetbook's Navigation, Addons and Knobs panels don't
-show there either: the screen dims, but nothing draws above the dimming, even in a plain Flutter app with Flutter
-3.50.0. On that Vulkan, `renderers_test.dart` runs with
+its host GPU, the canvas renderer can't draw the heaviest frames (see rasterizer_gpu's README). With KosmicKrisp, the
+emulator's default where the Mac supports Metal 4, 100 tigers take seconds per frame and never reach the screen, and
+opening the Svg dropdown over 100 SVGs can make the emulator quit. With MoltenVK, 100 SVGs hang the app with Flutter
+3.47.9 and come out empty or wrong with Flutter 3.50.0, and Widgetbook's Navigation, Addons and Knobs panels don't show:
+the screen dims, but nothing draws above the dimming, even in a plain Flutter app with Flutter 3.50.0
+([flutter#196603](https://github.com/flutter/flutter/issues/196603)). On that Vulkan, `renderers_test.dart` runs with
 `--name "^(GPU|Flame SVG)"`, without Canvas's games and the switching test, and in full on OpenGL ES.
 
 ## The SVGs' licences
