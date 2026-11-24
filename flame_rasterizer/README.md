@@ -148,6 +148,13 @@ class MyGame extends FlameGame with HasRasterizer {
   - While the GPU renderers can't draw a layer (rasterizer_gpu's `RasterizerScene.canDraw`), such as one with another
     color filter, a shader, or a hairline stroke, the component draws its layers with `Canvas.drawPath`, as Flame's
     does, with its `paint` over them. That ends the run.
+- **`RasterizerPolygonsComponent`** draws a `RasterizerPolygons`, rasterizer_gpu's shape made of polygons, the way a
+  `RasterizerPathComponent` without paint layers draws a path. Use it for shapes that a game rebuilds often, such as
+  every frame. The GPU renderers draw polygons without flattening them into lines, and the component doesn't make
+  hit-test polygons, as Flame's `PathComponent` does. Its size is the size of the polygons' bounds. With
+  `separate: true`, the mesh renderer fills each polygon on its own instead of filling their union. That's much faster,
+  but where polygons overlap, the overlap shows through an opacity (see rasterizer_gpu's README, Paths). Components made
+  with the same polygons share one import.
 - **Runs** split only where the game draws something else between vector components, such as a sprite, text, or a path
   component drawn with `Canvas.drawPath`. A clip or a layer (`saveLayer`) between them splits them too, and so do paints
   that differ by more than opacity, tint and hue. Transforms don't split runs. So give vector components a priority

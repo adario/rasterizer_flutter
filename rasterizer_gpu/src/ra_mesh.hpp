@@ -4,7 +4,8 @@
 //  scene. Its curves are flattened once, within a tolerance. Fills are tessellated by libtess2 with their winding rule, &
 //  strokes outlined, with their joins, caps & dashes, as strips of triangles, or where a strip overlaps itself, libtess2's
 //  non-zero union of it. So the triangles are each path's coverage, holes, overlaps & self-crossings included, & never
-//  overlap within a path. Plain paths come flattened already, as polylines (ra_paths.hpp), & import the same way.
+//  overlap within a path. Plain paths come flattened already, as polylines (ra_paths.hpp), & import the same way, except for
+//  a separate fill, which fills each contour on its own, a convex one as a fan, so that its triangles can overlap.
 //  A stroke's strip also holds each vertex's offset from the polyline point it's built around, for the vertex shader to
 //  hold the stroke at a least width on screen. A union's crossings come from no point, so an opaque stroke that overlaps itself
 //  keeps its strip too, in a second list of indices, for the instances drawn without an opacity, whose overlaps can't show.
@@ -241,7 +242,9 @@ struct RasterizerMesh {
                 for (Subpath& subpath: subpaths)
                     stroker.addPolyline(subpath.points.data(), subpath.points.size(), subpath.closed, Point{ 1.f, 0.f });
                 addStroke(stroker, paint, stops, *mesh);
-            } else
+            } else if (draw.separate)
+                addSeparateFill(subpaths, paint, stops, *mesh);
+            else
                 addFill(subpaths, draw.evenOdd, paint, stops, *mesh);
             if (glows)
                 addCore(draw, drawn[draw.path].stroked, glow->inWidths, subpaths, paint, stops, core, *mesh);
@@ -253,6 +256,8 @@ struct RasterizerMesh {
         subpaths.clear();
         return index.forEachContour(path, [&](const float *p, uint32_t n, bool closed) {
             subpaths.emplace_back();
+            // Reserves the points once: growing them at each doubling took most of the time to import small contours
+            subpaths.back().points.reserve(n);
             for (uint32_t k = 0; k < n; k++)
                 addPoint(subpaths.back(), roundf(p[2 * k] / grid) * grid, roundf(p[2 * k + 1] / grid) * grid);
             subpaths.back().closed = closed;
@@ -526,21 +531,77 @@ struct RasterizerMesh {
     // Appends tess's contours, tessellated with windingRule, to mesh as a path with paint & stops, & deletes tess. Its vertices
     // have no offsets. Its indices are in the strips' list too if shared
     static void addPath(TESStesselator *tess, int windingRule, RaMeshPath paint, const std::vector<RaMeshStop>& stops, RaMesh& mesh, bool shared = true) {
-        static const TESSreal normal[3] = { 0.f, 0.f, 1.f };
-        if (tessTesselate(tess, windingRule, TESS_POLYGONS, 3, 2, normal) && tessGetElementCount(tess) > 0) {
-            uint32_t base = uint32_t(mesh.vertices.size() / mesh.vertexFloats), count = uint32_t(tessGetVertexCount(tess));
-            float index = float(mesh.paths.size());
-            const TESSreal *vertices = tessGetVertices(tess);
-            for (uint32_t i = 0; i < count; i++)
-                addVertex(mesh, Point{ float(vertices[i * 2]), float(vertices[i * 2 + 1]) }, index, Point{ 0.f, 0.f });
-            paint.indexBegin = uint32_t(mesh.indices32.size());
-            const TESSindex *elements = tessGetElements(tess);
-            for (int i = 0, n = tessGetElementCount(tess); i < n; i++, elements += 3)
-                if (elements[0] != TESS_UNDEF && elements[1] != TESS_UNDEF && elements[2] != TESS_UNDEF)
-                    mesh.indices32.insert(mesh.indices32.end(), { base + uint32_t(elements[0]), base + uint32_t(elements[1]), base + uint32_t(elements[2]) });
+        paint.indexBegin = uint32_t(mesh.indices32.size());
+        if (addTessellation(tess, windingRule, float(mesh.paths.size()), mesh))
             endPath(paint, stops, mesh, shared);
-        }
         tessDeleteTess(tess);
+    }
+    // Tessellates tess's contours with windingRule, & appends the triangles to mesh with path's index. Returns false if there
+    // are none
+    static bool addTessellation(TESStesselator *tess, int windingRule, float path, RaMesh& mesh) {
+        static const TESSreal normal[3] = { 0.f, 0.f, 1.f };
+        if (!tessTesselate(tess, windingRule, TESS_POLYGONS, 3, 2, normal) || tessGetElementCount(tess) == 0)
+            return false;
+        uint32_t base = uint32_t(mesh.vertices.size() / mesh.vertexFloats), count = uint32_t(tessGetVertexCount(tess));
+        const TESSreal *vertices = tessGetVertices(tess);
+        for (uint32_t i = 0; i < count; i++)
+            addVertex(mesh, Point{ float(vertices[i * 2]), float(vertices[i * 2 + 1]) }, path, Point{ 0.f, 0.f });
+        const TESSindex *elements = tessGetElements(tess);
+        for (int i = 0, n = tessGetElementCount(tess); i < n; i++, elements += 3)
+            if (elements[0] != TESS_UNDEF && elements[1] != TESS_UNDEF && elements[2] != TESS_UNDEF)
+                mesh.indices32.insert(mesh.indices32.end(), { base + uint32_t(elements[0]), base + uint32_t(elements[1]), base + uint32_t(elements[2]) });
+        return true;
+    }
+    // Appends subpaths' fill to mesh as a path with paint & stops. It closes each contour & fills it on its own, instead of
+    // filling their union: a convex contour as a fan from its first point, & any other with libtess2's non-zero tessellation of
+    // that contour alone. So the path's triangles overlap where its contours do. For many overlapping contours, libtess2's
+    // sweep costs far more than fans
+    static void addSeparateFill(const std::vector<Subpath>& subpaths, RaMeshPath paint, const std::vector<RaMeshStop>& stops, RaMesh& mesh) {
+        paint.indexBegin = uint32_t(mesh.indices32.size());
+        const float path = float(mesh.paths.size());
+        for (const Subpath& subpath: subpaths) {
+            const std::vector<Point>& points = subpath.points;
+            const uint32_t n = uint32_t(points.size());
+            if (n < 3)
+                continue;
+            if (isConvex(points)) {
+                uint32_t base = uint32_t(mesh.vertices.size() / mesh.vertexFloats);
+                for (const Point& p: points)
+                    addVertex(mesh, p, path, Point{ 0.f, 0.f });
+                for (uint32_t i = 1; i + 1 < n; i++)
+                    mesh.indices32.insert(mesh.indices32.end(), { base, base + i, base + i + 1 });
+                continue;
+            }
+            TessMemory memory(n);
+            TESStesselator *tess = tessNewTess(&memory.alloc);
+            tessAddContour(tess, 2, points.data(), sizeof(Point), int(n));
+            addTessellation(tess, TESS_WINDING_NONZERO, path, mesh);
+            tessDeleteTess(tess);
+            if (memory.exceeded)
+                reportExceeded(memory, TESS_WINDING_NONZERO, std::vector<Subpath>{ subpath });
+        }
+        if (mesh.indices32.size() > paint.indexBegin)
+            endPath(paint, stops, mesh, true);
+    }
+    // Returns whether a closed contour is convex: it turns the same way at each vertex where it turns at all, & goes round once.
+    // A contour that never turns has no area, so it isn't convex
+    static bool isConvex(const std::vector<Point>& points) {
+        const size_t n = points.size();
+        int sign = 0;
+        float turned = 0.f;
+        for (size_t i = 0; i < n; i++) {
+            const Point& a = points[i], &b = points[(i + 1) % n], &c = points[(i + 2) % n];
+            float ux = b.x - a.x, uy = b.y - a.y, vx = c.x - b.x, vy = c.y - b.y;
+            float cross = ux * vy - uy * vx;
+            if (cross == 0.f)
+                continue;
+            int s = cross > 0.f ? 1 : -1;
+            if (sign != 0 && s != sign)
+                return false;
+            sign = s;
+            turned += atan2f(cross, ux * vx + uy * vy);
+        }
+        return sign != 0 && fabsf(turned) < 6.2932f;     // One full turn, 2π, plus a little for rounding
     }
 
     // Flattens geometry's subpaths, with Wang's formula for each curve's segment count, so each is within tolerance

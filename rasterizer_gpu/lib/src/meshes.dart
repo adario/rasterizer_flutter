@@ -554,6 +554,15 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       // mesh with gradients, the draw also splits where entries start or stop
       // having a color transform, or change it. Only entries with one read it
       // for each fragment, as their draw's uniform.
+      //
+      // An opaque mesh without strips or gradients gives its own unblended
+      // draw only to a run of [_leastUnblended] or more entries that keep its
+      // alpha, or to a run of all the scene's consecutive entries. Its
+      // shorter runs join the blended draw of the entries around them. That
+      // looks the same, as blending an opaque color changes nothing, and a
+      // draw costs more to encode than blending a few entries. A star field
+      // of one dot at many opacities would take 69 draws a frame, and 0.2 ms
+      // on an M1, if each change of alpha started a new draw.
       var first = 0;
       for (final (r, run) in _placed.indexed) {
         gpu.beginPass(run._target!, buffer);
@@ -563,11 +572,34 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
           final opaque = buffers?.opaque ?? false,
               strips = buffers?.stripIndices != null,
               gradients = buffers?.gradients ?? false;
-          final splits = opaque || strips,
-              keeps = splits && _keepsAlpha(entries[j]),
+          final merges = opaque && !strips && !gradients;
+          final splits = (opaque || strips) && !merges,
               transformed = gradients && _colorTransforms[entries[j]] != null;
+          var keeps = splits && _keepsAlpha(entries[j]);
           var n = 1;
-          while (j + n < entries.length &&
+          if (merges) {
+            final kept = _keeping(entries, j, scene);
+            keeps =
+                kept >= _leastUnblended ||
+                (kept > 0 &&
+                    (j + kept == entries.length ||
+                        !identical(_scenes[entries[j + kept]], scene)));
+            if (keeps) {
+              n = kept;
+            } else {
+              n = 0;
+              while (j + n < entries.length &&
+                  identical(_scenes[entries[j + n]], scene)) {
+                final kept = _keeping(entries, j + n, scene);
+                if (kept >= _leastUnblended) {
+                  break;
+                }
+                n += kept > 0 ? kept : 1;
+              }
+            }
+          }
+          while (!merges &&
+              j + n < entries.length &&
               identical(_scenes[entries[j + n]], scene) &&
               (!splits || _keepsAlpha(entries[j + n]) == keeps) &&
               (!gradients ||
@@ -639,6 +671,23 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       }
     }
     return true;
+  }
+
+  /// The fewest consecutive entries that keep the alpha of an opaque mesh
+  /// without strips or gradients, among entries that don't, that get their
+  /// own draw without blending.
+  static const _leastUnblended = 8;
+
+  /// Returns how many consecutive entries of [entries], from [j] on, show
+  /// [scene] and keep its alpha.
+  int _keeping(List<int> entries, int j, MeshScene scene) {
+    var n = 0;
+    while (j + n < entries.length &&
+        identical(_scenes[entries[j + n]], scene) &&
+        _keepsAlpha(entries[j + n])) {
+      n++;
+    }
+    return n;
   }
 
   /// Returns whether entry [i] keeps its scene's alpha: its opacity is 1, and

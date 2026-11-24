@@ -5,7 +5,9 @@ import 'package:flame/components.dart' show World;
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer/src/internal.dart';
 import 'package:flame_rasterizer/src/rasterizer_path_component.dart';
+import 'package:flame_rasterizer/src/rasterizer_polygons_component.dart';
 import 'package:flame_rasterizer/src/rasterizer_svg.dart' show RasterizerSvg;
+import 'package:flame_rasterizer/src/shared_scenes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show MediaQuery;
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
@@ -213,12 +215,12 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
       1;
 
   /// Disposes of the renderer, and releases the imports of the game's
-  /// [RasterizerPathComponent]s.
+  /// [RasterizerPathComponent]s and [RasterizerPolygonsComponent]s.
   ///
   /// The components import their paths again if the game is drawn again.
   @override
   void onRemove() {
-    releasePathScenes(this);
+    releaseScenes(this);
     _renderer?.dispose();
     _renderer = null;
     _lastFrame = null;

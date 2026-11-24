@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Added `RasterizerPolygons`, a shape made of polygons. A scene draws it as
+  it draws a path, but the GPU renderers don't need to flatten it into
+  lines first. `RasterizerScene.fromPolygons` makes a scene of them. With
+  `separate: true`, the mesh renderer fills each polygon on its own instead
+  of filling their union, and fills a convex polygon as a fan of triangles.
+- The mesh renderer draws an opaque scene's entries in fewer draws. It used
+  to start a new draw whenever entries switched between full and partial
+  opacity. Now it draws them together, blended, and gives its own unblended
+  draw only to a run of 8 or more entries at full opacity. So a star field
+  of one scene at many opacities takes a few draws instead of one for each
+  change. This applies to scenes without strokes or gradients.
+- The mesh renderer imports paths and polygons with many small contours a
+  third faster. It now reserves room for each contour's points once,
+  instead of growing them as it reads them.
+
 - The GPU renderers draw on Windows too, on Impeller's OpenGL ES through
   ANGLE, where the app's runner turns Flutter GPU on. The build hook builds
   the native library there with MSVC. Not tested on Windows yet.

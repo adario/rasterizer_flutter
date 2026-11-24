@@ -237,8 +237,9 @@ void main() {
       const ui.Color(0xFF000000),
       ui.BlendMode.clear,
     );
-    // The red square's first 4 entries make 3 draws: an unblended one, a
-    // blended one for the entry that erases it, then an unblended one again.
+    // The red square's first 4 entries make one blended draw. The entry that
+    // erases it keeps its alpha, but too few entries next to it do for them
+    // to get their own draw.
     final pixels = await render([
       entry(redSquare, x: 4, y: 4),
       entry(redSquare, x: 4, y: 4, color: erase),
@@ -255,6 +256,55 @@ void main() {
       ..expectAt(24, 56, [128, 128, 0, 255], 'faded over the gradient')
       ..expectAt(36, 56, [128, 0, 0, 128], 'faded over nothing')
       ..expectAt(2, 2, clear, 'outside');
+  });
+
+  meshTest("an opaque mesh's entries that keep its alpha draw unblended "
+      'when many, and blended among fading ones when few', () async {
+    String dot(String fill) =>
+        svg('<rect width="8" height="8" fill="$fill"/>', side: 8);
+    final redDot = scene(dot('red')), blueDot = scene(dot('blue'));
+    // Red to green, alpha kept.
+    final toGreen = RasterizerColorTransform.matrix([
+      0, 1, 0, 0, 0, //
+      1, 0, 0, 0, 0, //
+      0, 0, 1, 0, 0, //
+      0, 0, 0, 1, 0, //
+    ]);
+    final pixels = await render([
+      // 8 entries that keep the alpha: one draw without blending.
+      for (var x = 0.0; x < size; x += 8) entry(redDot, x: x),
+      // Fading entries, with a few that keep the alpha among them: one
+      // blended draw, in order.
+      entry(redDot, y: 8, opacity: 0.5),
+      entry(redDot, x: 8, y: 8),
+      entry(redDot, x: 16, y: 8, opacity: 0.5),
+      entry(redDot, x: 32, y: 8, opacity: 0.5),
+      entry(redDot, x: 32, y: 8, color: toGreen),
+      entry(redDot, x: 40, y: 8, color: toGreen),
+      entry(redDot, x: 40, y: 8, opacity: 0.5),
+      // 8 more that keep the alpha. The blended draw ends before them.
+      for (var x = 0.0; x < size; x += 8)
+        entry(redDot, x: x, y: 16, color: toGreen),
+      entry(redDot, y: 16, opacity: 0.5),
+      // One entry alone between other scenes' entries: a draw without
+      // blending.
+      entry(blueDot, y: 32),
+      entry(redDot, x: 8, y: 32),
+    ]);
+    const fadedRed = [128, 0, 0, 128], redOverGreen = [128, 128, 0, 255];
+    pixels
+      ..expectAt(4, 4, red, 'first of 8')
+      ..expectAt(60, 4, red, 'last of 8')
+      ..expectAt(4, 12, fadedRed, 'faded')
+      ..expectAt(12, 12, red, 'one that keeps it among faded ones')
+      ..expectAt(20, 12, fadedRed, 'faded after it')
+      ..expectAt(36, 12, green, 'one that keeps it over a faded one')
+      ..expectAt(44, 12, redOverGreen, 'a faded one over one that keeps it')
+      ..expectAt(4, 20, redOverGreen, 'a faded one over the next 8')
+      ..expectAt(60, 20, green, 'last of the next 8')
+      ..expectAt(4, 36, [0, 0, 255, 255], 'another scene')
+      ..expectAt(12, 36, red, 'alone')
+      ..expectAt(28, 12, clear, 'between');
   });
 
   meshTest('linear and radial gradients', () async {

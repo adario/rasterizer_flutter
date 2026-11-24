@@ -80,6 +80,19 @@ final class PathContours._(
       Int32List.fromList(contourCounts),
     );
   }
+
+  /// Creates the contours of polygons, as one path's closed contours, without
+  /// changing them: [vertices], x then y, polygon after polygon, and each
+  /// polygon's [vertexCounts].
+  ///
+  /// It keeps both lists without copying them, so they mustn't change.
+  factory PathContours.polygons(Float32List vertices, Int32List vertexCounts) =>
+      PathContours._(
+        vertices,
+        vertexCounts,
+        Uint8List(vertexCounts.length)..fillRange(0, vertexCounts.length, 1),
+        Int32List.fromList([vertexCounts.length]),
+      );
 }
 
 /// The sampling step, as a multiple of the tolerance.

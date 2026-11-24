@@ -79,6 +79,12 @@ class const PathDraw({
   ///
   /// Only [Mesh.fromPaths] imports hairlines. [Scene.fromPaths] skips them.
   final bool hairline = false,
+
+  /// Whether [Mesh.fromPaths] fills each closed contour on its own instead
+  /// of filling their union, and fills a convex contour as a fan of
+  /// triangles. The triangles can then overlap. [Scene.fromPaths] ignores
+  /// it.
+  final bool separate = false,
 });
 
 /// A glow around the paths of a [Mesh.fromPaths], like a neon tube's.
@@ -191,7 +197,8 @@ T _withPaths<T>(
         ..cap = draw.cap.index
         ..join = draw.join.index
         ..evenOdd = draw.evenOdd ? 1 : 0
-        ..hairline = draw.hairline ? 1 : 0;
+        ..hairline = draw.hairline ? 1 : 0
+        ..separate = draw.separate ? 1 : 0;
     }
     return f(native, nativeDraws);
   });

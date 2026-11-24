@@ -420,21 +420,22 @@ ra.Bounds _bounds(ui.Rect r) => ra.Bounds(r.left, r.top, r.right, r.bottom);
 
 /// Returns [paths]' draws for the core: a stroke or a fill each.
 List<ra.PathDraw> _pathDraws(ScenePaths paths) => [
-  for (final (i, draw) in paths.draws.indexed)
-    if (draw.paint.stroke case final stroke?)
+  for (final (i, paint) in paths.paints.indexed)
+    if (paint.style == ui.PaintingStyle.stroke)
       ra.PathDraw(
         path: paths.pathIndices[i],
-        color: stroke.color.toARGB32(),
-        strokeWidth: stroke.strokeWidth,
-        miterLimit: miterLimitOf(stroke),
-        cap: stroke.strokeCap,
-        join: stroke.strokeJoin,
+        color: paint.color.toARGB32(),
+        strokeWidth: paint.strokeWidth,
+        miterLimit: miterLimitOf(paint),
+        cap: paint.strokeCap,
+        join: paint.strokeJoin,
       )
     else
       ra.PathDraw(
         path: paths.pathIndices[i],
-        color: draw.paint.fill!.color.toARGB32(),
-        evenOdd: draw.path.fillType == ui.PathFillType.evenOdd,
+        color: paint.color.toARGB32(),
+        evenOdd: paths.isEvenOdd(i),
+        separate: paths.separate,
       ),
 ];
 
