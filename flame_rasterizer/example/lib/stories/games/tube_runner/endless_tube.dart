@@ -50,8 +50,14 @@ class Spike(final int lane, final double far) {
 }
 
 /// A point down the middle of a `lane`, `at` along the axis, in tube units,
-/// where a shape is: a seeder, a shot or an explosion.
-typedef TubeMark = ({int lane, double at});
+/// where a shape is: an enemy, a shot or an explosion. If it flips onto a
+/// neighbouring lane, `flip` says how far.
+typedef TubeMark = ({int lane, double at, TubeFlip? flip});
+
+/// How far a shape has flipped from its lane onto the neighbouring lane `to`,
+/// as in Tube Shooter: the angle it has turned by, about the corner the two
+/// lanes share, as `Tube.flipAngle` says, from 0.
+typedef TubeFlip = ({int to, double turn});
 
 /// Where a shape at a [TubeMark] shows in the world: its position, its angle,
 /// with its tail away along the lane, and its scale, the lane's width there.
@@ -180,16 +186,18 @@ class EndlessTube() {
   /// as they do the tube's lines, and `places` says where a shape at each of
   /// [marks] shows, or null where the tube hides it.
   ///
-  /// If [flash], one of [spikes], is given, the lines of its lane go to
-  /// `flashLane` instead, even those of [lane], and it goes to `flashSpike`.
-  /// With [halo], `halo` gets them all again, [halo] times as wide.
+  /// If [flashLane] is given, its lines go to `flashLane` instead, even if
+  /// it's [lane], and [flashSpike], one of [spikes], if given, goes to
+  /// `flashSpike`. With [halo], `halo` gets them all again, [halo] times as
+  /// wide.
   TubeQuads quadsAt(
     double distance,
     TubeView view, {
     int? lane,
     List<Spike> spikes = const [],
     List<TubeMark> marks = const [],
-    Spike? flash,
+    int? flashLane,
+    Spike? flashSpike,
     double? halo,
   }) {
     final tube = view.tube;
@@ -277,9 +285,9 @@ class EndlessTube() {
     final laneEdges = lane == null
         ? const <int>{}
         : {lane, tube.pointAfter(lane)};
-    final flashEdges = flash == null
+    final flashEdges = flashLane == null
         ? const <int>{}
-        : {flash.lane, tube.pointAfter(flash.lane)};
+        : {flashLane, tube.pointAfter(flashLane)};
     final every = (ringSpacing / step).round();
     for (var k = 0; k < _rings.length; k++) {
       final outline = seen[k];
@@ -314,7 +322,7 @@ class EndlessTube() {
           if (start < end) {
             final a = seenAt(k, start, middle);
             final b = seenAt(k, end, middle);
-            if (identical(spike, flash)) {
+            if (identical(spike, flashSpike)) {
               addFlash(flashSpikeLines, a, b, widths: spikeWidths);
             } else {
               spikeLines.add(a, b, hiders: hiders, widths: spikeWidths);
@@ -323,7 +331,10 @@ class EndlessTube() {
         }
         for (var j = 0; j < marks.length; j++) {
           final mark = marks[j];
-          if (mark.at >= from && mark.at < from + step && faces(k, mark.lane)) {
+          if (mark.at >= from &&
+              mark.at < from + step &&
+              (faces(k, mark.lane) ||
+                  (mark.flip != null && faces(k, mark.flip!.to)))) {
             places[j] = _placeOf(
               mark,
               (at, point) => seenAt(k, at, point),
@@ -339,7 +350,7 @@ class EndlessTube() {
           if (faces(k - 1, i) || faces(k, i)) {
             final point = outline[i];
             final after = outline[tube.pointAfter(i)];
-            if (i == flash?.lane) {
+            if (i == flashLane) {
               addFlash(flashLines, point, after, nearer: true);
             } else {
               (i == lane ? laneLines : lines).add(
@@ -371,6 +382,10 @@ class EndlessTube() {
   /// Returns where a shape at [mark] shows, or null where [hiders] hide its
   /// middle, with [seenAt] saying where the eye sees a point of the outline
   /// some distance along the axis, and [lines] where those land.
+  ///
+  /// A shape that flips turns about the corner its two lanes share, as in
+  /// Tube Shooter: its middle goes round the corner, through the inside of
+  /// the tube, and it turns from its lane's way by as much.
   static ShapePlace? _placeOf(
     TubeMark mark,
     Point3 Function(double at, Offset point) seenAt,
@@ -378,12 +393,27 @@ class EndlessTube() {
     _Lines lines,
     _Hiders? hiders,
   ) {
-    final (:lane, :at) = mark;
-    final middle = seenAt(at, tube.middles[lane]);
-    final ahead = seenAt(at + _look, tube.middles[lane]);
+    final (:lane, :at, :flip) = mark;
+    final laneMiddle = tube.middles[lane];
+    var point = laneMiddle;
+    if (flip != null) {
+      final corner = tube.points[tube.cornerOf(lane, flip.to)];
+      point = corner + Tube.rotate(laneMiddle - corner, flip.turn);
+    }
+    final middle = seenAt(at, point);
+    final ahead = seenAt(at + _look, point);
+    final laneAt = flip == null ? middle : seenAt(at, laneMiddle);
+    final laneAhead = flip == null ? ahead : seenAt(at + _look, laneMiddle);
     final corner = seenAt(at, tube.points[lane]);
     final nextCorner = seenAt(at, tube.points[tube.pointAfter(lane)]);
-    if ([middle, ahead, corner, nextCorner].any((p) => p.z < TubeView.near)) {
+    if ([
+      middle,
+      ahead,
+      laneAt,
+      laneAhead,
+      corner,
+      nextCorner,
+    ].any((p) => p.z < TubeView.near)) {
       return null;
     }
     if (hiders != null) {
@@ -397,10 +427,12 @@ class EndlessTube() {
       }
     }
     final position = lines._project(middle);
+    final laneWay = lines._project(laneAhead) - lines._project(laneAt);
     return (
       position: position,
-      // The shape's tail, along its y, points away along the lane.
-      angle: (lines._project(ahead) - position).direction - math.pi / 2,
+      // The shape's tail, along its y, points away along the lane, turned by
+      // the flip.
+      angle: laneWay.direction - math.pi / 2 + (flip?.turn ?? 0),
       // As Tube Shooter's, the same in every lane: [Tube.laneWidth], as far
       // away as the mark.
       scale:

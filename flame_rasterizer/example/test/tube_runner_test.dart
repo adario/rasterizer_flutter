@@ -10,6 +10,7 @@ import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +28,35 @@ void main() {
     expect(ring.right.dot(ring.right), closeTo(1, 1e-9));
     expect(ring.right.dot(ring.forward), closeTo(0, 1e-9));
     expect(ring.down.dot(ring.right), closeTo(0, 1e-9));
+  });
+
+  test('a shape that flips turns round the corner onto the next lane', () {
+    final tube = Tubes.hexagon;
+    final view = TubeView()
+      ..tube = tube
+      ..fit(720, 1);
+    final from = tube.bottomLane;
+    final to = tube.neighbour(from, 1)!;
+    final angle = tube.flipAngle(from, to);
+    const at = 3.0;
+    final places = (EndlessTube()..advanceTo(0))
+        .quadsAt(
+          0,
+          view,
+          marks: [
+            (lane: from, at: at, flip: null),
+            (lane: from, at: at, flip: (to: to, turn: 0)),
+            (lane: from, at: at, flip: (to: to, turn: angle)),
+            (lane: to, at: at, flip: null),
+          ],
+        )
+        .places;
+    expect(places, everyElement(isNotNull));
+    final [still!, starting!, flipped!, landed!] = places;
+    expect(starting.position, still.position);
+    expect(starting.angle, still.angle);
+    expect((flipped.position - landed.position).distance, lessThan(1e-6));
+    expect(flipped.angle, closeTo(still.angle + angle, 1e-9));
   });
 
   for (final renderer in [SvgRenderer.rasterizerCanvas, SvgRenderer.flameSvg]) {
@@ -101,6 +131,40 @@ void main() {
         game.score,
         EnemyKind.seeder.score + TubeShooterExample.spikeScore,
       );
+      expect(game.state, RunnerState.play);
+    });
+
+    testWidgets('a shot destroys a climber, with ${renderer.name}', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameStory<TubeRunnerExample, Object>(
+            renderer: renderer,
+            create: (status, _) =>
+                TubeRunnerExample.of(renderer, status, random: math.Random(1)),
+          ),
+        ),
+      );
+      final game = tester
+          .widget<GameWidget<TubeRunnerExample>>(
+            find.byWidgetPredicate((w) => w is GameWidget),
+          )
+          .game!;
+      await pumpWhileLoading(tester, () => !game.isLoaded);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      game.addEnemy(EnemyKind.climber, game.ship.lane);
+      final climber = game.enemies.single;
+      // Fires, following the climber as it flips, until it's gone, before
+      // the first seeder comes.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+      for (var i = 0; i < 300 && game.score < EnemyKind.climber.score; i++) {
+        game.ship.moveBy((climber.currentLane - game.ship.lane).toDouble());
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+      expect(game.enemies, isNot(contains(climber)));
+      expect(game.score, EnemyKind.climber.score);
       expect(game.state, RunnerState.play);
     });
   }

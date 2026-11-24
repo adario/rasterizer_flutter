@@ -8,6 +8,8 @@ import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/flight_stars_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_climber_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_explosion_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_seeder_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_shot_component.dart';
@@ -31,7 +33,7 @@ enum RunnerState() {
   /// lost ship.
   ready,
 
-  /// The game is on: seeders come, and touch the ship.
+  /// The game is on: enemies come, and touch the ship.
   play,
 
   /// The ship was destroyed. Next, it comes back, or the game ends.
@@ -97,21 +99,27 @@ abstract class TubeRunnerExample({
     Tube Shooter.
 
     READY shows until a tap or a key starts the game. After 4 seconds, and
-    every 4 seconds from then on, a seeder comes at the farthest ring across
-    the tube, on a lane picked at random. For a second and a half, its lane
-    flashes in the seeder's colour, added to the ship's in the ship's lane,
-    and glows with the seeder and its spike, fading out: the mesh renderer
-    draws the glow with RasterizerGlow, only on them, and with the other
-    renderers, wider, see-through copies of them stand for it. The seeder
-    climbs its lane toward the ship, laying a spike behind it, and goes once
-    it passes the ship; the spike goes once all of it does.
+    every 4 seconds from then on, an enemy comes at the farthest ring across
+    the tube, on a lane picked at random: a seeder at first, and after 30
+    seconds in the tube, a seeder or a climber. For a second and a half, its
+    lane flashes in the enemy's colour, added to the ship's in the ship's
+    lane, and glows with the enemy and a seeder's spike, fading out: the mesh
+    renderer draws the glow with RasterizerGlow, only on them, and with the
+    other renderers, wider, see-through copies of them stand for it. Enemies
+    climb their lanes toward the ship, and go once they pass it. A seeder lays
+    a spike behind it, which goes once all of it passes the ship. A climber
+    flips onto a neighbouring lane every 2 to 4 seconds, and fires down its
+    lane every 3 to 5 seconds, with at most 2 of its kind's shots in the tube,
+    as on Tube Shooter's first level; its shots climb half as fast again as
+    it does.
 
     The ship's shots fly as fast as Tube Shooter's ahead of it, and go 8
     units down the tube. As in Tube Shooter, a shot destroys a seeder for 50
-    points, and leaves its spike, or cuts a spike back from its near end for
-    2 points. A seeder or a spike that touches the ship, in its lane at the
-    ship's ring, destroys it, and takes a life, as in Tube Shooter: the
-    seeders, spikes and shots go, and READY shows again. Once the lives are
+    points, and leaves its spike, cuts a spike back from its near end for 2
+    points, destroys a climber for 100, and destroys a climber's shot. An
+    enemy, a spike or a climber's shot that touches the ship, in its lane at
+    the ship's ring, destroys it, and takes a life, as in Tube Shooter: the
+    enemies, spikes and shots go, and READY shows again. Once the lives are
     gone, Game Over stops the game until a tap, or Enter, starts a new one.
     The bottom left shows the tube's name and how long the game has gone on
     in it, and the bottom right the lives left and the score.
@@ -125,19 +133,24 @@ abstract class TubeRunnerExample({
   /// How fast the ship flies, in tube units a second.
   static const flightSpeed = 2.0;
 
-  /// When the first seeder comes, and how often the others do, in seconds
-  /// of the game.
-  static const firstSeeder = 4.0;
-  static const seederPeriod = 4.0;
+  /// When the first enemy comes, and how often the others do, in seconds of
+  /// the game.
+  static const firstEnemy = 4.0;
+  static const enemyPeriod = 4.0;
 
-  /// How far the glow of a seeder's lane and spike, and of the seeder, reach
-  /// as it comes, in line widths, as Tube Shooter's `tubeGlow` and `lineGlow`
-  /// do.
+  /// The kinds of enemy that come, in the order they join: the first from
+  /// the start, and one more after every [unlockTime] seconds in the tube.
+  static const enemyKinds = [EnemyKind.seeder, EnemyKind.climber];
+  static const unlockTime = 30.0;
+
+  /// How far the glow of an enemy's lane and a seeder's spike, and of the
+  /// enemy, reach as it comes, in line widths, as Tube Shooter's `tubeGlow`
+  /// and `lineGlow` do.
   static const laneGlowWidths = 2.0;
   static const shapeGlowWidths = 3.0;
 
   /// The alpha of the wider copies that stand for the glow with the renderers
-  /// that don't draw it, as the seeder comes.
+  /// that don't draw it, as an enemy comes.
   static const haloAlpha = 0.3;
 
   /// The seconds from the ship's destruction to its return, as in Tube
@@ -165,8 +178,8 @@ abstract class TubeRunnerExample({
 
   /// Changes the tube where the ship is, without a stop: the ship goes on at
   /// the same angle round the axis, in the new tube's nearest step. The
-  /// seeders, spikes, shots and their explosions go, and the time in the
-  /// tube starts again.
+  /// enemies, spikes, shots and explosions go, and the time in the tube
+  /// starts again.
   set tube(Tube value) {
     final from = view.tube;
     if (value == from) {
@@ -176,7 +189,7 @@ abstract class TubeRunnerExample({
     if (ship.isLoaded) {
       ship.switchFrom(from);
     }
-    _clearSeeders();
+    _clearEnemies();
     _clearBlasts();
     _tubeTime = 0;
   }
@@ -263,34 +276,41 @@ abstract class TubeRunnerExample({
   PositionComponent? _lane;
   PositionComponent? _spikesDrawing;
 
-  /// The components that draw the lane and the spike of the seeder that just
-  /// came, as it flashes, and their halo, if the renderer doesn't draw glows.
+  /// The components that draw the lane of the enemy that just came, and a
+  /// seeder's spike, as it flashes, and their halo, if the renderer doesn't
+  /// draw glows.
   PositionComponent? _flashLane;
   PositionComponent? _flashSpike;
   PositionComponent? _halo;
 
-  /// The seeders climbing the tube, and the spikes they laid, nearest first.
-  final _seeders = <RunnerSeederComponent>[];
+  /// The enemies climbing the tube, in the order they came, which is nearest
+  /// first, as they all climb as fast, and the spikes the seeders laid.
+  final _enemies = <RunnerEnemyComponent>[];
   final _spikes = <Spike>[];
 
-  /// The seeders climbing the tube, nearest first.
-  Iterable<RunnerSeederComponent> get seeders => _seeders;
+  /// The enemies climbing the tube, nearest first.
+  Iterable<RunnerEnemyComponent> get enemies => _enemies;
 
-  /// The ship's shots, and the explosions of the seeders they destroyed, in
-  /// [explosionGroup].
+  /// The seeders climbing the tube, nearest first.
+  Iterable<RunnerSeederComponent> get seeders =>
+      _enemies.whereType<RunnerSeederComponent>();
+
+  /// The ship's shots, the climbers' shots, and the explosions of the
+  /// enemies the ship's shots destroyed, in [explosionGroup].
   final _shots = <RunnerShotComponent>[];
+  final _enemyShots = <RunnerEnemyShotComponent>[];
   final _blasts = <PlacedExplosionComponent>[];
 
-  /// How long the game has run since the last seeder came, or since
-  /// [seederPeriod] before [firstSeeder].
-  double _seederTime = seederPeriod - firstSeeder;
+  /// How long the game has run since the last enemy came, or since
+  /// [enemyPeriod] before [firstEnemy].
+  double _enemyTime = enemyPeriod - firstEnemy;
 
   /// How far the ship had flown, the view's version, the ship's lane, and
-  /// the flashing seeder and its flash, as the tube's paths were made last.
+  /// the flashing enemy and its flash, as the tube's paths were made last.
   double _tubeFlown = double.nan;
   int _tubeVersion = -1;
   int? _tubeLane;
-  RunnerSeederComponent? _tubeFlasher;
+  RunnerEnemyComponent? _tubeFlasher;
   double _tubeFlash = 0;
 
   /// How many quads the tube's paths have.
@@ -382,21 +402,20 @@ abstract class TubeRunnerExample({
   /// wider, see-through copies stand for them.
   bool get rendererGlows => false;
 
-  /// Returns the glow of a seeder that comes, reaching [widths] line widths
-  /// with [strength], in its colour, or none for no [strength].
-  static RasterizerGlow? flashGlow(double widths, double strength) =>
-      strength > 0
-      ? RasterizerGlow.widths(
-          widths,
-          strength: strength,
-          color: TubeColors.seeder,
-        )
+  /// Returns the glow of an enemy that comes, reaching [widths] line widths
+  /// with [strength], in its [color], or none for no [strength].
+  static RasterizerGlow? flashGlow(
+    double widths,
+    double strength,
+    Color color,
+  ) => strength > 0
+      ? RasterizerGlow.widths(widths, strength: strength, color: color)
       : null;
 
-  /// Gives [drawing], made by [shapeComponent], the glow of a seeder that
-  /// comes, with [strength], if [rendererGlows]. If the glow changed, this
-  /// imports the shape again.
-  void glowShape(PathComponent drawing, double strength) {}
+  /// Gives [drawing], made by [shapeComponent], the glow of an enemy that
+  /// comes, with [strength], in its [color], if [rendererGlows]. If the glow
+  /// changed, this imports the shape again.
+  void glowShape(PathComponent drawing, double strength, Color color) {}
 
   @override
   Future<void> onLoad() async {
@@ -460,10 +479,11 @@ abstract class TubeRunnerExample({
     switch (_state) {
       case RunnerState.play:
         _tubeTime += dt;
-        _updateSeeders(dt);
+        _updateEnemies(dt);
         _updateShots(dt);
         _hit();
         _collide();
+        _dropPassed();
       case RunnerState.dying:
         if (_stateTime >= respawnTime) {
           if (_lives == 0) {
@@ -478,17 +498,50 @@ abstract class TubeRunnerExample({
     }
   }
 
-  /// Destroys the ship if a seeder or a spike touches it: one in its lane
-  /// that reaches the ship's ring, however the ship got into the lane. A
-  /// seeder is at its spike's near end, so the spikes say it all.
+  /// Destroys the ship if an enemy, a spike or a climber's shot touches it:
+  /// one in its lane that reaches the ship's ring, however the ship got into
+  /// the lane. Those that passed the ring before went with [_dropPassed].
   void _collide() {
     final lane = ship.lane;
     if (_spikes.any(
-      (spike) =>
-          spike.lane == lane && spike.near <= _flown && _flown <= spike.far,
-    )) {
+          (spike) =>
+              spike.lane == lane && spike.near <= _flown && _flown <= spike.far,
+        ) ||
+        _enemies.any(
+          (enemy) => enemy.currentLane == lane && enemy.at <= _flown,
+        ) ||
+        _enemyShots.any((shot) => shot.lane == lane && shot.at <= _flown)) {
       _destroyShip();
     }
+  }
+
+  /// Drops the enemies and the climbers' shots that reached the ship's ring,
+  /// and the spikes all past it.
+  void _dropPassed() {
+    bool drop(PositionComponent shape, double at) {
+      final passed = at <= _flown;
+      if (passed) {
+        shape.removeFromParent();
+      }
+      return passed;
+    }
+
+    _enemies.removeWhere((enemy) => drop(enemy, enemy.at));
+    _enemyShots.removeWhere((shot) => drop(shot, shot.at));
+    _spikes.removeWhere((spike) => spike.far < _flown);
+  }
+
+  /// Fires a shot from [climber] down its lane, toward the ship, unless
+  /// `maxEnemyShots` of Tube Shooter's first level are in the tube.
+  void fireFrom(RunnerClimberComponent climber) {
+    if (_state != RunnerState.play ||
+        _enemyShots.length >= levels.first.maxEnemyShots) {
+      return;
+    }
+    final shot = RunnerEnemyShotComponent(climber.currentLane, climber.at);
+    _enemyShots.add(shot);
+    world.add(shot);
+    _tubeFlown = double.nan;
   }
 
   /// Over [dt] seconds of the game: fires a shot down the ship's lane every
@@ -520,18 +573,40 @@ abstract class TubeRunnerExample({
   }
 
   /// Resolves the shots' hits, as in Tube Shooter: each shot hits the
-  /// nearest seeder or spike in its lane that it reached or passed since it
-  /// last flew. It destroys a seeder, which leaves its spike, or cuts a spike
-  /// back by `TubeShooterExample.spikeHit` from its near end, and scores.
+  /// nearest spike, enemy or climber's shot in its lane that it reached or
+  /// passed since it last flew. A seeder is at its spike's near end, so the
+  /// spike stands for it. The shot destroys an enemy, and scores, a seeder
+  /// leaving its spike, cuts a spike back by `TubeShooterExample.spikeHit`
+  /// from its near end, and scores, or destroys a climber's shot.
   void _hit() {
     for (final shot in [..._shots]) {
-      Spike? target;
+      Object? target;
+      var nearest = double.infinity;
+      void aim(Object at, double distance) {
+        if (distance < nearest) {
+          target = at;
+          nearest = distance;
+        }
+      }
+
       for (final spike in _spikes) {
         if (spike.lane == shot.lane &&
             spike.near <= shot.at &&
-            spike.far >= shot.previousAt &&
-            (target == null || spike.near < target.near)) {
-          target = spike;
+            spike.far >= shot.previousAt) {
+          aim(spike, spike.near);
+        }
+      }
+      for (final enemy in _enemies) {
+        if (enemy is! RunnerSeederComponent &&
+            enemy.currentLane == shot.lane &&
+            _meet(shot, enemy.previousAt, enemy.at)) {
+          aim(enemy, enemy.at);
+        }
+      }
+      for (final enemyShot in _enemyShots) {
+        if (enemyShot.lane == shot.lane &&
+            _meet(shot, enemyShot.previousAt, enemyShot.at)) {
+          aim(enemyShot, enemyShot.at);
         }
       }
       if (target == null) {
@@ -539,40 +614,56 @@ abstract class TubeRunnerExample({
       }
       _shots.remove(shot);
       shot.removeFromParent();
-      final seeder = _seeders
-          .where((seeder) => identical(seeder.spike, target))
-          .firstOrNull;
-      if (seeder != null) {
-        _destroySeeder(seeder);
-      } else {
-        target.near = math.min(
-          target.near + TubeShooterExample.spikeHit,
-          target.far,
-        );
-        _score += TubeShooterExample.spikeScore;
-        if (target.near >= target.far) {
-          _spikes.remove(target);
-        }
+      switch (target) {
+        case final Spike spike:
+          _hitSpike(spike);
+        case final RunnerEnemyComponent enemy:
+          _destroyEnemy(enemy);
+        case final RunnerEnemyShotComponent enemyShot:
+          _enemyShots.remove(enemyShot);
+          enemyShot.removeFromParent();
       }
     }
   }
 
-  /// Blows [seeder] up where it is along the tube, and adds its score. Its
-  /// spike stays.
-  void _destroySeeder(RunnerSeederComponent seeder) {
-    _seeders.remove(seeder);
-    seeder.removeFromParent();
-    _score += EnemyKind.seeder.score;
+  /// Whether [shot] met something that climbed from [previousAt] to [at]
+  /// as both last moved: it was behind the shot, and now it isn't.
+  static bool _meet(RunnerShotComponent shot, double previousAt, double at) =>
+      shot.previousAt <= previousAt && shot.at >= at;
+
+  /// Destroys the seeder at [spike]'s near end, if it's there, or else cuts
+  /// [spike] back, and scores.
+  void _hitSpike(Spike spike) {
+    final seeder = seeders
+        .where((seeder) => identical(seeder.spike, spike))
+        .firstOrNull;
+    if (seeder != null) {
+      _destroyEnemy(seeder);
+      return;
+    }
+    spike.near = math.min(spike.near + TubeShooterExample.spikeHit, spike.far);
+    _score += TubeShooterExample.spikeScore;
+    if (spike.near >= spike.far) {
+      _spikes.remove(spike);
+    }
+  }
+
+  /// Blows [enemy] up where it is along the tube, and adds its score. A
+  /// seeder's spike stays.
+  void _destroyEnemy(RunnerEnemyComponent enemy) {
+    _enemies.remove(enemy);
+    enemy.removeFromParent();
+    _score += enemy.kind.score;
     final blast = PlacedExplosionComponent(
-      seeder.mark,
-      rayColor: TubeColors.seeder,
+      enemy.mark,
+      rayColor: enemy.kind.color,
     );
     _blasts.add(blast);
     explosionGroup.add(blast);
     _tubeFlown = double.nan;
   }
 
-  /// Removes the seeders' explosions.
+  /// Removes the enemies' explosions.
   void _clearBlasts() {
     for (final blast in _blasts) {
       blast.removeFromParent();
@@ -580,7 +671,7 @@ abstract class TubeRunnerExample({
     _blasts.clear();
   }
 
-  /// Blows the ship up, fades it out, and takes a life. The seeders, spikes
+  /// Blows the ship up, fades it out, and takes a life. The enemies, spikes
   /// and shots go.
   void _destroyShip() {
     _lives--;
@@ -593,7 +684,7 @@ abstract class TubeRunnerExample({
       ),
     );
     ship.fadeOut();
-    _clearSeeders();
+    _clearEnemies();
     _setState(RunnerState.dying);
   }
 
@@ -603,11 +694,11 @@ abstract class TubeRunnerExample({
     _setState(RunnerState.ready);
   }
 
-  /// Starts the game, or resumes it after a lost ship, with the first seeder
-  /// [firstSeeder] away.
+  /// Starts the game, or resumes it after a lost ship, with the first enemy
+  /// [firstEnemy] away.
   void _beginPlay() {
     readyText.removeFromParent();
-    _seederTime = seederPeriod - firstSeeder;
+    _enemyTime = enemyPeriod - firstEnemy;
     _setState(RunnerState.play);
   }
 
@@ -643,21 +734,21 @@ abstract class TubeRunnerExample({
     }
   }
 
-  /// Makes the tube's paths again if the ship flew or changed lanes, a
-  /// seeder's flash changed, or the view changed, and places the seeders,
+  /// Makes the tube's paths again if the ship flew or changed lanes, an
+  /// enemy's flash changed, or the view changed, and places the enemies,
   /// shots and explosions where they show.
   ///
-  /// As the last seeder comes, its lane flashes: over its
-  /// [RunnerSeederComponent.flashTime], the lane fades from the seeder's
+  /// As the last enemy comes, the lane it came in flashes: over its
+  /// [RunnerEnemyComponent.flashTime], the lane fades from the enemy's
   /// colour to its own, or, if it's the ship's, from the ship's colour with
-  /// the seeder's added, and its lines and spike glow, fading out. With the
-  /// renderers that don't draw glows, wider, see-through copies of them in
-  /// the seeder's colour stand for the glow.
+  /// the enemy's added, and its lines and a seeder's spike glow, fading out.
+  /// With the renderers that don't draw glows, wider, see-through copies of
+  /// them in the enemy's colour stand for the glow.
   void _updateTube() {
     // The ship knows its lane once loaded. Its lane shows while it's in play,
     // as in Tube Shooter.
     final lane = ship.isLoaded && canMove ? ship.lane : null;
-    var flasher = _seeders.lastOrNull;
+    var flasher = _enemies.lastOrNull;
     final flash = flasher?.flash ?? 0;
     if (flash == 0) {
       flasher = null;
@@ -676,14 +767,21 @@ abstract class TubeRunnerExample({
     _tubeFlash = flash;
     // The explosions remove themselves once they're done.
     _blasts.removeWhere((blast) => blast.isRemoving || blast.isRemoved);
-    final placed = <TubePlaced>[..._seeders, ..._shots, ..._blasts];
+    final placed = <TubePlaced>[
+      ..._enemies,
+      ..._shots,
+      ..._enemyShots,
+      ..._blasts,
+    ];
+    final color = flasher?.kind.color ?? TubeColors.seeder;
     final quads = endlessTube.quadsAt(
       _flown,
       view,
       lane: lane,
       spikes: _spikes,
       marks: [for (final shape in placed) shape.mark],
-      flash: flasher?.spike,
+      flashLane: flasher?.spawnLane,
+      flashSpike: flasher is RunnerSeederComponent ? flasher.spike : null,
       halo: rendererGlows ? null : 2 * laneGlowWidths,
     );
     _quads =
@@ -705,15 +803,15 @@ abstract class TubeRunnerExample({
     _halo = _replaceQuads(
       _halo,
       quads.halo,
-      TubeColors.seeder.withValues(alpha: haloAlpha * flash),
+      color.withValues(alpha: haloAlpha * flash),
     );
-    final glow = rendererGlows ? flashGlow(laneGlowWidths, flash) : null;
+    final glow = rendererGlows ? flashGlow(laneGlowWidths, flash, color) : null;
     _flashLane = _replaceQuads(
       _flashLane,
       quads.flashLane,
-      flasher?.spike.lane == lane
-          ? _addLight(TubeColors.ship, TubeColors.seeder, flash)
-          : Color.lerp(TubeColors.seeder, TubeColors.tube, 1 - flash)!,
+      flasher?.spawnLane == lane
+          ? _addLight(TubeColors.ship, color, flash)
+          : Color.lerp(color, TubeColors.tube, 1 - flash)!,
       glow: glow,
     );
     _flashSpike = _replaceQuads(
@@ -727,42 +825,58 @@ abstract class TubeRunnerExample({
     }
   }
 
-  /// Over [dt] seconds of the game: brings a seeder at [firstSeeder], then
-  /// every [seederPeriod], at the farthest ring across the tube, climbs the
-  /// seeders, and drops those past the ship, and the spikes all past it.
-  void _updateSeeders(double dt) {
-    _seederTime += dt;
-    if (_seederTime >= seederPeriod) {
-      _seederTime -= seederPeriod;
-      const spacing = EndlessTube.ringSpacing;
-      final far = ((_flown + EndlessTube.ahead) / spacing).floor() * spacing;
-      final spike = Spike(random.nextInt(tube.laneCount), far);
-      final seeder = RunnerSeederComponent(spike);
-      _spikes.add(spike);
-      _seeders.add(seeder);
-      world.add(seeder);
+  /// Over [dt] seconds of the game: brings an enemy at [firstEnemy], then
+  /// every [enemyPeriod], of a kind picked at random among the [enemyKinds]
+  /// that joined, on a lane picked at random, and climbs the enemies and the
+  /// climbers' shots.
+  void _updateEnemies(double dt) {
+    _enemyTime += dt;
+    if (_enemyTime >= enemyPeriod) {
+      _enemyTime -= enemyPeriod;
+      final kinds = math.min(enemyKinds.length, 1 + _tubeTime ~/ unlockTime);
+      // Picking among one kind would take a number from [random], and change
+      // what comes until the second kind joins.
+      final kind = enemyKinds[kinds == 1 ? 0 : random.nextInt(kinds)];
+      addEnemy(kind, random.nextInt(tube.laneCount));
     }
-    for (final seeder in _seeders) {
-      seeder.climb(dt);
+    for (final enemy in _enemies) {
+      enemy.climb(dt);
     }
-    _seeders.removeWhere((seeder) {
-      final passed = seeder.spike.near < _flown;
-      if (passed) {
-        seeder.removeFromParent();
-      }
-      return passed;
-    });
-    _spikes.removeWhere((spike) => spike.far < _flown);
+    for (final shot in _enemyShots) {
+      shot.climb(dt);
+    }
   }
 
-  /// Removes all the seeders, spikes and shots.
-  void _clearSeeders() {
-    for (final shape in [..._seeders, ..._shots]) {
+  /// Brings an enemy of [kind], one of [enemyKinds], at the farthest ring
+  /// across the tube, in [lane].
+  @visibleForTesting
+  void addEnemy(EnemyKind kind, int lane) {
+    const spacing = EndlessTube.ringSpacing;
+    final far = ((_flown + EndlessTube.ahead) / spacing).floor() * spacing;
+    final RunnerEnemyComponent enemy;
+    switch (kind) {
+      case EnemyKind.seeder:
+        final spike = Spike(lane, far);
+        _spikes.add(spike);
+        enemy = RunnerSeederComponent(spike);
+      case EnemyKind.climber:
+        enemy = RunnerClimberComponent(lane, far);
+      case EnemyKind.splitter || EnemyKind.zapper || EnemyKind.edgeWalker:
+        throw ArgumentError.value(kind, 'kind', "doesn't come here yet");
+    }
+    _enemies.add(enemy);
+    world.add(enemy);
+  }
+
+  /// Removes all the enemies, spikes and shots.
+  void _clearEnemies() {
+    for (final shape in [..._enemies, ..._shots, ..._enemyShots]) {
       shape.removeFromParent();
     }
-    _seeders.clear();
+    _enemies.clear();
     _spikes.clear();
     _shots.clear();
+    _enemyShots.clear();
   }
 
   /// Returns [base] with [light] added to it, [amount] times as strong, as
@@ -951,10 +1065,11 @@ class RasterizerTubeRunnerExample({
   bool get rendererGlows => renderer == SvgRenderer.rasterizer;
 
   @override
-  void glowShape(PathComponent drawing, double strength) {
+  void glowShape(PathComponent drawing, double strength, Color color) {
     (drawing as RasterizerPathComponent).glow = TubeRunnerExample.flashGlow(
       TubeRunnerExample.shapeGlowWidths,
       strength,
+      color,
     );
   }
 }
