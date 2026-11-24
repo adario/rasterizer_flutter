@@ -38,9 +38,12 @@ class FlightStarsComponent()
   /// The ship's step at the last update.
   late int _step = gameRef.ship.step;
 
+  /// The tube the ship was on at the last update.
+  late Tube _tube = gameRef.view.tube;
+
   /// How far a star that turns as much as the ship turns for each lane that
-  /// the ship moves round.
-  late final double _turnPerLane = _turnPerLaneOn(gameRef.view.tube);
+  /// the ship moves round [_tube].
+  late double _turnPerLane = _turnPerLaneOn(_tube);
 
   @override
   Future<void> onLoad() async {
@@ -78,14 +81,22 @@ class FlightStarsComponent()
   /// Follows the ship's moves round the tube, and returns the angle by which
   /// a star that turns as much as the ship turns over [dt] seconds, clockwise
   /// on screen.
+  ///
+  /// When the tube changes, the ship's move onto it doesn't turn them.
   double _turn(double dt) {
     const stepsPerLane = PlayerComponent.stepsPerLane;
+    final tube = gameRef.view.tube;
     final step = gameRef.ship.step;
-    final steps = stepsPerLane * gameRef.view.tube.laneCount;
-    var moved = step - _step;
-    // The short way round, across the step where the lanes start again.
-    moved -= steps * (moved / steps).round();
-    _turnTarget += moved / stepsPerLane * _turnPerLane;
+    if (!identical(tube, _tube)) {
+      _tube = tube;
+      _turnPerLane = _turnPerLaneOn(tube);
+    } else {
+      final steps = stepsPerLane * tube.laneCount;
+      var moved = step - _step;
+      // The short way round, across the step where the lanes start again.
+      moved -= steps * (moved / steps).round();
+      _turnTarget += moved / stepsPerLane * _turnPerLane;
+    }
     _step = step;
     final turned = _turned;
     _turned +=
