@@ -7,6 +7,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
 /// An enemy of [kind], which comes at the far end of [spawnLane] and climbs
 /// the tube toward the ship, with the shape and colour of Tube Shooter's, and
@@ -18,11 +19,13 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 /// For [flashTime] after it comes, it glows in its colour, fading out as
 /// [flash] says: with [TubeRunnerExample.glowShape] if the renderer draws
 /// glows, or else under a wider, see-through copy of its shape, as wide as
-/// that glow.
+/// that glow. A splitter's climbers don't flash, as they don't come down the
+/// tube.
 abstract class RunnerEnemyComponent(
   final EnemyKind kind,
-  final int spawnLane,
-) extends PositionComponent
+  final int spawnLane, {
+  bool flashes = true,
+}) extends PositionComponent
     with HasGameRef<TubeRunnerExample>, HasVisibility, TubePlaced {
   this : super(priority: 1);
 
@@ -45,8 +48,9 @@ abstract class RunnerEnemyComponent(
   /// The lane it counts as in, for hits.
   int get currentLane;
 
-  /// How long it has climbed, in seconds of the game.
-  double _age = 0;
+  /// How long it has climbed, in seconds of the game, or [flashTime] at
+  /// first if it doesn't flash.
+  double _age = flashes ? 0 : flashTime;
 
   /// How strong its flash is: 1 as it comes, fading to 0 over [flashTime].
   double get flash => _age < flashTime ? 1 - _age / flashTime : 0;
@@ -119,8 +123,9 @@ abstract class RunnerEnemyComponent(
 abstract class RunnerFlipperComponent(
   super.kind,
   super.spawnLane,
-  @override var double at,
-) extends RunnerEnemyComponent {
+  @override var double at, {
+  super.flashes,
+}) extends RunnerEnemyComponent {
   /// The lane it's in, or flips from.
   late int lane = spawnLane;
 
@@ -179,7 +184,11 @@ abstract class RunnerFlipperComponent(
   /// Starts flipping onto the next lane on [side], 1 or -1.
   void _flipAside(int side) {
     final tube = gameRef.tube;
-    final to = (tube.neighbour(lane, side) ?? tube.neighbour(lane, -side))!;
+    flip((tube.neighbour(lane, side) ?? tube.neighbour(lane, -side))!, tube);
+  }
+
+  /// Starts flipping onto lane [to], next to its own in [tube].
+  void flip(int to, Tube tube) {
     _flipTo = to;
     _flipProgress = 0;
     _flipAngle = tube.flipAngle(lane, to);

@@ -13,6 +13,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ru
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_explosion_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_seeder_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_shot_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_splitter_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_zapper_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ship_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
@@ -102,8 +103,8 @@ abstract class TubeRunnerExample({
     READY shows until a tap or a key starts the game. After 4 seconds, and
     every 4 seconds from then on, an enemy comes at the farthest ring across
     the tube, on a lane picked at random: a seeder at first, after 30 seconds
-    in the tube, a seeder or a climber, and after 60, a zapper too, of a kind
-    picked at random. For a second and a half, its
+    in the tube, a seeder or a climber, after 60, a zapper too, and after 90,
+    a splitter too, of a kind picked at random. For a second and a half, its
     lane flashes in the enemy's colour, added to the ship's in the ship's
     lane, and glows with the enemy and a seeder's spike, fading out: the mesh
     renderer draws the glow with RasterizerGlow, only on them, and with the
@@ -117,13 +118,16 @@ abstract class TubeRunnerExample({
     together every 3 seconds, for 0.6 of a second, as on Tube Shooter's first
     level: each flashes white for half a second before, and while they
     pulse, a bolt zigzags from each down its lane to the ship's ring,
-    glowing, or with wider, see-through copies, as the flash does.
+    glowing, or with wider, see-through copies, as the flash does. A
+    splitter neither flips nor fires; 4 units ahead of the ship, as Tube
+    Shooter's at the rim, it splits into two climbers, which flip onto the
+    lanes on either side.
 
     The ship's shots fly as fast as Tube Shooter's ahead of it, and go 8
     units down the tube. As in Tube Shooter, a shot destroys a seeder for 50
     points, and leaves its spike, cuts a spike back from its near end for 2
-    points, destroys a climber for 100 or a zapper for 200, and destroys a
-    climber's shot. An enemy, a spike or a climber's shot that touches the
+    points, destroys a climber for 100 or a zapper for 200, splits a
+    splitter for 150, and destroys a climber's shot. An enemy, a spike or a climber's shot that touches the
     ship, in its lane at the ship's ring, or a bolt down the ship's lane,
     destroys it, and takes a life, as in Tube Shooter: the
     enemies, spikes and shots go, and READY shows again. Once the lives are
@@ -151,6 +155,7 @@ abstract class TubeRunnerExample({
     EnemyKind.seeder,
     EnemyKind.climber,
     EnemyKind.zapper,
+    EnemyKind.splitter,
   ];
   static const unlockTime = 30.0;
 
@@ -692,10 +697,8 @@ abstract class TubeRunnerExample({
   }
 
   /// Blows [enemy] up where it is along the tube, and adds its score. A
-  /// seeder's spike stays.
+  /// seeder's spike stays, and a splitter splits, as in Tube Shooter.
   void _destroyEnemy(RunnerEnemyComponent enemy) {
-    _enemies.remove(enemy);
-    enemy.removeFromParent();
     _score += enemy.kind.score;
     final blast = PlacedExplosionComponent(
       enemy.mark,
@@ -704,6 +707,12 @@ abstract class TubeRunnerExample({
     _blasts.add(blast);
     explosionGroup.add(blast);
     _tubeFlown = double.nan;
+    if (enemy is RunnerSplitterComponent) {
+      _split(enemy);
+    } else {
+      _enemies.remove(enemy);
+      enemy.removeFromParent();
+    }
   }
 
   /// Removes the enemies' explosions.
@@ -897,8 +906,9 @@ abstract class TubeRunnerExample({
 
   /// Over [dt] seconds of the game: brings an enemy at [firstEnemy], then
   /// every [enemyPeriod], of a kind picked at random among the [enemyKinds]
-  /// that joined, on a lane picked at random, and climbs the enemies and the
-  /// climbers' shots.
+  /// that joined, on a lane picked at random, climbs the enemies and the
+  /// climbers' shots, and splits the splitters that got
+  /// [RunnerSplitterComponent.splitAhead] of the ship.
   void _updateEnemies(double dt) {
     _enemyTime += dt;
     if (_enemyTime >= enemyPeriod) {
@@ -915,6 +925,30 @@ abstract class TubeRunnerExample({
     for (final shot in _enemyShots) {
       shot.climb(dt);
     }
+    final near = _flown + RunnerSplitterComponent.splitAhead;
+    _enemies
+        .whereType<RunnerSplitterComponent>()
+        .where((splitter) => splitter.at <= near)
+        .toList()
+        .forEach(_split);
+  }
+
+  /// Replaces [splitter] with two climbers where it is, which flip from its
+  /// lane onto the lanes on either side, as in Tube Shooter. They don't
+  /// flash, as they didn't come down the tube.
+  void _split(RunnerSplitterComponent splitter) {
+    final index = _enemies.indexOf(splitter);
+    _enemies.removeAt(index);
+    splitter.removeFromParent();
+    final climbers = [
+      for (final side in [-1, 1])
+        RunnerClimberComponent(splitter.lane, splitter.at, flashes: false)
+          ..flip(tube.neighbour(splitter.lane, side)!, tube),
+    ];
+    // Where the splitter was, so that they stay nearest first.
+    _enemies.insertAll(index, climbers);
+    world.addAll(climbers);
+    _tubeFlown = double.nan;
   }
 
   /// Brings an enemy of [kind], one of [enemyKinds], at the farthest ring
@@ -933,8 +967,10 @@ abstract class TubeRunnerExample({
         enemy = RunnerClimberComponent(lane, far);
       case EnemyKind.zapper:
         enemy = RunnerZapperComponent(lane, far);
-      case EnemyKind.splitter || EnemyKind.edgeWalker:
-        throw ArgumentError.value(kind, 'kind', "doesn't come here yet");
+      case EnemyKind.splitter:
+        enemy = RunnerSplitterComponent(lane, far);
+      case EnemyKind.edgeWalker:
+        throw ArgumentError.value(kind, 'kind', "doesn't come here");
     }
     _enemies.add(enemy);
     world.add(enemy);

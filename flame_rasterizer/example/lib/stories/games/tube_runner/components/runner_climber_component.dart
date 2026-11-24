@@ -8,7 +8,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 /// does at its first level's pace, but as fast as a seeder.
 ///
 /// It fires with [TubeRunnerExample.fireFrom].
-class RunnerClimberComponent(int lane, double at)
+class RunnerClimberComponent(int lane, double at, {super.flashes})
     extends RunnerFlipperComponent {
   this : super(EnemyKind.climber, lane, at);
 

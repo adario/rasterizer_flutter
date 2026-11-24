@@ -7,6 +7,8 @@ import 'package:flame/game.dart';
 import 'package:flame_rasterizer_example/commons/game_story.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_climber_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_splitter_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
@@ -201,6 +203,57 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
       expect(game.state, RunnerState.dying);
       expect(game.lives, TubeRunnerExample.startLives - 1);
+    });
+
+    testWidgets('a splitter splits near the ship, or when shot, with '
+        '${renderer.name}', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameStory<TubeRunnerExample, Object>(
+            renderer: renderer,
+            create: (status, _) =>
+                TubeRunnerExample.of(renderer, status, random: math.Random(1)),
+          ),
+        ),
+      );
+      final game = tester
+          .widget<GameWidget<TubeRunnerExample>>(
+            find.byWidgetPredicate((w) => w is GameWidget),
+          )
+          .game!;
+      await pumpWhileLoading(tester, () => !game.isLoaded);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      // Unshot, two lanes from the ship, it splits 4 units ahead of it, into
+      // climbers that flip onto the lanes on either side.
+      final lane = game.tube.neighbour(game.ship.lane, 2)!;
+      game.addEnemy(EnemyKind.splitter, lane);
+      bool splitting() =>
+          game.enemies.whereType<RunnerSplitterComponent>().isNotEmpty;
+      for (var i = 0; i < 300 && splitting(); i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final climbers = game.enemies.whereType<RunnerClimberComponent>();
+      expect(climbers, hasLength(2));
+      expect(climbers.map((climber) => climber.mark.flip?.to).toSet(), {
+        game.tube.neighbour(lane, -1),
+        game.tube.neighbour(lane, 1),
+      });
+      expect(
+        climbers.first.at - game.flown,
+        closeTo(RunnerSplitterComponent.splitAhead, 0.1),
+      );
+      expect(game.score, 0);
+      // Shot, it scores, and splits too.
+      game.addEnemy(EnemyKind.splitter, game.ship.lane);
+      final splitter = game.enemies.last;
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+      for (var i = 0; i < 300 && game.score < EnemyKind.splitter.score; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+      expect(game.enemies, isNot(contains(splitter)));
+      expect(game.score, greaterThanOrEqualTo(EnemyKind.splitter.score));
+      expect(game.state, RunnerState.play);
     });
   }
 }
