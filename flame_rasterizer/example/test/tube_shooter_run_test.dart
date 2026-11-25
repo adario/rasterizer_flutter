@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import 'package:flame/extensions.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
@@ -265,6 +266,48 @@ void main() {
     expect(game.score, 0);
     expect(runner.isMounted, isFalse);
     expect(game.gameOverText.isMounted, isFalse);
+    await pumpFrames(tester, 2);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("an enemy's explosion as the run's play ends goes on, where it "
+      'is along the run, on the arrival, until done', (tester) async {
+    final game = await pumpGame(
+      tester,
+      SvgRenderer.rasterizerCanvas,
+      firstLevel: hexagon,
+      runs: true,
+    );
+    final runner = await pumpToRun(tester, game);
+    const playEnd = Tube.depth + RunnerMode.flightSpeed * ShooterMode.runTime;
+    await pumpUntil(
+      tester,
+      () => runner.flown >= playEnd - 0.5,
+      frames: 2000,
+    );
+    // A climber across the tube, a little ahead of the ship, which a shot
+    // destroys just before the run's play ends.
+    final lanes = game.view.tube.laneCount;
+    runner.addEnemy(EnemyKind.climber, (runner.ship.lane + lanes ~/ 2) % lanes);
+    final climber = (runner.enemies.last as RunnerFlipperComponent)
+      ..at = runner.flown + 3;
+    await pumpFrames(tester, 1);
+    expect(climber.isVisible, isTrue);
+    runner.destroyEnemy(climber);
+    await pumpFrames(tester, 1);
+    final blast = runner.blasts.single;
+    expect(blast.isVisible, isTrue);
+    await pumpUntil(tester, () => game.shooter.state == TubeState.arrive);
+    expect(runner.isMounted, isFalse);
+    expect(blast.isMounted, isTrue);
+    expect(blast.parent, same(game.shooter.explosionGroup));
+    expect(blast.isVisible, isTrue);
+    // The eye flies on, so it shows elsewhere each frame.
+    final at = blast.position.clone();
+    await pumpFrames(tester, 1);
+    expect(blast.position, isNot(at));
+    await pumpUntil(tester, () => !blast.isMounted, frames: 100);
+    expect(game.shooter.state, TubeState.arrive);
     await pumpFrames(tester, 2);
     await tester.pumpWidget(const SizedBox());
   });

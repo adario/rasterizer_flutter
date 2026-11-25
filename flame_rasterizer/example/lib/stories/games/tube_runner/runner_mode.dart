@@ -201,6 +201,11 @@ class RunnerMode({
   final _enemyShots = <RunnerEnemyShotComponent>[];
   final _blasts = <PlacedExplosionComponent>[];
 
+  /// The explosions of the enemies that the ship's shots destroyed, that
+  /// still show: a run's mode places them on once the run's play is over.
+  Iterable<PlacedExplosionComponent> get blasts =>
+      _blasts.where((blast) => !blast.isRemoving && !blast.isRemoved);
+
   /// Whether enemies come; tests turn it off, as does a mode whose own
   /// tests do, for its run.
   bool spawning = true;
@@ -471,7 +476,7 @@ class RunnerMode({
         case final Spike spike:
           _hitSpike(spike);
         case final RunnerEnemyComponent enemy:
-          _destroyEnemy(enemy);
+          destroyEnemy(enemy);
         case final RunnerEnemyShotComponent enemyShot:
           _enemyShots.remove(enemyShot);
           enemyShot.removeFromParent();
@@ -491,7 +496,7 @@ class RunnerMode({
         .where((seeder) => identical(seeder.spike, spike))
         .firstOrNull;
     if (seeder != null) {
-      _destroyEnemy(seeder);
+      destroyEnemy(seeder);
       return;
     }
     spike.near = math.min(spike.near + ShooterMode.spikeHit, spike.far);
@@ -504,7 +509,8 @@ class RunnerMode({
 
   /// Blows [enemy] up where it is along the tube, and adds its score. A
   /// seeder's spike stays, and a splitter splits, as in Tube Shooter.
-  void _destroyEnemy(RunnerEnemyComponent enemy) {
+  @visibleForTesting
+  void destroyEnemy(RunnerEnemyComponent enemy) {
     gameRef.score += enemy.kind.score;
     gameRef.play(Sound.explosion);
     final blast = PlacedExplosionComponent(

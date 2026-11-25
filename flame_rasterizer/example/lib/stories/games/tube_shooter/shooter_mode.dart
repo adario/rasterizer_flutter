@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_explosion_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/bolts_component.dart';

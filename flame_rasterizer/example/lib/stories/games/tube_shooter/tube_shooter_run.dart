@@ -101,6 +101,10 @@ class _Run(
   PositionComponent? tubeDrawing;
   PositionComponent? nextDrawing;
 
+  /// The explosions that [runner] left as the run's play ended, which go on
+  /// where they are along the run, on the arrival, until they're done.
+  final blasts = <PlacedExplosionComponent>[];
+
   /// Where the ship was in the world, its angle and its scale, as it began
   /// to arrive.
   Vector2? shipFrom;
@@ -115,9 +119,14 @@ class _Run(
     tubeDrawing = nextDrawing = null;
   }
 
-  /// Removes its drawings and [runner], with what's left on the run.
+  /// Removes its drawings, its [blasts] and [runner], with what's left on
+  /// the run.
   void clear() {
     removeDrawings();
+    for (final blast in blasts) {
+      blast.removeFromParent();
+    }
+    blasts.clear();
     runner.removeFromParent();
   }
 
@@ -190,7 +199,7 @@ extension on ShooterMode {
 
   /// Starts the next round as the ship arrives on its rim, the run's
   /// overshoot into the arrival: the round's ship takes over from the
-  /// runner's, where it is.
+  /// runner's, where it is, and the round its explosions, where they are.
   void _beginArrive() {
     final run = _run!;
     final ship = run.runner.ship;
@@ -199,6 +208,11 @@ extension on ShooterMode {
       ..shipFrom = ship.position.clone()
       ..angleFrom = ship.angle
       ..scaleFrom = ship.scale.clone();
+    // Moved before the runner goes, so that they don't go with it.
+    for (final blast in run.runner.blasts) {
+      run.blasts.add(blast);
+      blast.parent = explosionGroup;
+    }
     run.runner.removeFromParent();
     player.isVisible = true;
     _nextRound(arriving: true);
@@ -238,7 +252,8 @@ extension on ShooterMode {
 
   /// Draws the run's tube on the drop and the arrival, if there's a run, and
   /// the next round's tube, once it's no farther ahead than the run's tube
-  /// goes. On the run, its runner draws them.
+  /// goes, and places the run's [_Run.blasts] where they show. On the run,
+  /// its runner draws and places them.
   void _drawRun() {
     final run = _run;
     if (run == null || !isLoaded || _state == TubeState.run) {
@@ -255,9 +270,12 @@ extension on ShooterMode {
                   math.min(1.0, _stateTime / ShooterMode.dropTime)
         : _Run.exit;
     final nextColor = arriving ? level.color : run.next.color;
+    // The explosions remove themselves once they're done.
+    run.blasts.removeWhere((blast) => blast.isRemoving || blast.isRemoved);
     final quads = run.endless.quadsAt(
       distance,
       run.view,
+      marks: [for (final blast in run.blasts) blast.mark],
       from: Tube.depth,
       until: math.min(until, _Run.exit),
       next: _Run.rim - distance <= EndlessTube.ahead
@@ -283,6 +301,9 @@ extension on ShooterMode {
     run
       ..tubeDrawing = replace(run.tubeDrawing, quads.tube, run.color)
       ..nextDrawing = replace(run.nextDrawing, quads.next, nextColor);
+    for (final (i, blast) in run.blasts.indexed) {
+      blast.placeAt(quads.places[i]);
+    }
   }
 
   /// Places the ship as it arrives: where it was as the run ended, until it
