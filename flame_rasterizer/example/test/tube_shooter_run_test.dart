@@ -204,7 +204,8 @@ void main() {
         (runner.ship.position - game.shooter.player.position).length,
         lessThan(0.02 * game.view.rimScale),
       );
-      const playEnd = Tube.depth + RunnerMode.flightSpeed * ShooterMode.runTime;
+      final playEnd =
+          Tube.depth + TubeHost.defaultFlightSpeed * ShooterMode.runTime(1);
       final kinds = <EnemyKind>{};
       var mostAt = 0.0;
       for (var i = 0; i < 2000 && game.shooter.state == TubeState.run; i++) {
@@ -275,7 +276,7 @@ void main() {
     }
     expect(next.shooter.state, TubeState.run);
     // As far as the ship flies in a frame at full speed, and a little more.
-    expect(most, lessThan(RunnerMode.flightSpeed * 0.02));
+    expect(most, lessThan(TubeHost.defaultFlightSpeed * 0.02));
     await pumpFrames(tester, 2);
     await tester.pumpWidget(const SizedBox());
   });
@@ -359,7 +360,7 @@ void main() {
         snapshotAgain.tubeTime,
         snapshotAgain.flown,
         snapshotAgain.sinceShot,
-        snapshotAgain.enemyTime,
+        snapshotAgain.untilEnemy,
         snapshotAgain.pulseClock,
       ),
       (
@@ -368,7 +369,7 @@ void main() {
         snapshot.tubeTime,
         snapshot.flown,
         snapshot.sinceShot,
-        snapshot.enemyTime,
+        snapshot.untilEnemy,
         snapshot.pulseClock,
       ),
     );
@@ -524,7 +525,8 @@ void main() {
       runs: true,
     );
     final runner = await pumpToRun(tester, game);
-    const playEnd = Tube.depth + RunnerMode.flightSpeed * ShooterMode.runTime;
+    final playEnd =
+        Tube.depth + TubeHost.defaultFlightSpeed * ShooterMode.runTime(1);
     await pumpUntil(
       tester,
       () => runner.flown >= playEnd - 0.5,

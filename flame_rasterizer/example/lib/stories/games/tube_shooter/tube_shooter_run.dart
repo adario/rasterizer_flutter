@@ -10,12 +10,14 @@ part of 'shooter_mode.dart';
 /// the round's tube, which leads straight into the run's: the drop is the
 /// first [Tube.depth] of the run. The drop speeds up to Tube Runner's
 /// [flightSpeed] by its end, as [dropDepth] says. There, [runner] takes over
-/// the ship, where it is, and the run's tube: the ship flies on as fast,
-/// for [ShooterMode.runTime] of play, as enemies come. Its tube eases into
-/// Tube Runner's bends past the drop, and out of them by the end of the
-/// run's play, then goes straight on to its [exit]. The round's rules take
-/// over again there, and the ship slows down to a stop on the next round's
-/// rim, [rim] along the axis, over [ShooterMode.arriveTime].
+/// the ship, where it is, and the run's tube: the ship flies on, as far as
+/// it would in [ShooterMode.runTime] of play at [flightSpeed], as enemies
+/// come, and faster for each it destroys. Its tube eases into Tube Runner's
+/// bends past the drop, and out of them by the end of the run's play, then
+/// goes straight on to its [exit]. The round's rules take over again there,
+/// and the ship slows down evenly to a stop on the next round's rim, [rim]
+/// along the axis, as far as it would in [ShooterMode.arriveTime] from
+/// [flightSpeed].
 ///
 /// [EndlessTube] draws the run's tube past the round's far end, which grows
 /// from there to the full length ahead on the drop, and the next round's
@@ -30,40 +32,42 @@ class _Run(
   /// The next round's level.
   final Level next,
 
-  /// How many of Tube Runner's kinds of enemy come on the run.
-  final int kinds, {
+  /// The round that the run comes after, which sets how long it is, and how
+  /// many of Tube Runner's kinds of enemy come on it.
+  final int round, {
+
+  /// How fast the runner's ship flies at first, in tube units a second.
+  required final double flightSpeed,
 
   /// The snapshot of the runner of a game with another renderer that the
   /// run goes on from, if any.
   final RunnerSnapshot? from,
 }) {
-  static const flightSpeed = RunnerMode.flightSpeed;
-
   /// Where the run's bends end: as far along as the ship flies on the drop
-  /// and the run.
-  static const playEnd = Tube.depth + flightSpeed * ShooterMode.runTime;
+  /// and the run, at [flightSpeed].
+  late final playEnd = Tube.depth + flightSpeed * ShooterMode.runTime(round);
 
   /// Where the next round's rim is: as far past [playEnd] as the ship flies
-  /// while it slows down evenly from [flightSpeed] to a stop.
-  static const rim = playEnd + flightSpeed * ShooterMode.arriveTime / 2;
+  /// while it slows down evenly from [flightSpeed] to a stop over
+  /// [ShooterMode.arriveTime].
+  late final rim = playEnd + flightSpeed * ShooterMode.arriveTime / 2;
 
   /// Where the run's tube ends, with a ring across: on a ring, and far
   /// enough before [rim] to be behind the eye once the ship is there.
-  static final exit = math.max(
+  late final exit = math.max(
     playEnd,
     (rim - Tube.eye - TubeView.near - EndlessTube.step).floorToDouble(),
   );
 
   /// How far the ship has dropped at [progress] of the drop: from a stop,
-  /// speeding up to [flightSpeed] at its end.
-  static double dropDepth(double progress) =>
-      Tube.depth *
-      math
-          .pow(
-            progress,
-            flightSpeed * ShooterMode.dropTime / Tube.depth,
-          )
-          .toDouble();
+  /// speeding up, and flying at [flightSpeed] at its end. If that's too slow
+  /// to drop [Tube.depth] in [ShooterMode.dropTime], it flies faster on the
+  /// way, then slows down to it.
+  double dropDepth(double progress) {
+    final p = progress;
+    final end = flightSpeed * ShooterMode.dropTime;
+    return Tube.depth * p * p * (3 - 2 * p) + end * p * p * (p - 1);
+  }
 
   /// Returns [t], from 0 to 1, eased in and out, as [EndlessTube]'s course
   /// eases its bends.
@@ -93,13 +97,16 @@ class _Run(
       color: color,
       next: (tube: next.tube, rim: rim),
       nextColor: next.color,
-      kinds: kinds,
+      kinds: round,
     ),
     from: from,
   );
 
   /// How far along the run the ship is.
   double flown = 0;
+
+  /// How fast the ship flew as the run's play ended, in tube units a second.
+  double arriveSpeed = flightSpeed;
 
   /// The components that draw the run's tube and the next round's tube, on
   /// the drop and the arrival.
@@ -176,6 +183,7 @@ extension on ShooterMode {
       level.color,
       levels[(_levelIndex + 1) % levels.length],
       round,
+      flightSpeed: gameRef.flightSpeed,
       from: from,
     );
     add(run.runner..spawning = spawning);
@@ -216,7 +224,7 @@ extension on ShooterMode {
       ..depth = run.flown
       ..step = runner.ship.step;
     view.eyeShift = run.flown;
-    if (run.flown >= _Run.playEnd) {
+    if (run.flown >= run.playEnd) {
       _beginArrive();
     }
   }
@@ -227,8 +235,9 @@ extension on ShooterMode {
   void _beginArrive() {
     final run = _run!;
     final ship = run.runner.ship;
-    final over = (run.flown - _Run.playEnd) / _Run.flightSpeed;
+    final over = (run.flown - run.playEnd) / run.runner.speed;
     run
+      ..arriveSpeed = run.runner.speed
       ..shipFrom = ship.position.clone()
       ..angleFrom = ship.angle
       ..scaleFrom = ship.scale.clone();
@@ -244,17 +253,16 @@ extension on ShooterMode {
     _stepArrive();
   }
 
-  /// Slows the ship down evenly to a stop on the next round's rim, as the
-  /// camera turns to look where the round's does, and then waits for the
-  /// player, as at the end of a zoom.
+  /// Slows the ship down evenly, from as fast as it flew, to a stop on the
+  /// next round's rim, as the camera turns to look where the round's does,
+  /// and then waits for the player, as at the end of a zoom.
   void _stepArrive() {
     final run = _run!;
-    const time = ShooterMode.arriveTime;
+    final way = run.rim - run.playEnd;
+    final time = 2 * way / run.arriveSpeed;
     final progress = math.min(1.0, _stateTime / time);
-    run.flown =
-        _Run.playEnd +
-        _Run.flightSpeed * time * (progress - progress * progress / 2);
-    player.depth = view.eyeShift = progress == 1 ? 0 : run.flown - _Run.rim;
+    run.flown = run.playEnd + way * progress * (2 - progress);
+    player.depth = view.eyeShift = progress == 1 ? 0 : run.flown - run.rim;
     _look = Offset.lerp(
       _lookFrom,
       view.tube.center,
@@ -292,7 +300,7 @@ extension on ShooterMode {
         ? Tube.depth +
               EndlessTube.ahead *
                   math.min(1.0, _stateTime / ShooterMode.dropTime)
-        : _Run.exit;
+        : run.exit;
     final nextColor = arriving ? level.color : run.next.color;
     // The explosions remove themselves once they're done.
     run.blasts.removeWhere((blast) => blast.isRemoving || blast.isRemoved);
@@ -301,9 +309,9 @@ extension on ShooterMode {
       run.view,
       marks: [for (final blast in run.blasts) blast.mark],
       from: Tube.depth,
-      until: math.min(until, _Run.exit),
-      next: _Run.rim - distance <= EndlessTube.ahead
-          ? (tube: arriving ? view.tube : run.next.tube, rim: _Run.rim)
+      until: math.min(until, run.exit),
+      next: run.rim - distance <= EndlessTube.ahead
+          ? (tube: arriving ? view.tube : run.next.tube, rim: run.rim)
           : null,
     );
     final glow = gameRef.linesGlow;
@@ -340,7 +348,7 @@ extension on ShooterMode {
       return;
     }
     final glide = _Run.eased(
-      ((run.flown - _Run.exit) / (_Run.rim - _Run.exit)).clamp(0.0, 1.0),
+      ((run.flown - run.exit) / (run.rim - run.exit)).clamp(0.0, 1.0),
     );
     var turn = (player.angle - run.angleFrom) % (2 * math.pi);
     if (turn > math.pi) {

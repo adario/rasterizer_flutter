@@ -52,7 +52,7 @@ abstract class RunnerEnemyComponent(
 
   /// How fast every kind climbs its lane, along the axis, in tube units a
   /// second.
-  static const climbSpeed = 1.0;
+  static const climbSpeed = 0.275;
 
   /// How many times as wide as the ship's its stroke is.
   static const strokeWidths = 2.0;

@@ -2,7 +2,6 @@ import 'package:flame/components.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/shot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
@@ -53,10 +52,11 @@ class RunnerShotComponent(final int lane, var double at)
     gameRef.keepStroke(drawing);
   }
 
-  /// Flies over [dt] seconds, with the ship and [speed] ahead of it.
-  void fly(double dt) {
+  /// Flies over [dt] seconds, with the ship, at [shipSpeed], and [speed]
+  /// ahead of it.
+  void fly(double dt, double shipSpeed) {
     previousAt = at;
-    at += (RunnerMode.flightSpeed + speed) * dt;
+    at += (shipSpeed + speed) * dt;
   }
 }
 

@@ -89,9 +89,13 @@ class ShooterMode({
   /// How long the drop takes, in seconds.
   static const dropTime = 2.0;
 
-  /// How long a run's play lasts, with [runs] on, once the drop is over, in
-  /// seconds of the game: see [TubeState.run].
-  static const runTime = 20.0;
+  /// How long the run after [round] plays, with [runs] on, once the drop is
+  /// over, in seconds of the game at Tube Runner's first speed: a minute
+  /// after the first round, and [runTimeStep] more after each other. See
+  /// [TubeState.run].
+  static double runTime(int round) => firstRunTime + runTimeStep * (round - 1);
+  static const firstRunTime = 60.0;
+  static const runTimeStep = 30.0;
 
   /// How far a run's tube eases into its bends, and out of them, in tube
   /// units.
@@ -471,7 +475,7 @@ class ShooterMode({
         final progress = math.min(1.0, _stateTime / dropTime);
         player.depth = view.eyeShift = _run == null
             ? Tube.depth * progress * progress
-            : _Run.dropDepth(progress);
+            : _run!.dropDepth(progress);
         _run?.flown = view.eyeShift;
         _collide();
         if (_state == TubeState.drop && progress == 1) {
@@ -808,8 +812,8 @@ class ShooterMode({
     if (arriving) {
       player.step = _Run.nearestStep(from, player.step, view.tube);
       // The eye goes on as fast, with the rim ahead now.
-      starField.shiftEye(-_Run.rim);
-      view.eyeShift = _run!.flown - _Run.rim;
+      starField.shiftEye(-_run!.rim);
+      view.eyeShift = _run!.flown - _run!.rim;
     } else {
       player
         ..startOn(view.tube)

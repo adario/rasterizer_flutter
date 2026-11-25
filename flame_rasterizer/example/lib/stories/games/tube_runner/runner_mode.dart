@@ -67,16 +67,20 @@ class RunnerRun({
 
 /// What a [RunnerMode] in a game for another renderer goes on from: its
 /// state and how long it has lasted, the time in the tube, how far the ship
-/// has flown, the seconds since its last shot and since the last enemy came,
-/// the zappers' pulse clock, the ship, the spikes, the enemies, and the
-/// shots.
+/// has flown, the seconds since its last shot and until the next enemy
+/// comes, the enemies that came and the kind of the last, those its shots
+/// destroyed, the zappers' pulse clock, the ship, the spikes, the enemies,
+/// and the shots.
 typedef RunnerSnapshot = ({
   RunnerState state,
   double stateTime,
   double tubeTime,
   double flown,
   double sinceShot,
-  double enemyTime,
+  double untilEnemy,
+  int spawned,
+  EnemyKind? lastKind,
+  int kills,
   double pulseClock,
   ShipSnapshot ship,
   List<({int lane, double far, double near})> spikes,
@@ -115,23 +119,28 @@ class RunnerMode({
     }
   }
 
-  /// How fast the ship flies, in tube units a second.
-  static const flightSpeed = 2.0;
+  /// How fast the ship flies at first, in tube units a second: the game's
+  /// [TubeHost.flightSpeed].
+  double get flightSpeed => gameRef.flightSpeed;
 
-  /// When the first enemy comes, and how often the others do, in seconds of
-  /// the game.
-  static const firstEnemy = 4.0;
-  static const enemyPeriod = 4.0;
+  /// How much faster the ship flies for each enemy that its shots destroyed,
+  /// as a part of [flightSpeed], until it loses a ship.
+  static const speedUp = 0.05;
 
-  /// The kinds of enemy that come, in the order they join: the first from
-  /// the start, and one more after every [unlockTime] seconds in the tube.
+  /// How many first enemies are seeders.
+  static const firstSeeders = 2;
+
+  /// When the first enemy comes, in seconds of the game.
+  static const firstEnemy = 3.0;
+
+  /// The kinds of enemy that come: all from the start, or on a [run], as
+  /// many as its kinds, from the first.
   static const enemyKinds = [
     EnemyKind.seeder,
     EnemyKind.climber,
     EnemyKind.zapper,
     EnemyKind.splitter,
   ];
-  static const unlockTime = 30.0;
 
   /// How far the glow of an enemy's lane and a seeder's spike, and of the
   /// enemy, reach as it comes, in line widths, as Tube Shooter's `tubeGlow`
@@ -248,9 +257,26 @@ class RunnerMode({
   /// tests do, for its run.
   bool spawning = true;
 
-  /// How long the game has run since the last enemy came, or since
-  /// [enemyPeriod] before [firstEnemy].
-  double _enemyTime = enemyPeriod - firstEnemy;
+  /// How long until the next enemy comes, in seconds of the game.
+  double _untilEnemy = firstEnemy;
+
+  /// How many enemies came since play began or resumed, and the kind of the
+  /// last.
+  int _spawned = 0;
+  EnemyKind? _lastKind;
+
+  /// How many enemies the ship's shots destroyed since the game began, or
+  /// the run, or the ship was last lost.
+  int _kills = 0;
+
+  /// How fast the ship flies now, in tube units a second.
+  double get speed => flightSpeed * (1 + speedUp * _kills);
+
+  /// How long after an enemy the next comes, at the ship's [speed]: as much
+  /// shorter than [firstEnemyPeriod] as the ship is faster than
+  /// [flightSpeed], so that the enemies come as far apart along the tube.
+  double get enemyPeriod => firstEnemyPeriod * flightSpeed / speed;
+  static const firstEnemyPeriod = 4.0;
 
   /// How far the ship had flown, the view's version, the ship's lane, and
   /// the flashing enemy and its flash, as the tube's paths were made last.
@@ -310,7 +336,10 @@ class RunnerMode({
     tubeTime: _tubeTime,
     flown: _flown,
     sinceShot: _sinceShot,
-    enemyTime: _enemyTime,
+    untilEnemy: _untilEnemy,
+    spawned: _spawned,
+    lastKind: _lastKind,
+    kills: _kills,
     pulseClock: _pulseClock,
     ship: ship.snapshot,
     spikes: [
@@ -330,7 +359,10 @@ class RunnerMode({
     _tubeTime = from.tubeTime;
     _flown = from.flown;
     _sinceShot = from.sinceShot;
-    _enemyTime = from.enemyTime;
+    _untilEnemy = from.untilEnemy;
+    _spawned = from.spawned;
+    _lastKind = from.lastKind;
+    _kills = from.kills;
     _pulseClock = from.pulseClock;
     for (final (:lane, :far, :near) in from.spikes) {
       _spikes.add(Spike(lane, far)..near = near);
@@ -409,7 +441,7 @@ class RunnerMode({
   /// flies only while the game is on.
   void advance(double dt) {
     if (run == null || _state == RunnerState.play) {
-      _flown += flightSpeed * dt;
+      _flown += speed * dt;
     }
     _step(dt);
     endlessTube.advanceTo(_flown);
@@ -522,7 +554,7 @@ class RunnerMode({
   /// shots, and drops those [RunnerShotComponent.range] ahead of the ship.
   void _updateShots(double dt) {
     for (final shot in _shots) {
-      shot.fly(dt);
+      shot.fly(dt, speed);
     }
     _shots.removeWhere((shot) {
       final gone = shot.at > _flown + RunnerShotComponent.range;
@@ -627,6 +659,7 @@ class RunnerMode({
   @visibleForTesting
   void destroyEnemy(RunnerEnemyComponent enemy) {
     gameRef.score += enemy.kind.score;
+    _kills++;
     gameRef.play(Sound.explosion);
     final blast = PlacedExplosionComponent(
       enemy.mark,
@@ -652,7 +685,7 @@ class RunnerMode({
   }
 
   /// Blows the ship up, fades it out, and takes a life. The enemies, spikes
-  /// and shots go.
+  /// and shots go, and the ship flies at [flightSpeed] again.
   void _destroyShip() {
     gameRef.lives--;
     gameRef.play(Sound.crash);
@@ -665,6 +698,7 @@ class RunnerMode({
       ),
     );
     ship.fadeOut();
+    _kills = 0;
     _clearEnemies();
     _setState(RunnerState.dying);
   }
@@ -676,10 +710,12 @@ class RunnerMode({
   }
 
   /// Starts the game, or resumes it after a lost ship, with the first enemy
-  /// [firstEnemy] away.
+  /// [firstEnemy] away, and the [firstSeeders] to come.
   void _beginPlay() {
     gameRef.readyText.removeFromParent();
-    _enemyTime = enemyPeriod - firstEnemy;
+    _untilEnemy = firstEnemy;
+    _spawned = 0;
+    _lastKind = null;
     _setState(RunnerState.play);
   }
 
@@ -860,23 +896,35 @@ class RunnerMode({
   }
 
   /// Over [dt] seconds of the game: brings an enemy at [firstEnemy], then
-  /// every [enemyPeriod], of a kind picked at random among the [enemyKinds]
-  /// that joined, or the [run]'s kinds, on a lane picked at random, climbs
-  /// the enemies and the climbers' shots, and splits the splitters that got
-  /// [RunnerSplitterComponent.splitAhead] of the ship. On a run, none comes
-  /// from past where its play ends.
+  /// every [enemyPeriod], as it is when the last came, of a kind picked at
+  /// random among the [enemyKinds], or the [run]'s kinds, on a lane picked
+  /// at random, climbs the enemies and the climbers' shots, and
+  /// splits the splitters that got [RunnerSplitterComponent.splitAhead] of
+  /// the ship. On a run, none comes from past where its play ends.
   void _updateEnemies(double dt) {
-    _enemyTime += dt;
-    if (_enemyTime >= enemyPeriod) {
-      _enemyTime -= enemyPeriod;
+    _untilEnemy -= dt;
+    if (_untilEnemy <= 0) {
+      _untilEnemy += enemyPeriod;
       if (spawning && _farRing <= (run?.playEnd ?? double.infinity)) {
-        final kinds = (run?.kinds ?? 1 + _tubeTime ~/ unlockTime).clamp(
+        final kinds = (run?.kinds ?? enemyKinds.length).clamp(
           1,
           enemyKinds.length,
         );
+        // The first come as seeders, then each comes of another kind than
+        // the last, but for a seeder.
+        final last = _lastKind;
+        final picks = _spawned < firstSeeders
+            ? const [EnemyKind.seeder]
+            : [
+                for (final kind in enemyKinds.take(kinds))
+                  if (kind != last || kind == EnemyKind.seeder) kind,
+              ];
         // Picking among one kind would take a number from [random], and
         // change what comes until the second kind joins.
-        final kind = enemyKinds[kinds == 1 ? 0 : random.nextInt(kinds)];
+        final kind =
+            picks[picks.length == 1 ? 0 : random.nextInt(picks.length)];
+        _spawned++;
+        _lastKind = kind;
         addEnemy(kind, random.nextInt(tube.laneCount));
       }
     }

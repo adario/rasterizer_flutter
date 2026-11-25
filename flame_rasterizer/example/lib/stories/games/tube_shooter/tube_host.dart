@@ -147,6 +147,11 @@ abstract class TubeHost({
     }
   }
 
+  /// The Flight speed knob's value: how fast Tube Runner's ship flies at
+  /// first, in tube units a second.
+  double flightSpeed = defaultFlightSpeed;
+  static const defaultFlightSpeed = 1.5;
+
   /// How many paths the game made in the last second, as the status bar
   /// shows: see [countPath].
   int get pathsPerSecond => _pathsPerSecond;

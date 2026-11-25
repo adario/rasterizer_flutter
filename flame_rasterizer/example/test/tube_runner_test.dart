@@ -167,7 +167,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
       expect(
         game.runner.flown,
-        closeTo(61 * 0.016 * RunnerMode.flightSpeed, 0.05),
+        closeTo(61 * 0.016 * TubeHost.defaultFlightSpeed, 0.05),
       );
       expect(game.runner.ship.lane, isNot(lane));
       expect(game.exampleStats.first, isNot('0 quads'));

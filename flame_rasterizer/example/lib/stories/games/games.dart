@@ -10,6 +10,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_e
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:widgetbook/widgetbook.dart';
 
@@ -62,6 +63,7 @@ WidgetbookComponent gamesStories() {
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
             speed: speedKnob(context),
+            flightSpeed: flightSpeedKnob(context),
           );
         },
         codeLink: baseLink('games/tube_shooter'),
@@ -104,14 +106,17 @@ WidgetbookComponent gamesStories() {
             label: 'Sound',
             initialValue: true,
           );
+          final flightSpeed = flightSpeedKnob(context);
           return GameStory<TubeRunnerExample, Object>(
             renderer: renderer,
             create: (status, _) =>
                 TubeRunnerExample.of(renderer, status, tube: tube)
-                  ..sound = sound,
+                  ..sound = sound
+                  ..flightSpeed = flightSpeed,
             update: (game) => game
               ..tube = tube
-              ..sound = sound,
+              ..sound = sound
+              ..flightSpeed = flightSpeed,
             zoom: zoomKnob(context),
             speed: speedKnob(context),
           );
@@ -197,6 +202,10 @@ class const TubeShooterStory({
   /// The game's speed, from 0, which stands still, to 2.
   final double speed = 1,
 
+  /// How fast Tube Runner's ship flies at first: see
+  /// [TubeHost.flightSpeed].
+  final double flightSpeed = TubeHost.defaultFlightSpeed,
+
   /// How many lines tall the status bar is.
   final int statusLines = 2,
   super.key,
@@ -244,13 +253,15 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
             ..glow = widget.glow
             ..runs = widget.runs
             ..sound = widget.sound
+            ..flightSpeed = widget.flightSpeed
             ..onLevel = _onLevel,
       snapshot: (game) => game.snapshot,
       update: (game) => game
         ..driftingStars = widget.driftingStars
         ..glow = widget.glow
         ..runs = widget.runs
-        ..sound = widget.sound,
+        ..sound = widget.sound
+        ..flightSpeed = widget.flightSpeed,
       zoom: widget.zoom,
       speed: widget.speed,
       statusLines: widget.statusLines,
