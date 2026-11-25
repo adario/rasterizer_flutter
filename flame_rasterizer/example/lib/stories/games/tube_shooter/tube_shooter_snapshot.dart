@@ -40,7 +40,8 @@ extension TubeShooterSnapshots on ShooterMode {
     firstLevel: firstLevel,
     levelIndex: _levelIndex,
     round: round,
-    state: _state,
+    // Game Over on a run is the round's, for the new game.
+    state: isOver ? TubeState.over : _state,
     stateTime: _stateTime,
     dyingOnDrop: _dyingOnDrop,
     score: gameRef.score,
@@ -103,7 +104,7 @@ extension TubeShooterSnapshots on ShooterMode {
       enemyShots.add(component);
       shotGroup.add(component);
     }
-    // The prototype's runs don't go on in the new game: the next round starts.
+    // A run doesn't go on in the new game: the next round starts.
     if (from.state == TubeState.run) {
       _nextRound();
       return;

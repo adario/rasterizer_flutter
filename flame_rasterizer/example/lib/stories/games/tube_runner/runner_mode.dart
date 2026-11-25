@@ -41,6 +41,28 @@ enum RunnerState() {
   over,
 }
 
+/// A run down a stretch of tube between two of another mode's rounds, which
+/// a [RunnerMode] plays rather than a game of its own.
+///
+/// The ship flies down [tube] from [from] once the run begins, with
+/// [RunnerMode.beginRun], and only while the game is on, so that the run's
+/// play lasts as long however many ships it loses. No enemy comes from past
+/// [playEnd], so that all are gone once the ship gets there. The tube shows
+/// from [from] to its [exit], in [color], with the ship's lane fading in to
+/// the ship's colour, and the next round's tube, [next], in [nextColor], once
+/// it's no farther ahead than the tube goes. As many of
+/// [RunnerMode.enemyKinds] as [kinds] come, from the first.
+class RunnerRun({
+  required final EndlessTube tube,
+  required final double from,
+  required final double playEnd,
+  required final double exit,
+  required final Color color,
+  required final NextTube next,
+  required final Color nextColor,
+  required final int kinds,
+});
+
 /// Tube Runner's rules, and the components that play by them, under it in
 /// the world, but for the stars, in the camera's backdrop.
 ///
@@ -49,7 +71,14 @@ enum RunnerState() {
 /// origin, where the camera looks. Its game, a [TubeHost] such as
 /// `TubeRunnerExample`, hands it the player's input, and has the score, the
 /// lives and the texts at the bottom.
-class RunnerMode() extends Component with HasGameRef<TubeHost> {
+///
+/// Given a [run], it plays that, for another mode that hands it the input,
+/// and has no stars of its own. Once the game is over, the other mode starts
+/// the next.
+class RunnerMode({
+  /// The run it plays between another mode's rounds, if any.
+  final RunnerRun? run,
+}) extends Component with HasGameRef<TubeHost> {
   /// How fast the ship flies, in tube units a second.
   static const flightSpeed = 2.0;
 
@@ -78,7 +107,7 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
   /// that don't draw it, as an enemy comes.
   static const haloAlpha = 0.3;
 
-  final endlessTube = EndlessTube();
+  final EndlessTube endlessTube = run?.tube ?? EndlessTube();
 
   /// The game's view of the tube.
   TubeView get view => gameRef.view;
@@ -136,13 +165,15 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
 
   /// How far the ship has flown along the tube's axis, in tube units.
   double get flown => _flown;
-  double _flown = 0;
+  double _flown = run?.from ?? 0;
 
   /// The components that draw the tube, and the ship's lane over it in the
-  /// ship's colour, as Tube Shooter does.
+  /// ship's colour, as Tube Shooter does, and the next round's tube, on a
+  /// run.
   PositionComponent? _tube;
   PositionComponent? _lane;
   PositionComponent? _spikesDrawing;
+  PositionComponent? _next;
 
   /// The components that draw the lane of the enemy that just came, and a
   /// seeder's spike, as it flashes, and their halo, if the renderer doesn't
@@ -169,6 +200,10 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
   final _enemyShots = <RunnerEnemyShotComponent>[];
   final _blasts = <PlacedExplosionComponent>[];
 
+  /// Whether enemies come; tests turn it off, as does a mode whose own
+  /// tests do, for its run.
+  bool spawning = true;
+
   /// How long the game has run since the last enemy came, or since
   /// [enemyPeriod] before [firstEnemy].
   double _enemyTime = enemyPeriod - firstEnemy;
@@ -178,6 +213,7 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
   double _tubeFlown = double.nan;
   int _tubeVersion = -1;
   int? _tubeLane;
+  Color? _tubeLaneColor;
   RunnerEnemyComponent? _tubeFlasher;
   double _tubeFlash = 0;
   List<TubeBolt> _tubeBolts = const [];
@@ -225,17 +261,35 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
 
   @override
   void onLoad() {
-    endlessTube.advanceTo(_flown);
     addAll([tubeGroup, ship, explosionGroup]);
+    if (run != null) {
+      // Out of sight until the run begins.
+      ship.isVisible = false;
+      return;
+    }
+    endlessTube.advanceTo(_flown);
     // Under the world, as Tube Shooter's stars are.
     gameRef.camera.backdrop.add(stars);
     _waitForPlayer();
     _updateTube();
   }
 
-  /// Flies the ship, then applies the game's rules.
+  /// Begins the [run], with the ship at [step], in play at once, and flies
+  /// [dt] seconds into it.
+  void beginRun(int step, double dt) {
+    ship
+      ..step = step
+      ..isVisible = true;
+    _beginPlay();
+    advance(dt);
+  }
+
+  /// Flies the ship, then applies the game's rules. On a [run], the ship
+  /// flies only while the game is on.
   void advance(double dt) {
-    _flown += flightSpeed * dt;
+    if (run == null || _state == RunnerState.play) {
+      _flown += flightSpeed * dt;
+    }
     _step(dt);
     endlessTube.advanceTo(_flown);
     _updateTube();
@@ -554,9 +608,20 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
         if (enemy is RunnerZapperComponent && enemy.isZapping)
           (lane: enemy.lane, far: enemy.at),
     ];
+    final run = this.run;
+    final tubeColor = run?.color ?? TubeColors.tube;
+    // On a run, the ship's lane fades in as it does in Tube Shooter's play.
+    final laneColor = run == null
+        ? TubeColors.ship
+        : Color.lerp(
+            tubeColor,
+            TubeColors.ship,
+            math.min(1.0, _tubeTime / ShooterMode.laneFadeTime),
+          )!;
     if (_flown == _tubeFlown &&
         view.version == _tubeVersion &&
         lane == _tubeLane &&
+        laneColor == _tubeLaneColor &&
         flasher == _tubeFlasher &&
         flash == _tubeFlash &&
         listEquals(bolts, _tubeBolts)) {
@@ -565,6 +630,7 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
     _tubeFlown = _flown;
     _tubeVersion = view.version;
     _tubeLane = lane;
+    _tubeLaneColor = laneColor;
     _tubeFlasher = flasher;
     _tubeFlash = flash;
     _tubeBolts = bolts;
@@ -588,10 +654,16 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
       halo: gameRef.rendererGlows ? null : 2 * laneGlowWidths,
       bolts: bolts,
       random: _boltRandom,
+      from: run?.from ?? double.negativeInfinity,
+      until: run?.exit ?? double.infinity,
+      next: run != null && run.next.rim - _flown <= EndlessTube.ahead
+          ? run.next
+          : null,
     );
     _quads =
         quads.tube.vertexCounts.length +
         quads.lane.vertexCounts.length +
+        quads.next.vertexCounts.length +
         quads.spikes.vertexCounts.length +
         quads.flashLane.vertexCounts.length +
         quads.flashSpike.vertexCounts.length +
@@ -600,8 +672,13 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
         quads.boltHalo.vertexCounts.length;
     // Under the lines it stands for the glow of, over the others, as a glow
     // is.
-    _tube = _replaceQuads(_tube, quads.tube, TubeColors.tube);
-    _lane = _replaceQuads(_lane, quads.lane, TubeColors.ship);
+    _tube = _replaceQuads(_tube, quads.tube, tubeColor);
+    _lane = _replaceQuads(_lane, quads.lane, laneColor);
+    _next = _replaceQuads(
+      _next,
+      quads.next,
+      run?.nextColor ?? TubeColors.tube,
+    );
     _spikesDrawing = _replaceQuads(
       _spikesDrawing,
       quads.spikes,
@@ -620,7 +697,7 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
       quads.flashLane,
       flasher?.spawnLane == lane
           ? _addLight(TubeColors.ship, color, flash)
-          : Color.lerp(color, TubeColors.tube, 1 - flash)!,
+          : Color.lerp(color, tubeColor, 1 - flash)!,
       glow: glow,
     );
     _flashSpike = _replaceQuads(
@@ -649,18 +726,24 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
 
   /// Over [dt] seconds of the game: brings an enemy at [firstEnemy], then
   /// every [enemyPeriod], of a kind picked at random among the [enemyKinds]
-  /// that joined, on a lane picked at random, climbs the enemies and the
-  /// climbers' shots, and splits the splitters that got
-  /// [RunnerSplitterComponent.splitAhead] of the ship.
+  /// that joined, or the [run]'s kinds, on a lane picked at random, climbs
+  /// the enemies and the climbers' shots, and splits the splitters that got
+  /// [RunnerSplitterComponent.splitAhead] of the ship. On a run, none comes
+  /// from past where its play ends.
   void _updateEnemies(double dt) {
     _enemyTime += dt;
     if (_enemyTime >= enemyPeriod) {
       _enemyTime -= enemyPeriod;
-      final kinds = math.min(enemyKinds.length, 1 + _tubeTime ~/ unlockTime);
-      // Picking among one kind would take a number from [random], and change
-      // what comes until the second kind joins.
-      final kind = enemyKinds[kinds == 1 ? 0 : random.nextInt(kinds)];
-      addEnemy(kind, random.nextInt(tube.laneCount));
+      if (spawning && _farRing <= (run?.playEnd ?? double.infinity)) {
+        final kinds = (run?.kinds ?? 1 + _tubeTime ~/ unlockTime).clamp(
+          1,
+          enemyKinds.length,
+        );
+        // Picking among one kind would take a number from [random], and
+        // change what comes until the second kind joins.
+        final kind = enemyKinds[kinds == 1 ? 0 : random.nextInt(kinds)];
+        addEnemy(kind, random.nextInt(tube.laneCount));
+      }
     }
     for (final enemy in _enemies) {
       enemy.climb(dt);
@@ -707,8 +790,7 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
   /// across the tube, in [lane].
   @visibleForTesting
   void addEnemy(EnemyKind kind, int lane) {
-    const spacing = EndlessTube.ringSpacing;
-    final far = ((_flown + EndlessTube.ahead) / spacing).floor() * spacing;
+    final far = _farRing;
     final RunnerEnemyComponent enemy;
     switch (kind) {
       case EnemyKind.seeder:
@@ -726,6 +808,12 @@ class RunnerMode() extends Component with HasGameRef<TubeHost> {
     }
     _enemies.add(enemy);
     add(enemy);
+  }
+
+  /// The farthest ring across the tube, where the enemies come.
+  double get _farRing {
+    const spacing = EndlessTube.ringSpacing;
+    return ((_flown + EndlessTube.ahead) / spacing).floor() * spacing;
   }
 
   /// Removes all the enemies, spikes and shots.

@@ -49,7 +49,7 @@ enum TubeState() {
   drop,
 
   /// With [ShooterMode.runs] on, the ship flies on from the drop, down
-  /// an endless tube.
+  /// an endless tube, by Tube Runner's rules: see [RunnerMode].
   run,
 
   /// The run is over: the ship flies out of its tube, onto the next round's
@@ -88,8 +88,8 @@ class ShooterMode({
   /// How long the drop takes, in seconds.
   static const dropTime = 2.0;
 
-  /// How long a run lasts, with [runs] on, once the drop is over, in seconds
-  /// of the game: see [TubeState.run].
+  /// How long a run's play lasts, with [runs] on, once the drop is over, in
+  /// seconds of the game: see [TubeState.run].
   static const runTime = 20.0;
 
   /// How far a run's tube eases into its bends, and out of them, in tube
@@ -159,6 +159,10 @@ class ShooterMode({
   /// The run, from the drop it starts with to the ship's arrival on the next
   /// round's rim, with [runs] on.
   _Run? _run;
+
+  /// What plays the run's rules, if there's a run.
+  @visibleForTesting
+  RunnerMode? get runner => _run?.runner;
 
   /// Whether the ship was destroyed on its drop, so that the next round comes
   /// rather than the same one again.
@@ -234,22 +238,28 @@ class ShooterMode({
   /// The seconds left before PURGE goes.
   double _purgeLeft = 0;
 
-  /// Whether the ship moves at the player's will: in play, and on a run.
+  /// Whether the ship moves at the player's will: in play, and in a run's.
   bool get canMove =>
       _state == TubeState.play ||
-      (_state == TubeState.run && _stateTime < runTime);
+      (_state == TubeState.run && _run!.runner.canMove);
 
   /// Whether the ship fires at the player's will: in play, and on the drop.
+  /// On a run, its runner fires.
   bool get canFire => _state == TubeState.play || _state == TubeState.drop;
 
   /// Whether the game waits for the player, at READY or Game Over.
   bool get isWaiting => isReady || isOver;
 
-  /// Whether the game waits at READY.
-  bool get isReady => _state == TubeState.ready;
+  /// Whether the game waits at READY, the round's or a run's.
+  bool get isReady =>
+      _state == TubeState.ready ||
+      (_state == TubeState.run && _run!.runner.isReady);
 
-  /// Whether the game is over, and the world stands still.
-  bool get isOver => _state == TubeState.over;
+  /// Whether the game is over, in a round or on a run, and the world stands
+  /// still.
+  bool get isOver =>
+      _state == TubeState.over ||
+      (_state == TubeState.run && _run!.runner.isOver);
 
   /// The Drifting stars knob's value: whether the stars stay, drifting,
   /// between the zoom and the drop. If not, they only show during those.
@@ -266,8 +276,9 @@ class ShooterMode({
   }
 
   /// The Runs knob's value: whether, after a closed tube's drop, the ship
-  /// flies on down an endless tube for [runTime], before it flies onto the
-  /// next round's rim: see [TubeState.run]. A prototype, off by default.
+  /// flies on down an endless tube, by Tube Runner's rules, for [runTime] of
+  /// play, before it flies onto the next round's rim: see [TubeState.run].
+  /// Off by default.
   bool runs = false;
 
   /// Does what updates would do in a moving world: makes the tube's paths
@@ -369,9 +380,12 @@ class ShooterMode({
   /// components updated, [dt] seconds after the last frame.
   void afterUpdate(double dt) {
     _placeArriving();
-    gameRef.roundText.text = _state == TubeState.run
-        ? _runClock
-        : 'ROUND $round';
+    if (_state == TubeState.run) {
+      // The run's time in play, as Tube Runner shows its time in the tube.
+      _run!.runner.afterUpdate(dt);
+    } else {
+      gameRef.roundText.text = 'ROUND $round';
+    }
     // In real time, so that it goes in a still world too.
     if (_purgeLeft > 0) {
       _purgeLeft -= dt;
@@ -449,11 +463,14 @@ class ShooterMode({
           _setState(TubeState.drop);
           gameRef.play(Sound.drop);
           if (runs && !view.tube.isOpen) {
-            _run = _Run(
+            // A kind of enemy more on each round's run.
+            final run = _run = _Run(
               view.tube,
               level.color,
               levels[(_levelIndex + 1) % levels.length],
+              round,
             );
+            add(run.runner..spawning = spawning);
           }
         }
       case TubeState.drop:
@@ -471,7 +488,7 @@ class ShooterMode({
           }
         }
       case TubeState.run:
-        _stepRun();
+        _stepRun(dt);
       case TubeState.arrive:
         _stepArrive();
       case TubeState.dying:
@@ -851,13 +868,22 @@ class ShooterMode({
     _startRound();
   }
 
-  /// Moves the ship [lanes] round the tube.
-  void moveShipBy(double lanes) => player.moveBy(lanes);
+  /// Moves the ship [lanes] round the tube: the runner's, on a run.
+  void moveShipBy(double lanes) {
+    if (_state == TubeState.run) {
+      _run!.runner.moveShipBy(lanes);
+    } else {
+      player.moveBy(lanes);
+    }
+  }
 
-  /// Ends a wait: starts a new game once it's over, or else the round.
+  /// Ends a wait: starts a new game once it's over, on a run too, or else
+  /// the round, or the run's play.
   void endWait() {
-    if (_state == TubeState.over) {
+    if (isOver) {
       _newGame();
+    } else if (_state == TubeState.run) {
+      _run!.runner.endWait();
     } else {
       _beginPlay();
     }
