@@ -12,18 +12,25 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 /// runs from it down its lane to the ship's ring, and destroys the ship
 /// there. Just before a pulse, it flashes white. One that comes too late to
 /// flash, or flips, waits for the next pulse.
-class RunnerZapperComponent(int lane, double at)
+class RunnerZapperComponent(int lane, double at, {super.from})
     extends RunnerFlipperComponent {
   this : super(EnemyKind.zapper, lane, at);
 
   @override
   Range get flipPeriod => RunnerFlipperComponent.level.zapperFlipPeriod;
 
-  /// Whether it's tinted white.
+  /// Whether it's tinted white. It tints itself again as it updates, as the
+  /// pulse says.
   bool _white = false;
 
   /// Whether it flashed white before the pulse coming or going on.
-  bool _warned = false;
+  late bool _warned = switch (from?.own) {
+    (:final bool warned) => warned,
+    _ => false,
+  };
+
+  @override
+  Record get ownSnapshot => (warned: _warned);
 
   /// Whether its bolt runs down its lane now.
   bool get isZapping => _warned && runner.isPulsing && !isFlipping;

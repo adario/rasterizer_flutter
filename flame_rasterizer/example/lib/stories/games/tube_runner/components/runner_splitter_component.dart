@@ -9,8 +9,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/e
 /// When shot, or [splitAhead] of the ship, as Tube Shooter's at the rim, the
 /// game splits it into two climbers, which flip onto the lanes on either
 /// side.
-class RunnerSplitterComponent(final int lane, @override var double at)
-    extends RunnerEnemyComponent {
+class RunnerSplitterComponent(
+  @override final int lane,
+  @override var double at, {
+  super.from,
+}) extends RunnerEnemyComponent {
   this : super(EnemyKind.splitter, lane);
 
   /// How far ahead of the ship it splits on its own, along the axis, in tube

@@ -8,6 +8,10 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
+/// What a shot in a game for another renderer goes on from: its lane, where
+/// it is along the axis, and where it was before it last moved.
+typedef RunnerShotSnapshot = ({int lane, double at, double previousAt});
+
 /// A shot from the ship, which flies down its [lane] from [at], as Tube
 /// Shooter's `ShotComponent` does, with the same shape, colour and speed
 /// ahead of the ship, and is gone [range] ahead of it.
@@ -27,6 +31,10 @@ class RunnerShotComponent(final int lane, var double at)
 
   /// Where it was along the axis before it last flew.
   late double previousAt = at;
+
+  /// What a game with another renderer goes on from.
+  RunnerShotSnapshot get snapshot =>
+      (lane: lane, at: at, previousAt: previousAt);
 
   @override
   TubeMark get mark => (lane: lane, at: at, flip: null);
@@ -69,6 +77,10 @@ class RunnerEnemyShotComponent(final int lane, var double at)
 
   /// Where it was along the axis before it last climbed.
   late double previousAt = at;
+
+  /// What a game with another renderer goes on from.
+  RunnerShotSnapshot get snapshot =>
+      (lane: lane, at: at, previousAt: previousAt);
 
   @override
   TubeMark get mark => (lane: lane, at: at, flip: null);

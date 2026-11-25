@@ -7,7 +7,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/e
 ///
 /// The spike stays where it's laid, so it comes at the ship as the tube does,
 /// and the seeder faster. A shot destroys the seeder, and leaves its spike.
-class RunnerSeederComponent(final Spike spike) extends RunnerEnemyComponent {
+class RunnerSeederComponent(final Spike spike, {super.from})
+    extends RunnerEnemyComponent {
   this : super(EnemyKind.seeder, spike.lane);
 
   /// At its spike's near end.
@@ -15,7 +16,14 @@ class RunnerSeederComponent(final Spike spike) extends RunnerEnemyComponent {
   double get at => spike.near;
 
   @override
+  int get lane => spike.lane;
+
+  @override
   int get currentLane => spike.lane;
+
+  /// Its spike's place among the game's spikes.
+  @override
+  Record get ownSnapshot => (spike: runner.spikes.indexOf(spike));
 
   @override
   TubeMark get mark => (lane: spike.lane, at: spike.near, flip: null);

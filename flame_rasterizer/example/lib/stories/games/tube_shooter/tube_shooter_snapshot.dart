@@ -2,9 +2,9 @@ part of 'shooter_mode.dart';
 
 /// What a game for another renderer goes on from: the first level, the
 /// round, its state and how long it has lasted, whether its drop flies on
-/// down a run, the score, the lives, the purge, the camera and the eye, the
-/// ship, the spikes, the enemies still to come and in the tube, and the
-/// shots.
+/// down a run, the run's runner once it plays, the score, the lives, the
+/// purge, the camera and the eye, the ship, the spikes, the enemies still to
+/// come and in the tube, and the shots.
 typedef TubeShooterSnapshot = ({
   int firstLevel,
   int levelIndex,
@@ -12,6 +12,7 @@ typedef TubeShooterSnapshot = ({
   TubeState state,
   double stateTime,
   bool hasRun,
+  RunnerSnapshot? runner,
   bool dyingOnDrop,
   int score,
   int lives,
@@ -45,7 +46,8 @@ extension TubeShooterSnapshots on ShooterMode {
     // Game Over on a run is the round's, for the new game.
     state: isOver ? TubeState.over : _state,
     stateTime: _stateTime,
-    hasRun: _run != null,
+    hasRun: !isOver && _run != null,
+    runner: !isOver && _state == TubeState.run ? _run!.runner.snapshot : null,
     dyingOnDrop: _dyingOnDrop,
     score: gameRef.score,
     lives: gameRef.lives,
@@ -107,11 +109,7 @@ extension TubeShooterSnapshots on ShooterMode {
       enemyShots.add(component);
       shotGroup.add(component);
     }
-    // A run doesn't go on in the new game: the next round starts.
-    if (from.state == TubeState.run) {
-      _nextRound();
-      return;
-    }
+    // An arrival doesn't go on in the new game: the round starts.
     if (from.state == TubeState.arrive) {
       _startRound();
       return;
@@ -123,9 +121,10 @@ extension TubeShooterSnapshots on ShooterMode {
     _setState(from.state);
     _stateTime = from.stateTime;
     // The drop flies on down a run if the old game's did, whatever the new
-    // game's runs, so that the eye doesn't jump.
-    if (from.state == TubeState.drop && from.hasRun) {
-      _makeRun();
+    // game's runs, so that the eye doesn't jump, and the run goes on. The
+    // eye is where the ship is along the run.
+    if (from.hasRun) {
+      _makeRun(from: from.runner);
       _run!.flown = from.eyeShift;
     }
     switch (from.state) {

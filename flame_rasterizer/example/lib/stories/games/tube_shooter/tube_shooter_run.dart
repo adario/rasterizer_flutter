@@ -31,8 +31,12 @@ class _Run(
   final Level next,
 
   /// How many of Tube Runner's kinds of enemy come on the run.
-  final int kinds,
-) {
+  final int kinds, {
+
+  /// The snapshot of the runner of a game with another renderer that the
+  /// run goes on from, if any.
+  final RunnerSnapshot? from,
+}) {
   static const flightSpeed = RunnerMode.flightSpeed;
 
   /// Where the run's bends end: as far along as the ship flies on the drop
@@ -91,6 +95,7 @@ class _Run(
       nextColor: next.color,
       kinds: kinds,
     ),
+    from: from,
   );
 
   /// How far along the run the ship is.
@@ -163,14 +168,15 @@ class _Run(
 /// The runs, with [ShooterMode.runs] on: see [_Run].
 extension on ShooterMode {
   /// Makes the run that the round's drop flies on down, with its runner,
-  /// which loads on the drop.
-  void _makeRun() {
+  /// which loads on the drop, or goes on [from] a runner's snapshot.
+  void _makeRun({RunnerSnapshot? from}) {
     // A kind of enemy more on each round's run.
     final run = _run = _Run(
       view.tube,
       level.color,
       levels[(_levelIndex + 1) % levels.length],
       round,
+      from: from,
     );
     add(run.runner..spawning = spawning);
   }
@@ -189,7 +195,12 @@ extension on ShooterMode {
 
   /// Plays the run over [dt] seconds of the world's time.
   void _stepRun(double dt) {
-    _run!.runner.advance(dt);
+    final runner = _run!.runner;
+    // A run that goes on from a snapshot waits for its runner to load.
+    if (!runner.isLoaded) {
+      return;
+    }
+    runner.advance(dt);
     _followRunner();
   }
 

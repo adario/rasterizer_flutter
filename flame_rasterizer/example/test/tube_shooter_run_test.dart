@@ -4,10 +4,12 @@
 // the run plays by Tube Runner's rules.
 import 'dart:math' as math;
 
+import 'package:flame/components.dart' show HasVisibility, PositionComponent;
 import 'package:flame/extensions.dart';
 import 'package:flame/game.dart' show GameWidget;
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_shot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
@@ -275,6 +277,195 @@ void main() {
     // As far as the ship flies in a frame at full speed, and a little more.
     expect(most, lessThan(RunnerMode.flightSpeed * 0.02));
     await pumpFrames(tester, 2);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a new renderer on a run goes on from the same distance, ship, '
+      'enemies, spikes and shots, where they show', (tester) async {
+    Widget storyWith(SvgRenderer renderer, {double speed = 1}) =>
+        story(renderer, speed: speed, firstLevel: hexagon, runs: true);
+    final game = await pumpGame(
+      tester,
+      SvgRenderer.rasterizer,
+      firstLevel: hexagon,
+      runs: true,
+    );
+    final runner = await pumpToRun(tester, game);
+    // Into the bends, where each ring has turned from the one before.
+    await pumpFrames(tester, 300);
+    expect(runner.flown, greaterThan(Tube.depth + ShooterMode.runEase));
+    final lane = runner.ship.lane;
+    final laneCount = game.view.tube.laneCount;
+    for (final (i, kind) in [
+      EnemyKind.seeder,
+      EnemyKind.climber,
+      EnemyKind.zapper,
+      EnemyKind.splitter,
+    ].indexed) {
+      runner.addEnemy(kind, (lane + 1 + i) % laneCount);
+    }
+    // The ship fires down its lane as it flies, and the enemies climb.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+    await pumpFrames(tester, 180);
+    await tester.pumpWidget(storyWith(SvgRenderer.rasterizer, speed: 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(game.shooter.state, TubeState.run);
+    expect(runner.canMove, isTrue);
+    final snapshot = runner.snapshot;
+    expect(snapshot.shots, isNotEmpty);
+    expect(snapshot.spikes, isNotEmpty);
+    expect(snapshot.enemies.map((enemy) => enemy.kind).toSet(), {
+      EnemyKind.seeder,
+      EnemyKind.climber,
+      EnemyKind.zapper,
+      EnemyKind.splitter,
+    });
+    // A hidden shape keeps where it last showed, so only the shown count.
+    Offset? placeOf(PositionComponent shape) =>
+        (shape as HasVisibility).isVisible ? shape.position.toOffset() : null;
+    List<Offset?> placesOf(RunnerMode runner) => [
+      for (final shape in <PositionComponent>[
+        runner.ship,
+        ...runner.enemies,
+        ...runner.children.whereType<RunnerShotComponent>(),
+      ])
+        placeOf(shape),
+    ];
+    final places = placesOf(runner);
+
+    await tester.pumpWidget(storyWith(SvgRenderer.rasterizerCanvas, speed: 0));
+    final next = tester
+        .widget<GameWidget<TubeShooterExample>>(
+          find.byWidgetPredicate((w) => w is GameWidget),
+        )
+        .game!;
+    expect(next, isNot(same(game)));
+    await pumpWhileLoading(tester, () => !next.isLoaded);
+    await pumpFrames(tester, 2);
+    expect(next.shooter.state, TubeState.run);
+    final again = next.shooter.runner!;
+    expect(again, isNot(same(runner)));
+    final snapshotAgain = again.snapshot;
+    // Records compare their lists by identity, so the lists go apart.
+    expect(snapshotAgain.spikes, snapshot.spikes);
+    expect(snapshotAgain.enemies, snapshot.enemies);
+    expect(snapshotAgain.shots, snapshot.shots);
+    expect(snapshotAgain.enemyShots, snapshot.enemyShots);
+    expect(snapshotAgain.ship, snapshot.ship);
+    expect(
+      (
+        snapshotAgain.state,
+        snapshotAgain.stateTime,
+        snapshotAgain.tubeTime,
+        snapshotAgain.flown,
+        snapshotAgain.sinceShot,
+        snapshotAgain.enemyTime,
+        snapshotAgain.pulseClock,
+      ),
+      (
+        snapshot.state,
+        snapshot.stateTime,
+        snapshot.tubeTime,
+        snapshot.flown,
+        snapshot.sinceShot,
+        snapshot.enemyTime,
+        snapshot.pulseClock,
+      ),
+    );
+    // The tube's rings turn as they did, so everything shows where it did.
+    final placesAgain = placesOf(again);
+    expect(placesAgain, hasLength(places.length));
+    // The ship, some enemies and some shots show.
+    expect(places.first, isNotNull);
+    expect(places.skip(1).take(runner.enemies.length).nonNulls, isNotEmpty);
+    expect(places.skip(1 + runner.enemies.length).nonNulls, isNotEmpty);
+    for (final (i, place) in placesAgain.indexed) {
+      expect(place == null, places[i] == null);
+      if (place != null) {
+        expect((place - places[i]!).distance, lessThan(1e-9));
+      }
+    }
+    expect(next.shooter.player.isVisible, isFalse);
+    expect(again.ship.isVisible, isTrue);
+    expect(next.view.eyeShift, snapshot.flown);
+
+    // The run goes on.
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+    await tester.pumpWidget(storyWith(SvgRenderer.rasterizerCanvas));
+    await pumpFrames(tester, 30);
+    expect(next.shooter.state, TubeState.run);
+    expect(again.flown, greaterThan(snapshot.flown));
+    await pumpFrames(tester, 2);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets("a new renderer goes on from a run's lost ship as it fades, "
+      'and from READY', (tester) async {
+    Widget storyWith(SvgRenderer renderer, {double speed = 1}) =>
+        story(renderer, speed: speed, firstLevel: hexagon, runs: true);
+
+    /// Stills the world, switches to [renderer], and returns the new
+    /// game's runner.
+    Future<RunnerMode> switchTo(SvgRenderer from, SvgRenderer renderer) async {
+      await tester.pumpWidget(storyWith(from, speed: 0));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pumpWidget(storyWith(renderer, speed: 0));
+      final next = tester
+          .widget<GameWidget<TubeShooterExample>>(
+            find.byWidgetPredicate((w) => w is GameWidget),
+          )
+          .game!;
+      await pumpWhileLoading(tester, () => !next.isLoaded);
+      await pumpFrames(tester, 2);
+      expect(next.shooter.state, TubeState.run);
+      return next.shooter.runner!;
+    }
+
+    final game = await pumpGame(
+      tester,
+      SvgRenderer.rasterizer,
+      firstLevel: hexagon,
+      runs: true,
+    );
+    var runner = await pumpToRun(tester, game);
+    runner.addEnemy(EnemyKind.seeder, runner.ship.lane);
+    await pumpUntil(
+      tester,
+      () => runner.state == RunnerState.dying,
+      frames: 1000,
+    );
+    await pumpFrames(tester, 10);
+    final faded = runner.ship.drawing.opacity;
+    expect(faded, inExclusiveRange(0, 1));
+    final flown = runner.flown;
+    runner = await switchTo(
+      SvgRenderer.rasterizer,
+      SvgRenderer.rasterizerCanvas,
+    );
+    expect(runner.state, RunnerState.dying);
+    expect(runner.ship.drawing.opacity, faded);
+    expect(runner.flown, flown);
+
+    // The fade goes on, to READY.
+    await tester.pumpWidget(storyWith(SvgRenderer.rasterizerCanvas));
+    await pumpUntil(tester, () => runner.isReady);
+    runner = await switchTo(
+      SvgRenderer.rasterizerCanvas,
+      SvgRenderer.rasterizer,
+    );
+    expect(runner.isReady, isTrue);
+    expect(runner.ship.isVisible, isTrue);
+    expect(runner.ship.drawing.opacity, 1);
+    expect(runner.gameRef.readyText.isMounted, isTrue);
+    expect(runner.flown, flown);
+
+    // A key goes on with the run.
+    await tester.pumpWidget(storyWith(SvgRenderer.rasterizer));
+    await pressKey(tester);
+    await pumpFrames(tester, 2);
+    expect(runner.canMove, isTrue);
+    expect(runner.gameRef.readyText.isMounted, isFalse);
+    expect(runner.flown, greaterThan(flown));
     await tester.pumpWidget(const SizedBox());
   });
 

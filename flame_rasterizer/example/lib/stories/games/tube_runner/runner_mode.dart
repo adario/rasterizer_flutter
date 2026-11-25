@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -64,6 +65,26 @@ class RunnerRun({
   required final int kinds,
 });
 
+/// What a [RunnerMode] in a game for another renderer goes on from: its
+/// state and how long it has lasted, the time in the tube, how far the ship
+/// has flown, the seconds since its last shot and since the last enemy came,
+/// the zappers' pulse clock, the ship, the spikes, the enemies, and the
+/// shots.
+typedef RunnerSnapshot = ({
+  RunnerState state,
+  double stateTime,
+  double tubeTime,
+  double flown,
+  double sinceShot,
+  double enemyTime,
+  double pulseClock,
+  ShipSnapshot ship,
+  List<({int lane, double far, double near})> spikes,
+  List<RunnerEnemySnapshot> enemies,
+  List<RunnerShotSnapshot> shots,
+  List<RunnerShotSnapshot> enemyShots,
+});
+
 /// Tube Runner's rules, and the components that play by them, under it in
 /// the world, but for the stars, in the camera's backdrop.
 ///
@@ -76,10 +97,24 @@ class RunnerRun({
 /// Given a [run], it plays that, for another mode that hands it the input,
 /// and has no stars of its own. Once the game is over, the other mode starts
 /// the next.
+///
+/// Given [from], it goes on from there: see [snapshot]. The explosions start
+/// again, and its random picks differ from those that the old one would
+/// have made.
 class RunnerMode({
   /// The run it plays between another mode's rounds, if any.
   final RunnerRun? run,
+
+  /// The snapshot of a game with another renderer that it goes on from, if
+  /// any.
+  final RunnerSnapshot? from,
 }) extends Component with HasGameRef<TubeHost> {
+  this {
+    if (from case final from?) {
+      _goOnFrom(from);
+    }
+  }
+
   /// How fast the ship flies, in tube units a second.
   static const flightSpeed = 2.0;
 
@@ -133,7 +168,7 @@ class RunnerMode({
   }
 
   final tubeGroup = Component();
-  final ship = ShipComponent();
+  late final ship = ShipComponent(from: from?.ship);
   final explosionGroup = Component(priority: 5);
 
   RunnerState get state => _state;
@@ -194,6 +229,9 @@ class RunnerMode({
   /// The seeders climbing the tube, nearest first.
   Iterable<RunnerSeederComponent> get seeders =>
       _enemies.whereType<RunnerSeederComponent>();
+
+  /// The spikes the seeders laid, in the order they came.
+  List<Spike> get spikes => UnmodifiableListView(_spikes);
 
   /// The ship's shots, the climbers' shots, and the explosions of the
   /// enemies the ship's shots destroyed, in [explosionGroup].
@@ -265,12 +303,89 @@ class RunnerMode({
   /// How many quads the tube's paths have.
   int get quads => _quads;
 
+  /// What a game with another renderer goes on from.
+  RunnerSnapshot get snapshot => (
+    state: _state,
+    stateTime: _stateTime,
+    tubeTime: _tubeTime,
+    flown: _flown,
+    sinceShot: _sinceShot,
+    enemyTime: _enemyTime,
+    pulseClock: _pulseClock,
+    ship: ship.snapshot,
+    spikes: [
+      for (final spike in _spikes)
+        (lane: spike.lane, far: spike.far, near: spike.near),
+    ],
+    enemies: [for (final enemy in _enemies) enemy.snapshot],
+    shots: [for (final shot in _shots) shot.snapshot],
+    enemyShots: [for (final shot in _enemyShots) shot.snapshot],
+  );
+
+  /// Goes on from [from]'s state, times, spikes, enemies and shots, and
+  /// makes the tube's rings again.
+  void _goOnFrom(RunnerSnapshot from) {
+    _state = from.state;
+    _stateTime = from.stateTime;
+    _tubeTime = from.tubeTime;
+    _flown = from.flown;
+    _sinceShot = from.sinceShot;
+    _enemyTime = from.enemyTime;
+    _pulseClock = from.pulseClock;
+    for (final (:lane, :far, :near) in from.spikes) {
+      _spikes.add(Spike(lane, far)..near = near);
+    }
+    for (final enemy in from.enemies) {
+      final RunnerEnemySnapshot(:kind, :spawnLane, :at, :own) = enemy;
+      final component = switch (kind) {
+        EnemyKind.seeder => RunnerSeederComponent(
+          _spikes[(own! as ({int spike})).spike],
+          from: enemy,
+        ),
+        EnemyKind.climber => RunnerClimberComponent(spawnLane, at, from: enemy),
+        EnemyKind.zapper => RunnerZapperComponent(spawnLane, at, from: enemy),
+        EnemyKind.splitter => RunnerSplitterComponent(
+          spawnLane,
+          at,
+          from: enemy,
+        ),
+        EnemyKind.edgeWalker => throw ArgumentError.value(
+          kind,
+          'kind',
+          "doesn't come here",
+        ),
+      };
+      _enemies.add(component);
+      add(component);
+    }
+    for (final (:lane, :at, :previousAt) in from.shots) {
+      final shot = RunnerShotComponent(lane, at)..previousAt = previousAt;
+      _shots.add(shot);
+      add(shot);
+    }
+    for (final (:lane, :at, :previousAt) in from.enemyShots) {
+      final shot = RunnerEnemyShotComponent(lane, at)..previousAt = previousAt;
+      _enemyShots.add(shot);
+      add(shot);
+    }
+    // Each ring turns from the one before, so they're made again from the
+    // first, as they were.
+    endlessTube
+      ..advanceTo(0)
+      ..advanceTo(_flown);
+  }
+
   @override
   void onLoad() {
     addAll([tubeGroup, ship, explosionGroup]);
+    if (from != null && isReady) {
+      gameRef.camera.viewport.add(gameRef.readyText);
+    }
     if (run != null) {
       // Out of sight until the run begins.
-      ship.isVisible = false;
+      if (from == null) {
+        ship.isVisible = false;
+      }
       return;
     }
     endlessTube.advanceTo(_flown);

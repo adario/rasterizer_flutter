@@ -9,13 +9,26 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
+/// What the ship in a game for another renderer goes on from: its step and
+/// the fraction of a step past it, whether it's visible, and how faded out it
+/// is.
+typedef ShipSnapshot = ({
+  int step,
+  double partStep,
+  bool isVisible,
+  double opacity,
+});
+
 /// The ship, which moves round the tube's ring at the ship as Tube Shooter's
 /// moves round the rim: see [PlayerComponent], whose numbers it shares.
 ///
 /// The eye looks at that ring as Tube Shooter's looks at the rim, so the ship
 /// is where Tube Shooter's is on screen. It moves only while the game is on,
 /// and fades out when destroyed.
-class ShipComponent()
+///
+/// Given [from], it goes on from there. The keys, which the new game hasn't
+/// seen go down, don't move it.
+class ShipComponent({final ShipSnapshot? from})
     extends PositionComponent
     with HasGameRef<TubeHost>, HasVisibility {
   this : super(priority: 4);
@@ -23,10 +36,11 @@ class ShipComponent()
   static const stepsPerLane = PlayerComponent.stepsPerLane;
 
   late int step =
+      from?.step ??
       gameRef.view.tube.bottomLane * stepsPerLane + PlayerComponent.startStep;
 
   /// The fraction of a step it has moved, short of a whole step.
-  double _partStep = 0;
+  double _partStep = from?.partStep ?? 0;
 
   /// How long a key has moved it without a stop.
   double _keyTime = 0;
@@ -39,8 +53,22 @@ class ShipComponent()
   @override
   Future<void> onLoad() async {
     add(drawing = gameRef.shapeComponent(Shapes.ship, TubeColors.ship));
+    if (from case final from?) {
+      isVisible = from.isVisible;
+      if (from.opacity < 1) {
+        fadeOut(from: from.opacity);
+      }
+    }
     place();
   }
+
+  /// What a game with another renderer goes on from.
+  ShipSnapshot get snapshot => (
+    step: step,
+    partStep: _partStep,
+    isVisible: isVisible,
+    opacity: isLoaded ? drawing.opacity : 1,
+  );
 
   /// Moves it [lanes] round the tube, in whole steps, stopping at an open
   /// tube's ends, as [PlayerComponent.moveBy] does.
@@ -75,13 +103,16 @@ class ShipComponent()
   }
 
   /// Fades it out over [PlayerComponent.fadeTime], as Tube Shooter's ship
-  /// does when destroyed.
-  void fadeOut() {
-    drawing.add(
-      OpacityEffect.fadeOut(
-        EffectController(duration: PlayerComponent.fadeTime),
-      ),
-    );
+  /// does when destroyed, or, [from] an opacity, over the time left.
+  void fadeOut({double from = 1}) {
+    drawing.opacity = from;
+    if (from > 0) {
+      drawing.add(
+        OpacityEffect.fadeOut(
+          EffectController(duration: PlayerComponent.fadeTime * from),
+        ),
+      );
+    }
   }
 
   /// Shows it again, fully opaque, after [fadeOut].
