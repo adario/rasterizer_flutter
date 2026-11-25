@@ -27,7 +27,7 @@ dependencies:
   logging: ^1.3.0
   native_toolchain_c: ^0.19.6
   # The canvas renderer's SVG parser, pure Dart, so also on web.
-  vector_graphics_compiler: ^1.3.6
+  vector_graphics_compiler: ^1.3.7
   vector_math: ^2.4.4
   xml: ">=6.3.0 <8.0.0"
 
