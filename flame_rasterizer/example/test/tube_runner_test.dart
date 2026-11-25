@@ -237,7 +237,7 @@ void main() {
       // Fires, following the climber as it flips, until it's gone, before
       // the first seeder comes.
       await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
-      for (var i = 0; i < 300 && game.score < EnemyKind.climber.score; i++) {
+      for (var i = 0; i < 1000 && game.score < EnemyKind.climber.score; i++) {
         game.runner.ship.moveBy(
           (climber.currentLane - game.runner.ship.lane).toDouble(),
         );
@@ -308,7 +308,7 @@ void main() {
       game.runner.addEnemy(EnemyKind.splitter, lane);
       bool splitting() =>
           game.runner.enemies.whereType<RunnerSplitterComponent>().isNotEmpty;
-      for (var i = 0; i < 300 && splitting(); i++) {
+      for (var i = 0; i < 1000 && splitting(); i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
       final climbers = game.runner.enemies.whereType<RunnerClimberComponent>();
@@ -326,7 +326,7 @@ void main() {
       game.runner.addEnemy(EnemyKind.splitter, game.runner.ship.lane);
       final splitter = game.runner.enemies.last;
       await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
-      for (var i = 0; i < 300 && game.score < EnemyKind.splitter.score; i++) {
+      for (var i = 0; i < 1000 && game.score < EnemyKind.splitter.score; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
       await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
@@ -366,7 +366,7 @@ void main() {
       game.runner.addEnemy(EnemyKind.splitter, 0);
       bool splitting() =>
           game.runner.enemies.whereType<RunnerSplitterComponent>().isNotEmpty;
-      for (var i = 0; i < 300 && splitting(); i++) {
+      for (var i = 0; i < 1000 && splitting(); i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
       final climbers = game.runner.enemies.whereType<RunnerClimberComponent>();

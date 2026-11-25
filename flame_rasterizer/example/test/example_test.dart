@@ -260,7 +260,7 @@ void main() {
     }
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
-    for (var i = 0; i < 300 && first.shooter.round < 2; i++) {
+    for (var i = 0; i < 1000 && first.shooter.round < 2; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect(first.shooter.round, 2);

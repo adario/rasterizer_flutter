@@ -29,6 +29,15 @@ import 'tube_shooter_test.dart'
 void main() {
   const course = (bendFrom: Tube.depth, bendTo: 40.0, ease: 8.0);
   final hexagon = levels.indexWhere((level) => level.tube == Tubes.hexagon);
+  // As many frames as the first round's drop, run and arrival take, and
+  // some more.
+  final runFrames =
+      ((ShooterMode.dropTime +
+                  ShooterMode.runTime(1) +
+                  ShooterMode.arriveTime) /
+              0.016)
+          .ceil() +
+      500;
 
   test('a course goes straight before and after its bends', () {
     final tube = EndlessTube(course: course)..advanceTo(0);
@@ -121,7 +130,11 @@ void main() {
       var most = 0.0;
       var mostOff = 0.0;
       final states = <TubeState>[];
-      for (var i = 0; i < 2000 && game.shooter.state != TubeState.ready; i++) {
+      for (
+        var i = 0;
+        i < runFrames && game.shooter.state != TubeState.ready;
+        i++
+      ) {
         await tester.pump(const Duration(milliseconds: 16));
         final position = game.shooter.player.position.toOffset();
         most = math.max(most, (position - last).distance);
@@ -208,7 +221,11 @@ void main() {
           Tube.depth + TubeHost.defaultFlightSpeed * ShooterMode.runTime(1);
       final kinds = <EnemyKind>{};
       var mostAt = 0.0;
-      for (var i = 0; i < 2000 && game.shooter.state == TubeState.run; i++) {
+      for (
+        var i = 0;
+        i < runFrames && game.shooter.state == TubeState.run;
+        i++
+      ) {
         // A lost ship goes on at READY.
         if (game.isReady) {
           await pressKey(tester);
@@ -293,7 +310,10 @@ void main() {
     );
     final runner = await pumpToRun(tester, game);
     // Into the bends, where each ring has turned from the one before.
-    await pumpFrames(tester, 300);
+    await pumpFrames(
+      tester,
+      ((ShooterMode.runEase + 1) / TubeHost.defaultFlightSpeed / 0.016).ceil(),
+    );
     expect(runner.flown, greaterThan(Tube.depth + ShooterMode.runEase));
     final lane = runner.ship.lane;
     final laneCount = game.view.tube.laneCount;
@@ -530,14 +550,14 @@ void main() {
     await pumpUntil(
       tester,
       () => runner.flown >= playEnd - 0.5,
-      frames: 2000,
+      frames: runFrames,
     );
     // A climber across the tube, a little ahead of the ship, which a shot
     // destroys just before the run's play ends.
     final lanes = game.view.tube.laneCount;
     runner.addEnemy(EnemyKind.climber, (runner.ship.lane + lanes ~/ 2) % lanes);
     final climber = (runner.enemies.last as RunnerFlipperComponent)
-      ..at = runner.flown + 3;
+      ..at = runner.flown + 1.5;
     await pumpFrames(tester, 1);
     expect(climber.isVisible, isTrue);
     runner.destroyEnemy(climber);
