@@ -250,9 +250,12 @@ abstract class RevolutePinballExample({
     final rect = outline.rect;
     final bounds = outline.path.getBounds();
     final scale = Vector2(body.size.x / rect.width, body.size.y / rect.height);
+    // A lighter fill than MultipleShapes'.
+    final paints = OutlinePaints.of(body.color, rect.longestSide);
+    paints.first.color = body.color.withValues(alpha: 0.7);
     return outlineComponent(
         outline.path,
-        OutlinePaints.of(body.color, rect.longestSide),
+        paints,
         maxSize: 3 * metersToPixels * SvgBodies.maxSide,
       )
       ..position = Vector2(
@@ -260,34 +263,6 @@ abstract class RevolutePinballExample({
         (bounds.top - rect.center.dy) * scale.y,
       )
       ..scale = scale;
-  }
-
-  @override
-  void addBody(BodyComponent body) {
-    if (body is Ball) {
-      _drawAsPath(body);
-    }
-    super.addBody(body);
-  }
-
-  /// A unit circle, which every ball draws, scaled to its radius.
-  static final _circle = Path()
-    ..addOval(Rect.fromCircle(center: Offset.zero, radius: 1));
-
-  /// Draws [ball] as MultipleShapes' paths.
-  void _drawAsPath(Ball ball) {
-    ball
-      ..glows = false
-      ..add(
-        outlineComponent(
-            _circle,
-            OutlinePaints.of(ball.paint.color, 2),
-            // The largest balls are 2 meters wide.
-            maxSize: 3 * metersToPixels * 2,
-          )
-          ..position = Vector2.all(-ball.radius)
-          ..scale = Vector2.all(ball.radius),
-      );
   }
 
   /// Creates a component of the game's renderer that draws [path] with
