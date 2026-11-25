@@ -13,6 +13,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -275,7 +276,7 @@ void main() {
       expect(game.ship.lane, lane);
       await tester.pump(const Duration(milliseconds: 16));
       expect(game.state, RunnerState.dying);
-      expect(game.lives, TubeRunnerExample.startLives - 1);
+      expect(game.lives, TubeHost.startLives - 1);
     });
 
     testWidgets('a splitter splits near the ship, or when shot, with '

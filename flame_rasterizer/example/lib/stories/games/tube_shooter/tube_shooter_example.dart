@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
-import 'package:flame/events.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/game_sounds.dart';
@@ -29,9 +28,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/sounds.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
 
 part 'tube_shooter_run.dart';
 part 'tube_shooter_snapshot.dart';
@@ -80,17 +78,12 @@ enum TubeState() {
 /// see [TubeShooterSnapshots].
 abstract class TubeShooterExample({
   required super.status,
-  math.Random? random,
+  super.random,
 
   /// Which of the [levels] the first round plays.
   final int firstLevel = 0,
   TubeShooterSnapshot? from,
-}) extends ExampleGame
-    with
-        DragCallbacks,
-        ScrollCallbacks,
-        KeyboardEvents,
-        PathComponents<ExampleWorld> {
+}) extends TubeHost {
   /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
   /// SVG, which goes on from [from], if any, at its first level and pace.
   factory TubeShooterExample.of(
@@ -173,20 +166,6 @@ abstract class TubeShooterExample({
   /// How long the ship's lane takes to fade in on a run, in seconds.
   static const laneFadeTime = 0.3;
 
-  /// The seconds from the ship's destruction to its return.
-  static const respawnTime = 1.5;
-
-  static const startLives = 3;
-
-  /// The cap height, in logical pixels, of the level's name and the round, at
-  /// the bottom left, of the lives and score, at the bottom right, and of
-  /// PURGE READY under the round's number.
-  static const hudCap = 12.0;
-
-  /// The cap height, in logical pixels, of the round's number on the zoom,
-  /// PURGE once the purge is used, and Game Over, at the middle.
-  static const bannerCap = VectorTextComponent.maxCapHeight;
-
   /// How long PURGE shows once the purge is used, in seconds.
   static const purgeTime = 1.0;
 
@@ -207,25 +186,8 @@ abstract class TubeShooterExample({
   /// What a shot that hits a spike scores.
   static const spikeScore = 2;
 
-  /// How far a drag goes to move the ship one lane, in logical pixels.
-  static const dragPerLane = 40.0;
-
-  /// The longest a drag can last and still count as a tap, in seconds.
-  static const tapTime = 0.25;
-
-  /// The farthest a drag can move and still count as a tap, in logical
-  /// pixels.
-  static const tapSlop = 10.0;
-
-  /// The most seconds between the two taps of a double tap.
-  static const doubleTapTime = 0.35;
-
-  final math.Random random = random ?? math.Random();
-
   /// The snapshot that it goes on from, if any.
   final TubeShooterSnapshot? _from = from;
-
-  final view = TubeView();
 
   final tubeGroup = Component();
   final spawnGroup = Component(priority: 1);
@@ -268,8 +230,6 @@ abstract class TubeShooterExample({
   bool _dyingOnDrop = false;
 
   int round = 0;
-  int score = 0;
-  int lives = startLives;
   bool purgeReady = true;
 
   /// The round's level.
@@ -319,128 +279,40 @@ abstract class TubeShooterExample({
         _pulseClock >= pulse - level.pulseWarning;
   }
 
-  final _levelText = VectorTextComponent(
-    capHeight: hudCap,
-    line: 1,
-    left: true,
-  );
-  final _roundText = VectorTextComponent(
-    capHeight: hudCap,
-    line: 0,
-    left: true,
-  );
-  final _livesText = VectorTextComponent(capHeight: hudCap, line: 1);
-  final _scoreText = VectorTextComponent(capHeight: hudCap, line: 0);
-  final _roundBanner = VectorTextComponent(capHeight: bannerCap);
+  /// The round's number, at the middle, on the zoom.
+  final _roundBanner = VectorTextComponent(capHeight: TubeHost.bannerCap);
 
   /// PURGE READY, under the round's number on the zoom: each round recharges
   /// the purge.
   final _purgeReadyText = VectorTextComponent(
     text: 'PURGE READY',
-    capHeight: hudCap,
-    below: 1.2 * bannerCap,
+    capHeight: TubeHost.hudCap,
+    below: 1.2 * TubeHost.bannerCap,
   );
 
   /// PURGE, for [purgeTime] once the purge is used.
-  final _purgeText = VectorTextComponent(text: 'PURGE', capHeight: bannerCap);
+  final _purgeText = VectorTextComponent(
+    text: 'PURGE',
+    capHeight: TubeHost.bannerCap,
+  );
 
   /// The seconds left before PURGE goes.
   double _purgeLeft = 0;
 
-  /// READY, in the camera's viewport while the game waits for the player.
-  final readyText = VectorTextComponent(text: 'READY', capHeight: bannerCap);
-
-  /// Game Over, in the camera's viewport once the game is over.
-  final gameOverText = VectorTextComponent(
-    text: 'GAME OVER',
-    capHeight: bannerCap,
-  );
-
-  /// How many paths the game made in the last second, for the tube, its lane,
-  /// the spikes and the bolts, as the status bar shows.
-  int get pathsPerSecond => _pathsPerSecond;
-  int _pathsPerSecond = 0;
-  int _paths = 0;
-  double _pathsTime = 0;
-
-  /// The game's own time, which the Speed knob doesn't scale, to time taps.
-  double _clock = 0;
-
-  /// Each drag's start time and distance moved, to tell taps from drags.
-  final _drags = <int, ({double start, double distance})>{};
-
-  /// When the last tap was, for double taps.
-  double _lastTap = double.negativeInfinity;
-
-  /// The pointers that went down while the game waits, at READY or Game
-  /// Over. Each ends the wait when it goes up, as a tap; pointers that were
-  /// already down don't.
-  final _waitPointers = <int>{};
-
-  /// The pointers that went down while the game wasn't waiting. The ship
-  /// fires while any of them is down, or while [_fireKey] is held.
-  final _firePointers = <int>{};
-
-  /// The keys that move the ship, fire and purge, by their places on the
-  /// keyboard, whatever its layout.
-  static final _leftKeys = {
-    PhysicalKeyboardKey.arrowLeft,
-    PhysicalKeyboardKey.keyA,
-  };
-  static final _rightKeys = {
-    PhysicalKeyboardKey.arrowRight,
-    PhysicalKeyboardKey.keyD,
-  };
-  static const _fireKey = PhysicalKeyboardKey.space;
-  static final _purgeKeys = {
-    PhysicalKeyboardKey.enter,
-    PhysicalKeyboardKey.numpadEnter,
-  };
-
-  /// The keys that don't end a wait for the player on their own.
-  static final _modifierKeys = {
-    PhysicalKeyboardKey.shiftLeft,
-    PhysicalKeyboardKey.shiftRight,
-    PhysicalKeyboardKey.controlLeft,
-    PhysicalKeyboardKey.controlRight,
-    PhysicalKeyboardKey.altLeft,
-    PhysicalKeyboardKey.altRight,
-    PhysicalKeyboardKey.metaLeft,
-    PhysicalKeyboardKey.metaRight,
-    PhysicalKeyboardKey.capsLock,
-    PhysicalKeyboardKey.fn,
-  };
-
-  /// The keys held that went down while the game had the focus.
-  final _heldKeys = <PhysicalKeyboardKey>{};
-
-  /// Where the keys held move the ship: 1 to the right along the bottom, -1
-  /// to the left, or 0.
-  int get keyDirection =>
-      (_heldKeys.any(_rightKeys.contains) ? 1 : 0) -
-      (_heldKeys.any(_leftKeys.contains) ? 1 : 0);
-
+  @override
   bool get canMove =>
       _state == TubeState.play ||
       (_state == TubeState.run && _stateTime < runTime);
   bool get canFire => _state == TubeState.play || _state == TubeState.drop;
 
-  /// Whether a tap ends a wait, rather than firing.
-  bool get _isWaiting => _state == TubeState.ready || _state == TubeState.over;
-
-  /// The Speed knob's value. It sets the world's time scale, except while the
-  /// game is over and the world stands still.
   @override
-  double get speed => _speed;
-  double _speed = 1;
+  bool get isWaiting => isReady || isOver;
 
   @override
-  set speed(double value) {
-    _speed = value;
-    if (_state != TubeState.over) {
-      world.timeScale = value;
-    }
-  }
+  bool get isReady => _state == TubeState.ready;
+
+  @override
+  bool get isOver => _state == TubeState.over;
 
   /// The Drifting stars knob's value: whether the stars stay, drifting,
   /// between the zoom and the drop. If not, they only show during those.
@@ -485,10 +357,6 @@ abstract class TubeShooterExample({
     }
   }
 
-  /// Whether the renderer draws the lines' glow with them, as the mesh
-  /// renderer does. Otherwise, [TubeGlow] draws it.
-  bool get rendererGlows => false;
-
   /// Makes a [TubeGlow] the camera's post process if [glow] is on, or
   /// removes it.
   void _updateGlow() {
@@ -529,7 +397,13 @@ abstract class TubeShooterExample({
   }
 
   /// The shapes' glow, if the Glow knob is on and the renderer draws it.
-  RasterizerGlow? get _shapeGlow => _glow && rendererGlows ? lineGlow : null;
+  @override
+  RasterizerGlow? get shapeGlow => _glow && rendererGlows ? lineGlow : null;
+
+  /// Twice the widest lane, a shape's longest side, as explosions grow to
+  /// twice their size.
+  @override
+  double get shapeGrowth => 2;
 
   /// Does what updates would do in a moving world: makes the tube's paths
   /// again for the view, places everything on the tube, and gives the shapes
@@ -557,47 +431,6 @@ abstract class TubeShooterExample({
     }
   }
 
-  /// Creates a component that draws [shape], one of `Shapes`, stroked in
-  /// [color] about its origin.
-  ///
-  /// All the components of a shape share one import of it, until the view
-  /// changes.
-  PathComponent shapeComponent(Path shape, Color color) {
-    final bounds = shape.getBounds();
-    return pathComponent(
-      shape,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = view.shapeStroke
-        ..color = color,
-      anchor: Anchor(-bounds.left / bounds.width, -bounds.top / bounds.height),
-      // Twice the widest lane, a shape's longest side, as explosions grow to
-      // twice their size.
-      maxSize: 2 * Tubes.widestLane * view.rimScale / view.devicePixel,
-      glow: _shapeGlow,
-    );
-  }
-
-  /// Creates a component that draws `Shapes.dot`, filled in [color], about
-  /// its middle.
-  ///
-  /// All the dots of a colour share one import, whatever their sizes.
-  PathComponent dotComponent(Color color) => pathComponent(
-    Shapes.dot,
-    Paint()..color = color,
-    anchor: Anchor.center,
-    maxSize: TubeView.rimPixels,
-  );
-
-  /// Gives [drawing], made by [shapeComponent], the view's stroke width. If
-  /// the width changed, this imports the shape again.
-  void keepStroke(PathComponent drawing) {
-    final width = view.shapeStroke;
-    if (drawing.paint.strokeWidth != width) {
-      drawing.paint.strokeWidth = width;
-    }
-  }
-
   /// Replaces [old], if any, with a component that fills [path], if any, in
   /// [color], and returns it.
   ///
@@ -614,7 +447,7 @@ abstract class TubeShooterExample({
     if (path == null || bounds == null || bounds.isEmpty) {
       return null;
     }
-    _paths++;
+    countPath();
     final component = pathComponent(
       path,
       Paint()..color = color,
@@ -627,42 +460,11 @@ abstract class TubeShooterExample({
     return component;
   }
 
-  /// Creates a component that fills [quads] in [color], where they are in
-  /// the world, at [priority], with [glow] if [rendererGlows]: a path of
-  /// them, by default.
-  ///
-  /// Its contours stay open, as the fill closes them anyway.
-  PositionComponent quadsComponent(
-    RasterizerPolygons quads,
-    Color color, {
-    int? priority,
-    RasterizerGlow? glow,
-  }) {
-    final path = Path();
-    final points = quads.vertices;
-    for (var i = 0; i < points.length; i += 8) {
-      path.addPolygon([
-        for (var k = i; k < i + 8; k += 2) Offset(points[k], points[k + 1]),
-      ], false);
-    }
-    return pathComponent(
-      path,
-      Paint()..color = color,
-      position: Vector2(quads.bounds.left, quads.bounds.top),
-      maxSize: _maxSizeOf(quads),
-      priority: priority,
-      glow: glow,
-    );
-  }
-
-  /// Returns the most device pixels that [quads]' longer side spans.
-  double _maxSizeOf(RasterizerPolygons quads) =>
-      math.max(quads.bounds.width, quads.bounds.height) / view.devicePixel;
-
   @override
   Future<void> onLoad() async {
-    // Before the ship loads in addAll: it sizes its import for the view.
-    _fitView();
+    // Fits the view before the ship loads in addAll: it sizes its import for
+    // the view.
+    await super.onLoad();
     world.addAll([
       tubeGroup,
       spawnGroup,
@@ -679,9 +481,6 @@ abstract class TubeShooterExample({
     if (_glow && !rendererGlows) {
       _updateGlow();
     }
-    // In the camera's viewport, as StoryGame's FPS counter is: above the
-    // world, and unzoomed.
-    camera.viewport.addAll([_levelText, _roundText, _livesText, _scoreText]);
     // Before the first round, so that its zoom sounds.
     if (_sound) {
       await _loadSounds();
@@ -701,30 +500,16 @@ abstract class TubeShooterExample({
   }
 
   @override
-  Iterable<String> get exampleStats => ['$_pathsPerSecond paths/s'];
-
-  @override
   void update(double dt) {
     _sounds?.nextFrame();
-    _clock += dt;
-    _pathsTime += dt;
-    if (_pathsTime >= 1) {
-      _pathsTime -= 1;
-      _pathsPerSecond = _paths;
-      _paths = 0;
-    }
-    // A key released after a knob took the focus is no longer held.
-    final held = _heldKeys.length;
-    _heldKeys.retainWhere(
-      HardwareKeyboard.instance.physicalKeysPressed.contains,
-    );
-    if (_heldKeys.length != held) {
-      _updateFire();
-    }
-    _fitView();
-    // Before the world's components move, and before TubeComponent makes the
-    // tube's paths for the view.
-    _step(dt * world.timeScale);
+    super.update(dt);
+  }
+
+  /// Before the world's components move, and before [TubeComponent] makes the
+  /// tube's paths for the view.
+  @override
+  void advance(double dt) {
+    _step(dt);
     _aimCamera();
     _drawRun();
     tube.lane = _state == TubeState.play ? player.lane : null;
@@ -734,12 +519,12 @@ abstract class TubeShooterExample({
       _updateStillLines();
     }
     _lastVersion = view.version;
-    super.update(dt);
+  }
+
+  @override
+  void afterUpdate(double dt) {
     _placeArriving();
-    _levelText.text = level.tube.name.toUpperCase();
-    _roundText.text = _state == TubeState.run ? _runClock : 'ROUND $round';
-    _livesText.text = 'LIVES $lives';
-    _scoreText.text = 'SCORE $score';
+    roundText.text = _state == TubeState.run ? _runClock : 'ROUND $round';
     // In real time, so that it goes in a still world too.
     if (_purgeLeft > 0) {
       _purgeLeft -= dt;
@@ -747,27 +532,6 @@ abstract class TubeShooterExample({
         _purgeText.removeFromParent();
       }
     }
-  }
-
-  /// Fits the tube's rim in 90% of the game's shorter side, with its lines'
-  /// widths in device pixels, whatever the zoom.
-  void _fitView() {
-    if (size.x <= 0 || size.y <= 0) {
-      return;
-    }
-    // The ratio the renderer uses: from the game's MediaQuery, which
-    // Widgetbook's device frames set, read without depending on it.
-    final ratio =
-        buildContext
-            ?.getInheritedWidgetOfExactType<MediaQuery>()
-            ?.data
-            .devicePixelRatio ??
-        PlatformDispatcher.instance.implicitView?.devicePixelRatio ??
-        1;
-    view.fit(
-      0.9 * math.min(size.x, size.y),
-      1 / (ratio * camera.viewfinder.zoom),
-    );
   }
 
   /// Points the camera at [_look].
@@ -782,7 +546,7 @@ abstract class TubeShooterExample({
   void _setState(TubeState state) {
     _state = state;
     _stateTime = 0;
-    _waitPointers.clear();
+    forgetWaitPointers();
     _updateStars();
   }
 
@@ -864,7 +628,7 @@ abstract class TubeShooterExample({
       case TubeState.arrive:
         _stepArrive();
       case TubeState.dying:
-        if (_stateTime >= respawnTime) {
+        if (_stateTime >= TubeHost.respawnTime) {
           if (lives == 0) {
             _gameOver();
           } else if (_dyingOnDrop) {
@@ -1211,7 +975,7 @@ abstract class TubeShooterExample({
   /// counts toward a double tap.
   void _beginPlay() {
     readyText.removeFromParent();
-    _lastTap = double.negativeInfinity;
+    forgetTaps();
     _setState(TubeState.play);
   }
 
@@ -1233,89 +997,19 @@ abstract class TubeShooterExample({
     }
     explosionGroup.removeAll(explosionGroup.children.toList());
     score = 0;
-    lives = startLives;
+    lives = TubeHost.startLives;
     gameOverText.removeFromParent();
-    world.timeScale = _speed;
+    world.timeScale = speed;
     _endRun();
     _startRound();
   }
 
-  /// Starts firing, unless the game is waiting at READY or Game Over. Then
-  /// the pointer only ends the wait when it goes up, as a tap: taps start
-  /// drags too.
   @override
-  void onDragStart(DragStartEvent event) {
-    if (_isWaiting) {
-      _waitPointers.add(event.pointerId);
-    } else {
-      _firePointers.add(event.pointerId);
-      _updateFire();
-    }
-    _drags[event.pointerId] = (start: _clock, distance: 0);
-    super.onDragStart(event);
-  }
-
-  /// Moves the ship a lane every [dragPerLane] logical pixels left or right,
-  /// whatever the zoom.
-  @override
-  void onDragUpdate(DragUpdateEvent event) {
-    final delta = event.canvasDelta;
-    if (canMove) {
-      player.moveBy(delta.x / dragPerLane);
-    }
-    final drag = _drags[event.pointerId];
-    if (drag != null) {
-      _drags[event.pointerId] = (
-        start: drag.start,
-        distance: drag.distance + delta.length,
-      );
-    }
-    super.onDragUpdate(event);
-  }
-
-  @override
-  void onDragEnd(DragEndEvent event) {
-    _firePointers.remove(event.pointerId);
-    _updateFire();
-    final drag = _drags.remove(event.pointerId);
-    if (_waitPointers.remove(event.pointerId)) {
-      _endWait();
-    } else if (drag != null &&
-        _clock - drag.start <= tapTime &&
-        drag.distance <= tapSlop) {
-      _tap();
-    }
-    super.onDragEnd(event);
-  }
-
-  @override
-  void onDragCancel(DragCancelEvent event) {
-    _firePointers.remove(event.pointerId);
-    _updateFire();
-    _drags.remove(event.pointerId);
-    _waitPointers.remove(event.pointerId);
-    super.onDragCancel(event);
-  }
-
-  /// Moves the ship a lane for each scroll, whatever its size: clockwise for
-  /// a scroll down, and as a drag would for one sideways. Scrolling in circles
-  /// on a Steam Deck trackpad set to Steam Input's Scroll Wheel mode turns it
-  /// round the tube.
-  @override
-  void onScroll(ScrollEvent event) {
-    final delta = event.raw.scrollDelta;
-    if (canMove) {
-      if (delta.dy != 0) {
-        player.moveBy(-delta.dy.sign);
-      } else if (delta.dx != 0) {
-        player.moveBy(delta.dx.sign);
-      }
-    }
-    super.onScroll(event);
-  }
+  void moveShipBy(double lanes) => player.moveBy(lanes);
 
   /// Ends a wait: starts a new game once it's over, or else the round.
-  void _endWait() {
+  @override
+  void endWait() {
     if (_state == TubeState.over) {
       _newGame();
     } else {
@@ -1323,59 +1017,18 @@ abstract class TubeShooterExample({
     }
   }
 
-  /// Handles a tap: the second tap of a double tap purges.
-  void _tap() {
-    if (_clock - _lastTap <= doubleTapTime) {
-      _lastTap = double.negativeInfinity;
-      purge();
-    } else {
-      _lastTap = _clock;
-    }
-  }
-
-  /// Handles a key: at READY, any key but a modifier starts the round.
-  /// Otherwise, Enter purges, or starts a new game once it's over. The keys
-  /// that move the ship or fire count as held while down, and it ignores the
-  /// others.
+  /// Purges.
   @override
-  KeyEventResult onKeyEvent(
-    KeyEvent event,
-    Set<LogicalKeyboardKey> keysPressed,
-  ) {
-    final key = event.physicalKey;
-    if (_state == TubeState.ready &&
-        event is KeyDownEvent &&
-        !_modifierKeys.contains(key)) {
-      _beginPlay();
-      return KeyEventResult.handled;
-    }
-    if (_purgeKeys.contains(key)) {
-      if (event is KeyDownEvent) {
-        if (_state == TubeState.over) {
-          _newGame();
-        } else {
-          purge();
-        }
-      }
-      return KeyEventResult.handled;
-    }
-    if (key != _fireKey &&
-        !_leftKeys.contains(key) &&
-        !_rightKeys.contains(key)) {
-      return KeyEventResult.ignored;
-    }
-    if (event is KeyDownEvent) {
-      _heldKeys.add(key);
-    } else if (event is KeyUpEvent) {
-      _heldKeys.remove(key);
-    }
-    _updateFire();
-    return KeyEventResult.handled;
-  }
+  void onDoubleTap() => purge();
 
-  /// Makes the ship fire while a drag is down or the fire key is held.
-  void _updateFire() {
-    if (_firePointers.isNotEmpty || _heldKeys.contains(_fireKey)) {
+  /// Purges.
+  @override
+  void onEnter() => purge();
+
+  /// Makes the ship fire while the player fires.
+  @override
+  void onFiringChanged() {
+    if (isFiring) {
       player.beginFire();
     } else {
       player.stopFire();
@@ -1391,59 +1044,22 @@ class RasterizerTubeShooterExample({
   super.random,
   super.firstLevel,
   super.from,
-}) extends TubeShooterExample with HasRasterizer, ExampleRasterizer {
+}) extends TubeShooterExample
+    with
+        HasRasterizer,
+        ExampleRasterizer,
+        RasterizerPathComponents<ExampleWorld>,
+        RasterizerTubeHost {
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
   }
 
-  @override
-  PathComponent pathComponent(
-    Path path,
-    Paint paint, {
-    Vector2? position,
-    Anchor? anchor,
-    double? maxSize,
-    int? priority,
-    RasterizerGlow? glow,
-  }) => RasterizerPathComponent(
-    path: path,
-    paint: paint,
-    position: position,
-    anchor: anchor,
-    maxSize: maxSize,
-    priority: priority,
-    glow: glow,
-  );
-
-  /// Whether the Renderer knob picked the mesh renderer, which draws the
-  /// lines' glow with them.
-  @override
-  bool get rendererGlows => renderer == SvgRenderer.rasterizer;
-
-  /// Fills the quads separate, which the mesh renderer imports much faster
-  /// than their union, as Tube Runner does.
-  @override
-  PositionComponent quadsComponent(
-    RasterizerPolygons quads,
-    Color color, {
-    int? priority,
-    RasterizerGlow? glow,
-  }) => RasterizerPolygonsComponent(
-    polygons: quads,
-    paint: Paint()..color = color,
-    position: Vector2(quads.bounds.left, quads.bounds.top),
-    maxSize: _maxSizeOf(quads),
-    priority: priority,
-    glow: glow,
-    separate: true,
-  );
-
   /// Keeps [drawing]'s stroke, and gives it the shapes' glow too. If the Glow
   /// knob changed, it imports the shape again.
   @override
-  void keepStroke(PathComponent drawing) {
-    super.keepStroke(drawing);
-    (drawing as RasterizerPathComponent).glow = _shapeGlow;
+  void keepStroke(PathComponent drawing, {double widths = 1}) {
+    super.keepStroke(drawing, widths: widths);
+    (drawing as RasterizerPathComponent).glow = shapeGlow;
   }
 }
 
@@ -1453,28 +1069,5 @@ class FlameTubeShooterExample({
   super.random,
   super.firstLevel,
   super.from,
-}) extends TubeShooterExample {
-  @override
-  String get rendererText => "Flame's PathComponent";
-
-  /// None: Flame's PathComponents keep no numbers to show.
-  @override
-  Iterable<String> get rendererStats => const [];
-
-  @override
-  PathComponent pathComponent(
-    Path path,
-    Paint paint, {
-    Vector2? position,
-    Anchor? anchor,
-    double? maxSize,
-    int? priority,
-    RasterizerGlow? glow,
-  }) => PathComponent(
-    path: path,
-    paint: paint,
-    position: position,
-    anchor: anchor,
-    priority: priority,
-  );
-}
+}) extends TubeShooterExample
+    with FlamePathComponents<ExampleWorld>, FlameTubeHost;

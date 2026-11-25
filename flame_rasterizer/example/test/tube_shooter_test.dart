@@ -30,6 +30,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1324,7 +1325,7 @@ void main() {
     game.addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
     await pumpFrames(tester, 2);
     expect(game.state, TubeState.dying);
-    expect(game.lives, TubeShooterExample.startLives - 1);
+    expect(game.lives, TubeHost.startLives - 1);
     expect(game.enemies, isEmpty);
     expect(game.spawns, hasLength(queued + 2));
     // They wait at the far end of their lanes, the next to come.
@@ -1481,7 +1482,7 @@ void main() {
     expect(game.pace, closeTo(pace * 1.05, 1e-9));
     expect(game.spawns, hasLength(18));
     expect(game.spikes.lengths.every((length) => length == 0), isTrue);
-    expect(game.lives, TubeShooterExample.startLives);
+    expect(game.lives, TubeHost.startLives);
     await pumpUntil(tester, () => game.state == TubeState.ready, frames: 80);
     expect(game.player.depth, 0);
     await tester.pumpWidget(const SizedBox());
@@ -1495,7 +1496,7 @@ void main() {
     game.clearSpawns();
     await pumpUntil(tester, () => game.state == TubeState.dying);
     expect(game.player.depth, greaterThanOrEqualTo(Tube.depth * 0.1));
-    expect(game.lives, TubeShooterExample.startLives - 1);
+    expect(game.lives, TubeHost.startLives - 1);
     // Then the next round.
     await pumpUntil(tester, () => game.state == TubeState.zoom, frames: 100);
     expect(game.round, 2);
@@ -1541,7 +1542,7 @@ void main() {
     // PURGE shows for a second.
     Iterable<String> banners() => game.camera.viewport.children
         .whereType<VectorTextComponent>()
-        .where((text) => text.capHeight == TubeShooterExample.bannerCap)
+        .where((text) => text.capHeight == TubeHost.bannerCap)
         .map((text) => text.text);
     await tester.pump(const Duration(milliseconds: 16));
     expect(banners(), contains('PURGE'));
@@ -1631,7 +1632,7 @@ void main() {
     await tester.tapAt(center);
     await tester.pump(const Duration(milliseconds: 16));
     expect(game.state, TubeState.zoom);
-    expect(game.lives, TubeShooterExample.startLives);
+    expect(game.lives, TubeHost.startLives);
     expect(game.score, 0);
     expect(game.round, 2);
     expect(game.levelIndex, 1);
@@ -1654,11 +1655,11 @@ void main() {
         .children
         .whereType<VectorTextComponent>()
         .where((text) => text.capHeight == capHeight);
-    expect(texts(TubeShooterExample.bannerCap).single.text, 'ROUND 1');
+    expect(texts(TubeHost.bannerCap).single.text, 'ROUND 1');
     // The level's name and the round show at the bottom left, the round
     // below, opposite the lives and the score.
     VectorTextComponent hud(String text) => texts(
-      TubeShooterExample.hudCap,
+      TubeHost.hudCap,
     ).singleWhere((component) => component.text == text);
     final levelText = hud('OCTAGON');
     final roundText = hud('ROUND 1');
@@ -1671,21 +1672,21 @@ void main() {
     expect(hud('SCORE 0').position.y, roundText.position.y);
     // Under it, as each round recharges the purge.
     expect(
-      texts(TubeShooterExample.hudCap).map((text) => text.text),
+      texts(TubeHost.hudCap).map((text) => text.text),
       contains('PURGE READY'),
     );
     await pumpUntil(tester, () => game.state == TubeState.ready);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(texts(TubeShooterExample.bannerCap).single.text, 'READY');
+    expect(texts(TubeHost.bannerCap).single.text, 'READY');
     expect(
-      texts(TubeShooterExample.hudCap).map((text) => text.text),
+      texts(TubeHost.hudCap).map((text) => text.text),
       isNot(contains('PURGE READY')),
     );
     await beginLevel(tester, game);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(texts(TubeShooterExample.bannerCap), isEmpty);
+    expect(texts(TubeHost.bannerCap), isEmpty);
 
-    final score = texts(TubeShooterExample.hudCap)
+    final score = texts(TubeHost.hudCap)
         .singleWhere((text) => text.text.startsWith('SCORE'));
     List<RasterizerPathComponent> glyphs() =>
         score.children.whereType<RasterizerPathComponent>().toList();

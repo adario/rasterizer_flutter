@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
-import 'package:flame/events.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
@@ -23,10 +22,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/p
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
 
 /// The game's states, as Tube Shooter's. The tube flies down in all of them,
 /// but once the game is over.
@@ -54,14 +52,13 @@ enum RunnerState() {
 /// Subclasses pick the component that draws a path: see [pathComponent].
 abstract class TubeRunnerExample({
   required super.status,
-  math.Random? random,
+  super.random,
   Tube? tube,
-}) extends ExampleGame
-    with
-        DragCallbacks,
-        ScrollCallbacks,
-        KeyboardEvents,
-        PathComponents<ExampleWorld> {
+}) extends TubeHost {
+  this {
+    view.tube = tube ?? Tubes.hexagon;
+  }
+
   /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
   /// SVG, down [tube], one of [tubes], or the hexagon.
   factory TubeRunnerExample.of(
@@ -167,24 +164,6 @@ abstract class TubeRunnerExample({
   /// that don't draw it, as an enemy comes.
   static const haloAlpha = 0.3;
 
-  /// The seconds from the ship's destruction to its return, as in Tube
-  /// Shooter.
-  static const respawnTime = 1.5;
-
-  static const startLives = 3;
-
-  /// The cap heights, in logical pixels, of the texts at the bottom, and of
-  /// READY and Game Over, at the middle, as in Tube Shooter.
-  static const hudCap = 12.0;
-  static const bannerCap = VectorTextComponent.maxCapHeight;
-
-  /// How far a drag goes to move the ship one lane, in logical pixels.
-  static const dragPerLane = 40.0;
-
-  final math.Random random = random ?? math.Random();
-
-  final view = TubeView()..tube = tube ?? Tubes.hexagon;
-
   final endlessTube = EndlessTube();
 
   /// The tube it flies down, one of [tubes].
@@ -218,62 +197,22 @@ abstract class TubeRunnerExample({
   /// How long the game has been in its state, in seconds of the game.
   double _stateTime = 0;
 
-  int get lives => _lives;
-  int _lives = startLives;
-
   /// How long the game has been on in the tube, in seconds of the game: since
   /// the last change of tube, or the last new game.
   double get tubeTime => _tubeTime;
   double _tubeTime = 0;
 
-  /// The game's score, from the shots' hits, as in Tube Shooter.
-  int get score => _score;
-  int _score = 0;
-
-  final _tubeText = VectorTextComponent(capHeight: hudCap, line: 1, left: true);
-  final _timeText = VectorTextComponent(capHeight: hudCap, line: 0, left: true);
-  final _livesText = VectorTextComponent(capHeight: hudCap, line: 1);
-  final _scoreText = VectorTextComponent(capHeight: hudCap, line: 0);
-
-  /// READY, in the camera's viewport while the game waits for the player.
-  final readyText = VectorTextComponent(text: 'READY', capHeight: bannerCap);
-
-  /// Game Over, in the camera's viewport once the game is over.
-  final gameOverText = VectorTextComponent(
-    text: 'GAME OVER',
-    capHeight: bannerCap,
-  );
-
-  /// The Speed knob's value. It sets the world's time scale, except while the
-  /// game is over and the world stands still.
   @override
-  double get speed => _speed;
-  double _speed = 1;
-
-  @override
-  set speed(double value) {
-    _speed = value;
-    if (_state != RunnerState.over) {
-      world.timeScale = value;
-    }
-  }
-
-  /// Whether the ship moves at the player's will.
   bool get canMove => _state == RunnerState.play;
 
-  /// Whether a tap ends a wait.
-  bool get _isWaiting =>
-      _state == RunnerState.ready || _state == RunnerState.over;
+  @override
+  bool get isWaiting => isReady || isOver;
 
-  /// The pointers that went down while the game waits, at READY or Game
-  /// Over. Each ends the wait when it goes up, as a tap; pointers that were
-  /// already down don't.
-  final _waitPointers = <int>{};
+  @override
+  bool get isReady => _state == RunnerState.ready;
 
-  /// The pointers that went down while the game didn't wait. The ship fires
-  /// while any of them is down, or while [_fireKey] is held, as in Tube
-  /// Shooter.
-  final _firePointers = <int>{};
+  @override
+  bool get isOver => _state == RunnerState.over;
 
   /// How long since the ship last fired, in seconds of the game.
   double _sinceShot = PlayerComponent.firePeriod;
@@ -356,92 +295,6 @@ abstract class TubeRunnerExample({
   /// How many quads the tube's paths have.
   int _quads = 0;
 
-  /// How many paths the game made in the last second, as the status bar
-  /// shows.
-  int _pathsPerSecond = 0;
-  int _paths = 0;
-  double _pathsTime = 0;
-
-  /// The keys that move the ship, by their places on the keyboard, whatever
-  /// its layout.
-  static final _leftKeys = {
-    PhysicalKeyboardKey.arrowLeft,
-    PhysicalKeyboardKey.keyA,
-  };
-  static final _rightKeys = {
-    PhysicalKeyboardKey.arrowRight,
-    PhysicalKeyboardKey.keyD,
-  };
-  static const _fireKey = PhysicalKeyboardKey.space;
-
-  static final _newGameKeys = {
-    PhysicalKeyboardKey.enter,
-    PhysicalKeyboardKey.numpadEnter,
-  };
-
-  /// The keys that don't end a wait for the player on their own.
-  static final _modifierKeys = {
-    PhysicalKeyboardKey.shiftLeft,
-    PhysicalKeyboardKey.shiftRight,
-    PhysicalKeyboardKey.controlLeft,
-    PhysicalKeyboardKey.controlRight,
-    PhysicalKeyboardKey.altLeft,
-    PhysicalKeyboardKey.altRight,
-    PhysicalKeyboardKey.metaLeft,
-    PhysicalKeyboardKey.metaRight,
-    PhysicalKeyboardKey.capsLock,
-    PhysicalKeyboardKey.fn,
-  };
-
-  /// The keys held that went down while the game had the focus.
-  final _heldKeys = <PhysicalKeyboardKey>{};
-
-  /// Where the keys held move the ship: 1 to the right along the bottom, -1
-  /// to the left, or 0.
-  int get keyDirection =>
-      (_heldKeys.any(_rightKeys.contains) ? 1 : 0) -
-      (_heldKeys.any(_leftKeys.contains) ? 1 : 0);
-
-  /// Creates a component that draws [shape], one of `Shapes`, stroked in
-  /// [color] about its origin, as Tube Shooter does, [widths] times as wide.
-  PathComponent shapeComponent(Path shape, Color color, {double widths = 1}) {
-    final bounds = shape.getBounds();
-    return pathComponent(
-      shape,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = widths * view.shapeStroke
-        ..color = color,
-      anchor: Anchor(-bounds.left / bounds.width, -bounds.top / bounds.height),
-      maxSize: Tubes.widestLane * view.rimScale / view.devicePixel,
-    );
-  }
-
-  /// Creates a component that draws `Shapes.dot`, filled in [color], about
-  /// its middle.
-  ///
-  /// All the dots of a colour share one import, whatever their sizes.
-  PathComponent dotComponent(Color color) => pathComponent(
-    Shapes.dot,
-    Paint()..color = color,
-    anchor: Anchor.center,
-    maxSize: TubeView.rimPixels,
-  );
-
-  /// Gives [drawing], made by [shapeComponent], the view's stroke width,
-  /// [widths] times as wide. If the width changed, this imports the shape
-  /// again.
-  void keepStroke(PathComponent drawing, {double widths = 1}) {
-    final width = widths * view.shapeStroke;
-    if (drawing.paint.strokeWidth != width) {
-      drawing.paint.strokeWidth = width;
-    }
-  }
-
-  /// Whether the renderer draws glows, as the mesh renderer does. Otherwise,
-  /// wider, see-through copies stand for them.
-  bool get rendererGlows => false;
-
   /// Returns the glow of an enemy that comes, reaching [widths] line widths
   /// with [strength], in its [color], or none for no [strength].
   static RasterizerGlow? flashGlow(
@@ -459,15 +312,12 @@ abstract class TubeRunnerExample({
 
   @override
   Future<void> onLoad() async {
-    // Before the ship loads: it sizes its import for the view.
-    _fitView();
+    // Fits the view before the ship loads: it sizes its import for the view.
+    await super.onLoad();
     endlessTube.advanceTo(_flown);
     world.addAll([tubeGroup, ship, explosionGroup]);
     // Under the world, as Tube Shooter's stars are.
     camera.backdrop.add(stars);
-    // In the camera's viewport, as StoryGame's FPS counter is: above the
-    // world, and unzoomed.
-    camera.viewport.addAll([_tubeText, _timeText, _livesText, _scoreText]);
     _waitForPlayer();
     _updateTube();
     startStatus();
@@ -476,40 +326,29 @@ abstract class TubeRunnerExample({
   @override
   Iterable<String> get exampleStats => [
     '$_quads quads',
-    '$_pathsPerSecond paths/s',
+    '$pathsPerSecond paths/s',
   ];
 
+  /// Flies the ship, then applies the game's rules.
   @override
-  void update(double dt) {
-    _pathsTime += dt;
-    if (_pathsTime >= 1) {
-      _pathsTime -= 1;
-      _pathsPerSecond = _paths;
-      _paths = 0;
-    }
-    // A key released after a knob took the focus is no longer held.
-    _heldKeys.retainWhere(
-      HardwareKeyboard.instance.physicalKeysPressed.contains,
-    );
-    _fitView();
-    final worldDt = dt * world.timeScale;
-    _flown += flightSpeed * worldDt;
-    _step(worldDt);
+  void advance(double dt) {
+    _flown += flightSpeed * dt;
+    _step(dt);
     endlessTube.advanceTo(_flown);
     _updateTube();
-    super.update(dt);
-    _tubeText.text = tube.name.toUpperCase();
+  }
+
+  @override
+  void afterUpdate(double dt) {
     final seconds = _tubeTime.floor();
-    _timeText.text =
+    roundText.text =
         'TIME ${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
-    _livesText.text = 'LIVES $_lives';
-    _scoreText.text = 'SCORE $_score';
   }
 
   void _setState(RunnerState state) {
     _state = state;
     _stateTime = 0;
-    _waitPointers.clear();
+    forgetWaitPointers();
   }
 
   /// Applies the game's rules over [dt] seconds of the world's time, after
@@ -526,8 +365,8 @@ abstract class TubeRunnerExample({
         _collide();
         _dropPassed();
       case RunnerState.dying:
-        if (_stateTime >= respawnTime) {
-          if (_lives == 0) {
+        if (_stateTime >= TubeHost.respawnTime) {
+          if (lives == 0) {
             _gameOver();
           } else {
             ship.revive();
@@ -606,7 +445,7 @@ abstract class TubeRunnerExample({
       return gone;
     });
     _sinceShot += dt;
-    if ((_firePointers.isNotEmpty || _heldKeys.contains(_fireKey)) &&
+    if (isFiring &&
         _sinceShot >= PlayerComponent.firePeriod &&
         _shots.length < PlayerComponent.maxShots) {
       _sinceShot = 0;
@@ -688,7 +527,7 @@ abstract class TubeRunnerExample({
       return;
     }
     spike.near = math.min(spike.near + TubeShooterExample.spikeHit, spike.far);
-    _score += TubeShooterExample.spikeScore;
+    score += TubeShooterExample.spikeScore;
     if (spike.near >= spike.far) {
       _spikes.remove(spike);
     }
@@ -697,7 +536,7 @@ abstract class TubeRunnerExample({
   /// Blows [enemy] up where it is along the tube, and adds its score. A
   /// seeder's spike stays, and a splitter splits, as in Tube Shooter.
   void _destroyEnemy(RunnerEnemyComponent enemy) {
-    _score += enemy.kind.score;
+    score += enemy.kind.score;
     final blast = PlacedExplosionComponent(
       enemy.mark,
       rayColor: enemy.kind.color,
@@ -724,7 +563,7 @@ abstract class TubeRunnerExample({
   /// Blows the ship up, fades it out, and takes a life. The enemies, spikes
   /// and shots go.
   void _destroyShip() {
-    _lives--;
+    lives--;
     explosionGroup.add(
       RunnerExplosionComponent(
         position: ship.position.clone(),
@@ -766,17 +605,18 @@ abstract class TubeRunnerExample({
   void _newGame() {
     explosionGroup.removeAll(explosionGroup.children.toList());
     _blasts.clear();
-    _lives = startLives;
+    lives = TubeHost.startLives;
     _tubeTime = 0;
-    _score = 0;
+    score = 0;
     gameOverText.removeFromParent();
-    world.timeScale = _speed;
+    world.timeScale = speed;
     ship.revive();
     _waitForPlayer();
   }
 
   /// Ends a wait: starts a new game once it's over, or else plays.
-  void _endWait() {
+  @override
+  void endWait() {
     if (_state == RunnerState.over) {
       _newGame();
     } else {
@@ -1015,131 +855,14 @@ abstract class TubeRunnerExample({
     if (quads.bounds.isEmpty) {
       return null;
     }
-    _paths++;
+    countPath();
     final component = quadsComponent(quads, color, glow: glow);
     tubeGroup.add(component);
     return component;
   }
 
-  /// Creates a component that fills [quads] in [color], where they are in
-  /// the world, with [glow] if [rendererGlows].
-  PositionComponent quadsComponent(
-    RasterizerPolygons quads,
-    Color color, {
-    RasterizerGlow? glow,
-  });
-
-  /// Returns the most device pixels that [quads]' longer side spans.
-  double maxSizeOf(RasterizerPolygons quads) =>
-      math.max(quads.bounds.width, quads.bounds.height) / view.devicePixel;
-
-  /// Fits the ring at the ship in 90% of the game's shorter side, as Tube
-  /// Shooter fits its rim, with its lines' widths in device pixels, whatever
-  /// the zoom.
-  void _fitView() {
-    if (size.x <= 0 || size.y <= 0) {
-      return;
-    }
-    final ratio =
-        buildContext
-            ?.getInheritedWidgetOfExactType<MediaQuery>()
-            ?.data
-            .devicePixelRatio ??
-        PlatformDispatcher.instance.implicitView?.devicePixelRatio ??
-        1;
-    view.fit(
-      0.9 * math.min(size.x, size.y),
-      1 / (ratio * camera.viewfinder.zoom),
-    );
-  }
-
-  /// Takes note of a pointer that goes down while the game waits, at READY
-  /// or Game Over: it ends the wait when it goes up, as a tap. Otherwise,
-  /// the ship fires while it's down, as in Tube Shooter.
   @override
-  void onDragStart(DragStartEvent event) {
-    if (_isWaiting) {
-      _waitPointers.add(event.pointerId);
-    } else {
-      _firePointers.add(event.pointerId);
-    }
-    super.onDragStart(event);
-  }
-
-  /// Moves the ship a lane every [dragPerLane] logical pixels left or right,
-  /// whatever the zoom.
-  @override
-  void onDragUpdate(DragUpdateEvent event) {
-    if (canMove) {
-      ship.moveBy(event.canvasDelta.x / dragPerLane);
-    }
-    super.onDragUpdate(event);
-  }
-
-  @override
-  void onDragEnd(DragEndEvent event) {
-    _firePointers.remove(event.pointerId);
-    if (_waitPointers.remove(event.pointerId)) {
-      _endWait();
-    }
-    super.onDragEnd(event);
-  }
-
-  @override
-  void onDragCancel(DragCancelEvent event) {
-    _firePointers.remove(event.pointerId);
-    _waitPointers.remove(event.pointerId);
-    super.onDragCancel(event);
-  }
-
-  /// Moves the ship a lane for each scroll, whatever its size: clockwise for
-  /// a scroll down, and as a drag would for one sideways.
-  @override
-  void onScroll(ScrollEvent event) {
-    final delta = event.raw.scrollDelta;
-    if (canMove) {
-      if (delta.dy != 0) {
-        ship.moveBy(-delta.dy.sign);
-      } else if (delta.dx != 0) {
-        ship.moveBy(delta.dx.sign);
-      }
-    }
-    super.onScroll(event);
-  }
-
-  /// Handles a key: at READY, any key but a modifier starts the game, and
-  /// once it's over, Enter starts a new one. The keys that move the ship or
-  /// fire count as held while down, and it ignores the others.
-  @override
-  KeyEventResult onKeyEvent(
-    KeyEvent event,
-    Set<LogicalKeyboardKey> keysPressed,
-  ) {
-    final key = event.physicalKey;
-    if (_state == RunnerState.ready &&
-        event is KeyDownEvent &&
-        !_modifierKeys.contains(key)) {
-      _beginPlay();
-      return KeyEventResult.handled;
-    }
-    if (_newGameKeys.contains(key)) {
-      if (event is KeyDownEvent && _state == RunnerState.over) {
-        _newGame();
-      }
-      return KeyEventResult.handled;
-    }
-    if (key != _fireKey &&
-        !_leftKeys.contains(key) &&
-        !_rightKeys.contains(key)) {
-      return KeyEventResult.ignored;
-    }
-    if (event is KeyDownEvent) {
-      _heldKeys.add(key);
-    } else if (event is KeyUpEvent) {
-      _heldKeys.remove(key);
-    }
-    return KeyEventResult.handled;
-  }
+  void moveShipBy(double lanes) => ship.moveBy(lanes);
 }
 
 /// The example with flame_rasterizer: [RasterizerPathComponent]s draw its
@@ -1153,31 +876,11 @@ class RasterizerTubeRunnerExample({
     with
         HasRasterizer,
         ExampleRasterizer,
-        RasterizerPathComponents<ExampleWorld> {
+        RasterizerPathComponents<ExampleWorld>,
+        RasterizerTubeHost {
   this {
     RasterizerGpu.forceCanvas = forceCanvas;
   }
-
-  /// Fills the quads separate, which the mesh renderer imports much faster
-  /// than their union. The tube is opaque, so their overlaps don't show,
-  /// but where glows overlap, they add up, as in Tube Shooter.
-  @override
-  PositionComponent quadsComponent(
-    RasterizerPolygons quads,
-    Color color, {
-    RasterizerGlow? glow,
-  }) => RasterizerPolygonsComponent(
-    polygons: quads,
-    paint: Paint()..color = color,
-    position: Vector2(quads.bounds.left, quads.bounds.top),
-    maxSize: maxSizeOf(quads),
-    glow: glow,
-    separate: true,
-  );
-
-  /// Whether the Renderer knob picked the mesh renderer, which draws glows.
-  @override
-  bool get rendererGlows => renderer == SvgRenderer.rasterizer;
 
   @override
   void glowShape(PathComponent drawing, double strength, Color color) {
@@ -1194,36 +897,5 @@ class FlameTubeRunnerExample({
   required super.status,
   super.random,
   super.tube,
-}) extends TubeRunnerExample with FlamePathComponents<ExampleWorld> {
-  @override
-  String get rendererText => "Flame's PathComponent";
-
-  /// None: Flame's PathComponents keep no numbers to show.
-  @override
-  Iterable<String> get rendererStats => const [];
-
-  /// Fills a path of the quads, without [glow], which Flame doesn't draw.
-  ///
-  /// Its contours stay open, as the fill closes them anyway. Flame's
-  /// `PathComponent` would walk each closed contour into a polygon, which the
-  /// game doesn't use, as [RasterizerPolygons.path]'s are.
-  @override
-  PositionComponent quadsComponent(
-    RasterizerPolygons quads,
-    Color color, {
-    RasterizerGlow? glow,
-  }) {
-    final path = Path();
-    final points = quads.vertices;
-    for (var i = 0; i < points.length; i += 8) {
-      path.addPolygon([
-        for (var k = i; k < i + 8; k += 2) Offset(points[k], points[k + 1]),
-      ], false);
-    }
-    return pathComponent(
-      path,
-      Paint()..color = color,
-      position: Vector2(quads.bounds.left, quads.bounds.top),
-    );
-  }
-}
+}) extends TubeRunnerExample
+    with FlamePathComponents<ExampleWorld>, FlameTubeHost;

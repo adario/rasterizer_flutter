@@ -237,7 +237,7 @@ extension on TubeShooterExample {
       if (quads.bounds.isEmpty) {
         return null;
       }
-      _paths++;
+      countPath();
       final component = quadsComponent(
         quads,
         color,

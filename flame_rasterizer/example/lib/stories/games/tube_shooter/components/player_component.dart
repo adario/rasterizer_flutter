@@ -6,6 +6,7 @@ import 'package:flame/effects.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 
 /// What the ship in a game for another renderer goes on from: its step and
@@ -48,7 +49,7 @@ class PlayerComponent({final PlayerSnapshot? from})
   static const startStep = stepsPerLane ~/ 2;
 
   /// Seconds it takes to fade out once destroyed.
-  static const fadeTime = TubeShooterExample.respawnTime * 2 / 3;
+  static const fadeTime = TubeHost.respawnTime * 2 / 3;
 
   int step = startStep;
   double depth = 0;

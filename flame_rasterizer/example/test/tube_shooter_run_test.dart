@@ -6,6 +6,7 @@ import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/widgets.dart' show SizedBox;
 import 'package:flutter_test/flutter_test.dart';
@@ -116,7 +117,7 @@ void main() {
     expect(game.level.tube, Tubes.floor);
     expect(game.round, 2);
     expect(game.score, 1234);
-    expect(game.lives, TubeShooterExample.startLives);
+    expect(game.lives, TubeHost.startLives);
     expect(game.player.isVisible, isTrue);
     expect(game.player.depth, 0);
     expect(game.view.eyeShift, 0);
