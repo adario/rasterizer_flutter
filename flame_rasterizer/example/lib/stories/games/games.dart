@@ -8,6 +8,7 @@ import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:widgetbook/widgetbook.dart';

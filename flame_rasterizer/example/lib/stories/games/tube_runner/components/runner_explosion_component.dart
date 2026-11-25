@@ -5,8 +5,8 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// A burst of rays in [color], placed, turned and scaled as what it destroyed,
 /// as Tube Shooter's `ExplosionComponent` is, with the same shapes and times.
@@ -24,7 +24,7 @@ class RunnerExplosionComponent({
   /// The colour of its flying rays, such as that of what it destroyed, or
   /// null for [color].
   final Color? rayColor,
-}) extends PositionComponent with HasGameRef<TubeRunnerExample> {
+}) extends PositionComponent with HasGameRef<TubeHost> {
   static const duration = 0.5;
 
   /// How long it shows, in seconds.

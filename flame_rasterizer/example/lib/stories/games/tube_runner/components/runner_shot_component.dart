@@ -2,10 +2,11 @@ import 'package:flame/components.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/shot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// A shot from the ship, which flies down its [lane] from [at], as Tube
 /// Shooter's `ShotComponent` does, with the same shape, colour and speed
@@ -14,7 +15,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// The game moves it with [fly].
 class RunnerShotComponent(final int lane, var double at)
     extends PositionComponent
-    with HasGameRef<TubeRunnerExample>, HasVisibility, TubePlaced {
+    with HasGameRef<TubeHost>, HasVisibility, TubePlaced {
   this : super(priority: 2);
 
   /// How fast it flies ahead of the ship, in tube units a second: across
@@ -47,7 +48,7 @@ class RunnerShotComponent(final int lane, var double at)
   /// Flies over [dt] seconds, with the ship and [speed] ahead of it.
   void fly(double dt) {
     previousAt = at;
-    at += (TubeRunnerExample.flightSpeed + speed) * dt;
+    at += (RunnerMode.flightSpeed + speed) * dt;
   }
 }
 
@@ -59,7 +60,7 @@ class RunnerShotComponent(final int lane, var double at)
 /// which it destroys if the ship is in its lane.
 class RunnerEnemyShotComponent(final int lane, var double at)
     extends PositionComponent
-    with HasGameRef<TubeRunnerExample>, HasVisibility, TubePlaced {
+    with HasGameRef<TubeHost>, HasVisibility, TubePlaced {
   this : super(priority: 2);
 
   /// How fast it climbs its lane, along the axis, in tube units a second:

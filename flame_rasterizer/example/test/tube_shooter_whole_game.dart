@@ -3,6 +3,7 @@
 import 'package:flame/components.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/climber_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,7 +49,7 @@ class FallbackWatch(
       return;
     }
     frames++;
-    final state = game.state;
+    final state = game.shooter.state;
     states.add(state);
     if (renderer.backend != expected) {
       problems.add('${state.name}: the ${renderer.backend.name} renderer');
@@ -93,8 +94,8 @@ Future<void> playWholeGame(
   Future<void> Function(double seconds, {bool Function()? done}) pumpFor,
 ) async {
   Future<void> reach(TubeState state, {double seconds = 15}) async {
-    await pumpFor(seconds, done: () => game.state == state);
-    expect(game.state, state);
+    await pumpFor(seconds, done: () => game.shooter.state == state);
+    expect(game.shooter.state, state);
   }
 
   // An enemy can destroy the ship at any time, so the game may be in play
@@ -102,27 +103,30 @@ Future<void> playWholeGame(
   Future<void> begin() async {
     await pumpFor(
       15,
-      done: () => game.state == TubeState.ready || game.state == TubeState.play,
+      done: () =>
+          game.shooter.state == TubeState.ready ||
+          game.shooter.state == TubeState.play,
     );
-    if (game.state == TubeState.ready) {
+    if (game.shooter.state == TubeState.ready) {
       await tester.tapAt(center);
       await reach(TubeState.play, seconds: 1);
     }
-    expect(game.state, TubeState.play);
+    expect(game.shooter.state, TubeState.play);
   }
 
   // A climber at the rim in the ship's lane destroys the ship.
-  void loseShip() =>
-      game.addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
+  void loseShip() => game.shooter.addEnemy(
+    ClimberComponent(lane: game.shooter.player.lane, depth: 0),
+  );
 
   await begin();
   final finger = await tester.startGesture(center);
-  for (var i = 0; i < 240 && game.state == TubeState.play; i++) {
+  for (var i = 0; i < 240 && game.shooter.state == TubeState.play; i++) {
     await finger.moveBy(Offset(i % 60 < 30 ? 8 : -8, 0));
     await pumpFor(1 / 60);
   }
   await finger.up();
-  game.purge();
+  game.shooter.purge();
   await pumpFor(0.5);
 
   await begin();
@@ -130,9 +134,9 @@ Future<void> playWholeGame(
   await reach(TubeState.dying, seconds: 1);
 
   await begin();
-  game.clearSpawns();
-  for (final enemy in [...game.enemies]) {
-    game.discard(enemy);
+  game.shooter.clearSpawns();
+  for (final enemy in [...game.shooter.enemies]) {
+    game.shooter.discard(enemy);
   }
   await reach(TubeState.drop, seconds: 1);
   await reach(TubeState.zoom);
@@ -142,9 +146,11 @@ Future<void> playWholeGame(
     loseShip();
     await pumpFor(
       5,
-      done: () => game.state == TubeState.ready || game.state == TubeState.over,
+      done: () =>
+          game.shooter.state == TubeState.ready ||
+          game.shooter.state == TubeState.over,
     );
-  } while (game.state != TubeState.over);
+  } while (game.shooter.state != TubeState.over);
   await pumpFor(0.5);
   await tester.tapAt(center);
   await reach(TubeState.zoom, seconds: 2);

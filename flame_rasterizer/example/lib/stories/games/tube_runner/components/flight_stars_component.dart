@@ -2,12 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_field_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// The stars, as on Tube Shooter's drop: see [StarFieldComponent], whose
 /// numbers they share.
@@ -23,9 +24,10 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// It's in the camera's backdrop, as Tube Shooter's stars are, and draws
 /// through the viewfinder's transform and updates at the world's time scale,
 /// as if it were in the world.
-class FlightStarsComponent()
-    extends Component
-    with HasGameRef<TubeRunnerExample>, CustomTraversal {
+class FlightStarsComponent(
+  /// The mode whose ship the stars fly by, and turn with.
+  final RunnerMode runner,
+) extends Component with HasGameRef<TubeHost>, CustomTraversal {
   final stars = <FlightStarComponent>[];
 
   /// How far the ship had flown at the last update.
@@ -37,7 +39,7 @@ class FlightStarsComponent()
   double _turned = 0;
 
   /// The ship's step at the last update.
-  late int _step = gameRef.ship.step;
+  late int _step = runner.ship.step;
 
   /// The tube the ship was on at the last update.
   late Tube _tube = gameRef.view.tube;
@@ -48,7 +50,7 @@ class FlightStarsComponent()
 
   @override
   Future<void> onLoad() async {
-    _flown = gameRef.flown;
+    _flown = runner.flown;
     final random = gameRef.random;
     for (var i = 0; i < StarFieldComponent.count; i++) {
       final distance =
@@ -88,7 +90,7 @@ class FlightStarsComponent()
   double _turn(double dt) {
     const stepsPerLane = PlayerComponent.stepsPerLane;
     final tube = gameRef.view.tube;
-    final step = gameRef.ship.step;
+    final step = runner.ship.step;
     if (!identical(tube, _tube)) {
       _tube = tube;
       _turnPerLane = _turnPerLaneOn(tube);
@@ -148,8 +150,8 @@ class FlightStarsComponent()
   @override
   void update(double dt) {
     super.update(dt);
-    final closer = gameRef.flown - _flown;
-    _flown = gameRef.flown;
+    final closer = runner.flown - _flown;
+    _flown = runner.flown;
     final turn = _turn(dt);
     for (final star in stars) {
       star
@@ -181,7 +183,7 @@ class FlightStarsComponent()
 /// the eye along it, in tube units.
 class FlightStarComponent(Offset point, double eyeDistance)
     extends PositionComponent
-    with HasGameRef<TubeRunnerExample> {
+    with HasGameRef<TubeHost> {
   Offset point = point;
   double eyeDistance = eyeDistance;
 

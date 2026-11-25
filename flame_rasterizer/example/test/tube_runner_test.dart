@@ -10,11 +10,12 @@ import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_climber_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_splitter_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -154,10 +155,10 @@ void main() {
           )
           .game!;
       await pumpWhileLoading(tester, () => !game.isLoaded);
-      final lane = game.ship.lane;
+      final lane = game.runner.ship.lane;
       // A key starts the game at READY.
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      expect(game.state, RunnerState.play);
+      expect(game.runner.state, RunnerState.play);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
       for (var i = 0; i < 60; i++) {
         await tester.pump(const Duration(milliseconds: 16));
@@ -165,10 +166,10 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump(const Duration(milliseconds: 16));
       expect(
-        game.flown,
-        closeTo(61 * 0.016 * TubeRunnerExample.flightSpeed, 0.05),
+        game.runner.flown,
+        closeTo(61 * 0.016 * RunnerMode.flightSpeed, 0.05),
       );
-      expect(game.ship.lane, isNot(lane));
+      expect(game.runner.ship.lane, isNot(lane));
       expect(game.exampleStats.first, isNot('0 quads'));
     });
 
@@ -190,24 +191,26 @@ void main() {
           .game!;
       await pumpWhileLoading(tester, () => !game.isLoaded);
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      for (var i = 0; i < 400 && game.seeders.isEmpty; i++) {
+      for (var i = 0; i < 400 && game.runner.seeders.isEmpty; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
-      final seeder = game.seeders.single;
-      game.ship.moveBy((seeder.spike.lane - game.ship.lane).toDouble());
-      expect(game.ship.lane, seeder.spike.lane);
+      final seeder = game.runner.seeders.single;
+      game.runner.ship.moveBy(
+        (seeder.spike.lane - game.runner.ship.lane).toDouble(),
+      );
+      expect(game.runner.ship.lane, seeder.spike.lane);
       // Fires until the seeder is gone, and then at its spike.
       await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
       for (var i = 0; i < 300 && game.score <= EnemyKind.seeder.score; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
       await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
-      expect(game.seeders, isNot(contains(seeder)));
+      expect(game.runner.seeders, isNot(contains(seeder)));
       expect(
         game.score,
-        EnemyKind.seeder.score + TubeShooterExample.spikeScore,
+        EnemyKind.seeder.score + ShooterMode.spikeScore,
       );
-      expect(game.state, RunnerState.play);
+      expect(game.runner.state, RunnerState.play);
     });
 
     testWidgets('a shot destroys a climber, with ${renderer.name}', (
@@ -229,19 +232,21 @@ void main() {
           .game!;
       await pumpWhileLoading(tester, () => !game.isLoaded);
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      game.addEnemy(EnemyKind.climber, game.ship.lane);
-      final climber = game.enemies.single;
+      game.runner.addEnemy(EnemyKind.climber, game.runner.ship.lane);
+      final climber = game.runner.enemies.single;
       // Fires, following the climber as it flips, until it's gone, before
       // the first seeder comes.
       await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
       for (var i = 0; i < 300 && game.score < EnemyKind.climber.score; i++) {
-        game.ship.moveBy((climber.currentLane - game.ship.lane).toDouble());
+        game.runner.ship.moveBy(
+          (climber.currentLane - game.runner.ship.lane).toDouble(),
+        );
         await tester.pump(const Duration(milliseconds: 16));
       }
       await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
-      expect(game.enemies, isNot(contains(climber)));
+      expect(game.runner.enemies, isNot(contains(climber)));
       expect(game.score, EnemyKind.climber.score);
-      expect(game.state, RunnerState.play);
+      expect(game.runner.state, RunnerState.play);
     });
 
     testWidgets("a zapper's bolt destroys the ship in its lane, with "
@@ -262,20 +267,20 @@ void main() {
           .game!;
       await pumpWhileLoading(tester, () => !game.isLoaded);
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      final lane = game.tube.neighbour(game.ship.lane, 2)!;
-      game.addEnemy(EnemyKind.zapper, lane);
+      final lane = game.tube.neighbour(game.runner.ship.lane, 2)!;
+      game.runner.addEnemy(EnemyKind.zapper, lane);
       // The first pulse, 2.4 seconds in, before the zapper's first flip, at
       // 3 seconds or later, leaves the ship in another lane alone.
-      for (var i = 0; i < 300 && !game.isPulsing; i++) {
+      for (var i = 0; i < 300 && !game.runner.isPulsing; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
       await tester.pump(const Duration(milliseconds: 16));
-      expect(game.isPulsing, isTrue);
-      expect(game.state, RunnerState.play);
-      game.ship.moveBy(2);
-      expect(game.ship.lane, lane);
+      expect(game.runner.isPulsing, isTrue);
+      expect(game.runner.state, RunnerState.play);
+      game.runner.ship.moveBy(2);
+      expect(game.runner.ship.lane, lane);
       await tester.pump(const Duration(milliseconds: 16));
-      expect(game.state, RunnerState.dying);
+      expect(game.runner.state, RunnerState.dying);
       expect(game.lives, TubeHost.startLives - 1);
     });
 
@@ -299,35 +304,35 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
       // Unshot, two lanes from the ship, it splits 4 units ahead of it, into
       // climbers that flip onto the lanes on either side.
-      final lane = game.tube.neighbour(game.ship.lane, 2)!;
-      game.addEnemy(EnemyKind.splitter, lane);
+      final lane = game.tube.neighbour(game.runner.ship.lane, 2)!;
+      game.runner.addEnemy(EnemyKind.splitter, lane);
       bool splitting() =>
-          game.enemies.whereType<RunnerSplitterComponent>().isNotEmpty;
+          game.runner.enemies.whereType<RunnerSplitterComponent>().isNotEmpty;
       for (var i = 0; i < 300 && splitting(); i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
-      final climbers = game.enemies.whereType<RunnerClimberComponent>();
+      final climbers = game.runner.enemies.whereType<RunnerClimberComponent>();
       expect(climbers, hasLength(2));
       expect(climbers.map((climber) => climber.mark.flip?.to).toSet(), {
         game.tube.neighbour(lane, -1),
         game.tube.neighbour(lane, 1),
       });
       expect(
-        climbers.first.at - game.flown,
+        climbers.first.at - game.runner.flown,
         closeTo(RunnerSplitterComponent.splitAhead, 0.1),
       );
       expect(game.score, 0);
       // Shot, it scores, and splits too.
-      game.addEnemy(EnemyKind.splitter, game.ship.lane);
-      final splitter = game.enemies.last;
+      game.runner.addEnemy(EnemyKind.splitter, game.runner.ship.lane);
+      final splitter = game.runner.enemies.last;
       await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
       for (var i = 0; i < 300 && game.score < EnemyKind.splitter.score; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
       await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
-      expect(game.enemies, isNot(contains(splitter)));
+      expect(game.runner.enemies, isNot(contains(splitter)));
       expect(game.score, greaterThanOrEqualTo(EnemyKind.splitter.score));
-      expect(game.state, RunnerState.play);
+      expect(game.runner.state, RunnerState.play);
     });
 
     testWidgets('round an open tube, the ship stops at its ends, and a '
@@ -354,24 +359,24 @@ void main() {
           .game!;
       await pumpWhileLoading(tester, () => !game.isLoaded);
       await tester.sendKeyEvent(LogicalKeyboardKey.space);
-      game.ship.moveBy(-2.0 * tube.laneCount);
-      expect(game.ship.lane, 0);
-      game.ship.moveBy(2.0 * tube.laneCount);
-      expect(game.ship.lane, tube.laneCount - 1);
-      game.addEnemy(EnemyKind.splitter, 0);
+      game.runner.ship.moveBy(-2.0 * tube.laneCount);
+      expect(game.runner.ship.lane, 0);
+      game.runner.ship.moveBy(2.0 * tube.laneCount);
+      expect(game.runner.ship.lane, tube.laneCount - 1);
+      game.runner.addEnemy(EnemyKind.splitter, 0);
       bool splitting() =>
-          game.enemies.whereType<RunnerSplitterComponent>().isNotEmpty;
+          game.runner.enemies.whereType<RunnerSplitterComponent>().isNotEmpty;
       for (var i = 0; i < 300 && splitting(); i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
-      final climbers = game.enemies.whereType<RunnerClimberComponent>();
+      final climbers = game.runner.enemies.whereType<RunnerClimberComponent>();
       expect(climbers, hasLength(2));
       expect(climbers.map((climber) => climber.mark.flip?.to).toSet(), {
         null,
         1,
       });
       expect(climbers.map((climber) => climber.lane), everyElement(0));
-      expect(game.state, RunnerState.play);
+      expect(game.runner.state, RunnerState.play);
     });
   }
 }

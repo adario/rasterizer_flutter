@@ -1,6 +1,6 @@
-part of 'tube_shooter_example.dart';
+part of 'shooter_mode.dart';
 
-/// A prototype of a run between two rounds, with [TubeShooterExample.runs]
+/// A prototype of a run between two rounds, with [ShooterMode.runs]
 /// on: after a closed tube's drop, the ship flies on down an endless tube,
 /// as in Tube Runner, then out of it, onto the next round's rim.
 ///
@@ -8,11 +8,11 @@ part of 'tube_shooter_example.dart';
 /// the round's tube, which leads straight into the run's: the drop is the
 /// first [Tube.depth] of the run. The drop speeds up to Tube Runner's
 /// [flightSpeed] by its end, as [dropDepth] says, and the ship flies on as
-/// fast, moving round the tube as in play, for [TubeShooterExample.runTime].
+/// fast, moving round the tube as in play, for [ShooterMode.runTime].
 /// Its tube eases into Tube Runner's bends past the drop, and out of them by
 /// the end of the run, then goes straight on to its [exit]. The ship slows
 /// down from there to a stop on the next round's rim, [rim] along the axis,
-/// over [TubeShooterExample.arriveTime].
+/// over [ShooterMode.arriveTime].
 ///
 /// [EndlessTube] draws the run's tube past the round's far end, which grows
 /// from there to the full length ahead on the drop, and the next round's
@@ -28,15 +28,15 @@ class _Run(
   /// The next round's level.
   final Level next,
 ) {
-  static const flightSpeed = TubeRunnerExample.flightSpeed;
+  static const flightSpeed = RunnerMode.flightSpeed;
 
   /// Where the run's bends end: as far along as the ship flies on the drop
   /// and the run.
-  static const playEnd = Tube.depth + flightSpeed * TubeShooterExample.runTime;
+  static const playEnd = Tube.depth + flightSpeed * ShooterMode.runTime;
 
   /// Where the next round's rim is: as far past [playEnd] as the ship flies
   /// while it slows down evenly from [flightSpeed] to a stop.
-  static const rim = playEnd + flightSpeed * TubeShooterExample.arriveTime / 2;
+  static const rim = playEnd + flightSpeed * ShooterMode.arriveTime / 2;
 
   /// Where the run's tube ends, with a ring across: on a ring, and far
   /// enough before [rim] to be behind the eye once the ship is there.
@@ -52,7 +52,7 @@ class _Run(
       math
           .pow(
             progress,
-            flightSpeed * TubeShooterExample.dropTime / Tube.depth,
+            flightSpeed * ShooterMode.dropTime / Tube.depth,
           )
           .toDouble();
 
@@ -64,7 +64,7 @@ class _Run(
     course: (
       bendFrom: Tube.depth,
       bendTo: playEnd,
-      ease: TubeShooterExample.runEase,
+      ease: ShooterMode.runEase,
     ),
   );
 
@@ -125,11 +125,11 @@ class _Run(
   }
 }
 
-/// The runs, with [TubeShooterExample.runs] on: see [_Run].
-extension on TubeShooterExample {
+/// The runs, with [ShooterMode.runs] on: see [_Run].
+extension on ShooterMode {
   /// Starts the run, the drop's overshoot into it.
   void _beginRun() {
-    final over = _stateTime - TubeShooterExample.dropTime;
+    final over = _stateTime - ShooterMode.dropTime;
     _setState(TubeState.run);
     _stateTime = over;
     _stepRun();
@@ -142,7 +142,7 @@ extension on TubeShooterExample {
     run.flown = Tube.depth + _Run.flightSpeed * _stateTime;
     // The round's tube goes on behind the eye.
     player.depth = view.eyeShift = run.flown;
-    if (_stateTime >= TubeShooterExample.runTime) {
+    if (_stateTime >= ShooterMode.runTime) {
       _beginArrive();
     }
   }
@@ -151,7 +151,7 @@ extension on TubeShooterExample {
   /// overshoot into the arrival.
   void _beginArrive() {
     final run = _run!;
-    final over = _stateTime - TubeShooterExample.runTime;
+    final over = _stateTime - ShooterMode.runTime;
     run
       ..shipFrom = player.position.clone()
       ..angleFrom = player.angle
@@ -166,7 +166,7 @@ extension on TubeShooterExample {
   /// player, as at the end of a zoom.
   void _stepArrive() {
     final run = _run!;
-    const time = TubeShooterExample.arriveTime;
+    const time = ShooterMode.arriveTime;
     final progress = math.min(1.0, _stateTime / time);
     run.flown =
         _Run.playEnd +
@@ -213,7 +213,7 @@ extension on TubeShooterExample {
     final until = dropping
         ? Tube.depth +
               EndlessTube.ahead *
-                  math.min(1.0, _stateTime / TubeShooterExample.dropTime)
+                  math.min(1.0, _stateTime / ShooterMode.dropTime)
         : _Run.exit;
     final nextColor = arriving ? level.color : run.next.color;
     final quads = run.endless.quadsAt(
@@ -226,7 +226,7 @@ extension on TubeShooterExample {
           ? (tube: arriving ? view.tube : run.next.tube, rim: _Run.rim)
           : null,
     );
-    final glow = _glow && rendererGlows ? TubeShooterExample.tubeGlow : null;
+    final glow = gameRef.linesGlow;
     PositionComponent? replace(
       PositionComponent? old,
       RasterizerPolygons quads,
@@ -237,8 +237,8 @@ extension on TubeShooterExample {
       if (quads.bounds.isEmpty) {
         return null;
       }
-      countPath();
-      final component = quadsComponent(
+      gameRef.countPath();
+      final component = gameRef.quadsComponent(
         quads,
         color,
         priority: priority,
@@ -248,7 +248,7 @@ extension on TubeShooterExample {
       return component;
     }
 
-    final fade = math.min(1.0, _stateTime / TubeShooterExample.laneFadeTime);
+    final fade = math.min(1.0, _stateTime / ShooterMode.laneFadeTime);
     run
       ..tubeDrawing = replace(run.tubeDrawing, quads.tube, run.color)
       ..laneDrawing = replace(

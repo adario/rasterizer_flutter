@@ -1,4 +1,4 @@
-part of 'tube_shooter_example.dart';
+part of 'shooter_mode.dart';
 
 /// What a game for another renderer goes on from: the first level, the
 /// round, its state and how long it has lasted, the score, the lives, the
@@ -28,13 +28,13 @@ typedef TubeShooterSnapshot = ({
   List<LaneSnapshot> enemyShots,
 });
 
-/// Takes a [TubeShooterExample]'s snapshot, and goes on from one.
+/// Takes a [ShooterMode]'s snapshot, and goes on from one.
 ///
 /// The explosions and the stars start again in the new game, and so do the
 /// keys, the drags and the taps, which the new game hasn't seen go down. The
 /// new game plays no sound for what the old one did, and its random picks
 /// differ from those that the old one would have made.
-extension TubeShooterSnapshots on TubeShooterExample {
+extension TubeShooterSnapshots on ShooterMode {
   /// What a game for another renderer goes on from.
   TubeShooterSnapshot get snapshot => (
     firstLevel: firstLevel,
@@ -43,8 +43,8 @@ extension TubeShooterSnapshots on TubeShooterExample {
     state: _state,
     stateTime: _stateTime,
     dyingOnDrop: _dyingOnDrop,
-    score: score,
-    lives: lives,
+    score: gameRef.score,
+    lives: gameRef.lives,
     purgeReady: purgeReady,
     purgeLeft: _purgeLeft,
     sinceSpawn: _sinceSpawn,
@@ -66,8 +66,8 @@ extension TubeShooterSnapshots on TubeShooterExample {
     _levelIndex = from.levelIndex;
     round = from.round;
     _dyingOnDrop = from.dyingOnDrop;
-    score = from.score;
-    lives = from.lives;
+    gameRef.score = from.score;
+    gameRef.lives = from.lives;
     purgeReady = from.purgeReady;
     _sinceSpawn = from.sinceSpawn;
     _pulseClock = from.pulseClock;
@@ -114,18 +114,18 @@ extension TubeShooterSnapshots on TubeShooterExample {
     }
     // Before the state, whose stars show at once in a still world.
     if (from.state == TubeState.over) {
-      world.timeScale = 0;
+      gameRef.world.timeScale = 0;
     }
     _setState(from.state);
     _stateTime = from.stateTime;
     switch (from.state) {
       case TubeState.zoom:
         _roundBanner.text = 'ROUND $round';
-        camera.viewport.addAll([_roundBanner, _purgeReadyText]);
+        gameRef.camera.viewport.addAll([_roundBanner, _purgeReadyText]);
       case TubeState.ready:
-        camera.viewport.add(readyText);
+        gameRef.camera.viewport.add(gameRef.readyText);
       case TubeState.over:
-        camera.viewport.add(gameOverText);
+        gameRef.camera.viewport.add(gameRef.gameOverText);
       case TubeState.play ||
           TubeState.dying ||
           TubeState.drop ||
@@ -135,7 +135,7 @@ extension TubeShooterSnapshots on TubeShooterExample {
     }
     _purgeLeft = from.purgeLeft;
     if (_purgeLeft > 0) {
-      camera.viewport.add(_purgeText);
+      gameRef.camera.viewport.add(_purgeText);
     }
   }
 }

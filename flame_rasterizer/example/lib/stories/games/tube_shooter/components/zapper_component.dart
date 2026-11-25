@@ -25,7 +25,7 @@ class ZapperComponent({
   bool _warned = false;
 
   /// Whether its bolt runs down its lane now.
-  bool get isZapping => _warned && gameRef.isPulsing && !isFlipping;
+  bool get isZapping => _warned && shooter.isPulsing && !isFlipping;
 
   @override
   Future<void> onLoad() async {
@@ -40,7 +40,7 @@ class ZapperComponent({
       _flash(white);
       return;
     }
-    _untilFlip = between(gameRef.level.zapperFlipPeriod);
+    _untilFlip = between(shooter.level.zapperFlipPeriod);
   }
 
   @override
@@ -53,8 +53,8 @@ class ZapperComponent({
   @override
   void move(double dt) {
     super.move(dt);
-    final level = gameRef.level;
-    final pace = gameRef.pace;
+    final level = shooter.level;
+    final pace = shooter.pace;
     _untilFlip -= dt * pace;
     if (depth > 0) {
       depth = math.max(0, depth - dt * pace * Tube.depth / level.zapperTime);
@@ -66,15 +66,15 @@ class ZapperComponent({
       }
     } else if (_untilFlip <= 0 && !isFlipping) {
       _untilFlip = level.zapperRimFlipPeriod;
-      final toward = gameRef.towardShip(lane);
+      final toward = shooter.towardShip(lane);
       if (toward != 0) {
         flipAside(toward);
       }
     }
-    final warning = gameRef.isWarning;
+    final warning = shooter.isWarning;
     if (warning) {
       _warned = true;
-    } else if (!gameRef.isPulsing) {
+    } else if (!shooter.isPulsing) {
       _warned = false;
     }
     _flash(warning);

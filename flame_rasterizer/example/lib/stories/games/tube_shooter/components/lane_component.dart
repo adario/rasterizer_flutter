@@ -2,7 +2,8 @@ import 'dart:ui';
 
 import 'package:flame/components.dart';
 
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// Where something in a lane of the tube is, for a game with another renderer
 /// to go on from: its lane, its depth, and its depth before its last update.
@@ -19,7 +20,7 @@ abstract class LaneComponent(
   required int lane,
   required double depth,
   double? previousDepth,
-}) extends PositionComponent with HasGameRef<TubeShooterExample> {
+}) extends PositionComponent with HasGameRef<TubeHost>, InShooterMode {
   int lane = lane;
   double depth = depth;
 
@@ -36,6 +37,7 @@ abstract class LaneComponent(
 
   @override
   Future<void> onLoad() async {
+    findShooter();
     add(drawing = gameRef.shapeComponent(shape, color));
     place();
   }
@@ -66,7 +68,7 @@ abstract class LaneComponent(
 
   @override
   void onRemove() {
-    gameRef.forget(this);
+    shooter.forget(this);
     super.onRemove();
   }
 }

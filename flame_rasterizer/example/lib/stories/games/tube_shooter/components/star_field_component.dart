@@ -4,9 +4,10 @@ import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// The stars around the tube, never inside it.
 ///
@@ -35,9 +36,10 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// process, the Glow knob's [TubeGlow], leaves the stars out. Still, it draws
 /// through the viewfinder's transform and updates at the world's time scale,
 /// as if it were in the world.
-class StarFieldComponent()
-    extends Component
-    with HasGameRef<TubeShooterExample>, CustomTraversal {
+class StarFieldComponent(
+  /// The mode whose ship the stars turn with, at its pace.
+  final ShooterMode shooter,
+) extends Component with HasGameRef<TubeHost>, CustomTraversal {
   static const count = 200;
   static const far = 10.0;
   static const bright = 4.0;
@@ -47,7 +49,7 @@ class StarFieldComponent()
   /// The slowest the stars come in the first round, in tube units a second: a
   /// tenth of the eye's top speed on the drop. Later rounds speed it up, as
   /// they do the game.
-  static const cruise = 0.1 * 2 * Tube.depth / TubeShooterExample.dropTime;
+  static const cruise = 0.1 * 2 * Tube.depth / ShooterMode.dropTime;
 
   /// How much a star [bright] from the eye turns for each turn of the ship:
   /// round a closed tube, or of its angle along an open one.
@@ -142,15 +144,15 @@ class StarFieldComponent()
   /// clockwise on screen.
   double _turn(double dt) {
     final tube = gameRef.view.tube;
-    final step = gameRef.player.step;
+    final step = shooter.player.step;
     if (!identical(tube, _tube)) {
       _tube = tube;
       _turnPerLane = _turnPerLaneOn(tube);
-    } else if (gameRef.canMove && tube.isOpen) {
+    } else if (shooter.canMove && tube.isOpen) {
       _turnTarget -=
           PlayerComponent.headingOn(tube, step) -
           PlayerComponent.headingOn(tube, _step);
-    } else if (gameRef.canMove) {
+    } else if (shooter.canMove) {
       const stepsPerLane = PlayerComponent.stepsPerLane;
       final steps = stepsPerLane * tube.laneCount;
       var moved = step - _step;
@@ -222,7 +224,7 @@ class StarFieldComponent()
     final eyeShift = view.eyeShift;
     final deeper = eyeShift - _eyeShift;
     _eyeShift = eyeShift;
-    final drift = cruise * gameRef.pace * dt;
+    final drift = cruise * shooter.pace * dt;
     final isSlow = deeper <= drift;
     final closer = isSlow ? drift : deeper;
     // Round the viewport's centre, as the stars lie, and larger by the widest

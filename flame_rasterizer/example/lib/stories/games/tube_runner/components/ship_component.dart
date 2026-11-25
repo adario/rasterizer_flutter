@@ -4,10 +4,10 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 
-import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// The ship, which moves round the tube's ring at the ship as Tube Shooter's
 /// moves round the rim: see [PlayerComponent], whose numbers it shares.
@@ -17,7 +17,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// and fades out when destroyed.
 class ShipComponent()
     extends PositionComponent
-    with HasGameRef<TubeRunnerExample>, HasVisibility {
+    with HasGameRef<TubeHost>, HasVisibility {
   this : super(priority: 4);
 
   static const stepsPerLane = PlayerComponent.stepsPerLane;

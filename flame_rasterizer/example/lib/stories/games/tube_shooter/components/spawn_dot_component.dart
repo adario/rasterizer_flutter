@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flame_rasterizer_example/commons/material.dart' show Colors;
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/dot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
 /// What an enemy still to come in a game for another renderer goes on from:
@@ -29,7 +30,7 @@ class SpawnDotComponent(
   final EnemyKind kind, {
   required double at,
   final SpawnSnapshot? from,
-}) extends DotComponent {
+}) extends DotComponent with InShooterMode {
   this : super(kind.color);
 
   /// Its width, in device pixels.
@@ -114,7 +115,7 @@ class SpawnDotComponent(
   void move(double dt) {
     final arriving = _arriving;
     if (arriving == null) {
-      final pace = gameRef.pace;
+      final pace = shooter.pace;
       final tube = gameRef.view.tube;
       _turnIn -= dt * pace;
       if (_turnIn <= 0) {

@@ -3,7 +3,7 @@ import 'dart:ui';
 
 import 'package:flame/extensions.dart';
 import 'package:flame/post_process.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// The Glow knob's glow with the renderers other than the mesh renderer,
 /// which draws its own: a halo round the lines, in their colours, with a
@@ -15,7 +15,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// The halo reaches [radius] logical pixels round the rim, and less towards
 /// the tube's middle, as the lines thin with depth. The stars, in the
 /// camera's backdrop, don't glow.
-class TubeGlow(final TubeShooterExample game) extends ShaderPostProcess {
+class TubeGlow(final TubeHost game) extends ShaderPostProcess {
   this
     : super(
         'shaders/glow.frag',

@@ -71,7 +71,7 @@ class EdgeWalkerComponent({
       cross(next);
     }
     _crossProgress = 0.5;
-    _untilCross = between(gameRef.level.crossPeriod);
+    _untilCross = between(shooter.level.crossPeriod);
     await super.onLoad();
   }
 
@@ -112,8 +112,8 @@ class EdgeWalkerComponent({
   @override
   void move(double dt) {
     super.move(dt);
-    final level = gameRef.level;
-    final pace = gameRef.pace;
+    final level = shooter.level;
+    final pace = shooter.pace;
     _turns = (_turns + dt * pace * spin) % 1;
     final to = _crossTo;
     if (to != null) {
@@ -139,7 +139,7 @@ class EdgeWalkerComponent({
       }
     } else if (_untilCross <= 0) {
       _untilCross = level.rimCrossPeriod;
-      final toward = gameRef.towardShip(_edge);
+      final toward = shooter.towardShip(_edge);
       if (toward != 0) {
         _crossAside(toward);
       }

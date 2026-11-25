@@ -5,9 +5,9 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 
 /// What the ship in a game for another renderer goes on from: its step and
 /// the fraction of a step past it, its depth, the seconds since its last
@@ -31,7 +31,7 @@ typedef PlayerSnapshot = ({
 /// game hasn't seen go down, don't move it or fire.
 class PlayerComponent({final PlayerSnapshot? from})
     extends PositionComponent
-    with HasGameRef<TubeShooterExample>, HasVisibility {
+    with HasGameRef<TubeHost>, InShooterMode, HasVisibility {
   this : super(priority: 4);
 
   static const stepsPerLane = 16;
@@ -143,10 +143,10 @@ class PlayerComponent({final PlayerSnapshot? from})
     _sinceShot += dt;
     if (_firing &&
         _sinceShot >= firePeriod &&
-        gameRef.canFire &&
-        gameRef.shots.length < maxShots) {
+        shooter.canFire &&
+        shooter.shots.length < maxShots) {
       _sinceShot = 0;
-      gameRef.fire(lane, depth);
+      shooter.fire(lane, depth);
     }
     place();
     gameRef.keepStroke(drawing);

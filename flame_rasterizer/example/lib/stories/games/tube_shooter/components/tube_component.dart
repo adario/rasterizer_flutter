@@ -1,7 +1,8 @@
 import 'package:flame/components.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// Draws the tube's lines, and the ship's [lane] over them in the ship's
 /// colour, but for while the ship arrives from a run, when the run draws
@@ -15,7 +16,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 ///
 /// Its priority makes it update after the components that move, so that it
 /// draws the view they moved in.
-class TubeComponent() extends Component with HasGameRef<TubeShooterExample> {
+class TubeComponent()
+    extends Component
+    with HasGameRef<TubeHost>, InShooterMode {
   this : super(priority: 10);
 
   /// The lane to show over the tube, if any: the ship's, in play.
@@ -31,21 +34,21 @@ class TubeComponent() extends Component with HasGameRef<TubeShooterExample> {
   void update(double dt) {
     super.update(dt);
     final view = gameRef.view;
-    final hidden = gameRef.state == TubeState.arrive;
+    final hidden = shooter.state == TubeState.arrive;
     final changed = view.version != _version || hidden != _hidden;
     if (changed) {
       _version = view.version;
       _hidden = hidden;
-      _tube = gameRef.replacePath(
+      _tube = shooter.replacePath(
         _tube,
         hidden ? null : view.tubePath(),
-        gameRef.level.color,
+        shooter.level.color,
       );
     }
     final lane = hidden ? null : this.lane;
     if (changed || lane != _shownLane) {
       _shownLane = lane;
-      _lane = gameRef.replacePath(
+      _lane = shooter.replacePath(
         _lane,
         lane == null ? null : view.lanePath(lane),
         TubeColors.ship,

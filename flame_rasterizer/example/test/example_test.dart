@@ -7,6 +7,7 @@ import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/main.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg_renderers_example.dart';
@@ -248,22 +249,22 @@ void main() {
     await settle();
     final first = game();
     await pumpWhileLoading(tester, () => !first.isLoaded);
-    expect(first.levelIndex, 0);
+    expect(first.shooter.levelIndex, 0);
     expect(knob(), 0);
     // A round without enemies ends as soon as it begins, and the ship drops
     // to the next level.
-    first.spawning = false;
-    first.clearSpawns();
-    for (var i = 0; i < 100 && first.state != TubeState.ready; i++) {
+    first.shooter.spawning = false;
+    first.shooter.clearSpawns();
+    for (var i = 0; i < 100 && first.shooter.state != TubeState.ready; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
-    for (var i = 0; i < 100 && first.round < 2; i++) {
+    for (var i = 0; i < 100 && first.shooter.round < 2; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
-    expect(first.round, 2);
-    expect(first.levelIndex, 1);
+    expect(first.shooter.round, 2);
+    expect(first.shooter.levelIndex, 1);
     await settle();
     expect(knob(), 1);
     expect(game(), same(first));
@@ -275,8 +276,8 @@ void main() {
     final picked = game();
     expect(picked, isNot(same(first)));
     await pumpWhileLoading(tester, () => !picked.isLoaded);
-    expect(picked.round, 1);
-    expect(picked.levelIndex, 3);
+    expect(picked.shooter.round, 1);
+    expect(picked.shooter.levelIndex, 3);
     expect(knob(), 3);
     await tester.pumpWidget(const SizedBox());
   });

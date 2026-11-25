@@ -31,12 +31,12 @@ class SeederComponent({
   @override
   void move(double dt) {
     super.move(dt);
-    final level = gameRef.level;
+    final level = shooter.level;
     final turn = level.seederTurn * Tube.depth;
-    final step = dt * gameRef.pace * (Tube.depth - turn) / level.seederTime;
+    final step = dt * shooter.pace * (Tube.depth - turn) / level.seederTime;
     if (!_descending) {
       depth = math.max(turn, depth - step);
-      gameRef.spikes.grow(lane, Tube.depth - depth);
+      shooter.spikes.grow(lane, Tube.depth - depth);
       _descending = depth == turn;
     } else {
       depth = math.min(Tube.depth, depth + step);

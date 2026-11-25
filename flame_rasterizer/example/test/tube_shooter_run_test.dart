@@ -5,9 +5,9 @@ import 'package:flame/extensions.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/widgets.dart' show SizedBox;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -86,24 +86,23 @@ void main() {
       SvgRenderer.rasterizerCanvas,
       firstLevel: hexagon,
     );
-    game
-      ..runs = true
-      ..spawning = false;
+    game.runs = true;
+    game.shooter.spawning = false;
     await beginLevel(tester, game);
     game.score = 1234;
-    game.clearSpawns();
-    var last = game.player.position.toOffset();
+    game.shooter.clearSpawns();
+    var last = game.shooter.player.position.toOffset();
     var most = 0.0;
     final states = <TubeState>[];
-    for (var i = 0; i < 2000 && game.state != TubeState.ready; i++) {
+    for (var i = 0; i < 2000 && game.shooter.state != TubeState.ready; i++) {
       await tester.pump(const Duration(milliseconds: 16));
-      final position = game.player.position.toOffset();
+      final position = game.shooter.player.position.toOffset();
       most = (position - last).distance > most
           ? (position - last).distance
           : most;
       last = position;
-      if (states.isEmpty || states.last != game.state) {
-        states.add(game.state);
+      if (states.isEmpty || states.last != game.shooter.state) {
+        states.add(game.shooter.state);
       }
     }
     expect(states, [
@@ -114,12 +113,12 @@ void main() {
     ]);
     // The ship glides onto the floor's lanes, a little each frame.
     expect(most, lessThan(0.02 * game.view.rimScale));
-    expect(game.level.tube, Tubes.floor);
-    expect(game.round, 2);
+    expect(game.shooter.level.tube, Tubes.floor);
+    expect(game.shooter.round, 2);
     expect(game.score, 1234);
     expect(game.lives, TubeHost.startLives);
-    expect(game.player.isVisible, isTrue);
-    expect(game.player.depth, 0);
+    expect(game.shooter.player.isVisible, isTrue);
+    expect(game.shooter.player.depth, 0);
     expect(game.view.eyeShift, 0);
     await pumpFrames(tester, 2);
     await tester.pumpWidget(const SizedBox());

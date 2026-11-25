@@ -3,8 +3,9 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// Draws the spikes, at most one per lane, each reaching from the far end
 /// toward the rim.
@@ -12,7 +13,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// All the spikes make one path. Whenever a spike grows or shortens, or the
 /// view changes, this makes the path again, with a new component in the game's
 /// tube group.
-class SpikesComponent() extends Component with HasGameRef<TubeShooterExample> {
+class SpikesComponent()
+    extends Component
+    with HasGameRef<TubeHost>, InShooterMode {
   this : super(priority: 10);
 
   /// The length of each lane's spike, 0 for none.
@@ -54,7 +57,7 @@ class SpikesComponent() extends Component with HasGameRef<TubeShooterExample> {
     }
     _changed = false;
     _version = view.version;
-    _spikes = gameRef.replacePath(
+    _spikes = shooter.replacePath(
       _spikes,
       lengths.any((length) => length > 0) ? view.spikesPath(lengths) : null,
       TubeColors.spikes,

@@ -1,6 +1,6 @@
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_enemy_component.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 
@@ -8,7 +8,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 /// firing, flips now and then, and electrifies its lane, as Tube Shooter's
 /// `ZapperComponent` does at its first level's pace, but as fast as a seeder.
 ///
-/// While the zappers pulse, as [TubeRunnerExample.isPulsing] says, a bolt
+/// While the zappers pulse, as [RunnerMode.isPulsing] says, a bolt
 /// runs from it down its lane to the ship's ring, and destroys the ship
 /// there. Just before a pulse, it flashes white. One that comes too late to
 /// flash, or flips, waits for the next pulse.
@@ -26,15 +26,15 @@ class RunnerZapperComponent(int lane, double at)
   bool _warned = false;
 
   /// Whether its bolt runs down its lane now.
-  bool get isZapping => _warned && gameRef.isPulsing && !isFlipping;
+  bool get isZapping => _warned && runner.isPulsing && !isFlipping;
 
   @override
   void move(double dt) {
     super.move(dt);
-    final warning = gameRef.isWarning;
+    final warning = runner.isWarning;
     if (warning) {
       _warned = true;
-    } else if (!gameRef.isPulsing) {
+    } else if (!runner.isPulsing) {
       _warned = false;
     }
   }
@@ -42,7 +42,7 @@ class RunnerZapperComponent(int lane, double at)
   @override
   void update(double dt) {
     super.update(dt);
-    _flash(gameRef.isWarning);
+    _flash(runner.isWarning);
   }
 
   /// Tints it white, or clears the tint. A tint doesn't import its shape

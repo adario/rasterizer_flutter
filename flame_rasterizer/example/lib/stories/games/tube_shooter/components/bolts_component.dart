@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/zapper_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 
 /// Draws the zappers' bolts while they zap, each down its zapper's lane to the
@@ -11,7 +13,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// All the bolts make one path. On every frame of a pulse, this makes the path
 /// again, with a new component in the game's tube group, unless the world is
 /// still and the view hasn't changed.
-class BoltsComponent() extends Component with HasGameRef<TubeShooterExample> {
+class BoltsComponent()
+    extends Component
+    with HasGameRef<TubeHost>, InShooterMode {
   this : super(priority: 10);
 
   /// For the bolts' zigzags, apart from [TubeShooterExample.random], so that
@@ -27,19 +31,19 @@ class BoltsComponent() extends Component with HasGameRef<TubeShooterExample> {
     final game = gameRef;
     final view = game.view;
     final bolts = [
-      for (final enemy in game.enemies)
+      for (final enemy in shooter.enemies)
         if (enemy is ZapperComponent && enemy.isZapping)
           (lane: enemy.lane, depth: enemy.depth),
     ];
     if (bolts.isEmpty) {
-      _bolts = game.replacePath(_bolts, null, TubeColors.bolts);
+      _bolts = shooter.replacePath(_bolts, null, TubeColors.bolts);
       return;
     }
     if (dt == 0 && view.version == _version && _bolts != null) {
       return;
     }
     _version = view.version;
-    _bolts = game.replacePath(
+    _bolts = shooter.replacePath(
       _bolts,
       view.boltsPath(bolts, _random),
       TubeColors.bolts,

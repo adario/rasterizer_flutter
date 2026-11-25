@@ -17,13 +17,13 @@ class SplitterComponent({
   @override
   void move(double dt) {
     super.move(dt);
-    final level = gameRef.level;
+    final level = shooter.level;
     depth = math.max(
       0,
-      depth - dt * gameRef.pace * Tube.depth / level.splitterTime,
+      depth - dt * shooter.pace * Tube.depth / level.splitterTime,
     );
     if (depth == 0) {
-      gameRef.split(this);
+      shooter.split(this);
     }
   }
 }

@@ -5,17 +5,20 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
+import 'package:flame_rasterizer_example/commons/game_sounds.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/sounds.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
 
 /// What Tube Shooter and Tube Runner share: the view of the tube, the score
 /// and the lives, the texts at the bottom, READY and Game Over, the
-/// player's keys, drags, taps and scrolls, and the components that draw
-/// shapes and quads.
+/// player's keys, drags, taps and scrolls, the glow, the sounds, and the
+/// components that draw shapes and quads.
 ///
 /// Each frame, [update] fits the view, applies the game's rules with
 /// [advance], updates the components, then calls [afterUpdate] and shows
@@ -54,6 +57,14 @@ abstract class TubeHost({
 
   /// The most seconds between the two taps of a double tap.
   static const doubleTapTime = 0.35;
+
+  /// The glow of the shapes' lines: 3 times as wide as the lines, and thinner
+  /// with depth, as they are.
+  static const lineGlow = RasterizerGlow.widths(3);
+
+  /// The glow of the lines of the tube, its lane, the spikes and the bolts:
+  /// twice as wide as the lines, and thinner with depth, as they are.
+  static const tubeGlow = RasterizerGlow.widths(2);
 
   final math.Random random = random ?? math.Random();
 
@@ -114,6 +125,10 @@ abstract class TubeHost({
   /// Applies the game's rules over [dt] seconds of the world's time, before
   /// the world's components update.
   void advance(double dt) {}
+
+  /// Does what updates would do in a moving world, where they don't happen,
+  /// for a change of the lines' glow.
+  void updateStillLines() {}
 
   /// Called once the components updated, [dt] seconds after the last frame.
   void afterUpdate(double dt) {}
@@ -214,11 +229,78 @@ abstract class TubeHost({
   void forgetTaps() => _lastTap = double.negativeInfinity;
 
   /// Whether the renderer draws the lines' glow with them, as the mesh
-  /// renderer does.
+  /// renderer does. Otherwise, [TubeGlow] draws the Glow knob's.
   bool get rendererGlows => false;
 
-  /// The glow of the shapes that [shapeComponent] makes, if any.
-  RasterizerGlow? get shapeGlow => null;
+  /// The Glow knob's value: whether the lines glow.
+  ///
+  /// If [rendererGlows], the lines glow with [lineGlow] and [tubeGlow], so a
+  /// change imports them again: the tube's paths, as a change of the view
+  /// does, and the shapes as they keep their stroke. In a still world, where
+  /// nothing updates, this happens at once: see [updateStillLines].
+  /// Otherwise, a [TubeGlow] is the camera's post process while it's on.
+  bool get glow => _glow;
+  bool _glow = false;
+
+  set glow(bool value) {
+    if (value != _glow) {
+      _glow = value;
+      if (rendererGlows) {
+        view.invalidate();
+        if (isLoaded && world.timeScale == 0) {
+          updateStillLines();
+        }
+      } else if (isLoaded) {
+        _updateGlow();
+      }
+    }
+  }
+
+  /// Makes a [TubeGlow] the camera's post process if [glow] is on, or
+  /// removes it.
+  void _updateGlow() {
+    camera.postProcess = _glow ? TubeGlow(this) : null;
+  }
+
+  /// The shapes' glow, if the Glow knob is on and the renderer draws it.
+  RasterizerGlow? get shapeGlow => _glow && rendererGlows ? lineGlow : null;
+
+  /// The glow of the tube's lines, if the Glow knob is on and the renderer
+  /// draws it.
+  RasterizerGlow? get linesGlow => _glow && rendererGlows ? tubeGlow : null;
+
+  /// The Sound knob's value: whether the game plays its sounds. Off by
+  /// default, so that tests stay silent.
+  ///
+  /// The sounds load the first time it's on, and stay loaded when it's off.
+  bool get sound => _sound;
+  bool _sound = false;
+
+  set sound(bool value) {
+    _sound = value;
+    if (value && isLoaded) {
+      _loadSounds();
+    }
+  }
+
+  /// The sounds, once [sound] was on.
+  GameSounds? _sounds;
+
+  /// Loads the sounds, unless they're loaded or loading.
+  Future<void> _loadSounds() async {
+    if (_sounds == null) {
+      await (_sounds = GameSounds([
+        for (final sound in Sound.values) sound.path,
+      ])).load();
+    }
+  }
+
+  /// Plays [sound], if the Sound knob is on and the sounds are loaded.
+  void play(Sound sound) {
+    if (_sound) {
+      _sounds?.play(sound.path);
+    }
+  }
 
   /// How many times as long as the widest lane the shapes grow, at most, so
   /// that their imports are fine enough.
@@ -254,6 +336,10 @@ abstract class TubeHost({
     anchor: Anchor.center,
     maxSize: TubeView.rimPixels,
   );
+
+  /// Gives [drawing], made by [shapeComponent], [glow], if the renderer
+  /// draws glows. If the glow changed, this imports the shape again.
+  void glowShape(PathComponent drawing, RasterizerGlow? glow) {}
 
   /// Gives [drawing], made by [shapeComponent], the view's stroke width,
   /// [widths] times as wide. If the width changed, this imports the shape
@@ -306,10 +392,24 @@ abstract class TubeHost({
     // In the camera's viewport, as StoryGame's FPS counter is: above the
     // world, and unzoomed.
     camera.viewport.addAll([tubeText, roundText, livesText, scoreText]);
+    if (_glow && !rendererGlows) {
+      _updateGlow();
+    }
+    // Before the game starts, so that its first sounds play.
+    if (_sound) {
+      await _loadSounds();
+    }
+  }
+
+  @override
+  void onRemove() {
+    _sounds?.dispose();
+    super.onRemove();
   }
 
   @override
   void update(double dt) {
+    _sounds?.nextFrame();
     _clock += dt;
     _pathsTime += dt;
     if (_pathsTime >= 1) {
@@ -485,6 +585,11 @@ mixin RasterizerTubeHost on TubeHost, ExampleRasterizer<ExampleWorld> {
   /// lines' glow with them.
   @override
   bool get rendererGlows => renderer == SvgRenderer.rasterizer;
+
+  @override
+  void glowShape(PathComponent drawing, RasterizerGlow? glow) {
+    (drawing as RasterizerPathComponent).glow = glow;
+  }
 
   /// Fills the quads separate, which the mesh renderer imports much faster
   /// than their union. Where glows overlap, they add up.

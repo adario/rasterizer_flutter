@@ -4,10 +4,11 @@ import 'package:flame/components.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/tube_placed.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// An enemy of [kind], which comes at the far end of [spawnLane] and climbs
 /// the tube toward the ship, with the shape and colour of Tube Shooter's, and
@@ -17,7 +18,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// tube says it shows. It goes once it passes the ship.
 ///
 /// For [flashTime] after it comes, it glows in its colour, fading out as
-/// [flash] says: with [TubeRunnerExample.glowShape] if the renderer draws
+/// [flash] says: with [TubeHost.glowShape] if the renderer draws
 /// glows, or else under a wider, see-through copy of its shape, as wide as
 /// that glow. A splitter's climbers don't flash, as they don't come down the
 /// tube.
@@ -26,7 +27,7 @@ abstract class RunnerEnemyComponent(
   final int spawnLane, {
   bool flashes = true,
 }) extends PositionComponent
-    with HasGameRef<TubeRunnerExample>, HasVisibility, TubePlaced {
+    with HasGameRef<TubeHost>, HasVisibility, TubePlaced, InRunnerMode {
   this : super(priority: 1);
 
   /// How fast every kind climbs its lane, along the axis, in tube units a
@@ -63,11 +64,11 @@ abstract class RunnerEnemyComponent(
   PathComponent? _halo;
 
   /// How many times as wide as the ship's the halo's stroke is.
-  static const _haloStroke =
-      strokeWidths * 2 * TubeRunnerExample.shapeGlowWidths;
+  static const _haloStroke = strokeWidths * 2 * RunnerMode.shapeGlowWidths;
 
   @override
   Future<void> onLoad() async {
+    findRunner();
     if (!gameRef.rendererGlows) {
       add(
         _halo =
@@ -91,7 +92,10 @@ abstract class RunnerEnemyComponent(
     super.update(dt);
     gameRef
       ..keepStroke(drawing, widths: strokeWidths)
-      ..glowShape(drawing, flash, kind.color);
+      ..glowShape(
+        drawing,
+        RunnerMode.flashGlow(RunnerMode.shapeGlowWidths, flash, kind.color),
+      );
     final halo = _halo;
     if (halo == null) {
       return;
@@ -102,7 +106,7 @@ abstract class RunnerEnemyComponent(
       return;
     }
     gameRef.keepStroke(halo, widths: _haloStroke);
-    halo.opacity = TubeRunnerExample.haloAlpha * flash;
+    halo.opacity = RunnerMode.haloAlpha * flash;
   }
 
   /// Climbs over [dt] seconds, as [move] says.
@@ -183,7 +187,7 @@ abstract class RunnerFlipperComponent(
 
   /// Starts flipping onto the next lane on [side], 1 or -1.
   void _flipAside(int side) {
-    final tube = gameRef.tube;
+    final tube = gameRef.view.tube;
     flip((tube.neighbour(lane, side) ?? tube.neighbour(lane, -side))!, tube);
   }
 
