@@ -100,11 +100,18 @@ WidgetbookComponent gamesStories() {
             initialOption: Tubes.hexagon,
             labelBuilder: (tube) => tube.name,
           );
+          final sound = context.knobs.boolean(
+            label: 'Sound',
+            initialValue: true,
+          );
           return GameStory<TubeRunnerExample, Object>(
             renderer: renderer,
             create: (status, _) =>
-                TubeRunnerExample.of(renderer, status, tube: tube),
-            update: (game) => game.tube = tube,
+                TubeRunnerExample.of(renderer, status, tube: tube)
+                  ..sound = sound,
+            update: (game) => game
+              ..tube = tube
+              ..sound = sound,
             zoom: zoomKnob(context),
             speed: speedKnob(context),
           );

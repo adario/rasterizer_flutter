@@ -19,6 +19,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/p
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/sounds.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flutter/foundation.dart';
@@ -315,7 +316,15 @@ class RunnerMode({
     switch (_state) {
       case RunnerState.play:
         _tubeTime += dt;
+        final wasPulsing = isPulsing;
         _pulseClock = (_pulseClock + dt) % _level.pulsePeriod;
+        if (!wasPulsing &&
+            isPulsing &&
+            _enemies.any(
+              (enemy) => enemy is RunnerZapperComponent && enemy.isZapping,
+            )) {
+          gameRef.play(Sound.zap);
+        }
         _updateEnemies(dt);
         _updateShots(dt);
         _hit();
@@ -384,6 +393,7 @@ class RunnerMode({
     _enemyShots.add(shot);
     add(shot);
     _tubeFlown = double.nan;
+    gameRef.play(Sound.enemyFire);
   }
 
   /// Over [dt] seconds of the game: fires a shot down the ship's lane every
@@ -411,6 +421,7 @@ class RunnerMode({
       add(shot);
       // Places it now, even if nothing else moved.
       _tubeFlown = double.nan;
+      gameRef.play(Sound.fire);
     }
   }
 
@@ -485,6 +496,7 @@ class RunnerMode({
     }
     spike.near = math.min(spike.near + ShooterMode.spikeHit, spike.far);
     gameRef.score += ShooterMode.spikeScore;
+    gameRef.play(Sound.spike);
     if (spike.near >= spike.far) {
       _spikes.remove(spike);
     }
@@ -494,6 +506,7 @@ class RunnerMode({
   /// seeder's spike stays, and a splitter splits, as in Tube Shooter.
   void _destroyEnemy(RunnerEnemyComponent enemy) {
     gameRef.score += enemy.kind.score;
+    gameRef.play(Sound.explosion);
     final blast = PlacedExplosionComponent(
       enemy.mark,
       rayColor: enemy.kind.color,
@@ -521,6 +534,7 @@ class RunnerMode({
   /// and shots go.
   void _destroyShip() {
     gameRef.lives--;
+    gameRef.play(Sound.crash);
     explosionGroup.add(
       RunnerExplosionComponent(
         position: ship.position.clone(),

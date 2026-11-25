@@ -98,7 +98,9 @@ abstract class TubeRunnerExample({
     enemies, spikes and shots go, and READY shows again. Once the lives are
     gone, Game Over stops the game until a tap, or Enter, starts a new one.
     The bottom left shows the tube's name and how long the game has gone on
-    in it, and the bottom right the lives left and the score.
+    in it, and the bottom right the lives left and the score. The game plays
+    Tube Shooter's sounds as the same things happen, and the Sound knob turns
+    them on and off.
 
     The game makes the tube's quads again every frame. The mesh renderer fills
     each quad on its own, as a fan of triangles, rather than their union. The
