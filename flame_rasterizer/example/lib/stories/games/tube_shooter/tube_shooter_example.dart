@@ -74,10 +74,10 @@ abstract class TubeShooterExample({
     world. The Level knob shows the round's level, and starts a new game at
     the level it picks. The other knobs keep the stars drifting, turn the
     sounds on and off, zoom the camera and change the game's speed. The Runs
-    knob, on by default, flies the ship on from a closed tube's drop down
-    Tube Runner's endless tube, by its rules, for 20 seconds of play, then
-    out of it, onto the next round's rim: each round's run brings one more
-    kind of enemy. A new renderer's game goes on with the same round, ship,
+    knob, on by default, flies the ship on from a round's drop down Tube
+    Runner's endless tube, by its rules, for 20 seconds of play, then out of
+    it, onto the next round's rim: each round's run brings one more kind of
+    enemy. A new renderer's game goes on with the same round, ship,
     enemies and shots, from where they were, but a run's next round starts.
     The bar under the game shows the renderer, the frame times, the
     renderer's own numbers and the paths made each second.

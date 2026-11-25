@@ -275,10 +275,10 @@ class ShooterMode({
     }
   }
 
-  /// The Runs knob's value: whether, after a closed tube's drop, the ship
-  /// flies on down an endless tube, by Tube Runner's rules, for [runTime] of
-  /// play, before it flies onto the next round's rim: see [TubeState.run].
-  /// On by default.
+  /// The Runs knob's value: whether, after a round's drop, the ship flies on
+  /// down an endless tube, by Tube Runner's rules, for [runTime] of play,
+  /// before it flies onto the next round's rim: see [TubeState.run]. On by
+  /// default.
   bool runs = true;
 
   /// Does what updates would do in a moving world: makes the tube's paths
@@ -462,7 +462,7 @@ class ShooterMode({
           }
           _setState(TubeState.drop);
           gameRef.play(Sound.drop);
-          if (runs && !view.tube.isOpen) {
+          if (runs) {
             // A kind of enemy more on each round's run.
             final run = _run = _Run(
               view.tube,

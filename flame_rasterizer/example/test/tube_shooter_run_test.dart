@@ -1,7 +1,7 @@
 // Checks Tube Shooter's runs into Tube Runner's tube: that the run's tube
-// leads on from the round's and into the next round's, that a round's drop
-// flies on down a run, onto the next round's rim, and that the run plays by
-// Tube Runner's rules.
+// leads on from the round's and into the next round's, that a closed or an
+// open tube's drop flies on down a run, onto the next round's rim, and that
+// the run plays by Tube Runner's rules.
 import 'dart:math' as math;
 
 import 'package:flame/extensions.dart';
@@ -87,53 +87,75 @@ void main() {
     }
   });
 
-  testWidgets('with runs, the hexagon drop flies on down a run, then onto '
-      'the next rim, with no jump of the ship', (tester) async {
-    final game = await pumpGame(
+  for (final tube in [
+    Tubes.hexagon,
+    Tubes.floor,
+    Tubes.ridge,
+    Tubes.horseshoe,
+  ]) {
+    final first = levels.indexWhere((level) => level.tube == tube);
+    final next = levels[first + 1].tube;
+    testWidgets('with runs, the ${tube.name} drop flies on down a run, then '
+        'onto the next rim, with no jump of the ship, the camera looking '
+        "where the round's does, then where the next round's does", (
       tester,
-      SvgRenderer.rasterizerCanvas,
-      firstLevel: hexagon,
-      runs: true,
-    );
-    game.shooter.spawning = false;
-    await beginLevel(tester, game);
-    game.score = 1234;
-    game.shooter.clearSpawns();
-    var last = game.shooter.player.position.toOffset();
-    var most = 0.0;
-    final states = <TubeState>[];
-    for (var i = 0; i < 2000 && game.shooter.state != TubeState.ready; i++) {
-      await tester.pump(const Duration(milliseconds: 16));
-      final position = game.shooter.player.position.toOffset();
-      most = (position - last).distance > most
-          ? (position - last).distance
-          : most;
-      last = position;
-      if (states.isEmpty || states.last != game.shooter.state) {
-        states.add(game.shooter.state);
+    ) async {
+      final game = await pumpGame(
+        tester,
+        SvgRenderer.rasterizerCanvas,
+        firstLevel: first,
+        runs: true,
+      );
+      game.shooter.spawning = false;
+      await beginLevel(tester, game);
+      game.score = 1234;
+      game.shooter.clearSpawns();
+      Offset aim() => game.camera.viewfinder.position.toOffset();
+      final round = tube.center * game.view.rimScale;
+      var last = game.shooter.player.position.toOffset();
+      var most = 0.0;
+      var mostOff = 0.0;
+      final states = <TubeState>[];
+      for (var i = 0; i < 2000 && game.shooter.state != TubeState.ready; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        final position = game.shooter.player.position.toOffset();
+        most = math.max(most, (position - last).distance);
+        last = position;
+        if (game.shooter.state == TubeState.run) {
+          mostOff = math.max(mostOff, (aim() - round).distance);
+        }
+        if (states.isEmpty || states.last != game.shooter.state) {
+          states.add(game.shooter.state);
+        }
       }
-    }
-    expect(states, [
-      TubeState.drop,
-      TubeState.run,
-      TubeState.arrive,
-      TubeState.ready,
-    ]);
-    // The ship glides onto the floor's lanes, a little each frame.
-    expect(most, lessThan(0.02 * game.view.rimScale));
-    expect(game.shooter.level.tube, Tubes.floor);
-    expect(game.shooter.round, 2);
-    expect(game.score, 1234);
-    expect(game.lives, TubeHost.startLives);
-    expect(game.shooter.player.isVisible, isTrue);
-    expect(game.shooter.player.depth, 0);
-    expect(game.view.eyeShift, 0);
-    await pumpFrames(tester, 2);
-    await tester.pumpWidget(const SizedBox());
-  });
+      expect(states, [
+        TubeState.drop,
+        TubeState.run,
+        TubeState.arrive,
+        TubeState.ready,
+      ]);
+      // The viewfinder keeps its position in single precision.
+      expect(mostOff, lessThan(1e-3));
+      expect(
+        (aim() - next.center * game.view.rimScale).distance,
+        lessThan(1e-3),
+      );
+      // The ship glides onto the next tube's lanes, a little each frame.
+      expect(most, lessThan(0.02 * game.view.rimScale));
+      expect(game.shooter.level.tube, next);
+      expect(game.shooter.round, 2);
+      expect(game.score, 1234);
+      expect(game.lives, TubeHost.startLives);
+      expect(game.shooter.player.isVisible, isTrue);
+      expect(game.shooter.player.depth, 0);
+      expect(game.view.eyeShift, 0);
+      await pumpFrames(tester, 2);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 
-  /// Pumps [game], on the hexagon's first round, with its runs on, until its
-  /// drop flies on down a run, and returns the run's runner.
+  /// Pumps [game], on its first round, with its runs on, until its drop
+  /// flies on down a run, and returns the run's runner.
   Future<RunnerMode> pumpToRun(
     WidgetTester tester,
     TubeShooterExample game,
@@ -157,47 +179,49 @@ void main() {
     await tester.sendKeyUpEvent(key);
   }
 
-  testWidgets("on a run, Tube Runner's ship takes over where the round's "
-      'was, the round brings seeders, and none comes from past the end of '
-      "the run's play", (tester) async {
-    final game = await pumpGame(
-      tester,
-      SvgRenderer.rasterizerCanvas,
-      firstLevel: hexagon,
-      runs: true,
-    );
-    final runner = await pumpToRun(tester, game);
-    runner.spawning = true;
-    await pumpFrames(tester, 2);
-    expect(game.shooter.player.isVisible, isFalse);
-    expect(runner.ship.isVisible, isTrue);
-    expect(runner.ship.step, game.shooter.player.step);
-    expect(
-      (runner.ship.position - game.shooter.player.position).length,
-      lessThan(0.02 * game.view.rimScale),
-    );
-    const playEnd = Tube.depth + RunnerMode.flightSpeed * ShooterMode.runTime;
-    final kinds = <EnemyKind>{};
-    var mostAt = 0.0;
-    for (var i = 0; i < 2000 && game.shooter.state == TubeState.run; i++) {
-      // A lost ship goes on at READY.
-      if (game.isReady) {
-        await pressKey(tester);
+  for (final tube in [Tubes.hexagon, Tubes.horseshoe]) {
+    testWidgets("on the ${tube.name}'s run, Tube Runner's ship takes over "
+        "where the round's was, the round brings seeders, and none comes from "
+        "past the end of the run's play", (tester) async {
+      final game = await pumpGame(
+        tester,
+        SvgRenderer.rasterizerCanvas,
+        firstLevel: levels.indexWhere((level) => level.tube == tube),
+        runs: true,
+      );
+      final runner = await pumpToRun(tester, game);
+      runner.spawning = true;
+      await pumpFrames(tester, 2);
+      expect(game.shooter.player.isVisible, isFalse);
+      expect(runner.ship.isVisible, isTrue);
+      expect(runner.ship.step, game.shooter.player.step);
+      expect(
+        (runner.ship.position - game.shooter.player.position).length,
+        lessThan(0.02 * game.view.rimScale),
+      );
+      const playEnd = Tube.depth + RunnerMode.flightSpeed * ShooterMode.runTime;
+      final kinds = <EnemyKind>{};
+      var mostAt = 0.0;
+      for (var i = 0; i < 2000 && game.shooter.state == TubeState.run; i++) {
+        // A lost ship goes on at READY.
+        if (game.isReady) {
+          await pressKey(tester);
+        }
+        await tester.pump(const Duration(milliseconds: 16));
+        for (final enemy in runner.enemies) {
+          kinds.add(enemy.kind);
+          mostAt = math.max(mostAt, enemy.at);
+        }
       }
-      await tester.pump(const Duration(milliseconds: 16));
-      for (final enemy in runner.enemies) {
-        kinds.add(enemy.kind);
-        mostAt = math.max(mostAt, enemy.at);
-      }
-    }
-    expect(game.shooter.state, TubeState.arrive);
-    expect(kinds, {EnemyKind.seeder});
-    expect(mostAt, lessThanOrEqualTo(playEnd));
-    expect(runner.isMounted, isFalse);
-    expect(game.shooter.player.isVisible, isTrue);
-    await pumpFrames(tester, 2);
-    await tester.pumpWidget(const SizedBox());
-  });
+      expect(game.shooter.state, TubeState.arrive);
+      expect(kinds, {EnemyKind.seeder});
+      expect(mostAt, lessThanOrEqualTo(playEnd));
+      expect(runner.isMounted, isFalse);
+      expect(game.shooter.player.isVisible, isTrue);
+      await pumpFrames(tester, 2);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 
   testWidgets('a ship lost on a run waits at READY, with the run standing '
       'still, and Game Over there starts a new game at the round', (

@@ -1,8 +1,10 @@
 part of 'shooter_mode.dart';
 
-/// A run between two rounds, with [ShooterMode.runs] on: after a closed
-/// tube's drop, the ship flies on down an endless tube, by Tube Runner's
-/// rules, then out of it, onto the next round's rim.
+/// A run between two rounds, with [ShooterMode.runs] on: after the round's
+/// drop, the ship flies on down an endless tube, by Tube Runner's rules,
+/// then out of it, onto the next round's rim. The camera keeps looking where
+/// the round's does, then turns, on the arrival, to look where the next
+/// round's does.
 ///
 /// Its distances are along the run's axis, in tube units, from the rim of
 /// the round's tube, which leads straight into the run's: the drop is the

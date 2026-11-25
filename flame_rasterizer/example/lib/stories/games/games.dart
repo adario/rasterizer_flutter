@@ -177,7 +177,7 @@ class const TubeShooterStory({
   /// Whether the lines glow: see [TubeShooterExample.glow].
   final bool glow = false,
 
-  /// Whether the ship flies on down a run after a closed tube's drop: see
+  /// Whether the ship flies on down a run after a round's drop: see
   /// [TubeShooterExample.runs].
   final bool runs = true,
 
