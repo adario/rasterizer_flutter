@@ -464,14 +464,7 @@ class ShooterMode({
           _setState(TubeState.drop);
           gameRef.play(Sound.drop);
           if (runs) {
-            // A kind of enemy more on each round's run.
-            final run = _run = _Run(
-              view.tube,
-              level.color,
-              levels[(_levelIndex + 1) % levels.length],
-              round,
-            );
-            add(run.runner..spawning = spawning);
+            _makeRun();
           }
         }
       case TubeState.drop:

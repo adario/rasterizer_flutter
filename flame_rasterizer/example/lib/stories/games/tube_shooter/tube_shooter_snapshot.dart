@@ -1,15 +1,17 @@
 part of 'shooter_mode.dart';
 
 /// What a game for another renderer goes on from: the first level, the
-/// round, its state and how long it has lasted, the score, the lives, the
-/// purge, the camera and the eye, the ship, the spikes, the enemies still to
-/// come and in the tube, and the shots.
+/// round, its state and how long it has lasted, whether its drop flies on
+/// down a run, the score, the lives, the purge, the camera and the eye, the
+/// ship, the spikes, the enemies still to come and in the tube, and the
+/// shots.
 typedef TubeShooterSnapshot = ({
   int firstLevel,
   int levelIndex,
   int round,
   TubeState state,
   double stateTime,
+  bool hasRun,
   bool dyingOnDrop,
   int score,
   int lives,
@@ -43,6 +45,7 @@ extension TubeShooterSnapshots on ShooterMode {
     // Game Over on a run is the round's, for the new game.
     state: isOver ? TubeState.over : _state,
     stateTime: _stateTime,
+    hasRun: _run != null,
     dyingOnDrop: _dyingOnDrop,
     score: gameRef.score,
     lives: gameRef.lives,
@@ -119,6 +122,12 @@ extension TubeShooterSnapshots on ShooterMode {
     }
     _setState(from.state);
     _stateTime = from.stateTime;
+    // The drop flies on down a run if the old game's did, whatever the new
+    // game's runs, so that the eye doesn't jump.
+    if (from.state == TubeState.drop && from.hasRun) {
+      _makeRun();
+      _run!.flown = from.eyeShift;
+    }
     switch (from.state) {
       case TubeState.zoom:
         _roundBanner.text = 'ROUND $round';

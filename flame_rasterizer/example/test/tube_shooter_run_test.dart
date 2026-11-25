@@ -5,6 +5,7 @@
 import 'dart:math' as math;
 
 import 'package:flame/extensions.dart';
+import 'package:flame/game.dart' show GameWidget;
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
@@ -16,11 +17,12 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
-import 'package:flutter/widgets.dart' show SizedBox;
+import 'package:flutter/widgets.dart' show SizedBox, Widget;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'pump_while_loading.dart';
 import 'tube_shooter_test.dart'
-    show beginLevel, pumpFrames, pumpGame, pumpUntil;
+    show beginLevel, pumpFrames, pumpGame, pumpUntil, story;
 
 void main() {
   const course = (bendFrom: Tube.depth, bendTo: 40.0, ease: 8.0);
@@ -223,6 +225,58 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
   }
+
+  testWidgets('a new renderer on the drop goes on down its run, with no '
+      'jump of the eye', (tester) async {
+    Widget storyWith(SvgRenderer renderer, {double speed = 1}) =>
+        story(renderer, speed: speed, firstLevel: hexagon, runs: true);
+    final game = await pumpGame(
+      tester,
+      SvgRenderer.rasterizer,
+      firstLevel: hexagon,
+      runs: true,
+    );
+    game.shooter.spawning = false;
+    await beginLevel(tester, game);
+    game.shooter.clearSpawns();
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.drop && game.view.eyeShift > 0.5,
+      frames: 400,
+    );
+    await tester.pumpWidget(storyWith(SvgRenderer.rasterizer, speed: 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    final eyeShift = game.view.eyeShift;
+    expect(game.snapshot.hasRun, isTrue);
+
+    await tester.pumpWidget(storyWith(SvgRenderer.rasterizerCanvas, speed: 0));
+    final next = tester
+        .widget<GameWidget<TubeShooterExample>>(
+          find.byWidgetPredicate((w) => w is GameWidget),
+        )
+        .game!;
+    expect(next, isNot(same(game)));
+    await pumpWhileLoading(tester, () => !next.isLoaded);
+    await pumpFrames(tester, 2);
+    expect(next.shooter.state, TubeState.drop);
+    expect(next.view.eyeShift, eyeShift);
+    expect(next.shooter.runner, isNotNull);
+
+    // The drop goes on along the run's curve, not the plain drop's.
+    await tester.pumpWidget(storyWith(SvgRenderer.rasterizerCanvas));
+    var last = eyeShift;
+    var most = 0.0;
+    for (var i = 0; i < 400 && next.shooter.state == TubeState.drop; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      most = math.max(most, (next.view.eyeShift - last).abs());
+      last = next.view.eyeShift;
+    }
+    expect(next.shooter.state, TubeState.run);
+    // As far as the ship flies in a frame at full speed, and a little more.
+    expect(most, lessThan(RunnerMode.flightSpeed * 0.02));
+    await pumpFrames(tester, 2);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('a ship lost on a run waits at READY, with the run standing '
       'still, and Game Over there starts a new game at the round', (

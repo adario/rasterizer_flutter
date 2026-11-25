@@ -162,6 +162,19 @@ class _Run(
 
 /// The runs, with [ShooterMode.runs] on: see [_Run].
 extension on ShooterMode {
+  /// Makes the run that the round's drop flies on down, with its runner,
+  /// which loads on the drop.
+  void _makeRun() {
+    // A kind of enemy more on each round's run.
+    final run = _run = _Run(
+      view.tube,
+      level.color,
+      levels[(_levelIndex + 1) % levels.length],
+      round,
+    );
+    add(run.runner..spawning = spawning);
+  }
+
   /// Starts the run, the drop's overshoot into it: its runner takes over the
   /// ship, where it is, and the drawing of the run's tube.
   void _beginRun() {

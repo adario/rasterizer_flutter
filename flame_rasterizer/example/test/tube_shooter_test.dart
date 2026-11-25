@@ -1865,6 +1865,7 @@ void main() {
         round: s.round,
         state: s.state,
         stateTime: s.stateTime,
+        hasRun: s.hasRun,
         dyingOnDrop: s.dyingOnDrop,
         score: s.score,
         lives: s.lives,
