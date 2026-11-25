@@ -114,13 +114,16 @@ Future<void> pumpFor(
   }
 }
 
-/// Plays a whole game with [renderer]'s GPU renderer, through all its states.
+/// Plays a whole game with [renderer]'s GPU renderer, through all its states
+/// but a run's, with runs off.
 ///
 /// No frame may fall back to the canvas renderer or to `Canvas.drawPath`.
 Future<void> wholeGame(WidgetTester tester, SvgRenderer renderer) async {
   expect(renderer.supported, isTrue);
   await tester.pumpWidget(
-    MaterialApp(home: TubeShooterStory(renderer: renderer, glow: true)),
+    MaterialApp(
+      home: TubeShooterStory(renderer: renderer, glow: true, runs: false),
+    ),
   );
   final gameWidget = find.byWidgetPredicate((w) => w is GameWidget);
   final game = tester.widget<GameWidget<TubeShooterExample>>(gameWidget).game!;
@@ -146,7 +149,10 @@ Future<void> wholeGame(WidgetTester tester, SvgRenderer renderer) async {
     'problems ${watch.problems}',
   );
   expect(watch.problems, isEmpty);
-  expect(watch.states, TubeState.values.toSet());
+  expect(
+    watch.states,
+    TubeState.values.toSet().difference({TubeState.run, TubeState.arrive}),
+  );
   await tester.pumpWidget(const SizedBox());
 }
 

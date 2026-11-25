@@ -251,8 +251,8 @@ void main() {
     await pumpWhileLoading(tester, () => !first.isLoaded);
     expect(first.shooter.levelIndex, 0);
     expect(knob(), 0);
-    // A round without enemies ends as soon as it begins, and the ship drops
-    // to the next level.
+    // A round without enemies ends as soon as it begins, and the ship drops,
+    // then flies down a run, with runs on by default, to the next level.
     first.shooter.spawning = false;
     first.shooter.clearSpawns();
     for (var i = 0; i < 100 && first.shooter.state != TubeState.ready; i++) {
@@ -260,7 +260,7 @@ void main() {
     }
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
-    for (var i = 0; i < 100 && first.shooter.round < 2; i++) {
+    for (var i = 0; i < 300 && first.shooter.round < 2; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect(first.shooter.round, 2);

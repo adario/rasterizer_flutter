@@ -93,8 +93,8 @@ void main() {
       tester,
       SvgRenderer.rasterizerCanvas,
       firstLevel: hexagon,
+      runs: true,
     );
-    game.runs = true;
     game.shooter.spawning = false;
     await beginLevel(tester, game);
     game.score = 1234;
@@ -132,13 +132,12 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  /// Pumps [game], on the hexagon's first round with runs on, until its drop
-  /// flies on down a run, and returns the run's runner.
+  /// Pumps [game], on the hexagon's first round, with its runs on, until its
+  /// drop flies on down a run, and returns the run's runner.
   Future<RunnerMode> pumpToRun(
     WidgetTester tester,
     TubeShooterExample game,
   ) async {
-    game.runs = true;
     game.shooter.spawning = false;
     await beginLevel(tester, game);
     game.shooter.clearSpawns();
@@ -165,6 +164,7 @@ void main() {
       tester,
       SvgRenderer.rasterizerCanvas,
       firstLevel: hexagon,
+      runs: true,
     );
     final runner = await pumpToRun(tester, game);
     runner.spawning = true;
@@ -207,6 +207,7 @@ void main() {
       tester,
       SvgRenderer.rasterizerCanvas,
       firstLevel: hexagon,
+      runs: true,
     );
     final runner = await pumpToRun(tester, game);
     final round = game.shooter.round;

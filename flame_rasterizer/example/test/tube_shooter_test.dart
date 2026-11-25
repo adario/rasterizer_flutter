@@ -42,6 +42,9 @@ import 'tube_shooter_whole_game.dart';
 /// Returns the game with [renderer], at [zoom] and [speed], starting from
 /// [firstLevel], with a seeded random so that runs repeat.
 ///
+/// Its [runs] are off by default, so that a round's drop leads straight to
+/// the next round's zoom.
+///
 /// With [pixelRatio], it sits in a MediaQuery of that device pixel ratio, as
 /// Widgetbook's device frames set one.
 Widget story(
@@ -50,6 +53,7 @@ Widget story(
   double speed = 1,
   int firstLevel = 0,
   double? pixelRatio,
+  bool runs = false,
 }) => MaterialApp(
   builder: pixelRatio == null
       ? null
@@ -65,7 +69,7 @@ Widget story(
       random: math.Random(1),
       firstLevel: firstLevel,
       from: from,
-    ),
+    )..runs = runs,
     snapshot: (game) => game.snapshot,
     zoom: zoom,
     speed: speed,
@@ -77,13 +81,14 @@ Widget story(
 final octagonLevel = levels.indexWhere((level) => level.tube == Tubes.octagon);
 
 /// Pumps a [story] from [firstLevel], or from the octagon's level by default,
-/// and waits for its game to load.
+/// with [runs] on or off, and waits for its game to load.
 Future<TubeShooterExample> pumpGame(
   WidgetTester tester,
   SvgRenderer renderer, {
   double zoom = 1,
   int? firstLevel,
   double? pixelRatio,
+  bool runs = false,
 }) async {
   await tester.pumpWidget(
     story(
@@ -91,6 +96,7 @@ Future<TubeShooterExample> pumpGame(
       zoom: zoom,
       firstLevel: firstLevel ?? octagonLevel,
       pixelRatio: pixelRatio,
+      runs: runs,
     ),
   );
   final game = tester
@@ -2023,7 +2029,7 @@ void main() {
         );
         watch.stop();
         expect(watch.problems, isEmpty);
-        // All but a run's, which needs the Runs knob.
+        // All but a run's, as the story's runs are off.
         expect(
           watch.states,
           TubeState.values.toSet().difference({
