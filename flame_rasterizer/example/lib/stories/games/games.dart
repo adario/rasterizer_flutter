@@ -6,10 +6,10 @@ import 'package:flame_rasterizer_example/commons/renderer_knob.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
+// import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+// import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:widgetbook/widgetbook.dart';
@@ -59,7 +59,6 @@ WidgetbookComponent gamesStories() {
               initialValue: true,
             ),
             glow: context.knobs.boolean(label: 'Glow'),
-            runs: context.knobs.boolean(label: 'Runs', initialValue: true),
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
             speed: speedKnob(context),
@@ -91,39 +90,40 @@ WidgetbookComponent gamesStories() {
         codeLink: baseLink('games/revolute_pinball'),
         info: RevolutePinballExample.description,
       ),
-      ExampleUseCase(
-        name: 'Tube Runner',
-        builder: (context) {
-          // Its paths are drawn by Flame's own components with Flame SVG.
-          final renderer = rendererKnob(context, svgs: false);
-          final tube = context.knobs.object.dropdown(
-            label: 'Tube',
-            options: TubeRunnerExample.tubes,
-            initialOption: Tubes.hexagon,
-            labelBuilder: (tube) => tube.name,
-          );
-          final sound = context.knobs.boolean(
-            label: 'Sound',
-            initialValue: true,
-          );
-          final flightSpeed = flightSpeedKnob(context);
-          return GameStory<TubeRunnerExample, Object>(
-            renderer: renderer,
-            create: (status, _) =>
-                TubeRunnerExample.of(renderer, status, tube: tube)
-                  ..sound = sound
-                  ..flightSpeed = flightSpeed,
-            update: (game) => game
-              ..tube = tube
-              ..sound = sound
-              ..flightSpeed = flightSpeed,
-            zoom: zoomKnob(context),
-            speed: speedKnob(context),
-          );
-        },
-        codeLink: baseLink('games/tube_runner'),
-        info: TubeRunnerExample.description,
-      ),
+      // Not deployed for now: Tube Shooter plays its runs.
+      // ExampleUseCase(
+      //   name: 'Tube Runner',
+      //   builder: (context) {
+      //     // Its paths are drawn by Flame's own components with Flame SVG.
+      //     final renderer = rendererKnob(context, svgs: false);
+      //     final tube = context.knobs.object.dropdown(
+      //       label: 'Tube',
+      //       options: TubeRunnerExample.tubes,
+      //       initialOption: Tubes.hexagon,
+      //       labelBuilder: (tube) => tube.name,
+      //     );
+      //     final sound = context.knobs.boolean(
+      //       label: 'Sound',
+      //       initialValue: true,
+      //     );
+      //     final flightSpeed = flightSpeedKnob(context);
+      //     return GameStory<TubeRunnerExample, Object>(
+      //       renderer: renderer,
+      //       create: (status, _) =>
+      //           TubeRunnerExample.of(renderer, status, tube: tube)
+      //             ..sound = sound
+      //             ..flightSpeed = flightSpeed,
+      //       update: (game) => game
+      //         ..tube = tube
+      //         ..sound = sound
+      //         ..flightSpeed = flightSpeed,
+      //       zoom: zoomKnob(context),
+      //       speed: speedKnob(context),
+      //     );
+      //   },
+      //   codeLink: baseLink('games/tube_runner'),
+      //   info: TubeRunnerExample.description,
+      // ),
     ],
   );
 }
