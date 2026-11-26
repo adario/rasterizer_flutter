@@ -48,10 +48,10 @@ void main() {
           0,
           view,
           marks: [
-            (lane: from, at: at, flip: null),
-            (lane: from, at: at, flip: (to: to, turn: 0)),
-            (lane: from, at: at, flip: (to: to, turn: angle)),
-            (lane: to, at: at, flip: null),
+            (lane: from, at: at, flip: null, across: null),
+            (lane: from, at: at, flip: (to: to, turn: 0), across: null),
+            (lane: from, at: at, flip: (to: to, turn: angle), across: null),
+            (lane: to, at: at, flip: null, across: null),
           ],
         )
         .places;
@@ -99,7 +99,7 @@ void main() {
               view,
               marks: [
                 for (final face in faces)
-                  (lane: face.lane, at: face.at, flip: null),
+                  (lane: face.lane, at: face.at, flip: null, across: null),
               ],
             )
             .places;

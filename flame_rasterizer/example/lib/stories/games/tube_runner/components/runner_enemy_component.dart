@@ -72,6 +72,13 @@ abstract class RunnerEnemyComponent(
   /// The lane it counts as in, for hits.
   int get currentLane;
 
+  /// Whether a shot down its [currentLane] can destroy it.
+  bool get canBeShot => true;
+
+  /// Whether it destroys the ship in [shipLane] once it reaches the ship's
+  /// ring.
+  bool hits(int shipLane) => currentLane == shipLane;
+
   /// How long it has climbed, in seconds of the game, or [flashTime] at
   /// first if it doesn't flash.
   double _age = from?.age ?? (flashes ? 0 : flashTime);
@@ -218,6 +225,7 @@ abstract class RunnerFlipperComponent(
       final to? => (to: to, turn: _flipAngle * _flipProgress),
       null => null,
     },
+    across: null,
   );
 
   @override

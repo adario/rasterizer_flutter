@@ -6,6 +6,7 @@ import 'package:flame/components.dart';
 import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/flight_stars_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_climber_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_edge_walker_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_explosion_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_seeder_component.dart';
@@ -140,6 +141,7 @@ class RunnerMode({
     EnemyKind.climber,
     EnemyKind.zapper,
     EnemyKind.splitter,
+    EnemyKind.edgeWalker,
   ];
 
   /// How far the glow of an enemy's lane and a seeder's spike, and of the
@@ -381,10 +383,10 @@ class RunnerMode({
           at,
           from: enemy,
         ),
-        EnemyKind.edgeWalker => throw ArgumentError.value(
-          kind,
-          'kind',
-          "doesn't come here",
+        EnemyKind.edgeWalker => RunnerEdgeWalkerComponent(
+          spawnLane,
+          at,
+          from: enemy,
         ),
       };
       _enemies.add(component);
@@ -508,7 +510,7 @@ class RunnerMode({
         ) ||
         _enemies.any(
           (enemy) =>
-              (enemy.currentLane == lane && enemy.at <= _flown) ||
+              (enemy.at <= _flown && enemy.hits(lane)) ||
               (enemy is RunnerZapperComponent &&
                   enemy.isZapping &&
                   enemy.lane == lane),
@@ -603,6 +605,7 @@ class RunnerMode({
       }
       for (final enemy in _enemies) {
         if (enemy is! RunnerSeederComponent &&
+            enemy.canBeShot &&
             enemy.currentLane == shot.lane &&
             _meet(shot, enemy.previousAt, enemy.at)) {
           aim(enemy, enemy.at);
@@ -987,7 +990,7 @@ class RunnerMode({
       case EnemyKind.splitter:
         enemy = RunnerSplitterComponent(lane, far);
       case EnemyKind.edgeWalker:
-        throw ArgumentError.value(kind, 'kind', "doesn't come here");
+        enemy = RunnerEdgeWalkerComponent(lane, far);
     }
     _enemies.add(enemy);
     add(enemy);

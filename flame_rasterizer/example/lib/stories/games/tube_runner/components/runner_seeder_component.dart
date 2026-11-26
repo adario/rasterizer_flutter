@@ -26,7 +26,8 @@ class RunnerSeederComponent(final Spike spike, {super.from})
   Record get ownSnapshot => (spike: runner.spikes.indexOf(spike));
 
   @override
-  TubeMark get mark => (lane: spike.lane, at: spike.near, flip: null);
+  TubeMark get mark =>
+      (lane: spike.lane, at: spike.near, flip: null, across: null);
 
   /// Climbs its lane, laying the spike to where it gets.
   @override

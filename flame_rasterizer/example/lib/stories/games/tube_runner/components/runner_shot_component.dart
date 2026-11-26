@@ -36,7 +36,7 @@ class RunnerShotComponent(final int lane, var double at)
       (lane: lane, at: at, previousAt: previousAt);
 
   @override
-  TubeMark get mark => (lane: lane, at: at, flip: null);
+  TubeMark get mark => (lane: lane, at: at, flip: null, across: null);
 
   /// The component that draws its shape.
   late final PathComponent drawing;
@@ -83,7 +83,7 @@ class RunnerEnemyShotComponent(final int lane, var double at)
       (lane: lane, at: at, previousAt: previousAt);
 
   @override
-  TubeMark get mark => (lane: lane, at: at, flip: null);
+  TubeMark get mark => (lane: lane, at: at, flip: null, across: null);
 
   /// The component that draws its shape.
   late final PathComponent drawing;

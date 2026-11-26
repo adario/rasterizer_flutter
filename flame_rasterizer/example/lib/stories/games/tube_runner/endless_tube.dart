@@ -52,7 +52,10 @@ class Spike(final int lane, final double far) {
 /// A point down the middle of a `lane`, `at` along the axis, in tube units,
 /// where a shape is: an enemy, a shot or an explosion. If it flips onto a
 /// neighbouring lane, `flip` says how far.
-typedef TubeMark = ({int lane, double at, TubeFlip? flip});
+///
+/// Its `across`, if given, is where it is across its lane, from 0 at the
+/// lane's first point to 1 at the next, instead of the lane's middle.
+typedef TubeMark = ({int lane, double at, TubeFlip? flip, double? across});
 
 /// How far a shape has flipped from its lane onto the neighbouring lane `to`,
 /// as in Tube Shooter: the angle it has turned by, about the corner the two
@@ -590,17 +593,25 @@ class EndlessTube({final TubeCourse? course}) {
     _Lines lines,
     _Hiding hiders,
   ) {
-    final (:lane, :at, :flip) = mark;
+    final (:lane, :at, :flip, :across) = mark;
     final laneMiddle = tube.middles[lane];
     var point = laneMiddle;
     if (flip != null) {
       final corner = tube.points[tube.cornerOf(lane, flip.to)];
       point = corner + Tube.rotate(laneMiddle - corner, flip.turn);
+    } else if (across != null) {
+      // Just inside the lane, so that its walls don't hide it on an edge.
+      point = Offset.lerp(
+        tube.points[lane],
+        tube.points[tube.pointAfter(lane)],
+        across.clamp(0.03, 0.97),
+      )!;
     }
+    final onMiddle = flip == null && across == null;
     final middle = seenAt(at, point);
     final ahead = seenAt(at + _look, point);
-    final laneAt = flip == null ? middle : seenAt(at, laneMiddle);
-    final laneAhead = flip == null ? ahead : seenAt(at + _look, laneMiddle);
+    final laneAt = onMiddle ? middle : seenAt(at, laneMiddle);
+    final laneAhead = onMiddle ? ahead : seenAt(at + _look, laneMiddle);
     final corner = seenAt(at, tube.points[lane]);
     final nextCorner = seenAt(at, tube.points[tube.pointAfter(lane)]);
     if ([

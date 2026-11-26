@@ -24,7 +24,7 @@ class RunnerSplitterComponent(
   int get currentLane => lane;
 
   @override
-  TubeMark get mark => (lane: lane, at: at, flip: null);
+  TubeMark get mark => (lane: lane, at: at, flip: null, across: null);
 
   @override
   void move(double dt) {
