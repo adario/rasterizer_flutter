@@ -21,6 +21,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.da
 /// do: by its lanes round a closed tube, and against its heading round an
 /// open one.
 ///
+/// There are [TubeHost.starCount] of them. As it changes, stars go, or come
+/// at random distances, as at first.
+///
 /// It's in the camera's backdrop, as Tube Shooter's stars are, and draws
 /// through the viewfinder's transform and updates at the world's time scale,
 /// as if it were in the world.
@@ -51,17 +54,31 @@ class FlightStarsComponent(
   @override
   Future<void> onLoad() async {
     _flown = runner.flown;
-    final random = gameRef.random;
-    for (var i = 0; i < StarFieldComponent.count; i++) {
-      final distance =
-          TubeView.near +
-          (StarFieldComponent.far - TubeView.near) * random.nextDouble();
-      stars.add(
-        FlightStarComponent(_point(), distance)
-          ..brightness = _brightnessAt(distance),
-      );
+    _matchCount();
+  }
+
+  /// Adds or removes stars, so that there are [TubeHost.starCount]: the last
+  /// ones go, and new ones come at random distances.
+  void _matchCount() {
+    final count = gameRef.starCount;
+    if (stars.length > count) {
+      removeAll(stars.sublist(count));
+      stars.removeRange(count, stars.length);
     }
-    addAll(stars);
+    final added = [
+      for (var i = stars.length; i < count; i++) _star(),
+    ];
+    stars.addAll(added);
+    addAll(added);
+  }
+
+  /// Returns a new star, at a random distance from the eye.
+  FlightStarComponent _star() {
+    final distance =
+        TubeView.near +
+        (StarFieldComponent.far - TubeView.near) * gameRef.random.nextDouble();
+    return FlightStarComponent(_point(), distance)
+      ..brightness = _brightnessAt(distance);
   }
 
   /// Returns how bright a star [distance] from the eye is.
@@ -129,9 +146,13 @@ class FlightStarsComponent(
   }
 
   /// Updates it and the stars as the world's time scale does its components:
-  /// not at all in a still world.
+  /// not at all in a still world. Even there, it adds or removes stars as
+  /// [TubeHost.starCount] changes.
   @override
   void updateSubtree(double dt) {
+    if (isLoaded) {
+      _matchCount();
+    }
     final timeScale = gameRef.world.timeScale;
     if (timeScale > 0) {
       super.updateSubtree(dt * timeScale);

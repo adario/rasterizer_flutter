@@ -15,6 +15,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.
 import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_field_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
@@ -383,6 +384,7 @@ void main() {
   }
 
   _snapshotTests();
+  _starsTests();
 }
 
 /// Returns whether the quad of [corners] hides [point] from [eye]: whether
@@ -439,6 +441,53 @@ Future<TubeRunnerExample> _gameOf(WidgetTester tester) async {
       .game!;
   await pumpWhileLoading(tester, () => !game.isLoaded);
   return game;
+}
+
+/// Checks that the Stars knob changes how many stars there are.
+void _starsTests() {
+  testWidgets('the Stars knob changes how many stars there are in the '
+      'running game, even in a still world', (tester) async {
+    await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas));
+    final game = await _gameOf(tester);
+    final field = game.runner.stars;
+    expect(field.stars, hasLength(TubeHost.defaultStarCount));
+    expect(field.children, hasLength(TubeHost.defaultStarCount));
+    // The last ones go.
+    final first = field.stars.first;
+    game.starCount = 20;
+    // Flame adds and removes the children in the frames after, once what
+    // loads before them has.
+    await pumpWhileLoading(
+      tester,
+      () => field.children.length != game.starCount,
+    );
+    expect(field.stars, hasLength(20));
+    expect(field.stars.first, same(first));
+    expect(field.children, hasLength(20));
+    game.starCount = 0;
+    await pumpWhileLoading(
+      tester,
+      () => field.children.length != game.starCount,
+    );
+    expect(field.stars, isEmpty);
+    expect(field.children, isEmpty);
+    // In a still world, new ones come at once, at random distances.
+    game.world.timeScale = 0;
+    game.starCount = 1000;
+    await pumpWhileLoading(
+      tester,
+      () => field.children.length != game.starCount,
+    );
+    expect(field.stars, hasLength(1000));
+    expect(field.children, hasLength(1000));
+    final distances = field.stars.map((star) => star.eyeDistance).toSet();
+    expect(distances.length, greaterThan(900));
+    expect(
+      distances,
+      everyElement(inInclusiveRange(TubeView.near, StarFieldComponent.far)),
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
 }
 
 /// Checks that a new renderer's game goes on from the old one's.

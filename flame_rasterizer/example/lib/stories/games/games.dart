@@ -54,10 +54,7 @@ WidgetbookComponent gamesStories() {
                 );
               }
             },
-            driftingStars: context.knobs.boolean(
-              label: 'Drifting stars',
-              initialValue: true,
-            ),
+            stars: starsKnob(context),
             glow: context.knobs.boolean(label: 'Glow'),
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
@@ -110,6 +107,7 @@ WidgetbookComponent gamesStories() {
       //     return TubeRunnerStory(
       //       renderer: renderer,
       //       tube: tube,
+      //       stars: starsKnob(context),
       //       sound: sound,
       //       flightSpeed: flightSpeedKnob(context),
       //       zoom: zoomKnob(context),
@@ -178,8 +176,8 @@ class const TubeShooterStory({
   /// knob can show it.
   final void Function(int level)? onLevel,
 
-  /// Whether the stars stay, drifting, between the zoom and the drop.
-  final bool driftingStars = true,
+  /// How many stars there are: see [TubeHost.starCount].
+  final int stars = TubeHost.defaultStarCount,
 
   /// Whether the lines glow: see [TubeShooterExample.glow].
   final bool glow = false,
@@ -244,7 +242,7 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
               firstLevel: widget.firstLevel,
               from: from,
             )
-            ..driftingStars = widget.driftingStars
+            ..starCount = widget.stars
             ..glow = widget.glow
             ..runs = widget.runs
             ..sound = widget.sound
@@ -252,7 +250,7 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
             ..onLevel = _onLevel,
       snapshot: (game) => game.snapshot,
       update: (game) => game
-        ..driftingStars = widget.driftingStars
+        ..starCount = widget.stars
         ..glow = widget.glow
         ..runs = widget.runs
         ..sound = widget.sound
@@ -314,6 +312,9 @@ class const TubeRunnerStory({
   /// hexagon.
   final Tube? tube,
 
+  /// How many stars there are: see [TubeHost.starCount].
+  final int stars = TubeHost.defaultStarCount,
+
   /// Whether the game plays its sounds.
   final bool sound = true,
 
@@ -336,11 +337,13 @@ class const TubeRunnerStory({
       renderer: renderer,
       create: (status, from) =>
           TubeRunnerExample.of(renderer, status, tube: tube, from: from)
+            ..starCount = stars
             ..sound = sound
             ..flightSpeed = flightSpeed,
       snapshot: (game) => game.snapshot,
       update: (game) => game
         ..tube = tube ?? Tubes.hexagon
+        ..starCount = stars
         ..sound = sound
         ..flightSpeed = flightSpeed,
       zoom: zoom,

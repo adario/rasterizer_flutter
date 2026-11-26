@@ -84,9 +84,10 @@ abstract class TubeRunnerExample({
     left and right, or a lane per scroll of the mouse wheel. Fire down its
     lane with the space bar, or while dragging, as in Tube Shooter. The Tube
     knob picks one of Tube Shooter's tubes, which the ship goes on down
-    without a stop. Round an open tube, the ship stops at its ends, as in
-    Tube Shooter, and where the tube bends, its nearer lanes hide what's
-    beyond them, as a closed tube's walls do. The ship's lane shows in the
+    without a stop, and the Stars knob sets how many stars there are. Round
+    an open tube, the ship stops at its ends, as in Tube Shooter, and where
+    the tube bends, its nearer lanes hide what's beyond them, as a closed
+    tube's walls do. The ship's lane shows in the
     ship's colour, as in Tube Shooter.
 
     READY shows until a tap or a key starts the game. After 4 seconds, and

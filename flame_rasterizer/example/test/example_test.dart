@@ -209,7 +209,7 @@ void main() {
     }
 
     await settle();
-    expect(find.text('Drifting stars'), findsOneWidget);
+    expect(find.text('Stars'), findsOneWidget);
     expectGlowKnob(SvgRenderer.rasterizerCanvas);
     await tester.tap(find.byType(DropdownMenu<SvgRenderer>));
     await settle();

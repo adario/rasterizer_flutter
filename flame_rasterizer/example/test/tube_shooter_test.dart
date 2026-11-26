@@ -396,7 +396,10 @@ void main() {
       expect(game.shooter.round, 1);
       expect(game.shooter.player.isVisible, isFalse);
       expect(game.shooter.spawns, hasLength(16));
-      expect(game.shooter.starField.stars, hasLength(StarFieldComponent.count));
+      expect(
+        game.shooter.starField.stars,
+        hasLength(TubeHost.defaultStarCount),
+      );
       await pumpFrames(tester, 70);
       expect(game.shooter.state, TubeState.ready);
       expect(game.shooter.player.isVisible, isTrue);
@@ -668,7 +671,7 @@ void main() {
       'and stay after them', (tester) async {
     final game = await playing(tester);
     final field = game.shooter.starField;
-    expect(field.stars, hasLength(StarFieldComponent.count));
+    expect(field.stars, hasLength(TubeHost.defaultStarCount));
 
     game.shooter.clearSpawns();
     await tester.pump(const Duration(milliseconds: 16));
@@ -723,15 +726,15 @@ void main() {
       () => game.shooter.state == TubeState.zoom,
       frames: 200,
     );
-    expect(field.stars, hasLength(StarFieldComponent.count));
+    expect(field.stars, hasLength(TubeHost.defaultStarCount));
     await pumpUntil(
       tester,
       () => game.shooter.state == TubeState.ready,
       frames: 100,
     );
     await pumpFrames(tester, 25);
-    expect(field.stars, hasLength(StarFieldComponent.count));
-    expect(field.children, hasLength(StarFieldComponent.count));
+    expect(field.stars, hasLength(TubeHost.defaultStarCount));
+    expect(field.children, hasLength(TubeHost.defaultStarCount));
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -924,43 +927,54 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('with drifting stars off, stars only show on the drop and the '
-      'zoom, and the running game changes at once', (tester) async {
+  testWidgets('the Stars knob changes how many stars there are in the '
+      'running game, at once, even once it is over', (tester) async {
     final game = await playing(tester);
     final field = game.shooter.starField;
-    expect(field.stars, hasLength(StarFieldComponent.count));
-    // In play, they fade out.
-    game.driftingStars = false;
-    await pumpFrames(tester, 25);
-    expect(field.stars, isEmpty);
+    expect(field.stars, hasLength(TubeHost.defaultStarCount));
+    // In play, the last ones go.
+    final first = field.stars.first;
+    game.starCount = 40;
+    // Flame adds and removes the children on the frame after.
+    await pumpFrames(tester, 2);
+    expect(field.stars, hasLength(40));
+    expect(field.stars.first, same(first));
+    expect(field.children, hasLength(40));
+    // With none, none show on the drop and the zoom either.
+    game.starCount = 0;
+    await pumpFrames(tester, 2);
     expect(field.children, isEmpty);
-
     game.shooter.clearSpawns();
     await tester.pump(const Duration(milliseconds: 16));
     expect(game.shooter.state, TubeState.drop);
-    expect(field.stars, hasLength(StarFieldComponent.count));
+    expect(field.stars, isEmpty);
     await pumpUntil(
       tester,
       () => game.shooter.state == TubeState.zoom,
       frames: 200,
     );
-    expect(field.stars, hasLength(StarFieldComponent.count));
+    expect(field.stars, isEmpty);
+    expect(field.children, isEmpty);
     await pumpUntil(
       tester,
       () => game.shooter.state == TubeState.ready,
       frames: 100,
     );
-    await pumpFrames(tester, 25);
-    expect(field.stars, isEmpty);
 
-    // On again, they fade in.
-    game.driftingStars = true;
-    expect(field.stars, hasLength(StarFieldComponent.count));
+    // New ones come at random distances, as bright as stars there are.
+    game.starCount = 500;
+    await pumpFrames(tester, 2);
+    expect(field.stars, hasLength(500));
     await pumpFrames(tester, 25);
+    for (final star in field.stars) {
+      expect(
+        star.eyeDistance,
+        inInclusiveRange(TubeView.near, StarFieldComponent.far),
+      );
+    }
     expect(field.stars.map((star) => star.brightness), anyElement(1));
 
-    // Once the game is over, nothing fades: the knob turns them off and on
-    // again at once.
+    // Once the game is over, in a still world, they change at once.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
     game.lives = 1;
@@ -972,10 +986,11 @@ void main() {
       () => game.shooter.state == TubeState.over,
       frames: 120,
     );
-    game.driftingStars = false;
-    expect(field.stars, isEmpty);
-    game.driftingStars = true;
-    await tester.pump(const Duration(milliseconds: 16));
+    expect(game.world.timeScale, 0);
+    game.starCount = 1000;
+    await pumpFrames(tester, 2);
+    expect(field.stars, hasLength(1000));
+    expect(field.children, hasLength(1000));
     expect(field.stars.map((star) => star.brightness), anyElement(1));
     await tester.pumpWidget(const SizedBox());
   });
@@ -1722,7 +1737,7 @@ void main() {
     final star = game.shooter.starField.stars.first;
     final eyeDistance = star.eyeDistance;
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.shooter.starField.stars, hasLength(StarFieldComponent.count));
+    expect(game.shooter.starField.stars, hasLength(TubeHost.defaultStarCount));
     expect(star.eyeDistance, eyeDistance);
     final center = tester.getCenter(
       find.byType(GameWidget<TubeShooterExample>),

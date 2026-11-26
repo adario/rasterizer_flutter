@@ -273,20 +273,6 @@ class ShooterMode({
       _state == TubeState.over ||
       (_state == TubeState.run && _run!.runner.isOver);
 
-  /// The Drifting stars knob's value: whether the stars stay, drifting,
-  /// between the zoom and the drop. If not, they only show during those.
-  bool get driftingStars => _driftingStars;
-  bool _driftingStars = true;
-
-  set driftingStars(bool value) {
-    if (value != _driftingStars) {
-      _driftingStars = value;
-      if (isLoaded) {
-        _updateStars();
-      }
-    }
-  }
-
   /// The Runs knob's value: whether, after a round's drop, the ship flies on
   /// down an endless tube, by Tube Runner's rules, for [runTime] of play,
   /// before it flies onto the next round's rim: see [TubeState.run]. On by
@@ -420,25 +406,7 @@ class ShooterMode({
     _state = state;
     _stateTime = 0;
     gameRef.forgetWaitPointers();
-    _updateStars();
-  }
-
-  /// Shows the stars if they drift, on the zoom and the drop, and after a
-  /// ship lost on the drop. Otherwise hides them, at once in a still world,
-  /// where nothing fades.
-  void _updateStars() {
-    if (driftingStars ||
-        _state == TubeState.zoom ||
-        _state == TubeState.drop ||
-        _state == TubeState.run ||
-        _state == TubeState.arrive ||
-        (_state == TubeState.dying && _dyingOnDrop)) {
-      starField.show();
-    } else if (gameRef.world.timeScale == 0) {
-      starField.stop();
-    } else {
-      starField.hide();
-    }
+    starField.show();
   }
 
   /// Applies the game's rules over [dt] seconds of the world's time.

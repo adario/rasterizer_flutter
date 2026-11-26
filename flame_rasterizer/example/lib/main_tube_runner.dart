@@ -9,8 +9,8 @@ void main() {
 }
 
 /// Tube Runner's story, with a renderer menu and no knobs: it flies down the
-/// hexagon at the default flight speed, at a zoom and speed of 1, over a
-/// one-line status bar.
+/// hexagon at the default flight speed, with 200 stars, at a zoom and speed
+/// of 1, over a one-line status bar.
 class const TubeRunnerApp({
   /// Whether the game plays its sounds.
   final bool sound = true,

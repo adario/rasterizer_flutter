@@ -46,6 +46,17 @@ double flightSpeedKnob(BuildContext context) => context.knobs.onKnobAdded(
   _SliderKnob(label: 'Flight speed', initialValue: 1.5, min: 0.5, max: 2),
 )!;
 
+/// Returns the Stars knob: how many stars Tube Shooter and Tube Runner show,
+/// from 0 to 1000 in steps of 20, 200 at first.
+int starsKnob(BuildContext context) => intSliderKnob(
+  context,
+  label: 'Stars',
+  initialValue: 200,
+  min: 0,
+  max: 1000,
+  divisions: 50,
+);
+
 /// Returns an integer slider knob from [min] to [max], in [divisions] steps,
 /// like Widgetbook's. Like [zoomKnob], it shows its value in tabular figures.
 int intSliderKnob(

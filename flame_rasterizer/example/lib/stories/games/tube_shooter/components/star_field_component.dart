@@ -11,12 +11,12 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.da
 
 /// The stars around the tube, never inside it.
 ///
-/// [count] stars lie [radii] from the axis through the viewport's centre,
-/// and up to [far] from the eye, in tube units: see [StarComponent]. Each
-/// frame, they come closer by as much as the eye went deeper, so on the zoom
-/// and the drop they stream outward as streaks. A star that passes the
-/// tube's near plane goes back to the farthest distance, as a dot somewhere
-/// else.
+/// [TubeHost.starCount] stars lie [radii] from the axis through the
+/// viewport's centre, and up to [far] from the eye, in tube units: see
+/// [StarComponent]. Each frame, they come closer by as much as the eye went
+/// deeper, so on the zoom and the drop they stream outward as streaks. A star
+/// that passes the tube's near plane goes back to the farthest distance, as a
+/// dot somewhere else.
 ///
 /// While the eye goes slower than [cruise], at the round's pace, the stars
 /// come at that speed instead, with short streaks, and a star wholly off
@@ -29,8 +29,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.da
 /// stars turn more, as with parallax: see [turnRatio]. Their places turn,
 /// not their distances from the eye.
 /// Stars are unseen at the farthest, and at their brightest from [bright] in.
-/// [show] fades them in over [fadeTime], and [hide] fades them out, then
-/// removes them.
+/// [show] fades them in over [fadeTime]. As [TubeHost.starCount] changes,
+/// stars go, or come at random distances, as at first, at once.
 ///
 /// It's in the camera's backdrop, under the world, so that the camera's post
 /// process, the Glow knob's [TubeGlow], leaves the stars out. Still, it draws
@@ -40,7 +40,6 @@ class StarFieldComponent(
   /// The mode whose ship the stars turn with, at its pace.
   final ShooterMode shooter,
 ) extends Component with HasGameRef<TubeHost>, CustomTraversal {
-  static const count = 200;
   static const far = 10.0;
   static const bright = 4.0;
   static const radii = (inner: 1.2, outer: 5.0);
@@ -88,40 +87,44 @@ class StarFieldComponent(
   double _turnPerLane = 0;
 
   /// Shows the stars, fading them in, or at once in a still world.
-  ///
-  /// Stars that are fading out fade in again.
   void show() {
-    _shown = true;
-    if (stars.isNotEmpty) {
+    if (_shown) {
       return;
     }
+    _shown = true;
     _fade = gameRef.world.timeScale == 0 ? 1 : 0;
     _eyeShift = gameRef.view.eyeShift;
     // The first update only notes where the ship is.
     _tube = null;
     _turnTarget = _turned;
-    for (var i = 0; i < count; i++) {
-      final distance =
-          TubeView.near + (far - TubeView.near) * gameRef.random.nextDouble();
-      stars.add(
-        StarComponent(_point(), distance)..brightness = _brightnessAt(distance),
-      );
-    }
-    addAll(stars);
+    _matchCount();
   }
-
-  /// Hides the stars, fading them out.
-  void hide() => _shown = false;
 
   /// Follows a shift of the view's eye [by] that doesn't move it, as when the
   /// tube that the eye shift counts from changes, after a run.
   void shiftEye(double by) => _eyeShift += by;
 
-  /// Removes the stars at once.
-  void stop() {
-    _shown = false;
-    removeAll(stars);
-    stars.clear();
+  /// Adds or removes stars, so that there are [TubeHost.starCount]: the last
+  /// ones go, and new ones come at random distances.
+  void _matchCount() {
+    final count = gameRef.starCount;
+    if (stars.length > count) {
+      removeAll(stars.sublist(count));
+      stars.removeRange(count, stars.length);
+    }
+    final added = [
+      for (var i = stars.length; i < count; i++) _star(),
+    ];
+    stars.addAll(added);
+    addAll(added);
+  }
+
+  /// Returns a new star, at a random distance from the eye.
+  StarComponent _star() {
+    final distance =
+        TubeView.near + (far - TubeView.near) * gameRef.random.nextDouble();
+    return StarComponent(_point(), distance)
+      ..brightness = _brightnessAt(distance);
   }
 
   /// Returns how bright a star [distance] from the eye is, given the fade.
@@ -189,9 +192,13 @@ class StarFieldComponent(
     ..point = _point();
 
   /// Updates it and the stars as the world's time scale does its components:
-  /// not at all in a still world.
+  /// not at all in a still world. Even there, it adds or removes stars as
+  /// [TubeHost.starCount] changes.
   @override
   void updateSubtree(double dt) {
+    if (_shown) {
+      _matchCount();
+    }
     final timeScale = gameRef.world.timeScale;
     if (timeScale > 0) {
       super.updateSubtree(dt * timeScale);
@@ -213,11 +220,7 @@ class StarFieldComponent(
     if (stars.isEmpty) {
       return;
     }
-    _fade = (_fade + (_shown ? dt : -dt) / fadeTime).clamp(0.0, 1.0);
-    if (_fade == 0 && !_shown) {
-      stop();
-      return;
-    }
+    _fade = math.min(1, _fade + dt / fadeTime);
     // The eye only goes deeper, but for the cut from a drop to the next zoom,
     // where it jumps back: the stars then come at the cruise speed.
     final view = gameRef.view;

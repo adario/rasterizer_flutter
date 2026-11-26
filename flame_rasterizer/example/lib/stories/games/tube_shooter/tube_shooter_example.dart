@@ -72,7 +72,7 @@ abstract class TubeShooterExample({
     shapes. The Glow knob makes the lines glow: the mesh renderer draws the
     glow with them, and the other renderers draw it with a shader over the
     world. The Level knob shows the round's level, and starts a new game at
-    the level it picks. The other knobs keep the stars drifting, turn the
+    the level it picks. The other knobs set how many stars there are, turn the
     sounds on and off, zoom the camera and change the game's speed. After
     each round's drop, the ship flies on down Tube Runner's endless tube, by
     its rules, as the round's enemies come again in the same order, then out
@@ -89,10 +89,6 @@ abstract class TubeShooterExample({
 
   /// What a game for another renderer goes on from.
   TubeShooterSnapshot get snapshot => shooter.snapshot;
-
-  /// The Drifting stars knob's value: see [ShooterMode.driftingStars].
-  bool get driftingStars => shooter.driftingStars;
-  set driftingStars(bool value) => shooter.driftingStars = value;
 
   /// The Runs knob's value: see [ShooterMode.runs].
   bool get runs => shooter.runs;
