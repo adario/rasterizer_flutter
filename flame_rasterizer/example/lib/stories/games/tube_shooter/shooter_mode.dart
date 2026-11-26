@@ -157,6 +157,9 @@ class ShooterMode({
   /// their dots, for its run.
   final _appeared = <EnemyKind>[];
 
+  @visibleForTesting
+  List<EnemyKind> get appeared => _appeared;
+
   /// Whether enemies come; tests turn it off.
   @visibleForTesting
   bool spawning = true;

@@ -173,14 +173,19 @@ void main() {
   }
 
   /// Pumps [game], on its first round, with its runs on, until its drop
-  /// flies on down a run, and returns the run's runner.
+  /// flies on down a run of [sequence], and returns the run's runner. With
+  /// no spawning, a run of more than [RunnerMode.endSpawns] enemies goes on.
   Future<RunnerMode> pumpToRun(
     WidgetTester tester,
-    TubeShooterExample game,
-  ) async {
+    TubeShooterExample game, {
+    List<EnemyKind>? sequence,
+  }) async {
     game.shooter.spawning = false;
     await beginLevel(tester, game);
     game.shooter.clearSpawns();
+    game.shooter.appeared
+      ..clear()
+      ..addAll(sequence ?? List.filled(10, EnemyKind.climber));
     await pumpUntil(
       tester,
       () => game.shooter.state == TubeState.run,
@@ -199,15 +204,23 @@ void main() {
 
   for (final tube in [Tubes.hexagon, Tubes.horseshoe]) {
     testWidgets("on the ${tube.name}'s run, Tube Runner's ship takes over "
-        "where the round's was, the round brings seeders, and none comes from "
-        "past the end of the run's play", (tester) async {
+        "where the round's was, the round's enemies come in the order they "
+        "came, and none comes from past the end of the run's play", (
+      tester,
+    ) async {
+      const sequence = [
+        EnemyKind.seeder,
+        EnemyKind.climber,
+        EnemyKind.zapper,
+        EnemyKind.edgeWalker,
+      ];
       final game = await pumpGame(
         tester,
         SvgRenderer.rasterizerCanvas,
         firstLevel: levels.indexWhere((level) => level.tube == tube),
         runs: true,
       );
-      final runner = await pumpToRun(tester, game);
+      final runner = await pumpToRun(tester, game, sequence: sequence);
       runner.spawning = true;
       await pumpFrames(tester, 2);
       expect(game.shooter.player.isVisible, isFalse);
@@ -217,9 +230,8 @@ void main() {
         (runner.ship.position - game.shooter.player.position).length,
         lessThan(0.02 * game.view.rimScale),
       );
-      final playEnd =
-          Tube.depth + TubeHost.defaultFlightSpeed * ShooterMode.runTime(1);
-      final kinds = <EnemyKind>{};
+      final seen = <RunnerEnemyComponent>{};
+      final kinds = <EnemyKind>[];
       var mostAt = 0.0;
       for (
         var i = 0;
@@ -232,13 +244,16 @@ void main() {
         }
         await tester.pump(const Duration(milliseconds: 16));
         for (final enemy in runner.enemies) {
-          kinds.add(enemy.kind);
+          if (seen.add(enemy) && !kinds.contains(enemy.kind)) {
+            kinds.add(enemy.kind);
+          }
           mostAt = math.max(mostAt, enemy.at);
         }
       }
       expect(game.shooter.state, TubeState.arrive);
-      expect(kinds, {EnemyKind.seeder});
-      expect(mostAt, lessThanOrEqualTo(playEnd));
+      // A lost ship's enemies come again, so each kind counts once.
+      expect(kinds, sequence);
+      expect(mostAt, lessThanOrEqualTo(runner.run!.playEnd));
       expect(runner.isMounted, isFalse);
       expect(game.shooter.player.isVisible, isTrue);
       await pumpFrames(tester, 2);
@@ -544,12 +559,11 @@ void main() {
       firstLevel: hexagon,
       runs: true,
     );
-    final runner = await pumpToRun(tester, game);
-    final playEnd =
-        Tube.depth + TubeHost.defaultFlightSpeed * ShooterMode.runTime(1);
+    // With no enemies to come, the run's end is set as its play begins.
+    final runner = await pumpToRun(tester, game, sequence: const []);
     await pumpUntil(
       tester,
-      () => runner.flown >= playEnd - 0.5,
+      () => runner.flown >= runner.run!.playEnd - 0.5,
       frames: runFrames,
     );
     // A climber across the tube, a little ahead of the ship, which a shot
