@@ -28,6 +28,19 @@ android {
         versionName = flutter.versionName
         // Impeller's backend: auto, unless IMPELLER_BACKEND asks for vulkan or opengles (see AndroidManifest.xml)
         manifestPlaceholders["impellerBackend"] = System.getenv("IMPELLER_BACKEND") ?: "auto"
+        // A game on its own gets its own app id and label, so it installs beside the example:
+        // `flutter build apk -t lib/main_tube_shooter.dart --android-project-arg standalone=tube_shooter`.
+        val standalone = project.findProperty("standalone") as String?
+        val standaloneLabels = mapOf(
+            "tube_shooter" to "Tube Shooter",
+            "revolute_pinball" to "Revolute Pinball",
+        )
+        manifestPlaceholders["appLabel"] = "Flame Rasterizer Example"
+        if (standalone != null) {
+            applicationIdSuffix = ".$standalone"
+            manifestPlaceholders["appLabel"] = standaloneLabels[standalone]
+                ?: throw GradleException("Unknown standalone game: $standalone")
+        }
     }
 
     buildTypes {

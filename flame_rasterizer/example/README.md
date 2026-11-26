@@ -26,6 +26,10 @@ one-line status bar under it, but no other knobs:
 - Tube Shooter: `flutter run -t lib/main_tube_shooter.dart`.
 - Revolute Pinball: `flutter run -t lib/main_revolute_pinball.dart`.
 
+On Android, `--android-project-arg standalone=tube_shooter` (or `standalone=revolute_pinball`) gives the game its own
+app id and label, so it installs beside the example: for instance, `flutter build apk -t lib/main_tube_shooter.dart
+--android-project-arg standalone=tube_shooter`.
+
 ## Shared knobs and SVGs
 
 Every use case has a Renderer knob (see [Svg Renderers](#svg--svg-renderers)) and a status bar under the game. They also
