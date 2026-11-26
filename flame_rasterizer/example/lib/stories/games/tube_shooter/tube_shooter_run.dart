@@ -30,34 +30,43 @@ class _Run(
   final Color color,
 
   /// The next round's level.
-  final Level next,
-
-  /// The round that the run comes after, which sets how long it is, and how
-  /// many of Tube Runner's kinds of enemy come on it.
-  final int round, {
+  final Level next, {
 
   /// How fast the runner's ship flies at first, in tube units a second.
   required final double flightSpeed,
+
+  /// The enemies that come on the run, in order: the round's, as they came.
+  required final List<EnemyKind> sequence,
 
   /// The snapshot of the runner of a game with another renderer that the
   /// run goes on from, if any.
   final RunnerSnapshot? from,
 }) {
-  /// Where the run's bends end: as far along as the ship flies on the drop
-  /// and the run, at [flightSpeed].
-  late final playEnd = Tube.depth + flightSpeed * ShooterMode.runTime(round);
+  /// Where the run's bends end, where the next round's rim is, and where
+  /// the run's tube ends: endless, until the runner sets them with [endAt].
+  double playEnd = double.infinity;
+  double rim = double.infinity;
+  double exit = double.infinity;
 
-  /// Where the next round's rim is: as far past [playEnd] as the ship flies
-  /// while it slows down evenly from [flightSpeed] to a stop over
-  /// [ShooterMode.arriveTime].
-  late final rim = playEnd + flightSpeed * ShooterMode.arriveTime / 2;
-
-  /// Where the run's tube ends, with a ring across: on a ring, and far
-  /// enough before [rim] to be behind the eye once the ship is there.
-  late final exit = math.max(
-    playEnd,
-    (rim - Tube.eye - TubeView.near - EndlessTube.step).floorToDouble(),
-  );
+  /// Sets [playEnd], and from it [rim], as far past as the ship flies while
+  /// it slows down evenly from [flightSpeed] to a stop over
+  /// [ShooterMode.arriveTime], and [exit], on a ring, far enough before
+  /// [rim] to be behind the eye once the ship is there. Returns [exit] and
+  /// [rim].
+  ({double exit, double rim}) endAt(double playEnd) {
+    this.playEnd = playEnd;
+    rim = playEnd + flightSpeed * ShooterMode.arriveTime / 2;
+    exit = math.max(
+      playEnd,
+      (rim - Tube.eye - TubeView.near - EndlessTube.step).floorToDouble(),
+    );
+    endless.course = (
+      bendFrom: Tube.depth,
+      bendTo: playEnd,
+      ease: ShooterMode.runEase,
+    );
+    return (exit: exit, rim: rim);
+  }
 
   /// How far the ship has dropped at [progress] of the drop: from a stop,
   /// speeding up, and flying at [flightSpeed] at its end. If that's too slow
@@ -76,7 +85,7 @@ class _Run(
   late final endless = EndlessTube(
     course: (
       bendFrom: Tube.depth,
-      bendTo: playEnd,
+      bendTo: double.infinity,
       ease: ShooterMode.runEase,
     ),
   );
@@ -97,7 +106,8 @@ class _Run(
       color: color,
       next: (tube: next.tube, rim: rim),
       nextColor: next.color,
-      kinds: round,
+      sequence: sequence,
+      endAt: endAt,
     ),
     from: from,
   );
@@ -177,13 +187,12 @@ extension on ShooterMode {
   /// Makes the run that the round's drop flies on down, with its runner,
   /// which loads on the drop, or goes on [from] a runner's snapshot.
   void _makeRun({RunnerSnapshot? from}) {
-    // A kind of enemy more on each round's run.
     final run = _run = _Run(
       view.tube,
       level.color,
       levels[(_levelIndex + 1) % levels.length],
-      round,
       flightSpeed: gameRef.flightSpeed,
+      sequence: [..._appeared],
       from: from,
     );
     add(run.runner..spawning = spawning);

@@ -153,6 +153,10 @@ class ShooterMode({
   /// one last. Those arriving are among them.
   final spawns = <SpawnDotComponent>[];
 
+  /// The kinds of the round's enemies, in the order they first came out of
+  /// their dots, for its run.
+  final _appeared = <EnemyKind>[];
+
   /// Whether enemies come; tests turn it off.
   @visibleForTesting
   bool spawning = true;
@@ -514,6 +518,9 @@ class ShooterMode({
     for (final spawn in spawns.where((spawn) => spawn.hasArrived).toList()) {
       spawns.remove(spawn);
       spawn.removeFromParent();
+      if (!spawn.again) {
+        _appeared.add(spawn.kind);
+      }
       addEnemy(spawn.kind.create(lane: spawn.lane, depth: Tube.depth));
     }
     _sinceSpawn += dt * pace;
@@ -532,8 +539,18 @@ class ShooterMode({
   /// Adds an enemy of [kind] to come next, as a dot [at] lanes round the far
   /// end, which goes on [from] a dot in a game with another renderer, if
   /// given.
-  void _addSpawn(EnemyKind kind, double at, {SpawnSnapshot? from}) {
-    final spawn = SpawnDotComponent(kind, at: at, from: from);
+  void _addSpawn(
+    EnemyKind kind,
+    double at, {
+    SpawnSnapshot? from,
+    bool again = false,
+  }) {
+    final spawn = SpawnDotComponent(
+      kind,
+      at: at,
+      from: from,
+      again: again || (from?.again ?? false),
+    );
     spawns.add(spawn);
     spawnGroup.add(spawn);
   }
@@ -759,7 +776,7 @@ class ShooterMode({
       spawn.wander();
     }
     for (final enemy in [...enemies]) {
-      _addSpawn(enemy.kind, enemy.currentLane + 0.5);
+      _addSpawn(enemy.kind, enemy.currentLane + 0.5, again: true);
       discard(enemy);
     }
     for (final shot in [...shots, ...enemyShots]) {
@@ -792,6 +809,7 @@ class ShooterMode({
     _lookFrom = _look;
     spikes.clear();
     clearSpawns();
+    _appeared.clear();
     final kinds = [
       for (var i = 0; i < level.climbers; i++) EnemyKind.climber,
       for (var i = 0; i < level.splitters; i++) EnemyKind.splitter,

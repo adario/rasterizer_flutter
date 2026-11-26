@@ -53,17 +53,22 @@ enum RunnerState() {
 /// [playEnd], so that all are gone once the ship gets there. The tube shows
 /// from [from] to its [exit], in [color], with the ship's lane fading in to
 /// the ship's colour, and the next round's tube, [next], in [nextColor], once
-/// it's no farther ahead than the tube goes. As many of
-/// [RunnerMode.enemyKinds] as [kinds] come, from the first.
+/// it's no farther ahead than the tube goes.
+///
+/// The enemies come in the order of [sequence]. Its [playEnd] and [exit]
+/// start endless: once the sequence nearly ran out, the runner sets them
+/// with [endAt], which takes the run's play end, and returns its exit and
+/// the next round's rim.
 class RunnerRun({
   required final EndlessTube tube,
   required final double from,
-  required final double playEnd,
-  required final double exit,
+  required var double playEnd,
+  required var double exit,
   required final Color color,
-  required final NextTube next,
+  required var NextTube next,
   required final Color nextColor,
-  required final int kinds,
+  required final List<EnemyKind> sequence,
+  required final ({double exit, double rim}) Function(double playEnd) endAt,
 });
 
 /// What a [RunnerMode] in a game for another renderer goes on from: its
@@ -82,6 +87,8 @@ typedef RunnerSnapshot = ({
   int spawned,
   EnemyKind? lastKind,
   int kills,
+  List<EnemyKind> queue,
+  double playEnd,
   double pulseClock,
   ShipSnapshot ship,
   List<({int lane, double far, double near})> spikes,
@@ -134,8 +141,7 @@ class RunnerMode({
   /// When the first enemy comes, in seconds of the game.
   static const firstEnemy = 3.0;
 
-  /// The kinds of enemy that come: all from the start, or on a [run], as
-  /// many as its kinds, from the first.
+  /// The kinds of enemy that come, but on a [run].
   static const enemyKinds = [
     EnemyKind.seeder,
     EnemyKind.climber,
@@ -267,6 +273,15 @@ class RunnerMode({
   int _spawned = 0;
   EnemyKind? _lastKind;
 
+  /// On a run, the enemies still to come, in order.
+  late final _queue = <EnemyKind>[...?run?.sequence];
+
+  /// On a run, how many enemies are left to come when its end is set, and
+  /// how far past the last one's ring the end is, for the drift of the
+  /// spawns' spacing as the ship speeds up.
+  static const endSpawns = 2;
+  static const endMargin = 2.0;
+
   /// How many enemies the ship's shots destroyed since the game began, or
   /// the run, or the ship was last lost.
   int _kills = 0;
@@ -342,6 +357,8 @@ class RunnerMode({
     spawned: _spawned,
     lastKind: _lastKind,
     kills: _kills,
+    queue: [..._queue],
+    playEnd: run?.playEnd ?? double.infinity,
     pulseClock: _pulseClock,
     ship: ship.snapshot,
     spikes: [
@@ -365,6 +382,12 @@ class RunnerMode({
     _spawned = from.spawned;
     _lastKind = from.lastKind;
     _kills = from.kills;
+    _queue
+      ..clear()
+      ..addAll(from.queue);
+    if (run != null) {
+      _endRunAt(from.playEnd);
+    }
     _pulseClock = from.pulseClock;
     for (final (:lane, :far, :near) in from.spikes) {
       _spikes.add(Spike(lane, far)..near = near);
@@ -687,6 +710,16 @@ class RunnerMode({
     _blasts.clear();
   }
 
+  /// Sets the run's play end to [playEnd], and its exit.
+  void _endRunAt(double playEnd) {
+    final run = this.run!;
+    final (:exit, :rim) = run.endAt(playEnd);
+    run
+      ..playEnd = playEnd
+      ..exit = exit
+      ..next = (tube: run.next.tube, rim: rim);
+  }
+
   /// Blows the ship up, fades it out, and takes a life. The enemies, spikes
   /// and shots go, and the ship flies at [flightSpeed] again.
   void _destroyShip() {
@@ -702,6 +735,14 @@ class RunnerMode({
     );
     ship.fadeOut();
     _kills = 0;
+    if (run case final run?) {
+      // On a run, the enemies come again, unless its end already shows.
+      _queue.insertAll(0, [for (final enemy in _enemies) enemy.kind]);
+      final ease = run.tube.course?.ease ?? 0;
+      if (run.playEnd - ease > _farRing) {
+        _endRunAt(double.infinity);
+      }
+    }
     _clearEnemies();
     _setState(RunnerState.dying);
   }
@@ -900,26 +941,27 @@ class RunnerMode({
 
   /// Over [dt] seconds of the game: brings an enemy at [firstEnemy], then
   /// every [enemyPeriod], as it is when the last came, of a kind picked at
-  /// random among the [enemyKinds], or the [run]'s kinds, on a lane picked
-  /// at random, climbs the enemies and the climbers' shots, and
+  /// random among the [enemyKinds], or the next of the [run]'s, on a lane
+  /// picked at random, climbs the enemies and the climbers' shots, and
   /// splits the splitters that got [RunnerSplitterComponent.splitAhead] of
   /// the ship. On a run, none comes from past where its play ends.
   void _updateEnemies(double dt) {
     _untilEnemy -= dt;
     if (_untilEnemy <= 0) {
       _untilEnemy += enemyPeriod;
-      if (spawning && _farRing <= (run?.playEnd ?? double.infinity)) {
-        final kinds = (run?.kinds ?? enemyKinds.length).clamp(
-          1,
-          enemyKinds.length,
-        );
+      final run = this.run;
+      if (run != null) {
+        if (spawning && _farRing <= run.playEnd && _queue.isNotEmpty) {
+          addEnemy(_queue.removeAt(0), random.nextInt(tube.laneCount));
+        }
+      } else if (spawning) {
         // The first come as seeders, then each comes of another kind than
         // the last, but for a seeder.
         final last = _lastKind;
         final picks = _spawned < firstSeeders
             ? const [EnemyKind.seeder]
             : [
-                for (final kind in enemyKinds.take(kinds))
+                for (final kind in enemyKinds)
                   if (kind != last || kind == EnemyKind.seeder) kind,
               ];
         // Picking among one kind would take a number from [random], and
@@ -930,6 +972,16 @@ class RunnerMode({
         _lastKind = kind;
         addEnemy(kind, random.nextInt(tube.laneCount));
       }
+    }
+    // The run's end, once the last enemies' rings are near enough to tell,
+    // past them, and past where its bends still show.
+    if (run case final run?
+        when run.playEnd == double.infinity && _queue.length <= endSpawns) {
+      final spacing = firstEnemyPeriod * flightSpeed;
+      final ease = run.tube.course?.ease ?? 0;
+      _endRunAt(
+        _farRing + math.max(spacing * _queue.length + endMargin, ease),
+      );
     }
     for (final enemy in _enemies) {
       enemy.climb(dt);

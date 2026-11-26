@@ -16,6 +16,7 @@ typedef SpawnSnapshot = ({
   ({double speed, double turnIn})? wander,
   double? arriving,
   bool white,
+  bool again,
 });
 
 /// An enemy of [kind] still to come: a dot in its colour on the tube's far
@@ -30,6 +31,9 @@ class SpawnDotComponent(
   final EnemyKind kind, {
   required double at,
   final SpawnSnapshot? from,
+
+  /// Whether its enemy came out before, and went back on a lost ship.
+  final bool again = false,
 }) extends DotComponent with InShooterMode {
   this : super(kind.color);
 
@@ -78,6 +82,7 @@ class SpawnDotComponent(
     wander: isLoaded ? (speed: _speed, turnIn: _turnIn) : null,
     arriving: _arriving,
     white: _white,
+    again: again,
   );
 
   /// Starts arriving.

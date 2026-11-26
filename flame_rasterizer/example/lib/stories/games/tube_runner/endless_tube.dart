@@ -112,7 +112,7 @@ typedef NextTube = ({Tube tube, double rim});
 /// Given a [course], the axis bends only along it, and goes straight before
 /// and after, so that Tube Shooter's tube can lead into it, and another
 /// follow it: see [quadsAt].
-class EndlessTube({final TubeCourse? course}) {
+class EndlessTube({var TubeCourse? course}) {
   /// The distance between two rings along the axis, in tube units.
   static const step = 0.5;
 

@@ -26,6 +26,7 @@ typedef TubeShooterSnapshot = ({
   PlayerSnapshot player,
   List<double> spikes,
   List<SpawnSnapshot> spawns,
+  List<EnemyKind> appeared,
   List<EnemySnapshot> enemies,
   List<LaneSnapshot> shots,
   List<LaneSnapshot> enemyShots,
@@ -61,6 +62,7 @@ extension TubeShooterSnapshots on ShooterMode {
     player: player.snapshot,
     spikes: [...spikes.lengths],
     spawns: [for (final spawn in spawns) spawn.snapshot],
+    appeared: [..._appeared],
     enemies: [for (final enemy in enemies) enemy.snapshot],
     shots: [for (final shot in shots) shot.laneSnapshot],
     enemyShots: [for (final shot in enemyShots) shot.laneSnapshot],
@@ -88,6 +90,7 @@ extension TubeShooterSnapshots on ShooterMode {
     for (final spawn in from.spawns) {
       _addSpawn(spawn.kind, spawn.at, from: spawn);
     }
+    _appeared.addAll(from.appeared);
     for (final enemy in from.enemies) {
       addEnemy(enemy.kind.goOnFrom(enemy));
     }
