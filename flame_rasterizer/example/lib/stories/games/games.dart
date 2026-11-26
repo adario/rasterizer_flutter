@@ -62,7 +62,8 @@ WidgetbookComponent gamesStories() {
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
             speed: speedKnob(context),
-            flightSpeed: flightSpeedKnob(context),
+            // Off for now: the default flight speed.
+            // flightSpeed: flightSpeedKnob(context),
           );
         },
         codeLink: baseLink('games/tube_shooter'),
