@@ -35,7 +35,9 @@ class PlayerComponent({final PlayerSnapshot? from})
   this : super(priority: 4);
 
   static const stepsPerLane = 16;
-  static const firePeriod = 0.1;
+  // Long enough that a held key's sweep at top speed doesn't put a shot in
+  // every lane.
+  static const firePeriod = 0.15;
   static const maxShots = 8;
 
   /// Its speed while a key is held, in lanes a second: at first, and at most.

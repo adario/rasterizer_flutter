@@ -583,8 +583,8 @@ void main() {
         expect(shot.lane, 3);
       }
     }
-    // A shot every 0.1 s, each crossing the tube in 0.5 s: 5 or 6 at once.
-    expect(most, inInclusiveRange(5, 6));
+    // A shot every 0.15 s, each crossing the tube in 0.5 s: 3 or 4 at once.
+    expect(most, inInclusiveRange(3, 4));
     game.shooter.player.stopFire();
     await pumpFrames(tester, 40);
     expect(game.shooter.shots, isEmpty);
