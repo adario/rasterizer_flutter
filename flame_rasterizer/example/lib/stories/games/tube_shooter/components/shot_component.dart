@@ -17,7 +17,7 @@ class ShotComponent({
   void move(double dt) {
     depth += dt * Tube.depth / crossTime;
     if (depth >= Tube.depth) {
-      gameRef.discard(this);
+      shooter.discard(this);
     }
   }
 }
@@ -36,7 +36,7 @@ class EnemyShotComponent({
 
   @override
   void move(double dt) {
-    final speed = gameRef.pace * Tube.depth / gameRef.level.enemyShotTime;
+    final speed = shooter.pace * Tube.depth / shooter.level.enemyShotTime;
     depth -= dt * speed;
   }
 }

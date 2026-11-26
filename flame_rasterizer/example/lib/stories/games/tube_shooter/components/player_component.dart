@@ -5,8 +5,9 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// What the ship in a game for another renderer goes on from: its step and
 /// the fraction of a step past it, its depth, the seconds since its last
@@ -30,11 +31,13 @@ typedef PlayerSnapshot = ({
 /// game hasn't seen go down, don't move it or fire.
 class PlayerComponent({final PlayerSnapshot? from})
     extends PositionComponent
-    with HasGameRef<TubeShooterExample>, HasVisibility {
+    with HasGameRef<TubeHost>, InShooterMode, HasVisibility {
   this : super(priority: 4);
 
   static const stepsPerLane = 16;
-  static const firePeriod = 0.1;
+  // Long enough that a held key's sweep at top speed doesn't put a shot in
+  // every lane.
+  static const firePeriod = 0.15;
   static const maxShots = 8;
 
   /// Its speed while a key is held, in lanes a second: at first, and at most.
@@ -48,7 +51,7 @@ class PlayerComponent({final PlayerSnapshot? from})
   static const startStep = stepsPerLane ~/ 2;
 
   /// Seconds it takes to fade out once destroyed.
-  static const fadeTime = TubeShooterExample.respawnTime * 2 / 3;
+  static const fadeTime = TubeHost.respawnTime * 2 / 3;
 
   int step = startStep;
   double depth = 0;
@@ -142,10 +145,10 @@ class PlayerComponent({final PlayerSnapshot? from})
     _sinceShot += dt;
     if (_firing &&
         _sinceShot >= firePeriod &&
-        gameRef.canFire &&
-        gameRef.shots.length < maxShots) {
+        shooter.canFire &&
+        shooter.shots.length < maxShots) {
       _sinceShot = 0;
-      gameRef.fire(lane, depth);
+      shooter.fire(lane, depth);
     }
     place();
     gameRef.keepStroke(drawing);

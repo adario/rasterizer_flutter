@@ -6,7 +6,11 @@ import 'package:flame_rasterizer_example/commons/renderer_knob.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
+// import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
+// import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:widgetbook/widgetbook.dart';
 
@@ -58,6 +62,8 @@ WidgetbookComponent gamesStories() {
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
             speed: speedKnob(context),
+            // Off for now: the default flight speed.
+            // flightSpeed: flightSpeedKnob(context),
           );
         },
         codeLink: baseLink('games/tube_shooter'),
@@ -85,6 +91,40 @@ WidgetbookComponent gamesStories() {
         codeLink: baseLink('games/revolute_pinball'),
         info: RevolutePinballExample.description,
       ),
+      // Not deployed for now: Tube Shooter plays its runs.
+      // ExampleUseCase(
+      //   name: 'Tube Runner',
+      //   builder: (context) {
+      //     // Its paths are drawn by Flame's own components with Flame SVG.
+      //     final renderer = rendererKnob(context, svgs: false);
+      //     final tube = context.knobs.object.dropdown(
+      //       label: 'Tube',
+      //       options: TubeRunnerExample.tubes,
+      //       initialOption: Tubes.hexagon,
+      //       labelBuilder: (tube) => tube.name,
+      //     );
+      //     final sound = context.knobs.boolean(
+      //       label: 'Sound',
+      //       initialValue: true,
+      //     );
+      //     final flightSpeed = flightSpeedKnob(context);
+      //     return GameStory<TubeRunnerExample, Object>(
+      //       renderer: renderer,
+      //       create: (status, _) =>
+      //           TubeRunnerExample.of(renderer, status, tube: tube)
+      //             ..sound = sound
+      //             ..flightSpeed = flightSpeed,
+      //       update: (game) => game
+      //         ..tube = tube
+      //         ..sound = sound
+      //         ..flightSpeed = flightSpeed,
+      //       zoom: zoomKnob(context),
+      //       speed: speedKnob(context),
+      //     );
+      //   },
+      //   codeLink: baseLink('games/tube_runner'),
+      //   info: TubeRunnerExample.description,
+      // ),
     ],
   );
 }
@@ -150,6 +190,10 @@ class const TubeShooterStory({
   /// Whether the lines glow: see [TubeShooterExample.glow].
   final bool glow = false,
 
+  /// Whether the ship flies on down a run after a round's drop: see
+  /// [TubeShooterExample.runs].
+  final bool runs = true,
+
   /// Whether the game plays its sounds.
   final bool sound = true,
 
@@ -158,6 +202,10 @@ class const TubeShooterStory({
 
   /// The game's speed, from 0, which stands still, to 2.
   final double speed = 1,
+
+  /// How fast Tube Runner's ship flies at first: see
+  /// [TubeHost.flightSpeed].
+  final double flightSpeed = TubeHost.defaultFlightSpeed,
 
   /// How many lines tall the status bar is.
   final int statusLines = 2,
@@ -204,13 +252,17 @@ class _TubeShooterStoryState() extends State<TubeShooterStory> {
             )
             ..driftingStars = widget.driftingStars
             ..glow = widget.glow
+            ..runs = widget.runs
             ..sound = widget.sound
+            ..flightSpeed = widget.flightSpeed
             ..onLevel = _onLevel,
       snapshot: (game) => game.snapshot,
       update: (game) => game
         ..driftingStars = widget.driftingStars
         ..glow = widget.glow
-        ..sound = widget.sound,
+        ..runs = widget.runs
+        ..sound = widget.sound
+        ..flightSpeed = widget.flightSpeed,
       zoom: widget.zoom,
       speed: widget.speed,
       statusLines: widget.statusLines,

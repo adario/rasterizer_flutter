@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flame/components.dart';
 
-import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// A dot of [color], such as a star or an enemy waiting to come.
 ///
@@ -11,7 +11,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter
 /// one imported path per colour.
 abstract class DotComponent(final Color color)
     extends PositionComponent
-    with HasGameRef<TubeShooterExample> {
+    with HasGameRef<TubeHost> {
   /// The component that draws it.
   late final PathComponent drawing;
 

@@ -39,6 +39,13 @@ double speedKnob(BuildContext context) => context.knobs.onKnobAdded(
   _SliderKnob(label: 'Speed', initialValue: 1, min: 0, max: 2),
 )!;
 
+/// Returns the Flight speed knob: how fast Tube Runner's ship flies at first,
+/// from 0.5 to 2 tube units a second, on a continuous slider. A prototype's,
+/// to pick a speed with.
+double flightSpeedKnob(BuildContext context) => context.knobs.onKnobAdded(
+  _SliderKnob(label: 'Flight speed', initialValue: 1.5, min: 0.5, max: 2),
+)!;
+
 /// Returns an integer slider knob from [min] to [max], in [divisions] steps,
 /// like Widgetbook's. Like [zoomKnob], it shows its value in tabular figures.
 int intSliderKnob(

@@ -148,7 +148,7 @@ abstract class EnemyComponent(
     if (to == null) {
       return;
     }
-    _flipProgress += dt * gameRef.pace / gameRef.level.flipTime;
+    _flipProgress += dt * shooter.pace / shooter.level.flipTime;
     if (_flipProgress >= 1) {
       lane = to;
       _flipTo = null;

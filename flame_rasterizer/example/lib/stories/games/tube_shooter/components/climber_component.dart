@@ -28,7 +28,7 @@ class ClimberComponent({
       _untilFire = untilFire;
       return;
     }
-    final level = gameRef.level;
+    final level = shooter.level;
     _untilFlip = between(level.flipPeriod);
     _untilFire = between(level.firePeriod);
   }
@@ -43,8 +43,8 @@ class ClimberComponent({
   @override
   void move(double dt) {
     super.move(dt);
-    final level = gameRef.level;
-    final pace = gameRef.pace;
+    final level = shooter.level;
+    final pace = shooter.pace;
     _untilFlip -= dt * pace;
     if (depth > 0) {
       depth = math.max(0, depth - dt * pace * Tube.depth / level.climberTime);
@@ -55,7 +55,7 @@ class ClimberComponent({
       _untilFire -= dt * pace;
       if (_untilFire <= 0) {
         _untilFire = between(level.firePeriod);
-        gameRef.fireAt(this);
+        shooter.fireAt(this);
       }
       if (_untilFlip <= 0 && !isFlipping) {
         _untilFlip = between(level.flipPeriod);
@@ -63,7 +63,7 @@ class ClimberComponent({
       }
     } else if (_untilFlip <= 0 && !isFlipping) {
       _untilFlip = level.rimFlipPeriod;
-      final toward = gameRef.towardShip(lane);
+      final toward = shooter.towardShip(lane);
       if (toward != 0) {
         flipAside(toward);
       }

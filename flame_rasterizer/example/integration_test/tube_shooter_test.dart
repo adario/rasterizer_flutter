@@ -21,6 +21,7 @@ import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
@@ -50,8 +51,12 @@ void main() {
     final game = tester
         .widget<GameWidget<TubeShooterExample>>(gameWidget)
         .game!;
-    await pumpFor(tester, 10, done: () => game.state == TubeState.ready);
-    expect(game.state, TubeState.ready);
+    await pumpFor(
+      tester,
+      10,
+      done: () => game.shooter.state == TubeState.ready,
+    );
+    expect(game.shooter.state, TubeState.ready);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -109,13 +114,16 @@ Future<void> pumpFor(
   }
 }
 
-/// Plays a whole game with [renderer]'s GPU renderer, through all its states.
+/// Plays a whole game with [renderer]'s GPU renderer, through all its states
+/// but a run's, with runs off.
 ///
 /// No frame may fall back to the canvas renderer or to `Canvas.drawPath`.
 Future<void> wholeGame(WidgetTester tester, SvgRenderer renderer) async {
   expect(renderer.supported, isTrue);
   await tester.pumpWidget(
-    MaterialApp(home: TubeShooterStory(renderer: renderer, glow: true)),
+    MaterialApp(
+      home: TubeShooterStory(renderer: renderer, glow: true, runs: false),
+    ),
   );
   final gameWidget = find.byWidgetPredicate((w) => w is GameWidget);
   final game = tester.widget<GameWidget<TubeShooterExample>>(gameWidget).game!;
@@ -141,7 +149,10 @@ Future<void> wholeGame(WidgetTester tester, SvgRenderer renderer) async {
     'problems ${watch.problems}',
   );
   expect(watch.problems, isEmpty);
-  expect(watch.states, TubeState.values.toSet());
+  expect(
+    watch.states,
+    TubeState.values.toSet().difference({TubeState.run, TubeState.arrive}),
+  );
   await tester.pumpWidget(const SizedBox());
 }
 
@@ -197,11 +208,13 @@ Future<void> play(
 
   /// Counts a frame of [state], and whether its tube paths are all new.
   void watchTube(TubeState state) {
-    if (game.state != state) {
+    if (game.shooter.state != state) {
       last = null;
       return;
     }
-    final paths = game.tubeGroup.children.whereType<PathComponent>().toSet();
+    final paths = game.shooter.tubeGroup.children
+        .whereType<PathComponent>()
+        .toSet();
     if (last != null) {
       frames++;
       if (paths.intersection(last!).isEmpty) {
@@ -214,18 +227,18 @@ Future<void> play(
   await pumpFor(
     tester,
     10,
-    done: () => game.state == TubeState.ready,
+    done: () => game.shooter.state == TubeState.ready,
     onFrame: () => watchTube(TubeState.zoom),
   );
-  expect(game.state, TubeState.ready);
+  expect(game.shooter.state, TubeState.ready);
   expect(frames, greaterThan(0));
   expect(remade, frames);
   // A zapper's pulse destroys the ship in the zapper's lane, at any depth,
   // and the sweep can cross that lane. No drop would follow, so remove the
   // zappers.
-  for (final spawn in game.spawns.toList()) {
+  for (final spawn in game.shooter.spawns.toList()) {
     if (spawn.kind == EnemyKind.zapper) {
-      game.spawns.remove(spawn);
+      game.shooter.spawns.remove(spawn);
       spawn.removeFromParent();
     }
   }
@@ -233,8 +246,8 @@ Future<void> play(
   await pumpFor(tester, 0.3);
   report('zoom');
   await tester.tapAt(tester.getCenter(gameWidget));
-  await pumpFor(tester, 1, done: () => game.state == TubeState.play);
-  expect(game.state, TubeState.play);
+  await pumpFor(tester, 1, done: () => game.shooter.state == TubeState.play);
+  expect(game.shooter.state, TubeState.play);
   // About two seconds of fire, sweeping round the rim.
   final gesture = await tester.startGesture(tester.getCenter(gameWidget));
   for (var i = 0; i < 120; i++) {
@@ -247,21 +260,21 @@ Future<void> play(
   await gesture.up();
   report('play');
   // Remove the round's enemies, so that the drop starts.
-  game.clearSpawns();
-  for (final enemy in [...game.enemies]) {
-    game.discard(enemy);
+  game.shooter.clearSpawns();
+  for (final enemy in [...game.shooter.enemies]) {
+    game.shooter.discard(enemy);
   }
-  await pumpFor(tester, 1, done: () => game.state == TubeState.drop);
-  expect(game.state, TubeState.drop);
+  await pumpFor(tester, 1, done: () => game.shooter.state == TubeState.drop);
+  expect(game.shooter.state, TubeState.drop);
   frames = remade = 0;
   last = null;
   await pumpFor(
     tester,
     10,
-    done: () => game.state != TubeState.drop,
+    done: () => game.shooter.state != TubeState.drop,
     onFrame: () => watchTube(TubeState.drop),
   );
-  expect(game.state, isNot(TubeState.drop));
+  expect(game.shooter.state, isNot(TubeState.drop));
   expect(frames, greaterThan(0));
   expect(remade, frames);
   report('drop');

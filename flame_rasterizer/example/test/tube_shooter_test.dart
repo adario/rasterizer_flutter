@@ -28,8 +28,10 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/s
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/zapper_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +42,9 @@ import 'tube_shooter_whole_game.dart';
 /// Returns the game with [renderer], at [zoom] and [speed], starting from
 /// [firstLevel], with a seeded random so that runs repeat.
 ///
+/// Its [runs] are off by default, so that a round's drop leads straight to
+/// the next round's zoom.
+///
 /// With [pixelRatio], it sits in a MediaQuery of that device pixel ratio, as
 /// Widgetbook's device frames set one.
 Widget story(
@@ -48,6 +53,7 @@ Widget story(
   double speed = 1,
   int firstLevel = 0,
   double? pixelRatio,
+  bool runs = false,
 }) => MaterialApp(
   builder: pixelRatio == null
       ? null
@@ -63,7 +69,7 @@ Widget story(
       random: math.Random(1),
       firstLevel: firstLevel,
       from: from,
-    ),
+    )..runs = runs,
     snapshot: (game) => game.snapshot,
     zoom: zoom,
     speed: speed,
@@ -75,13 +81,14 @@ Widget story(
 final octagonLevel = levels.indexWhere((level) => level.tube == Tubes.octagon);
 
 /// Pumps a [story] from [firstLevel], or from the octagon's level by default,
-/// and waits for its game to load.
+/// with [runs] on or off, and waits for its game to load.
 Future<TubeShooterExample> pumpGame(
   WidgetTester tester,
   SvgRenderer renderer, {
   double zoom = 1,
   int? firstLevel,
   double? pixelRatio,
+  bool runs = false,
 }) async {
   await tester.pumpWidget(
     story(
@@ -89,6 +96,7 @@ Future<TubeShooterExample> pumpGame(
       zoom: zoom,
       firstLevel: firstLevel ?? octagonLevel,
       pixelRatio: pixelRatio,
+      runs: runs,
     ),
   );
   final game = tester
@@ -129,10 +137,14 @@ Future<void> beginLevel(
   TubeShooterExample game, {
   int frames = 300,
 }) async {
-  await pumpUntil(tester, () => game.state == TubeState.ready, frames: frames);
+  await pumpUntil(
+    tester,
+    () => game.shooter.state == TubeState.ready,
+    frames: frames,
+  );
   await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
   await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
-  expect(game.state, TubeState.play);
+  expect(game.shooter.state, TubeState.play);
 }
 
 /// Pumps the game with flame_rasterizer, and begins its level once zoomed in.
@@ -147,7 +159,7 @@ Future<TubeShooterExample> playing(
     SvgRenderer.rasterizer,
     firstLevel: firstLevel,
   );
-  game.spawning = false;
+  game.shooter.spawning = false;
   await beginLevel(tester, game);
   return game;
 }
@@ -155,17 +167,17 @@ Future<TubeShooterExample> playing(
 /// Returns the path components of the tube group: the tube, the ship's lane,
 /// and the spikes and the bolts while there are any.
 Iterable<PathComponent> tubePathsOf(TubeShooterExample game) =>
-    game.tubeGroup.children.whereType<PathComponent>();
+    game.shooter.tubeGroup.children.whereType<PathComponent>();
 
 /// Returns the explosions of [game].
 Iterable<ExplosionComponent> explosionsOf(TubeShooterExample game) =>
-    game.explosionGroup.children.whereType<ExplosionComponent>();
+    game.shooter.explosionGroup.children.whereType<ExplosionComponent>();
 
 /// Fires one shot from the ship, over one frame.
 Future<void> fireOnce(WidgetTester tester, TubeShooterExample game) async {
-  game.player.beginFire();
+  game.shooter.player.beginFire();
   await tester.pump(const Duration(milliseconds: 16));
-  game.player.stopFire();
+  game.shooter.player.stopFire();
 }
 
 /// Walks the ship from one end of open [tube] to the other, on the tube's
@@ -182,22 +194,23 @@ Future<({StarComponent star, double turn, double shipTurn})> walkOpenTube(
     firstLevel: levels.indexWhere((level) => level.tube == tube),
   );
   await pumpFrames(tester, 20);
-  expect(game.state, TubeState.play);
+  expect(game.shooter.state, TubeState.play);
   expect(tube.isOpen, isTrue);
-  game.player.moveBy(-100);
+  game.shooter.player.moveBy(-100);
   await pumpFrames(tester, 60);
   // Near the camera's aim, the middle of the tube's drawing, so on screen.
   const from = Offset(0.3, 0.6);
-  final star = game.starField.stars[0]
+  final star = game.shooter.starField.stars[0]
     ..point = from
     ..eyeDistance = 1.5;
-  final heading = PlayerComponent.headingOn(tube, game.player.step);
-  game.player.moveBy(100);
+  final heading = PlayerComponent.headingOn(tube, game.shooter.player.step);
+  game.shooter.player.moveBy(100);
   await pumpFrames(tester, 60);
   return (
     star: star,
     turn: star.point.direction - from.direction,
-    shipTurn: PlayerComponent.headingOn(tube, game.player.step) - heading,
+    shipTurn:
+        PlayerComponent.headingOn(tube, game.shooter.player.step) - heading,
   );
 }
 
@@ -250,7 +263,7 @@ void main() {
       expect(strokeAt(Tube.depth), closeTo(4 / 3.8 * pixel, 1e-9));
       // With the eye far back, as the zoom starts, the lines stay a device
       // pixel wide.
-      view.eyeShift = -TubeShooterExample.zoomDistance;
+      view.eyeShift = -ShooterMode.zoomDistance;
       expect(view.lineWidthAt(Tube.depth), pixel);
       expect(view.lineWidthAt(0), pixel);
     });
@@ -379,15 +392,15 @@ void main() {
     testWidgets('the game loads with ${renderer.label}, and zooms in, the '
         "tube's path made again each frame", (tester) async {
       final game = await pumpGame(tester, renderer);
-      expect(game.state, TubeState.zoom);
-      expect(game.round, 1);
-      expect(game.player.isVisible, isFalse);
-      expect(game.spawns, hasLength(16));
-      expect(game.starField.stars, hasLength(StarFieldComponent.count));
+      expect(game.shooter.state, TubeState.zoom);
+      expect(game.shooter.round, 1);
+      expect(game.shooter.player.isVisible, isFalse);
+      expect(game.shooter.spawns, hasLength(16));
+      expect(game.shooter.starField.stars, hasLength(StarFieldComponent.count));
       await pumpFrames(tester, 70);
-      expect(game.state, TubeState.ready);
-      expect(game.player.isVisible, isTrue);
-      expect(game.player.lane, 0);
+      expect(game.shooter.state, TubeState.ready);
+      expect(game.shooter.player.isVisible, isTrue);
+      expect(game.shooter.player.lane, 0);
       expect(game.view.eyeShift, 0);
       await beginLevel(tester, game);
       await pumpFrames(tester, 2);
@@ -414,16 +427,16 @@ void main() {
 
   testWidgets('its lines keep their device widths at any zoom', (tester) async {
     final game = await pumpGame(tester, SvgRenderer.rasterizer, zoom: 2);
-    await pumpUntil(tester, () => game.state == TubeState.ready);
+    await pumpUntil(tester, () => game.shooter.state == TubeState.ready);
     final ratio = tester.view.devicePixelRatio;
     expect(game.view.devicePixel, 1 / (ratio * 2));
     // A paint keeps its stroke width as a 32-bit float.
     expect(
-      game.player.drawing.paint.strokeWidth,
+      game.shooter.player.drawing.paint.strokeWidth,
       closeTo(game.view.shapeStroke, 1e-6 * game.view.shapeStroke),
     );
     expect(
-      game.spawns.first.scale.x,
+      game.shooter.spawns.first.scale.x,
       closeTo(SpawnDotComponent.pixels * game.view.devicePixel, 1e-6),
     );
     await tester.pumpWidget(const SizedBox());
@@ -445,7 +458,7 @@ void main() {
       'back there, and the camera looks at its middle', (tester) async {
     final game = await playing(tester, firstLevel: 2);
     final tube = game.view.tube;
-    final player = game.player;
+    final player = game.shooter.player;
     expect(tube.isOpen, isTrue);
     expect(player.lane, tube.bottomLane);
     player.moveBy(-100);
@@ -457,7 +470,7 @@ void main() {
       closeTo(tube.center.dy * game.view.rimScale, 1e-3),
     );
     final climber = ClimberComponent(lane: 0, depth: Tube.depth / 2);
-    game.addEnemy(climber);
+    game.shooter.addEnemy(climber);
     await pumpFrames(tester, 1);
     climber.flipAside(-1);
     await pumpFrames(tester, 30);
@@ -471,24 +484,24 @@ void main() {
     expect(game.view.tube, same(levels[0].tube));
     // The hexagon's last lane, lane 11, which the next level's Floor, with 8
     // lanes, doesn't have.
-    game.player.step = 11 * PlayerComponent.stepsPerLane + 8;
-    game.clearSpawns();
-    await pumpUntil(tester, () => game.state == TubeState.drop);
-    game.player.beginFire();
-    await pumpUntil(tester, () => game.round == 2);
-    game.player.stopFire();
+    game.shooter.player.step = 11 * PlayerComponent.stepsPerLane + 8;
+    game.shooter.clearSpawns();
+    await pumpUntil(tester, () => game.shooter.state == TubeState.drop);
+    game.shooter.player.beginFire();
+    await pumpUntil(tester, () => game.shooter.round == 2);
+    game.shooter.player.stopFire();
     await pumpFrames(tester, 2);
-    expect(game.level, same(levels[1]));
+    expect(game.shooter.level, same(levels[1]));
     expect(game.view.tube, same(levels[1].tube));
-    expect(game.player.lane, levels[1].tube.bottomLane);
-    expect(game.spawns, hasLength(12));
+    expect(game.shooter.player.lane, levels[1].tube.bottomLane);
+    expect(game.shooter.spawns, hasLength(12));
     await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('the ship moves 16 steps a lane, round the tube, by keys and '
       'drags', (tester) async {
     final game = await playing(tester);
-    final player = game.player;
+    final player = game.shooter.player;
     expect(player.step, PlayerComponent.startStep);
     player.moveBy(1);
     expect(player.step, 24);
@@ -530,7 +543,7 @@ void main() {
   testWidgets('the ship moves a lane a scroll, whatever its size, clockwise '
       'for a scroll down', (tester) async {
     final game = await playing(tester);
-    final player = game.player;
+    final player = game.shooter.player;
     final tube = game.view.tube;
     final from = player.lane;
     final pointer = TestPointer(1, ui.PointerDeviceKind.mouse);
@@ -560,28 +573,28 @@ void main() {
     tester,
   ) async {
     final game = await playing(tester);
-    game.player.step = 3 * 16 + 8;
-    game.player.beginFire();
+    game.shooter.player.step = 3 * 16 + 8;
+    game.shooter.player.beginFire();
     var most = 0;
     for (var i = 0; i < 60; i++) {
       await tester.pump(const Duration(milliseconds: 16));
-      most = math.max(most, game.shots.length);
-      for (final shot in game.shots) {
+      most = math.max(most, game.shooter.shots.length);
+      for (final shot in game.shooter.shots) {
         expect(shot.lane, 3);
       }
     }
-    // A shot every 0.1 s, each crossing the tube in 0.5 s: 5 or 6 at once.
-    expect(most, inInclusiveRange(5, 6));
-    game.player.stopFire();
+    // A shot every 0.15 s, each crossing the tube in 0.5 s: 3 or 4 at once.
+    expect(most, inInclusiveRange(3, 4));
+    game.shooter.player.stopFire();
     await pumpFrames(tester, 40);
-    expect(game.shots, isEmpty);
+    expect(game.shooter.shots, isEmpty);
     // No more than 8 in the tube.
     for (var i = 0; i < 8; i++) {
-      game.fire(3, 0);
+      game.shooter.fire(3, 0);
     }
-    game.player.beginFire();
+    game.shooter.player.beginFire();
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.shots, hasLength(8));
+    expect(game.shooter.shots, hasLength(8));
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -590,7 +603,7 @@ void main() {
     tester,
   ) async {
     final game = await playing(tester);
-    final spawns = [...game.spawns];
+    final spawns = [...game.shooter.spawns];
     expect(spawns, hasLength(16));
     int countOf(Color color) => spawns
         .where(
@@ -599,7 +612,7 @@ void main() {
               spawn.drawing.paint.style == PaintingStyle.fill,
         )
         .length;
-    final level = game.level;
+    final level = game.shooter.level;
     expect(countOf(TubeColors.climber), level.climbers);
     expect(countOf(TubeColors.splitter), level.splitters);
     expect(countOf(TubeColors.seeder), level.seeders);
@@ -622,15 +635,17 @@ void main() {
     }
 
     // The next enemy to come arrives as a flashing dot at its lane's middle.
-    game.spawning = true;
+    game.shooter.spawning = true;
     await tester.pump(const Duration(milliseconds: 16));
-    game.spawning = false;
-    final arriving = game.spawns.singleWhere((spawn) => spawn.isArriving);
-    expect(arriving, same(game.spawns.last));
+    game.shooter.spawning = false;
+    final arriving = game.shooter.spawns.singleWhere(
+      (spawn) => spawn.isArriving,
+    );
+    expect(arriving, same(game.shooter.spawns.last));
     final lane = arriving.lane;
     final tints = <bool>{};
     var frames = 0;
-    while (game.enemies.isEmpty && frames < 40) {
+    while (game.shooter.enemies.isEmpty && frames < 40) {
       await tester.pump(const Duration(milliseconds: 16));
       tints.add(arriving.drawing.paint.colorFilter != null);
       frames++;
@@ -638,12 +653,12 @@ void main() {
     expect(tints, {true, false});
     expect(frames * 0.016, greaterThanOrEqualTo(SpawnDotComponent.arriveTime));
     expect(arriving.at, closeTo(lane + 0.5, 1e-9));
-    final enemy = game.enemies.single;
+    final enemy = game.shooter.enemies.single;
     expect(enemy.kind, arriving.kind);
     expect(enemy.lane, lane);
     expect(enemy.depth, closeTo(Tube.depth, 0.05));
-    expect(game.spawns, hasLength(15));
-    expect(game.spawns, isNot(contains(arriving)));
+    expect(game.shooter.spawns, hasLength(15));
+    expect(game.shooter.spawns, isNot(contains(arriving)));
     // The dots add no path to the tube group.
     expect(tubePathsOf(game), hasLength(2));
     await tester.pumpWidget(const SizedBox());
@@ -652,12 +667,12 @@ void main() {
   testWidgets('stars fly by on the drop and the zoom, around the tube, '
       'and stay after them', (tester) async {
     final game = await playing(tester);
-    final field = game.starField;
+    final field = game.shooter.starField;
     expect(field.stars, hasLength(StarFieldComponent.count));
 
-    game.clearSpawns();
+    game.shooter.clearSpawns();
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.drop);
+    expect(game.shooter.state, TubeState.drop);
     await pumpFrames(tester, 30);
     final pixel = game.view.devicePixel;
     for (final star in field.stars) {
@@ -703,9 +718,17 @@ void main() {
     expect(star.scale.x - star.scale.y, closeTo((to - from).distance, 1e-3));
 
     // The stars stay through the zoom, and after it.
-    await pumpUntil(tester, () => game.state == TubeState.zoom, frames: 200);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.zoom,
+      frames: 200,
+    );
     expect(field.stars, hasLength(StarFieldComponent.count));
-    await pumpUntil(tester, () => game.state == TubeState.ready, frames: 100);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.ready,
+      frames: 100,
+    );
     await pumpFrames(tester, 25);
     expect(field.stars, hasLength(StarFieldComponent.count));
     expect(field.children, hasLength(StarFieldComponent.count));
@@ -720,7 +743,7 @@ void main() {
     final centre = game.camera.viewfinder.position;
     expect(centre.y, greaterThan(0));
     final view = game.view;
-    for (final star in game.starField.stars) {
+    for (final star in game.shooter.starField.stars) {
       final drawn =
           star.point *
           ((view.scaleOf(star.eyeDistance) + view.scaleOf(star.cameFrom)) / 2);
@@ -735,13 +758,13 @@ void main() {
     tester,
   ) async {
     final game = await playing(tester);
-    final field = game.starField;
+    final field = game.shooter.starField;
     final view = game.view;
     final right = game.camera.visibleWorldRect.right;
     Future<void> frame() => tester.pump(const Duration(milliseconds: 16));
     double distanceFor(double radius, double x) => radius * view.rimScale / x;
     await pumpFrames(tester, 20);
-    expect(game.state, TubeState.play);
+    expect(game.shooter.state, TubeState.play);
 
     final drifting = field.stars[0];
     final eyeDistance = drifting.eyeDistance;
@@ -749,20 +772,23 @@ void main() {
     expect(
       drifting.eyeDistance,
       closeTo(
-        eyeDistance - StarFieldComponent.cruise * game.pace * 0.016,
+        eyeDistance - StarFieldComponent.cruise * game.shooter.pace * 0.016,
         1e-9,
       ),
     );
     // Later rounds speed it up, at the game's pace.
-    game.round = 5;
+    game.shooter.round = 5;
     final later = drifting.eyeDistance;
     await frame();
     expect(
       drifting.eyeDistance,
-      closeTo(later - StarFieldComponent.cruise * game.pace * 0.016, 1e-9),
+      closeTo(
+        later - StarFieldComponent.cruise * game.shooter.pace * 0.016,
+        1e-9,
+      ),
     );
-    expect(game.pace, greaterThan(1.2));
-    game.round = 1;
+    expect(game.shooter.pace, greaterThan(1.2));
+    game.shooter.round = 1;
 
     // Close to the eye, a drifting star's streak is at most as long as the
     // star is wide, and a logical pixel longer.
@@ -805,24 +831,24 @@ void main() {
     final tube = game.view.tube;
     double wrapped(double angle) =>
         angle - 2 * math.pi * (angle / (2 * math.pi)).roundToDouble();
-    double shipDirection() => game.player.position.toOffset().direction;
+    double shipDirection() => game.shooter.player.position.toOffset().direction;
     await pumpFrames(tester, 20);
-    expect(game.state, TubeState.play);
+    expect(game.shooter.state, TubeState.play);
     expect(tube.isOpen, isFalse);
 
     // Two stars that stay on screen, one near the eye and one far from it.
     const nearPoint = Offset(0.5, 0);
     const farPoint = Offset(2, 0);
-    final near = game.starField.stars[0]
+    final near = game.shooter.starField.stars[0]
       ..point = nearPoint
       ..eyeDistance = 1.5;
-    final far = game.starField.stars[1]
+    final far = game.shooter.starField.stars[1]
       ..point = farPoint
       ..eyeDistance = 8;
     double nearTurn() => wrapped(near.point.direction - nearPoint.direction);
     double farTurn() => wrapped(far.point.direction - farPoint.direction);
     final shipFrom = shipDirection();
-    game.player.moveBy(1);
+    game.shooter.player.moveBy(1);
     await tester.pump(const Duration(milliseconds: 16));
     final shipTurn = wrapped(shipDirection() - shipFrom);
     // The ship's lane, turned the other way.
@@ -837,7 +863,7 @@ void main() {
     // more as it comes closer. The turn leaves its distances from the axis and
     // the eye alone.
     await pumpFrames(tester, 60);
-    final drift = StarFieldComponent.cruise * game.pace * 0.016;
+    final drift = StarFieldComponent.cruise * game.shooter.pace * 0.016;
     for (final (star, turn, from) in [
       (near, nearTurn(), 1.5),
       (far, farTurn(), 8.0),
@@ -885,7 +911,7 @@ void main() {
     tester,
   ) async {
     final game = await playing(tester);
-    final star = game.starField.stars.firstWhere(
+    final star = game.shooter.starField.stars.firstWhere(
       (star) => star.brightness > 0.2 && star.brightness < 0.8,
     );
     for (var i = 0; i < 60; i++) {
@@ -901,7 +927,7 @@ void main() {
   testWidgets('with drifting stars off, stars only show on the drop and the '
       'zoom, and the running game changes at once', (tester) async {
     final game = await playing(tester);
-    final field = game.starField;
+    final field = game.shooter.starField;
     expect(field.stars, hasLength(StarFieldComponent.count));
     // In play, they fade out.
     game.driftingStars = false;
@@ -909,13 +935,21 @@ void main() {
     expect(field.stars, isEmpty);
     expect(field.children, isEmpty);
 
-    game.clearSpawns();
+    game.shooter.clearSpawns();
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.drop);
+    expect(game.shooter.state, TubeState.drop);
     expect(field.stars, hasLength(StarFieldComponent.count));
-    await pumpUntil(tester, () => game.state == TubeState.zoom, frames: 200);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.zoom,
+      frames: 200,
+    );
     expect(field.stars, hasLength(StarFieldComponent.count));
-    await pumpUntil(tester, () => game.state == TubeState.ready, frames: 100);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.ready,
+      frames: 100,
+    );
     await pumpFrames(tester, 25);
     expect(field.stars, isEmpty);
 
@@ -929,10 +963,15 @@ void main() {
     // again at once.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
-    game
-      ..lives = 1
-      ..addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
-    await pumpUntil(tester, () => game.state == TubeState.over, frames: 120);
+    game.lives = 1;
+    game.shooter.addEnemy(
+      ClimberComponent(lane: game.shooter.player.lane, depth: 0),
+    );
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.over,
+      frames: 120,
+    );
     game.driftingStars = false;
     expect(field.stars, isEmpty);
     game.driftingStars = true;
@@ -944,11 +983,11 @@ void main() {
   group('the glow', () {
     /// The glows of what [linesOf] returns, in its order.
     const glows = [
-      TubeShooterExample.lineGlow,
-      TubeShooterExample.lineGlow,
-      TubeShooterExample.tubeGlow,
-      TubeShooterExample.tubeGlow,
-      TubeShooterExample.tubeGlow,
+      TubeHost.lineGlow,
+      TubeHost.lineGlow,
+      TubeHost.tubeGlow,
+      TubeHost.tubeGlow,
+      TubeHost.tubeGlow,
     ];
 
     /// Returns [game]'s lines after two frames: the ship, [climber], the tube,
@@ -960,7 +999,7 @@ void main() {
     ) async {
       await pumpFrames(tester, 2);
       final lines = [
-        game.player.drawing,
+        game.shooter.player.drawing,
         climber.drawing,
         ...tubePathsOf(game),
       ].cast<RasterizerPathComponent>();
@@ -972,13 +1011,13 @@ void main() {
         'stars', (tester) async {
       final game = await pumpGame(tester, SvgRenderer.rasterizer);
       game.glow = true;
-      await pumpUntil(tester, () => game.state == TubeState.ready);
-      final spawned = game.spawnGroup.descendants();
+      await pumpUntil(tester, () => game.shooter.state == TubeState.ready);
+      final spawned = game.shooter.spawnGroup.descendants();
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
-      game.spawning = false;
+      game.shooter.spawning = false;
       final climber = ClimberComponent(lane: 3, depth: Tube.depth / 2);
-      game
+      game.shooter
         ..addEnemy(climber)
         ..spikes.grow(0, Tube.depth / 2);
       await tester.pump(const Duration(milliseconds: 16));
@@ -988,7 +1027,7 @@ void main() {
       );
       final plain = [
         ...spawned,
-        ...game.starField.descendants(),
+        ...game.shooter.starField.descendants(),
         ...game.camera.viewport.descendants(),
       ].whereType<RasterizerPathComponent>().toList();
       expect(plain, isNotEmpty);
@@ -1002,7 +1041,7 @@ void main() {
         'in a still world', (tester) async {
       final game = await playing(tester);
       final climber = ClimberComponent(lane: 3, depth: Tube.depth / 2);
-      game
+      game.shooter
         ..addEnemy(climber)
         ..spikes.grow(0, Tube.depth / 2);
       await tester.pump(const Duration(milliseconds: 16));
@@ -1047,9 +1086,9 @@ void main() {
           '${glow ? 'on' : 'off'}', (tester) async {
         final game = await playing(tester);
         game.glow = glow;
-        game.addEnemy(ClimberComponent(lane: 3, depth: Tube.depth / 2));
+        game.shooter.addEnemy(ClimberComponent(lane: 3, depth: Tube.depth / 2));
         await tester.pump(const Duration(milliseconds: 16));
-        game.purge();
+        game.shooter.purge();
         await pumpFrames(tester, 2);
         final bursts = explosionsOf(game)
             .expand((e) => e.children)
@@ -1058,7 +1097,7 @@ void main() {
         expect(bursts, hasLength(9));
         expect(
           bursts.map((burst) => burst.glow),
-          everyElement(glow ? TubeShooterExample.lineGlow : isNull),
+          everyElement(glow ? TubeHost.lineGlow : isNull),
         );
         await tester.pumpWidget(const SizedBox());
       });
@@ -1096,8 +1135,8 @@ void main() {
       tester,
     ) async {
       final game = await pumpGame(tester, SvgRenderer.rasterizerCanvas);
-      expect(game.starField.parent, same(game.camera.backdrop));
-      expect(game.starField.stars, isNotEmpty);
+      expect(game.shooter.starField.parent, same(game.camera.backdrop));
+      expect(game.shooter.starField.stars, isNotEmpty);
       await tester.pumpWidget(const SizedBox());
     });
 
@@ -1127,12 +1166,12 @@ void main() {
       'explosion fades out and removes itself', (tester) async {
     final game = await playing(tester);
     final climber = ClimberComponent(lane: 0, depth: Tube.depth / 2);
-    game.addEnemy(climber);
+    game.shooter.addEnemy(climber);
     await tester.pump(const Duration(milliseconds: 16));
     await fireOnce(tester, game);
-    await pumpUntil(tester, () => game.enemies.isEmpty, frames: 40);
+    await pumpUntil(tester, () => game.shooter.enemies.isEmpty, frames: 40);
     expect(game.score, 100);
-    expect(game.shots, isEmpty);
+    expect(game.shooter.shots, isEmpty);
     await tester.pump();
     expect(explosionsOf(game), hasLength(1));
     final drawings = explosionsOf(
@@ -1179,9 +1218,9 @@ void main() {
       'half as long', (tester) async {
     final game = await playing(tester);
     final climber = ClimberComponent(lane: 0, depth: Tube.depth);
-    game.addEnemy(climber);
+    game.shooter.addEnemy(climber);
     await tester.pump(const Duration(milliseconds: 16));
-    game.destroy(climber);
+    game.shooter.destroy(climber);
     await tester.pump();
     final explosion = explosionsOf(game).single;
     expect(explosion.depth, greaterThan(ExplosionComponent.farDepth));
@@ -1194,17 +1233,19 @@ void main() {
   testWidgets('a shot splits a splitter into two climbers, which flip onto '
       'its neighbouring lanes', (tester) async {
     final game = await playing(tester);
-    game.player.step = 3 * 16 + 8;
-    game.addEnemy(SplitterComponent(lane: 3, depth: Tube.depth / 2));
+    game.shooter.player.step = 3 * 16 + 8;
+    game.shooter.addEnemy(SplitterComponent(lane: 3, depth: Tube.depth / 2));
     await tester.pump(const Duration(milliseconds: 16));
     await fireOnce(tester, game);
     await pumpUntil(
       tester,
-      () => game.enemies.whereType<SplitterComponent>().isEmpty,
+      () => game.shooter.enemies.whereType<SplitterComponent>().isEmpty,
       frames: 40,
     );
     expect(game.score, 150);
-    final climbers = game.enemies.whereType<ClimberComponent>().toList();
+    final climbers = game.shooter.enemies
+        .whereType<ClimberComponent>()
+        .toList();
     expect(climbers, hasLength(2));
     expect(climbers.every((climber) => climber.isFlipping), isTrue);
     await pumpFrames(tester, 20);
@@ -1215,13 +1256,13 @@ void main() {
   testWidgets("a seeder grows its lane's spike, a path made again as it "
       'grows, and a shot shortens it', (tester) async {
     final game = await playing(tester);
-    game.player.step = 5 * 16 + 8;
+    game.shooter.player.step = 5 * 16 + 8;
     final seeder = SeederComponent(lane: 5, depth: Tube.depth);
-    game.addEnemy(seeder);
+    game.shooter.addEnemy(seeder);
     await pumpFrames(tester, 45);
-    final length = game.spikes.lengths[5];
+    final length = game.shooter.spikes.lengths[5];
     expect(length, greaterThan(0.15));
-    expect(game.spikes.tipOf(5), Tube.depth - length);
+    expect(game.shooter.spikes.tipOf(5), Tube.depth - length);
     // A paint keeps its colour in 32-bit floats, so compare ARGB values.
     PathComponent spikesPath() => tubePathsOf(game).singleWhere(
       (path) => path.paint.color.toARGB32() == TubeColors.spikes.toARGB32(),
@@ -1229,17 +1270,21 @@ void main() {
     final first = spikesPath();
     await pumpFrames(tester, 2);
     expect(spikesPath(), isNot(same(first)));
-    expect(game.spikes.lengths[5], greaterThan(length));
+    expect(game.shooter.spikes.lengths[5], greaterThan(length));
 
-    game.discard(seeder);
-    final grown = game.spikes.lengths[5];
+    game.shooter.discard(seeder);
+    final grown = game.shooter.spikes.lengths[5];
     await fireOnce(tester, game);
-    await pumpUntil(tester, () => game.spikes.lengths[5] < grown, frames: 40);
-    expect(
-      game.spikes.lengths[5],
-      closeTo(grown - TubeShooterExample.spikeHit, 1e-9),
+    await pumpUntil(
+      tester,
+      () => game.shooter.spikes.lengths[5] < grown,
+      frames: 40,
     );
-    expect(game.score, TubeShooterExample.spikeScore);
+    expect(
+      game.shooter.spikes.lengths[5],
+      closeTo(grown - ShooterMode.spikeHit, 1e-9),
+    );
+    expect(game.score, ShooterMode.spikeScore);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -1249,17 +1294,17 @@ void main() {
   ) async {
     final game = await playing(tester);
     final zapper = ZapperComponent(lane: 3, depth: Tube.depth / 2);
-    game.addEnemy(zapper);
+    game.shooter.addEnemy(zapper);
     // A paint keeps its colour in 32-bit floats, so compare ARGB values.
     PathComponent? boltsPath() => tubePathsOf(game)
         .where(
           (path) => path.paint.color.toARGB32() == TubeColors.bolts.toARGB32(),
         )
         .firstOrNull;
-    await pumpUntil(tester, () => game.isWarning, frames: 180);
+    await pumpUntil(tester, () => game.shooter.isWarning, frames: 180);
     expect(zapper.drawing.paint.colorFilter, isNotNull);
     expect(boltsPath(), isNull);
-    await pumpUntil(tester, () => game.isPulsing, frames: 40);
+    await pumpUntil(tester, () => game.shooter.isPulsing, frames: 40);
     // The bolts' path mounts the frame after it's added.
     await tester.pump(const Duration(milliseconds: 16));
     final first = boltsPath();
@@ -1267,26 +1312,33 @@ void main() {
     expect(zapper.drawing.paint.colorFilter, isNull);
     await tester.pump(const Duration(milliseconds: 16));
     expect(boltsPath(), isNot(same(first)));
-    expect(game.state, TubeState.play);
-    game.player.step = 3 * 16 + 8;
+    expect(game.shooter.state, TubeState.play);
+    game.shooter.player.step = 3 * 16 + 8;
     await pumpFrames(tester, 2);
-    expect(game.state, TubeState.dying);
+    expect(game.shooter.state, TubeState.dying);
     await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets("a zapper that arrives in the ship's lane during a pulse waits "
       'for the next pulse, which it flashes white for', (tester) async {
     final game = await playing(tester);
-    await pumpUntil(tester, () => game.isPulsing, frames: 240);
-    final zapper = ZapperComponent(lane: game.player.lane, depth: Tube.depth);
-    game.addEnemy(zapper);
+    await pumpUntil(tester, () => game.shooter.isPulsing, frames: 240);
+    final zapper = ZapperComponent(
+      lane: game.shooter.player.lane,
+      depth: Tube.depth,
+    );
+    game.shooter.addEnemy(zapper);
     await pumpFrames(tester, 3);
-    expect(game.isPulsing, isTrue);
+    expect(game.shooter.isPulsing, isTrue);
     expect(zapper.isZapping, isFalse);
-    expect(game.state, TubeState.play);
-    await pumpUntil(tester, () => game.isWarning, frames: 180);
+    expect(game.shooter.state, TubeState.play);
+    await pumpUntil(tester, () => game.shooter.isWarning, frames: 180);
     expect(zapper.drawing.paint.colorFilter, isNotNull);
-    await pumpUntil(tester, () => game.state == TubeState.dying, frames: 40);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.dying,
+      frames: 40,
+    );
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -1296,74 +1348,85 @@ void main() {
   ) async {
     final game = await playing(tester);
     final walker = EdgeWalkerComponent(lane: 0, depth: Tube.depth / 4);
-    game.addEnemy(walker);
+    game.shooter.addEnemy(walker);
     // It walks from its lane's middle to one of the lane's edges. Its lane is
     // the ship's.
     await tester.pump(const Duration(milliseconds: 16));
     await pumpUntil(tester, () => !walker.isCrossing, frames: 30);
     expect(walker.edge, anyOf(0, 1));
     await fireOnce(tester, game);
-    await pumpUntil(tester, () => game.shots.isEmpty, frames: 60);
-    expect(game.enemies, contains(walker));
+    await pumpUntil(tester, () => game.shooter.shots.isEmpty, frames: 60);
+    expect(game.shooter.enemies, contains(walker));
     walker.cross(walker.edge == 0 ? 1 : 0);
     await fireOnce(tester, game);
-    await pumpUntil(tester, () => game.enemies.isEmpty, frames: 30);
+    await pumpUntil(tester, () => game.shooter.enemies.isEmpty, frames: 30);
     expect(game.score, EnemyKind.edgeWalker.score);
 
-    game.addEnemy(EdgeWalkerComponent(lane: game.player.lane, depth: 0));
+    game.shooter.addEnemy(
+      EdgeWalkerComponent(lane: game.shooter.player.lane, depth: 0),
+    );
     await pumpFrames(tester, 2);
-    expect(game.state, TubeState.dying);
+    expect(game.shooter.state, TubeState.dying);
     await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets("a climber at the rim in the ship's lane costs a life; the "
       'enemies go back to the queue, and the ship comes back', (tester) async {
     final game = await playing(tester);
-    final queued = game.spawns.length;
-    game.addEnemy(ClimberComponent(lane: 9, depth: Tube.depth));
-    game.addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
+    final queued = game.shooter.spawns.length;
+    game.shooter.addEnemy(ClimberComponent(lane: 9, depth: Tube.depth));
+    game.shooter.addEnemy(
+      ClimberComponent(lane: game.shooter.player.lane, depth: 0),
+    );
     await pumpFrames(tester, 2);
-    expect(game.state, TubeState.dying);
-    expect(game.lives, TubeShooterExample.startLives - 1);
-    expect(game.enemies, isEmpty);
-    expect(game.spawns, hasLength(queued + 2));
+    expect(game.shooter.state, TubeState.dying);
+    expect(game.lives, TubeHost.startLives - 1);
+    expect(game.shooter.enemies, isEmpty);
+    expect(game.shooter.spawns, hasLength(queued + 2));
     // They wait at the far end of their lanes, the next to come.
-    expect(game.spawns.skip(queued).map((spawn) => spawn.lane).toSet(), {
-      9,
-      game.player.lane,
-    });
+    expect(
+      game.shooter.spawns.skip(queued).map((spawn) => spawn.lane).toSet(),
+      {
+        9,
+        game.shooter.player.lane,
+      },
+    );
     expect(explosionsOf(game), hasLength(1));
     // The ship fades by its opacity, then comes back whole.
     await pumpFrames(tester, 30);
-    expect(game.player.drawing.opacity, inExclusiveRange(0, 1));
-    expect(game.player.drawing.paint.colorFilter, isNull);
-    await pumpUntil(tester, () => game.state == TubeState.ready, frames: 100);
-    expect(game.player.drawing.opacity, 1);
+    expect(game.shooter.player.drawing.opacity, inExclusiveRange(0, 1));
+    expect(game.shooter.player.drawing.paint.colorFilter, isNull);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.ready,
+      frames: 100,
+    );
+    expect(game.shooter.player.drawing.opacity, 1);
     await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('a level waits on READY, the tube at rest and nothing coming, '
       'until a key but a modifier, which only begins it', (tester) async {
     final game = await pumpGame(tester, SvgRenderer.rasterizer);
-    await pumpUntil(tester, () => game.state == TubeState.ready);
+    await pumpUntil(tester, () => game.shooter.state == TubeState.ready);
     await tester.pump(const Duration(milliseconds: 16));
     expect(game.readyText.isMounted, isTrue);
-    expect(game.player.isVisible, isTrue);
+    expect(game.shooter.player.isVisible, isTrue);
     await pumpFrames(tester, 125);
-    expect(game.state, TubeState.ready);
-    expect(game.enemies, isEmpty);
-    expect(game.spawns.where((spawn) => spawn.isArriving), isEmpty);
+    expect(game.shooter.state, TubeState.ready);
+    expect(game.shooter.enemies, isEmpty);
+    expect(game.shooter.spawns.where((spawn) => spawn.isArriving), isEmpty);
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.ready);
+    expect(game.shooter.state, TubeState.ready);
 
     // The space bar begins the level, but held, it doesn't fire.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
-    expect(game.state, TubeState.play);
+    expect(game.shooter.state, TubeState.play);
     await pumpFrames(tester, 20);
-    expect(game.shots, isEmpty);
+    expect(game.shooter.shots, isEmpty);
     expect(game.readyText.isMounted, isFalse);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
     await tester.pumpWidget(const SizedBox());
@@ -1373,90 +1436,102 @@ void main() {
     tester,
   ) async {
     final game = await pumpGame(tester, SvgRenderer.rasterizer);
-    game.spawning = false;
-    await pumpUntil(tester, () => game.state == TubeState.ready);
+    game.shooter.spawning = false;
+    await pumpUntil(tester, () => game.shooter.state == TubeState.ready);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.enter);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.play);
-    expect(game.purgeReady, isTrue);
+    expect(game.shooter.state, TubeState.play);
+    expect(game.shooter.purgeReady, isTrue);
     await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('a tap at READY begins the level once it is up, without a shot '
       'or counting towards a double tap', (tester) async {
     final game = await pumpGame(tester, SvgRenderer.rasterizer);
-    game.spawning = false;
-    await pumpUntil(tester, () => game.state == TubeState.ready);
+    game.shooter.spawning = false;
+    await pumpUntil(tester, () => game.shooter.state == TubeState.ready);
     final center = tester.getCenter(
       find.byType(GameWidget<TubeShooterExample>),
     );
     final tap = await tester.startGesture(center);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.ready);
+    expect(game.shooter.state, TubeState.ready);
     await tap.up();
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.play);
+    expect(game.shooter.state, TubeState.play);
     await pumpFrames(tester, 5);
-    expect(game.shots, isEmpty);
+    expect(game.shooter.shots, isEmpty);
     await tester.tapAt(center);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.purgeReady, isTrue);
+    expect(game.shooter.purgeReady, isTrue);
     await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('after a lost ship the level waits on READY again, and what '
       'was held since before does not begin it', (tester) async {
     final game = await playing(tester);
-    game.addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
+    game.shooter.addEnemy(
+      ClimberComponent(lane: game.shooter.player.lane, depth: 0),
+    );
     await pumpFrames(tester, 2);
-    expect(game.state, TubeState.dying);
+    expect(game.shooter.state, TubeState.dying);
     final center = tester.getCenter(
       find.byType(GameWidget<TubeShooterExample>),
     );
     await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
     final finger = await tester.startGesture(center);
-    await pumpUntil(tester, () => game.state == TubeState.ready, frames: 120);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.ready,
+      frames: 120,
+    );
     await tester.pump(const Duration(milliseconds: 16));
     expect(game.readyText.isMounted, isTrue);
-    expect(game.player.drawing.opacity, 1);
-    final step = game.player.step;
+    expect(game.shooter.player.drawing.opacity, 1);
+    final step = game.shooter.player.step;
     await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowRight);
     await finger.up();
     await pumpFrames(tester, 10);
-    expect(game.state, TubeState.ready);
-    expect(game.player.step, step);
-    expect(game.shots, isEmpty);
+    expect(game.shooter.state, TubeState.ready);
+    expect(game.shooter.player.step, step);
+    expect(game.shooter.shots, isEmpty);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyX);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.keyX);
-    expect(game.state, TubeState.play);
+    expect(game.shooter.state, TubeState.play);
     await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('taps mashed around READY never purge', (tester) async {
     final game = await playing(tester);
-    game.addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
+    game.shooter.addEnemy(
+      ClimberComponent(lane: game.shooter.player.lane, depth: 0),
+    );
     await pumpFrames(tester, 2);
-    expect(game.state, TubeState.dying);
+    expect(game.shooter.state, TubeState.dying);
     final center = tester.getCenter(
       find.byType(GameWidget<TubeShooterExample>),
     );
     // A tap that went down before READY and up during it doesn't begin the
     // level.
     await pumpFrames(tester, 90);
-    expect(game.state, TubeState.dying);
+    expect(game.shooter.state, TubeState.dying);
     final early = await tester.startGesture(center);
-    await pumpUntil(tester, () => game.state == TubeState.ready, frames: 10);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.ready,
+      frames: 10,
+    );
     await early.up();
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.ready);
+    expect(game.shooter.state, TubeState.ready);
     await tester.tapAt(center);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.play);
+    expect(game.shooter.state, TubeState.play);
     await tester.tapAt(center);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.purgeReady, isTrue);
+    expect(game.shooter.purgeReady, isTrue);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -1465,25 +1540,33 @@ void main() {
     final game = await playing(tester);
     // A game that starts at a later level goes as fast as if it had started
     // at the first.
-    expect(game.pace, closeTo(math.pow(1.05, octagonLevel), 1e-9));
-    final pace = game.pace;
-    game.spikes.grow(7, 1);
-    game.clearSpawns();
+    expect(game.shooter.pace, closeTo(math.pow(1.05, octagonLevel), 1e-9));
+    final pace = game.shooter.pace;
+    game.shooter.spikes.grow(7, 1);
+    game.shooter.clearSpawns();
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.drop);
+    expect(game.shooter.state, TubeState.drop);
     await pumpFrames(tester, 62);
     // The ship drops down its lane with the eye, a quarter of the way in
     // about a second.
-    expect(game.player.depth, closeTo(Tube.depth / 4, 0.1));
-    expect(game.view.eyeShift, game.player.depth);
-    await pumpUntil(tester, () => game.state == TubeState.zoom, frames: 80);
-    expect(game.round, 2);
-    expect(game.pace, closeTo(pace * 1.05, 1e-9));
-    expect(game.spawns, hasLength(18));
-    expect(game.spikes.lengths.every((length) => length == 0), isTrue);
-    expect(game.lives, TubeShooterExample.startLives);
-    await pumpUntil(tester, () => game.state == TubeState.ready, frames: 80);
-    expect(game.player.depth, 0);
+    expect(game.shooter.player.depth, closeTo(Tube.depth / 4, 0.1));
+    expect(game.view.eyeShift, game.shooter.player.depth);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.zoom,
+      frames: 80,
+    );
+    expect(game.shooter.round, 2);
+    expect(game.shooter.pace, closeTo(pace * 1.05, 1e-9));
+    expect(game.shooter.spawns, hasLength(18));
+    expect(game.shooter.spikes.lengths.every((length) => length == 0), isTrue);
+    expect(game.lives, TubeHost.startLives);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.ready,
+      frames: 80,
+    );
+    expect(game.shooter.player.depth, 0);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -1491,14 +1574,18 @@ void main() {
     tester,
   ) async {
     final game = await playing(tester);
-    game.spikes.grow(game.player.lane, Tube.depth * 0.9);
-    game.clearSpawns();
-    await pumpUntil(tester, () => game.state == TubeState.dying);
-    expect(game.player.depth, greaterThanOrEqualTo(Tube.depth * 0.1));
-    expect(game.lives, TubeShooterExample.startLives - 1);
+    game.shooter.spikes.grow(game.shooter.player.lane, Tube.depth * 0.9);
+    game.shooter.clearSpawns();
+    await pumpUntil(tester, () => game.shooter.state == TubeState.dying);
+    expect(game.shooter.player.depth, greaterThanOrEqualTo(Tube.depth * 0.1));
+    expect(game.lives, TubeHost.startLives - 1);
     // Then the next round.
-    await pumpUntil(tester, () => game.state == TubeState.zoom, frames: 100);
-    expect(game.round, 2);
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.zoom,
+      frames: 100,
+    );
+    expect(game.shooter.round, 2);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -1506,42 +1593,48 @@ void main() {
       'once a round', (tester) async {
     final game = await playing(tester);
     for (final lane in [4, 8, 12]) {
-      game.addEnemy(ClimberComponent(lane: lane, depth: Tube.depth / 2));
+      game.shooter.addEnemy(
+        ClimberComponent(lane: lane, depth: Tube.depth / 2),
+      );
     }
-    game.addEnemy(SplitterComponent(lane: 10, depth: Tube.depth / 2));
+    game.shooter.addEnemy(SplitterComponent(lane: 10, depth: Tube.depth / 2));
     await tester.pump(const Duration(milliseconds: 16));
     await tester.sendKeyDownEvent(LogicalKeyboardKey.enter);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
-    expect(game.enemies, isEmpty);
+    expect(game.shooter.enemies, isEmpty);
     expect(game.score, 3 * 100 + 150);
-    expect(game.purgeReady, isFalse);
+    expect(game.shooter.purgeReady, isFalse);
     final climber = ClimberComponent(lane: 6, depth: Tube.depth / 2);
-    game.addEnemy(climber);
-    game.purge();
-    expect(game.enemies, {climber});
+    game.shooter.addEnemy(climber);
+    game.shooter.purge();
+    expect(game.shooter.enemies, {climber});
 
     // The next round's purge, by a double tap.
-    game.discard(climber);
-    game.clearSpawns();
-    await pumpUntil(tester, () => game.state == TubeState.zoom, frames: 200);
+    game.shooter.discard(climber);
+    game.shooter.clearSpawns();
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.zoom,
+      frames: 200,
+    );
     await beginLevel(tester, game, frames: 100);
-    expect(game.purgeReady, isTrue);
-    game.addEnemy(ClimberComponent(lane: 6, depth: Tube.depth / 2));
+    expect(game.shooter.purgeReady, isTrue);
+    game.shooter.addEnemy(ClimberComponent(lane: 6, depth: Tube.depth / 2));
     final center = tester.getCenter(
       find.byType(GameWidget<TubeShooterExample>),
     );
     await tester.tapAt(center);
     await tester.pump(const Duration(milliseconds: 50));
-    expect(game.purgeReady, isTrue);
+    expect(game.shooter.purgeReady, isTrue);
     await tester.tapAt(center);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.purgeReady, isFalse);
-    expect(game.enemies, isEmpty);
+    expect(game.shooter.purgeReady, isFalse);
+    expect(game.shooter.enemies, isEmpty);
 
     // PURGE shows for a second.
     Iterable<String> banners() => game.camera.viewport.children
         .whereType<VectorTextComponent>()
-        .where((text) => text.capHeight == TubeShooterExample.bannerCap)
+        .where((text) => text.capHeight == TubeHost.bannerCap)
         .map((text) => text.text);
     await tester.pump(const Duration(milliseconds: 16));
     expect(banners(), contains('PURGE'));
@@ -1554,7 +1647,7 @@ void main() {
       'what is on it, again', (tester) async {
     final game = await playing(tester);
     final climber = ClimberComponent(lane: 3, depth: Tube.depth / 2);
-    game.addEnemy(climber);
+    game.shooter.addEnemy(climber);
     await tester.pump(const Duration(milliseconds: 16));
     game.speed = 0;
     await tester.pump(const Duration(milliseconds: 16));
@@ -1607,35 +1700,41 @@ void main() {
     final game = await playing(tester, firstLevel: 0);
     final reported = <int>[];
     game.onLevel = reported.add;
-    game.clearSpawns();
-    await pumpUntil(tester, () => game.round == 2);
-    expect(game.levelIndex, 1);
+    game.shooter.clearSpawns();
+    await pumpUntil(tester, () => game.shooter.round == 2);
+    expect(game.shooter.levelIndex, 1);
     expect(reported, [1]);
     await beginLevel(tester, game);
     game.lives = 1;
     game.score = 500;
-    game.addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
-    await pumpUntil(tester, () => game.state == TubeState.over, frames: 120);
+    game.shooter.addEnemy(
+      ClimberComponent(lane: game.shooter.player.lane, depth: 0),
+    );
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.over,
+      frames: 120,
+    );
     expect(game.world.timeScale, 0);
     await tester.pump();
     expect(game.gameOverText.isMounted, isTrue);
     // The stars stay, standing still.
-    final star = game.starField.stars.first;
+    final star = game.shooter.starField.stars.first;
     final eyeDistance = star.eyeDistance;
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.starField.stars, hasLength(StarFieldComponent.count));
+    expect(game.shooter.starField.stars, hasLength(StarFieldComponent.count));
     expect(star.eyeDistance, eyeDistance);
     final center = tester.getCenter(
       find.byType(GameWidget<TubeShooterExample>),
     );
     await tester.tapAt(center);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(game.state, TubeState.zoom);
-    expect(game.lives, TubeShooterExample.startLives);
+    expect(game.shooter.state, TubeState.zoom);
+    expect(game.lives, TubeHost.startLives);
     expect(game.score, 0);
-    expect(game.round, 2);
-    expect(game.levelIndex, 1);
-    expect(game.pace, closeTo(1.05, 1e-9));
+    expect(game.shooter.round, 2);
+    expect(game.shooter.levelIndex, 1);
+    expect(game.shooter.pace, closeTo(1.05, 1e-9));
     expect(reported, [1, 1]);
     expect(game.world.timeScale, 1);
     expect(game.gameOverText.isMounted, isFalse);
@@ -1647,18 +1746,18 @@ void main() {
     tester,
   ) async {
     final game = await pumpGame(tester, SvgRenderer.rasterizer);
-    game.spawning = false;
+    game.shooter.spawning = false;
     Iterable<VectorTextComponent> texts(double capHeight) => game
         .camera
         .viewport
         .children
         .whereType<VectorTextComponent>()
         .where((text) => text.capHeight == capHeight);
-    expect(texts(TubeShooterExample.bannerCap).single.text, 'ROUND 1');
+    expect(texts(TubeHost.bannerCap).single.text, 'ROUND 1');
     // The level's name and the round show at the bottom left, the round
     // below, opposite the lives and the score.
     VectorTextComponent hud(String text) => texts(
-      TubeShooterExample.hudCap,
+      TubeHost.hudCap,
     ).singleWhere((component) => component.text == text);
     final levelText = hud('OCTAGON');
     final roundText = hud('ROUND 1');
@@ -1671,21 +1770,21 @@ void main() {
     expect(hud('SCORE 0').position.y, roundText.position.y);
     // Under it, as each round recharges the purge.
     expect(
-      texts(TubeShooterExample.hudCap).map((text) => text.text),
+      texts(TubeHost.hudCap).map((text) => text.text),
       contains('PURGE READY'),
     );
-    await pumpUntil(tester, () => game.state == TubeState.ready);
+    await pumpUntil(tester, () => game.shooter.state == TubeState.ready);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(texts(TubeShooterExample.bannerCap).single.text, 'READY');
+    expect(texts(TubeHost.bannerCap).single.text, 'READY');
     expect(
-      texts(TubeShooterExample.hudCap).map((text) => text.text),
+      texts(TubeHost.hudCap).map((text) => text.text),
       isNot(contains('PURGE READY')),
     );
     await beginLevel(tester, game);
     await tester.pump(const Duration(milliseconds: 16));
-    expect(texts(TubeShooterExample.bannerCap), isEmpty);
+    expect(texts(TubeHost.bannerCap), isEmpty);
 
-    final score = texts(TubeShooterExample.hudCap)
+    final score = texts(TubeHost.hudCap)
         .singleWhere((text) => text.text.startsWith('SCORE'));
     List<RasterizerPathComponent> glyphs() =>
         score.children.whereType<RasterizerPathComponent>().toList();
@@ -1766,6 +1865,7 @@ void main() {
         round: s.round,
         state: s.state,
         stateTime: s.stateTime,
+        hasRun: s.hasRun,
         dyingOnDrop: s.dyingOnDrop,
         score: s.score,
         lives: s.lives,
@@ -1812,15 +1912,17 @@ void main() {
     ) async {
       final game = await pumpStory(tester, SvgRenderer.rasterizer);
       await beginLevel(tester, game);
-      game.player.beginFire();
+      game.shooter.player.beginFire();
       await pumpUntil(
         tester,
         () =>
-            game.enemies.length >= 2 && game.shots.isNotEmpty && game.score > 0,
+            game.shooter.enemies.length >= 2 &&
+            game.shooter.shots.isNotEmpty &&
+            game.score > 0,
         frames: 900,
       );
-      expect(game.state, TubeState.play);
-      expect(game.spawns, isNotEmpty);
+      expect(game.shooter.state, TubeState.play);
+      expect(game.shooter.spawns, isNotEmpty);
       final next = await switchStill(
         tester,
         game,
@@ -1834,7 +1936,7 @@ void main() {
         containsAll(['ROUND 1', 'SCORE ${game.score}', 'LIVES 3']),
       );
 
-      expect(next.pace, game.pace);
+      expect(next.shooter.pace, game.shooter.pace);
 
       // The new game's first level is the old game's, whatever level its
       // story starts at, as the Level knob shows the round's level.
@@ -1852,7 +1954,7 @@ void main() {
     ) async {
       var game = await pumpStory(tester, SvgRenderer.rasterizer);
       await pumpFrames(tester, 30);
-      expect(game.state, TubeState.zoom);
+      expect(game.shooter.state, TubeState.zoom);
       game = await switchStill(tester, game, SvgRenderer.rasterizer, [
         SvgRenderer.rasterizerCanvas,
       ]);
@@ -1860,29 +1962,29 @@ void main() {
           .whereType<VectorTextComponent>()
           .map((text) => text.text);
       expect(banners, containsAll(['ROUND 1', 'PURGE READY']));
-      expect(game.player.isVisible, isFalse);
+      expect(game.shooter.player.isVisible, isFalse);
 
       // The zoom goes on, to READY.
       await tester.pumpWidget(storyWith(SvgRenderer.rasterizerCanvas));
       await beginLevel(tester, game);
-      game
+      game.lives = 1;
+      game.shooter
         ..spawning = false
-        ..lives = 1
-        ..addEnemy(ClimberComponent(lane: game.player.lane, depth: 0));
+        ..addEnemy(ClimberComponent(lane: game.shooter.player.lane, depth: 0));
       await pumpFrames(tester, 30);
-      expect(game.state, TubeState.dying);
-      final faded = game.player.drawing.opacity;
+      expect(game.shooter.state, TubeState.dying);
+      final faded = game.shooter.player.drawing.opacity;
       expect(faded, inExclusiveRange(0, 1));
       game = await switchStill(tester, game, SvgRenderer.rasterizerCanvas, [
         SvgRenderer.flameSvg,
         SvgRenderer.rasterizer,
       ]);
-      expect(game.player.drawing.opacity, faded);
+      expect(game.shooter.player.drawing.opacity, faded);
 
       // The fade goes on, and then the game is over.
       await tester.pumpWidget(storyWith(SvgRenderer.rasterizer));
-      await pumpUntil(tester, () => game.state == TubeState.over);
-      expect(game.player.drawing.opacity, 0);
+      await pumpUntil(tester, () => game.shooter.state == TubeState.over);
+      expect(game.shooter.player.drawing.opacity, 0);
       game = await switchStill(tester, game, SvgRenderer.rasterizer, [
         SvgRenderer.rasterizerCanvas,
       ]);
@@ -1928,7 +2030,14 @@ void main() {
         );
         watch.stop();
         expect(watch.problems, isEmpty);
-        expect(watch.states, TubeState.values.toSet());
+        // All but a run's, as the story's runs are off.
+        expect(
+          watch.states,
+          TubeState.values.toSet().difference({
+            TubeState.run,
+            TubeState.arrive,
+          }),
+        );
         await tester.pumpWidget(const SizedBox());
       });
     }
@@ -1947,7 +2056,7 @@ void main() {
       final hairline = FallbackWatch(game, RasterizerBackend.canvas);
       await pumpFrames(tester, 2);
       expect(hairline.problems, isEmpty);
-      game.tubeGroup.add(
+      game.shooter.tubeGroup.add(
         RasterizerPathComponent(
           path: ui.Path()..addRect(const Rect.fromLTWH(0, 0, 9, 9)),
           paint: Paint()..style = PaintingStyle.stroke,

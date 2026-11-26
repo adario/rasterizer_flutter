@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flame_rasterizer_example/commons/material.dart' show Colors;
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/dot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
 /// What an enemy still to come in a game for another renderer goes on from:
@@ -15,6 +16,7 @@ typedef SpawnSnapshot = ({
   ({double speed, double turnIn})? wander,
   double? arriving,
   bool white,
+  bool again,
 });
 
 /// An enemy of [kind] still to come: a dot in its colour on the tube's far
@@ -29,7 +31,10 @@ class SpawnDotComponent(
   final EnemyKind kind, {
   required double at,
   final SpawnSnapshot? from,
-}) extends DotComponent {
+
+  /// Whether its enemy came out before, and went back on a lost ship.
+  final bool again = false,
+}) extends DotComponent with InShooterMode {
   this : super(kind.color);
 
   /// Its width, in device pixels.
@@ -77,6 +82,7 @@ class SpawnDotComponent(
     wander: isLoaded ? (speed: _speed, turnIn: _turnIn) : null,
     arriving: _arriving,
     white: _white,
+    again: again,
   );
 
   /// Starts arriving.
@@ -114,7 +120,7 @@ class SpawnDotComponent(
   void move(double dt) {
     final arriving = _arriving;
     if (arriving == null) {
-      final pace = gameRef.pace;
+      final pace = shooter.pace;
       final tube = gameRef.view.tube;
       _turnIn -= dt * pace;
       if (_turnIn <= 0) {
