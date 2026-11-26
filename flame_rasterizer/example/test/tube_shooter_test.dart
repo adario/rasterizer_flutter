@@ -386,8 +386,8 @@ void main() {
   });
 
   for (final (renderer, status) in [
-    (SvgRenderer.rasterizer, 'canvas (noImpeller)'),
-    (SvgRenderer.flameSvg, "Flame's PathComponent"),
+    (SvgRenderer.rasterizer, 'Canvas (noImpeller)'),
+    (SvgRenderer.flameSvg, 'Flame · '),
   ]) {
     testWidgets('the game loads with ${renderer.label}, and zooms in, the '
         "tube's path made again each frame", (tester) async {

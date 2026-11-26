@@ -71,7 +71,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
         expect(tester.getRect(finder), first, reason: 'at frame $i');
       }
-      expect(game.status.value, startsWith('canvas (forced) · '));
+      expect(game.status.value, startsWith('Canvas · '));
       for (final text in ['', 'short', 'a long status · ' * 50]) {
         game.status.value = text;
         await tester.pump();

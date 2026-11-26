@@ -11,8 +11,8 @@ String rendererStatus(SvgRenderer renderer) => switch (renderer) {
   SvgRenderer.rasterizer || SvgRenderer.rasterizerAtlas =>
     renderer.supported
         ? '${renderer.text} · '
-        : 'canvas '
+        : 'Canvas '
               '(${RasterizerGpu.of(renderer.gpu).support.name}) · ',
-  SvgRenderer.rasterizerCanvas => 'canvas (forced) · ',
+  SvgRenderer.rasterizerCanvas => 'Canvas · ',
   SvgRenderer.flameSvg => 'flame_svg · ',
 };

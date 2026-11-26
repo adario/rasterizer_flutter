@@ -99,7 +99,7 @@ void main() {
           status,
           startsWith(
             renderer == SvgRenderer.flameSvg && shapes == Shapes.paths
-                ? "Flame's PathComponent · "
+                ? 'Flame · '
                 : rendererStatus(renderer),
           ),
         );

@@ -87,15 +87,15 @@ void main() {
     (
       SvgRenderer.rasterizer,
       Shapes.svgs,
-      'canvas (noImpeller)',
+      'Canvas (noImpeller)',
     ),
     (SvgRenderer.flameSvg, Shapes.svgs, 'flame_svg'),
     (
       SvgRenderer.rasterizer,
       Shapes.paths,
-      'canvas (noImpeller)',
+      'Canvas (noImpeller)',
     ),
-    (SvgRenderer.flameSvg, Shapes.paths, "Flame's PathComponent"),
+    (SvgRenderer.flameSvg, Shapes.paths, 'Flame · '),
   ]) {
     testWidgets('the game loads with ${renderer.label} and ${shapes.label}', (
       tester,

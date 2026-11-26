@@ -27,7 +27,7 @@ void main() {
   void expectBars(WidgetTester tester, String title) {
     expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, title);
     expect(find.byType(AppBar), findsNothing);
-    final status = find.textContaining(RegExp(r'^canvas \('));
+    final status = find.textContaining(RegExp('^Canvas · '));
     expect(tester.widget<Text>(status).maxLines, 1);
   }
 
@@ -54,13 +54,13 @@ void main() {
     expect(game.descendants().whereType<FpsTextComponent>(), isNotEmpty);
     // The status bar shows the renderer, which is the canvas one here, and
     // the frame times.
-    expect(find.textContaining(RegExp(r'^canvas \(.*render ')), findsOneWidget);
+    expect(find.textContaining(RegExp('^Canvas · render ')), findsOneWidget);
     // Tube Shooter draws no SVGs, so Flame SVG shows Flame.
     await pick(tester, 'Flame');
     final flameGame = gameOf<TubeShooterExample>(tester);
     expect(flameGame, isNot(same(game)));
     expect(flameGame.isLoaded, isTrue);
-    expect(find.textContaining("Flame's PathComponent"), findsOneWidget);
+    expect(find.textContaining('Flame · render '), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -80,7 +80,7 @@ void main() {
     final game = gameOf<RevolutePinballExample>(tester);
     expect(game.isLoaded, isTrue);
     expect(game.descendants().whereType<FpsTextComponent>(), isNotEmpty);
-    expect(find.textContaining(RegExp(r'^canvas \(.*render ')), findsOneWidget);
+    expect(find.textContaining(RegExp('^Canvas · render ')), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 }

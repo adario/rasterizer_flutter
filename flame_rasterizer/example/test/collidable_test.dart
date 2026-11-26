@@ -60,7 +60,7 @@ void main() {
   // vector_graphics shares its loads between tests, and a test's fake time
   // doesn't run another test's loads.
   for (final (renderer, status) in [
-    (SvgRenderer.rasterizer, 'canvas (noImpeller)'),
+    (SvgRenderer.rasterizer, 'Canvas (noImpeller)'),
     (SvgRenderer.flameSvg, 'flame_svg'),
   ]) {
     testWidgets('the game loads with ${renderer.label}', (tester) async {

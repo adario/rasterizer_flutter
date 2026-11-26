@@ -281,7 +281,7 @@ Future<void> play(
 
   for (final line in lines.values) {
     if (renderer == SvgRenderer.flameSvg) {
-      expect(line, contains(": Flame's PathComponent · "));
+      expect(line, contains(': Flame · '));
     } else {
       expect(line, contains(': ${rendererStatus(renderer)}'));
       expect(line, contains(RegExp(r'\b1 run, ')));

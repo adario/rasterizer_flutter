@@ -618,7 +618,7 @@ mixin RasterizerTubeHost on TubeHost, ExampleRasterizer<ExampleWorld> {
 /// A [TubeHost] whose paths Flame's `PathComponent`s draw, with no glow.
 mixin FlameTubeHost on TubeHost {
   @override
-  String get rendererText => "Flame's PathComponent";
+  String get rendererText => 'Flame';
 
   /// None: Flame's PathComponents keep no numbers to show.
   @override

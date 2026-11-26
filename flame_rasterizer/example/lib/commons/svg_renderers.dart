@@ -256,16 +256,16 @@ mixin ExampleRasterizer<W extends World> on StoryGame<W>, HasRasterizer<W> {
     await Future.wait([Future.sync(super.onLoad), rasterizerReady]);
   }
 
-  /// The renderer's entry. With the canvas renderer, it says whether the knob
-  /// forced it, or else why the GPU renderer doesn't run.
+  /// The renderer's entry. When the canvas renderer draws for a GPU entry, it
+  /// says why the GPU renderer doesn't run.
   @override
   String get rendererText {
     final gpu = RasterizerGpu.of(rasterizerGpu);
     final backend = rasterizer?.backend ?? gpu.backend;
-    if (backend != RasterizerBackend.canvas) {
+    if (backend != RasterizerBackend.canvas || forceCanvas) {
       return renderer.text;
     }
-    return forceCanvas ? 'canvas (forced)' : 'canvas (${gpu.support.name})';
+    return 'Canvas (${gpu.support.name})';
   }
 
   /// The frame's runs (see [RasterizerCanvas]) and entries.

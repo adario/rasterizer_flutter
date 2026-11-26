@@ -353,7 +353,7 @@ void main() {
         },
       );
       expect(
-        find.textContaining('canvas (forced)'),
+        find.textContaining('Canvas · '),
         findsOneWidget,
       );
       await tester.pumpWidget(const SizedBox());
@@ -366,9 +366,9 @@ void main() {
   // test's fake time doesn't run another test's loads.
   var nextSvg = 0;
   for (final (renderer, status) in [
-    (SvgRenderer.rasterizer, 'canvas (noImpeller)'),
-    (SvgRenderer.rasterizerAtlas, 'canvas (noImpeller)'),
-    (SvgRenderer.rasterizerCanvas, 'canvas (forced)'),
+    (SvgRenderer.rasterizer, 'Canvas (noImpeller)'),
+    (SvgRenderer.rasterizerAtlas, 'Canvas (noImpeller)'),
+    (SvgRenderer.rasterizerCanvas, 'Canvas · '),
     (SvgRenderer.flameSvg, 'flame_svg'),
   ]) {
     for (final fade in [false, true]) {

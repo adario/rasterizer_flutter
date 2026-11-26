@@ -712,7 +712,7 @@ class FlameMultipleShapesExample({
 
   @override
   String get rendererText =>
-      shapes == Shapes.paths ? "Flame's PathComponent" : super.rendererText;
+      shapes == Shapes.paths ? 'Flame' : super.rendererText;
 
   /// No numbers with paths, which have no flame_svg cache.
   @override

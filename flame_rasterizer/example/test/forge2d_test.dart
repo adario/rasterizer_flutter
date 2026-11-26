@@ -134,7 +134,7 @@ void main() {
       final position = body.body.position;
       expect(arena.contains(Offset(position.x, position.y)), isTrue);
     }
-    expect(find.textContaining('canvas (noImpeller) · '), findsOneWidget);
+    expect(find.textContaining('Canvas (noImpeller) · '), findsOneWidget);
     // An entry for each body: the SVGs, and the other bodies' paths.
     const bodies = 15 + 7;
     expect(find.textContaining('1 run, $bodies entries'), findsOneWidget);
