@@ -735,13 +735,11 @@ class RunnerMode({
     );
     ship.fadeOut();
     _kills = 0;
-    if (run case final run?) {
-      // On a run, the enemies come again, unless its end already shows.
+    // On a run, the enemies come again, unless its end already shows.
+    if (run case final run?
+        when run.playEnd - (run.tube.course?.ease ?? 0) > _farRing) {
       _queue.insertAll(0, [for (final enemy in _enemies) enemy.kind]);
-      final ease = run.tube.course?.ease ?? 0;
-      if (run.playEnd - ease > _farRing) {
-        _endRunAt(double.infinity);
-      }
+      _endRunAt(double.infinity);
     }
     _clearEnemies();
     _setState(RunnerState.dying);
