@@ -11,38 +11,62 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flutter/foundation.dart';
 
+/// What a game for another renderer goes on from: its runner's snapshot, the
+/// score and the lives.
+typedef TubeRunnerSnapshot = ({RunnerSnapshot runner, int score, int lives});
+
 /// A prototype of an endless runner, where running is flying: see
 /// [description].
 ///
 /// It borrows Tube Shooter's tube, ship, stars and view. Its [runner] flies
 /// the ship, and plays by the rules: it hands the mode the player's input.
 /// Subclasses pick the component that draws a path: see [pathComponent].
+///
+/// Given the snapshot of a game with another renderer, it goes on from there:
+/// see [snapshot].
 abstract class TubeRunnerExample({
   required super.status,
   super.random,
   Tube? tube,
+  TubeRunnerSnapshot? from,
 }) extends TubeHost {
   this {
     view.tube = tube ?? Tubes.hexagon;
+    if (from != null) {
+      score = from.score;
+      lives = from.lives;
+    }
   }
 
   /// The run, and the rules it plays by.
-  final runner = RunnerMode();
+  final runner = RunnerMode(from: from?.runner);
+
+  /// What a game for another renderer goes on from.
+  TubeRunnerSnapshot get snapshot =>
+      (runner: runner.snapshot, score: score, lives: lives);
 
   /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
-  /// SVG, down [tube], one of [tubes], or the hexagon.
+  /// SVG, down [tube], one of [tubes], or the hexagon, which goes on from
+  /// [from], if any.
   factory TubeRunnerExample.of(
     SvgRenderer renderer,
     ValueNotifier<String> status, {
     math.Random? random,
     Tube? tube,
+    TubeRunnerSnapshot? from,
   }) => renderer == SvgRenderer.flameSvg
-      ? FlameTubeRunnerExample(status: status, random: random, tube: tube)
+      ? FlameTubeRunnerExample(
+          status: status,
+          random: random,
+          tube: tube,
+          from: from,
+        )
       : RasterizerTubeRunnerExample(
           status: status,
           renderer: renderer,
           random: random,
           tube: tube,
+          from: from,
         );
 
   /// The tubes it can fly down: Tube Shooter's, in the order of its levels.
@@ -100,7 +124,8 @@ abstract class TubeRunnerExample({
     The bottom left shows the tube's name and how long the game has gone on
     in it, and the bottom right the lives left and the score. The game plays
     Tube Shooter's sounds as the same things happen, and the Sound knob turns
-    them on and off.
+    them on and off. A new renderer's game goes on with the same ship,
+    enemies, spikes and shots, from where they were.
 
     The game makes the tube's quads again every frame. The mesh renderer fills
     each quad on its own, as a fan of triangles, rather than their union. The
@@ -170,6 +195,7 @@ class RasterizerTubeRunnerExample({
   @override required final SvgRenderer renderer,
   super.random,
   super.tube,
+  super.from,
 }) extends TubeRunnerExample
     with
         HasRasterizer,
@@ -186,5 +212,6 @@ class FlameTubeRunnerExample({
   required super.status,
   super.random,
   super.tube,
+  super.from,
 }) extends TubeRunnerExample
     with FlamePathComponents<ExampleWorld>, FlameTubeHost;

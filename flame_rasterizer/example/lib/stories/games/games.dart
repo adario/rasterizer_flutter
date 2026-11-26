@@ -108,12 +108,13 @@ WidgetbookComponent gamesStories() {
       //       initialValue: true,
       //     );
       //     final flightSpeed = flightSpeedKnob(context);
-      //     return GameStory<TubeRunnerExample, Object>(
+      //     return GameStory<TubeRunnerExample, TubeRunnerSnapshot>(
       //       renderer: renderer,
-      //       create: (status, _) =>
-      //           TubeRunnerExample.of(renderer, status, tube: tube)
+      //       create: (status, from) =>
+      //           TubeRunnerExample.of(renderer, status, tube: tube, from: from)
       //             ..sound = sound
       //             ..flightSpeed = flightSpeed,
+      //       snapshot: (game) => game.snapshot,
       //       update: (game) => game
       //         ..tube = tube
       //         ..sound = sound

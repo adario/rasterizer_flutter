@@ -452,7 +452,12 @@ class RunnerMode({
     endlessTube.advanceTo(_flown);
     // Under the world, as Tube Shooter's stars are.
     gameRef.camera.backdrop.add(stars);
-    _waitForPlayer();
+    if (from == null) {
+      _waitForPlayer();
+    } else if (isOver) {
+      gameRef.world.timeScale = 0;
+      gameRef.camera.viewport.add(gameRef.gameOverText);
+    }
     _updateTube();
   }
 

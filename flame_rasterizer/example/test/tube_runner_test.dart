@@ -3,11 +3,13 @@
 // ship flies and moves round the tube, and that its shots hit.
 import 'dart:math' as math;
 
+import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flame_rasterizer_example/commons/game_story.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_climber_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_shot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_splitter_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
@@ -379,6 +381,8 @@ void main() {
       expect(game.runner.state, RunnerState.play);
     });
   }
+
+  _snapshotTests();
 }
 
 /// Returns whether the quad of [corners] hides [point] from [eye]: whether
@@ -408,4 +412,132 @@ bool _hides(Point3 eye, Point3 point, List<Point3> corners) {
     }
   }
   return false;
+}
+
+/// The story of a Tube Runner game for [renderer], at [speed], that goes on
+/// from the snapshot of the game before.
+Widget _story(SvgRenderer renderer, {double speed = 1}) => MaterialApp(
+  home: GameStory<TubeRunnerExample, TubeRunnerSnapshot>(
+    renderer: renderer,
+    create: (status, from) => TubeRunnerExample.of(
+      renderer,
+      status,
+      random: math.Random(1),
+      from: from,
+    ),
+    snapshot: (game) => game.snapshot,
+    speed: speed,
+  ),
+);
+
+/// Returns the story's game, once loaded.
+Future<TubeRunnerExample> _gameOf(WidgetTester tester) async {
+  final game = tester
+      .widget<GameWidget<TubeRunnerExample>>(
+        find.byWidgetPredicate((w) => w is GameWidget),
+      )
+      .game!;
+  await pumpWhileLoading(tester, () => !game.isLoaded);
+  return game;
+}
+
+/// Checks that a new renderer's game goes on from the old one's.
+void _snapshotTests() {
+  testWidgets('a new renderer goes on from the same distance, score, lives, '
+      'ship, enemies, spikes and shots, where they show, and from Game Over', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas));
+    final game = await _gameOf(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    final runner = game.runner;
+    final lane = runner.ship.lane;
+    final laneCount = game.view.tube.laneCount;
+    for (final (i, kind) in [
+      EnemyKind.seeder,
+      EnemyKind.climber,
+      EnemyKind.zapper,
+      EnemyKind.splitter,
+    ].indexed) {
+      runner.addEnemy(kind, (lane + 1 + i) % laneCount);
+    }
+    // The ship fires down its lane as it flies, and the enemies climb.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+    for (var i = 0; i < 180; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    game
+      ..score = 1234
+      ..lives = 2;
+    await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas, speed: 0));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(runner.state, RunnerState.play);
+    final snapshot = game.snapshot;
+    expect(snapshot.runner.shots, isNotEmpty);
+    expect(snapshot.runner.spikes, isNotEmpty);
+    expect(snapshot.runner.enemies, isNotEmpty);
+    // A hidden shape keeps where it last showed, so only the shown count.
+    List<Offset?> placesOf(RunnerMode runner) => [
+      for (final shape in <PositionComponent>[
+        runner.ship,
+        ...runner.enemies,
+        ...runner.children.whereType<RunnerShotComponent>(),
+      ])
+        if ((shape as HasVisibility).isVisible)
+          shape.position.toOffset()
+        else
+          null,
+    ];
+    final places = placesOf(runner);
+
+    await tester.pumpWidget(_story(SvgRenderer.flameSvg, speed: 0));
+    final next = await _gameOf(tester);
+    expect(next, isNot(same(game)));
+    await tester.pump(const Duration(milliseconds: 16));
+    final again = next.snapshot;
+    // Records compare their lists by identity, so the lists go apart.
+    expect((again.score, again.lives), (1234, 2));
+    expect(again.runner.spikes, snapshot.runner.spikes);
+    expect(again.runner.enemies, snapshot.runner.enemies);
+    expect(again.runner.shots, snapshot.runner.shots);
+    expect(again.runner.ship, snapshot.runner.ship);
+    expect(
+      (again.runner.state, again.runner.flown, again.runner.tubeTime),
+      (snapshot.runner.state, snapshot.runner.flown, snapshot.runner.tubeTime),
+    );
+    final placesAgain = placesOf(next.runner);
+    expect(placesAgain, hasLength(places.length));
+    expect(places.nonNulls, hasLength(greaterThan(1)));
+    for (final (i, place) in placesAgain.indexed) {
+      expect(place == null, places[i] == null);
+      if (place != null) {
+        expect((place - places[i]!).distance, lessThan(1e-9));
+      }
+    }
+
+    // The game goes on, until a seeder down the ship's lane ends it.
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+    await tester.pumpWidget(_story(SvgRenderer.flameSvg));
+    next.lives = 1;
+    next.runner.addEnemy(EnemyKind.seeder, next.runner.ship.lane);
+    for (var i = 0; i < 1000 && !next.runner.isOver; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(next.runner.isOver, isTrue);
+
+    await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas));
+    final over = await _gameOf(tester);
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(over.runner.isOver, isTrue);
+    expect(over.world.timeScale, 0);
+    expect(over.gameOverText.isMounted, isTrue);
+    expect(over.runner.ship.isVisible, isFalse);
+    // Enter starts a new game, at READY.
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(over.runner.isReady, isTrue);
+    expect(over.lives, TubeHost.startLives);
+    expect(over.world.timeScale, 1);
+    await tester.pumpWidget(const SizedBox());
+  });
 }
