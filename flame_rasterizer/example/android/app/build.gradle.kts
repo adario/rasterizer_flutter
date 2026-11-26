@@ -34,6 +34,7 @@ android {
         val standaloneLabels = mapOf(
             "tube_shooter" to "Tube Shooter",
             "revolute_pinball" to "Revolute Pinball",
+            "tube_runner" to "Tube Runner",
         )
         manifestPlaceholders["appLabel"] = "Flame Rasterizer Example"
         if (standalone != null) {

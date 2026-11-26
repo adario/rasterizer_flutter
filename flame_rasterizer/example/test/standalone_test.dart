@@ -3,8 +3,10 @@ import 'package:flame/game.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/main_revolute_pinball.dart';
+import 'package:flame_rasterizer_example/main_tube_runner.dart';
 import 'package:flame_rasterizer_example/main_tube_shooter.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_example.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:widgetbook/widgetbook.dart';
@@ -81,6 +83,31 @@ void main() {
     expect(game.isLoaded, isTrue);
     expect(game.descendants().whereType<FpsTextComponent>(), isNotEmpty);
     expect(find.textContaining(RegExp('^Canvas · render ')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Tube Runner runs on its own, with its status bar, and the '
+      'menu switches its renderer, going on from where it was', (tester) async {
+    tester.view
+      ..physicalSize = const Size(1000, 700)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const TubeRunnerApp(sound: false));
+    await pumpFrames(tester, 30);
+    expect(find.byType(Widgetbook), findsNothing);
+    expectBars(tester, 'Tube Runner');
+    final game = gameOf<TubeRunnerExample>(tester);
+    expect(game.isLoaded, isTrue);
+    expect(game.descendants().whereType<FpsTextComponent>(), isNotEmpty);
+    expect(find.textContaining(RegExp('^Canvas · render ')), findsOneWidget);
+    game.score = 1234;
+    // Tube Runner draws no SVGs, so Flame SVG shows Flame.
+    await pick(tester, 'Flame');
+    final flameGame = gameOf<TubeRunnerExample>(tester);
+    expect(flameGame, isNot(same(game)));
+    expect(flameGame.isLoaded, isTrue);
+    expect(flameGame.score, 1234);
+    expect(find.textContaining('Flame · render '), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 }
