@@ -209,7 +209,8 @@ void main() {
     }
 
     await settle();
-    expect(find.text('Stars'), findsOneWidget);
+    // Off for now: the default stars.
+    expect(find.text('Stars'), findsNothing);
     expectGlowKnob(SvgRenderer.rasterizerCanvas);
     await tester.tap(find.byType(DropdownMenu<SvgRenderer>));
     await settle();

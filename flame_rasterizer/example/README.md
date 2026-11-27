@@ -339,19 +339,23 @@ Inspired by Atari's Tempest (1981): a tube shooter with a tube, enemies, colours
   each dot a component under a transform. A filled path's width is its transform's, so the dots cost no import as they
   move, whatever their sizes and the zoom: dots of one colour share one imported path. Tints, which cost none either,
   flash the dots, and opacity fades the stars.
-- **Stars.** 200 white dots by default, as many as the Stars knob sets, around the tube, never in it, up to 10 tube
-  units from the eye. As the eye goes deeper, they come as much closer, so that they stream outward. They're twice as
-  wide as the tube's lines at their distance, 2 to 8 device pixels, and stretched into streaks from where they were the
-  frame before. They're unseen at the farthest, and at their brightest from 4 tube units in.
-  - While the eye goes slower than a tenth of its top speed on the drop, the stars come at that speed instead, 5%
-    faster each round, as the game is. They drift, with streaks no longer than they're wide, plus a logical pixel. A
-    star wholly past the screen's edge comes back as a new one, at the farthest, elsewhere.
+- **Stars.** 400 white dots around the tube, never in it, up to 10 tube units from the eye. As the eye goes deeper, they
+  come as much closer, so that they stream outward. They're twice as wide as the tube's lines at their distance, 2 to 8
+  device pixels, and stretched into streaks from where they were the frame before. They're unseen at the farthest, and
+  at their brightest from 4 tube units in.
+  - While the eye goes slower than a tenth of its top speed on the drop, and 5% more, the stars come at that speed
+    instead, 5% faster each round, as the game is, and faster by 2.5% of that for each enemy destroyed in the round
+    since the ship was last lost. They drift, with streaks no longer than they're wide, plus a logical pixel. A star
+    wholly past the screen's edge comes back as a new one, at the farthest, elsewhere.
   - In play, as the ship moves round the rim, the stars turn about the axis the other way, easing in over about 0.2 s,
     nearer ones more, as with parallax. A star 4 tube units from the eye turns half the ship's turn round a closed tube,
     and one elsewhere 4 over its distance times that. So their moves sideways grow with nearness, as their moves outward
     do. The stars' places turn, not their distances.
-  - They fade in over 0.3 s as the game starts, and stay, still once it's over. As the Stars knob changes, stars go, or
-    come at random distances, at once.
+  - On a run, they don't turn with the ship, but toward the tube's bends, as the ship flies: clockwise where the tube 8
+    tube units ahead goes right of the ship's ring, anticlockwise where it goes left. A star 4 tube units from the eye
+    turns 0.2 radians for each tube unit flown where the tube there goes wholly sideways, and less as it goes less so,
+    nearer ones more. So they don't turn where the tube goes straight on, or bends only up or down.
+  - They fade in over 0.3 s as the game starts, and stay, still once it's over.
 - **Texts.** The game draws its texts in `VectorFont`, a font of capitals, digits, a space, a colon, a period, a dash
   and a slash. Each glyph is 1 to 3 straight polylines on a grid 4 wide and 6 tall, stroked an eighth of its height
   wide, with miter joins, none sharper than 60°, and square ends, as the shapes are. Each glyph is a path, which all its
@@ -374,8 +378,6 @@ Its knobs pick:
   Flutter GPU isn't available there, and the canvas renderer draws the paths.
 - **Level**: the level a new game starts at, by its number and its tube's name, so that the player can see any tube
   without playing up to it.
-- **Stars**: how many stars there are, from 0 to 1000 in steps of 20, 200 by default. With none, the mesh renderer's
-  targets, which the stars spread over the window, can shrink. It changes the running game.
 - **Glow**: shown with GPU (mesh) only, the one renderer that draws glows, and off by default. It makes the lines glow,
   thinner with depth, as they are: the shapes' glows 3 times as wide as their lines, and those of the tube, the ship's
   lane, the spikes and the bolts 2 times. It changes the running game, which imports its lines again.

@@ -793,6 +793,35 @@ void main() {
     expect(game.shooter.pace, greaterThan(1.2));
     game.shooter.round = 1;
 
+    // Each enemy that the ship destroys speeds them up, by a share of that
+    // speed: a splitter that splits counts once.
+    for (final enemy in [
+      ClimberComponent(lane: 0, depth: Tube.depth),
+      SplitterComponent(lane: 1, depth: Tube.depth),
+    ]) {
+      game.shooter
+        ..addEnemy(enemy)
+        ..destroy(enemy);
+    }
+    expect(game.shooter.kills, 2);
+    expect(game.shooter.enemies, hasLength(2));
+    final faster = drifting.eyeDistance;
+    await frame();
+    expect(
+      drifting.eyeDistance,
+      closeTo(
+        faster -
+            StarFieldComponent.cruise *
+                game.shooter.pace *
+                (1 + 2 * StarFieldComponent.killSpeedUp) *
+                0.016,
+        1e-9,
+      ),
+    );
+    for (final enemy in [...game.shooter.enemies]) {
+      game.shooter.discard(enemy);
+    }
+
     // Close to the eye, a drifting star's streak is at most as long as the
     // star is wide, and a logical pixel longer.
     const near = Offset(0.3, 0);
@@ -1483,14 +1512,22 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('after a lost ship the level waits on READY again, and what '
-      'was held since before does not begin it', (tester) async {
+  testWidgets('after a lost ship the level waits on READY again, with no '
+      'kills, and what was held since before does not begin it', (
+    tester,
+  ) async {
     final game = await playing(tester);
+    final destroyed = ClimberComponent(lane: 0, depth: Tube.depth);
+    game.shooter
+      ..addEnemy(destroyed)
+      ..destroy(destroyed);
+    expect(game.shooter.kills, 1);
     game.shooter.addEnemy(
       ClimberComponent(lane: game.shooter.player.lane, depth: 0),
     );
     await pumpFrames(tester, 2);
     expect(game.shooter.state, TubeState.dying);
+    expect(game.shooter.kills, 0);
     final center = tester.getCenter(
       find.byType(GameWidget<TubeShooterExample>),
     );
@@ -1886,6 +1923,7 @@ void main() {
         lives: s.lives,
         purgeReady: s.purgeReady,
         purgeLeft: s.purgeLeft,
+        kills: s.kills,
         sinceSpawn: s.sinceSpawn,
         pulseClock: s.pulseClock,
         look: s.look,
@@ -1933,7 +1971,7 @@ void main() {
         () =>
             game.shooter.enemies.length >= 2 &&
             game.shooter.shots.isNotEmpty &&
-            game.score > 0,
+            game.shooter.kills > 0,
         frames: 900,
       );
       expect(game.shooter.state, TubeState.play);

@@ -54,7 +54,8 @@ WidgetbookComponent gamesStories() {
                 );
               }
             },
-            stars: starsKnob(context),
+            // Off for now: the default stars.
+            // stars: starsKnob(context),
             glow: context.knobs.boolean(label: 'Glow'),
             sound: context.knobs.boolean(label: 'Sound', initialValue: true),
             zoom: zoomKnob(context),
@@ -107,7 +108,8 @@ WidgetbookComponent gamesStories() {
       //     return TubeRunnerStory(
       //       renderer: renderer,
       //       tube: tube,
-      //       stars: starsKnob(context),
+      //       // Off for now: the default stars.
+      //       // stars: starsKnob(context),
       //       sound: sound,
       //       flightSpeed: flightSpeedKnob(context),
       //       zoom: zoomKnob(context),

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flame/components.dart';
 import 'package:flame/extensions.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
@@ -18,14 +19,16 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.da
 /// that passes the tube's near plane goes back to the farthest distance, as a
 /// dot somewhere else.
 ///
-/// While the eye goes slower than [cruise], at the round's pace, the stars
-/// come at that speed instead, with short streaks, and a star wholly off
-/// screen goes back too.
+/// While the eye goes slower than [cruise], at the round's pace, and
+/// [killSpeedUp] faster for each of [ShooterMode.kills], the stars come at
+/// that speed instead, with short streaks, and a star wholly off screen goes
+/// back too.
 ///
-/// While the ship can move, in play and on a run, as it moves round the
-/// tube, the stars turn about the axis the other way, easing in over about
-/// [turnLag]: round a closed tube, by an even share for each lane, and along
-/// an open one, as the ship turns, so not at all along a straight. Nearer
+/// In play, as the ship moves round the tube, the stars turn about the axis
+/// the other way, easing in over about [turnLag]: round a closed tube, by an
+/// even share for each lane, and along an open one, as the ship turns, so
+/// not at all along a straight. On a run, they don't turn with the ship, but
+/// toward the run's bends, as Tube Runner's do: see [bendTurnOver]. Nearer
 /// stars turn more, as with parallax: see [turnRatio]. Their places turn,
 /// not their distances from the eye.
 /// Stars are unseen at the farthest, and at their brightest from [bright] in.
@@ -45,10 +48,15 @@ class StarFieldComponent(
   static const radii = (inner: 1.2, outer: 5.0);
   static const fadeTime = 0.3;
 
-  /// The slowest the stars come in the first round, in tube units a second: a
-  /// tenth of the eye's top speed on the drop. Later rounds speed it up, as
-  /// they do the game.
-  static const cruise = 0.1 * 2 * Tube.depth / ShooterMode.dropTime;
+  /// The slowest the stars come in the first round, in tube units a second:
+  /// a tenth of the eye's top speed on the drop, and 5% more. Later rounds
+  /// speed it up, as they do the game.
+  static const cruise = 1.05 * 0.1 * 2 * Tube.depth / ShooterMode.dropTime;
+
+  /// How much faster than [cruise] the stars come, at the round's pace, for
+  /// each enemy that the ship destroyed in the round, since it was last lost:
+  /// a share of that speed.
+  static const killSpeedUp = 0.025;
 
   /// How much a star [bright] from the eye turns for each turn of the ship:
   /// round a closed tube, or of its angle along an open one.
@@ -61,6 +69,24 @@ class StarFieldComponent(
   /// How long the stars take to close most of the gap to their turn, in
   /// seconds: about two thirds of it, then two thirds of the rest, and so on.
   static const turnLag = 0.2;
+
+  /// How far ahead of the ship the stars look for an [EndlessTube]'s bends,
+  /// in tube units: see [bendTurnOver].
+  static const bendAhead = 8.0;
+
+  /// How much a star that turns as much as the ship turns, for each tube unit
+  /// that the ship flies, where the tube [bendAhead] ahead goes wholly
+  /// sideways: see [bendTurnOver].
+  static const bendTurn = 0.4;
+
+  /// Returns the angle by which a star that turns as much as the ship turns,
+  /// clockwise on screen, as the ship flies [closer] along [tube], [flown]
+  /// along it: toward the side that the tube bends to [bendAhead] ahead, by
+  /// [bendTurn] times how far its way there points that side, so faster
+  /// where it bends more, and not at all where it goes straight on, or bends
+  /// only up or down.
+  static double bendTurnOver(EndlessTube tube, double flown, double closer) =>
+      bendTurn * tube.bendAt(flown, bendAhead) * closer;
 
   /// The stars, while they're shown or fading out.
   final stars = <StarComponent>[];
@@ -144,18 +170,21 @@ class StarFieldComponent(
 
   /// Follows the ship's moves round the rim in play, and returns the angle by
   /// which a star that turns as much as the ship turns over [dt] seconds,
-  /// clockwise on screen.
-  double _turn(double dt) {
+  /// clockwise on screen. On a run, it turns toward the bends instead, as
+  /// the ship flies [deeper].
+  double _turn(double dt, double deeper) {
     final tube = gameRef.view.tube;
     final step = shooter.player.step;
+    final runner = shooter.state == TubeState.run ? shooter.runner : null;
+    final turns = shooter.state == TubeState.play;
     if (!identical(tube, _tube)) {
       _tube = tube;
       _turnPerLane = _turnPerLaneOn(tube);
-    } else if (shooter.canMove && tube.isOpen) {
+    } else if (turns && tube.isOpen) {
       _turnTarget -=
           PlayerComponent.headingOn(tube, step) -
           PlayerComponent.headingOn(tube, _step);
-    } else if (shooter.canMove) {
+    } else if (turns) {
       const stepsPerLane = PlayerComponent.stepsPerLane;
       final steps = stepsPerLane * tube.laneCount;
       var moved = step - _step;
@@ -166,7 +195,11 @@ class StarFieldComponent(
     _step = step;
     final turned = _turned;
     _turned += (_turnTarget - _turned) * (1 - math.exp(-dt / turnLag));
-    return _turned - turned;
+    // The runner makes the run's rings once it's loaded.
+    final bend = runner != null && runner.isLoaded && deeper > 0
+        ? bendTurnOver(runner.endlessTube, runner.flown, deeper)
+        : 0.0;
+    return _turned - turned + bend;
   }
 
   /// Returns how far a star that turns as much as the ship turns for each lane
@@ -227,7 +260,8 @@ class StarFieldComponent(
     final eyeShift = view.eyeShift;
     final deeper = eyeShift - _eyeShift;
     _eyeShift = eyeShift;
-    final drift = cruise * shooter.pace * dt;
+    final drift =
+        cruise * shooter.pace * (1 + killSpeedUp * shooter.kills) * dt;
     final isSlow = deeper <= drift;
     final closer = isSlow ? drift : deeper;
     // Round the viewport's centre, as the stars lie, and larger by the widest
@@ -240,7 +274,7 @@ class StarFieldComponent(
           StarComponent.widthScale * TubeView.rimPixels * view.devicePixel +
               StarComponent.slowLength / camera.viewfinder.zoom / 2,
         );
-    final turn = _turn(dt);
+    final turn = _turn(dt, deeper);
     for (final star in stars) {
       star
         ..cameFrom = star.eyeDistance

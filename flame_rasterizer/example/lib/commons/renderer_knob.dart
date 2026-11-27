@@ -47,11 +47,11 @@ double flightSpeedKnob(BuildContext context) => context.knobs.onKnobAdded(
 )!;
 
 /// Returns the Stars knob: how many stars Tube Shooter and Tube Runner show,
-/// from 0 to 1000 in steps of 20, 200 at first.
+/// from 0 to 1000 in steps of 20, 400 at first.
 int starsKnob(BuildContext context) => intSliderKnob(
   context,
   label: 'Stars',
-  initialValue: 200,
+  initialValue: 400,
   min: 0,
   max: 1000,
   divisions: 50,

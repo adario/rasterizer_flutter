@@ -155,7 +155,7 @@ abstract class TubeHost({
   /// The Stars knob's value: how many stars there are, around Tube Shooter's
   /// tube and on Tube Runner's flight.
   int starCount = defaultStarCount;
-  static const defaultStarCount = 200;
+  static const defaultStarCount = 400;
 
   /// How many paths the game made in the last second, as the status bar
   /// shows: see [countPath].

@@ -9,7 +9,7 @@ void main() {
 }
 
 /// Tube Shooter's story, with a renderer menu and no knobs: it starts at the
-/// first level, with 200 stars, without glow, at a zoom and speed of 1,
+/// first level, with 400 stars, without glow, at a zoom and speed of 1,
 /// over a one-line status bar.
 class const TubeShooterApp({
   /// Whether the game plays its sounds.

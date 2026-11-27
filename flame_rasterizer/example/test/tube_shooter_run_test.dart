@@ -12,7 +12,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ru
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_shot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/climber_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/star_field_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
@@ -201,6 +203,92 @@ void main() {
     await tester.sendKeyDownEvent(key);
     await tester.sendKeyUpEvent(key);
   }
+
+  testWidgets("on a run, the stars come as much closer as the runner's ship "
+      "flies, and turn toward the run's bends, not with the ship, then with "
+      'it again in the next round', (tester) async {
+    // The next round's tube is the Cog, which is closed, so that the stars
+    // turn as the ship moves round it.
+    final game = await pumpGame(
+      tester,
+      SvgRenderer.rasterizerCanvas,
+      firstLevel: levels.indexWhere((level) => level.tube == Tubes.octagon),
+      runs: true,
+    );
+    // With no enemies to come, the run's end is set as its play begins.
+    final runner = await pumpToRun(tester, game, sequence: const []);
+    final field = game.shooter.starField;
+    // A kill of the round's, as if on the drop.
+    final destroyed = ClimberComponent(lane: 0, depth: Tube.depth);
+    game.shooter
+      ..addEnemy(destroyed)
+      ..destroy(destroyed);
+    expect(game.shooter.kills, 1);
+    double wrapped(double angle) =>
+        angle - 2 * math.pi * (angle / (2 * math.pi)).roundToDouble();
+    double bendAt(double flown) =>
+        runner.endlessTube.bendAt(flown, StarFieldComponent.bendAhead);
+    // Into the bends, with the round's turn eased out.
+    await pumpUntil(
+      tester,
+      () => bendAt(runner.flown).abs() > 0.1,
+      frames: 600,
+    );
+    var bent = 0;
+    for (var i = 0; i < runFrames && game.shooter.state == TubeState.run; i++) {
+      // The ship's moves don't turn them.
+      runner.moveShipBy(bent.isEven ? 1 : -1);
+      const from = Offset(1.5, 0.5);
+      final star = field.stars.first
+        ..point = from
+        ..eyeDistance = 6;
+      final flown = runner.flown;
+      await tester.pump(const Duration(milliseconds: 16));
+      if (game.shooter.state != TubeState.run) {
+        break;
+      }
+      final closer = runner.flown - flown;
+      expect(closer, closeTo(runner.speed * 0.016, 1e-9));
+      expect(star.eyeDistance, closeTo(6 - closer, 1e-9));
+      final turn = wrapped(star.point.direction - from.direction);
+      final ratio =
+          StarFieldComponent.turnRatio *
+          StarFieldComponent.bright /
+          star.eyeDistance;
+      final bend = bendAt(runner.flown);
+      expect(
+        turn,
+        closeTo(StarFieldComponent.bendTurn * bend * closer * ratio, 1e-6),
+      );
+      if (bend.abs() > 0.05) {
+        bent++;
+      }
+    }
+    expect(bent, greaterThan(100));
+    // The next round starts with no kills.
+    expect(game.shooter.state, TubeState.arrive);
+    expect(game.shooter.kills, 0);
+    // In the next round's play, they turn with the ship again.
+    await pumpUntil(
+      tester,
+      () => game.shooter.state == TubeState.ready,
+      frames: 400,
+    );
+    await pressKey(tester);
+    await pumpFrames(tester, 20);
+    expect(game.shooter.state, TubeState.play);
+    const from = Offset(1.5, 0.5);
+    final star = field.stars.first
+      ..point = from
+      ..eyeDistance = 6;
+    game.shooter.player.moveBy(1);
+    await pumpFrames(tester, 20);
+    expect(
+      wrapped(star.point.direction - from.direction).abs(),
+      greaterThan(0.05),
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
 
   for (final tube in [Tubes.hexagon, Tubes.horseshoe]) {
     testWidgets("on the ${tube.name}'s run, Tube Runner's ship takes over "

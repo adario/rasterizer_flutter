@@ -173,7 +173,6 @@ class ShooterMode({
   _Run? _run;
 
   /// What plays the run's rules, if there's a run.
-  @visibleForTesting
   RunnerMode? get runner => _run?.runner;
 
   /// Whether the ship was destroyed on its drop, so that the next round comes
@@ -182,6 +181,11 @@ class ShooterMode({
 
   int round = 0;
   bool purgeReady = true;
+
+  /// How many enemies the ship destroyed since the round began, or the ship
+  /// was last lost: each speeds the stars up, as [StarFieldComponent] says.
+  int get kills => _kills;
+  int _kills = 0;
 
   /// The round's level.
   Level get level => levels[_levelIndex];
@@ -665,6 +669,7 @@ class ShooterMode({
     _explode(enemy, enemy.depth, rayColor: enemy.kind.color);
     gameRef.play(Sound.explosion);
     gameRef.score += enemy.kind.score;
+    _kills++;
     if (enemy is SplitterComponent && !purged) {
       split(enemy);
     } else {
@@ -739,6 +744,7 @@ class ShooterMode({
     }
     _dyingOnDrop = _state == TubeState.drop;
     _endRun();
+    _kills = 0;
     gameRef.lives--;
     _explode(player, player.depth, color: TubeColors.ship);
     gameRef.play(Sound.crash);
@@ -792,6 +798,7 @@ class ShooterMode({
       _addSpawn(kind, view.tube.laneCount * random.nextDouble());
     }
     purgeReady = true;
+    _kills = 0;
     _sinceSpawn = level.spawnPeriod;
     _pulseClock = 0;
     for (final shot in [...shots, ...enemyShots]) {

@@ -443,8 +443,65 @@ Future<TubeRunnerExample> _gameOf(WidgetTester tester) async {
   return game;
 }
 
-/// Checks that the Stars knob changes how many stars there are.
+/// Checks that the stars come as fast as the ship flies, and turn toward
+/// the tube's bends, and that the Stars knob changes how many there are.
 void _starsTests() {
+  testWidgets('the stars come as much closer as the ship flies, faster for '
+      "each enemy it destroys, and turn toward the tube's bends ahead, not "
+      'with the ship', (tester) async {
+    await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas));
+    final game = await _gameOf(tester);
+    final runner = game.runner..spawning = false;
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    expect(runner.state, RunnerState.play);
+    runner
+      ..addEnemy(EnemyKind.climber, 0)
+      ..destroyEnemy(runner.enemies.single);
+    expect(runner.speed, greaterThan(TubeHost.defaultFlightSpeed));
+    // The first frame after the key flies nothing.
+    await tester.pump(const Duration(milliseconds: 16));
+    double wrapped(double angle) =>
+        angle - 2 * math.pi * (angle / (2 * math.pi)).roundToDouble();
+    // A star that stays on screen, which turns as much as the bend says,
+    // nearer ones more, and comes as much closer as the ship flies.
+    Future<double> frame() async {
+      const from = Offset(1.5, 0.5);
+      final star = runner.stars.stars.first
+        ..point = from
+        ..eyeDistance = 6;
+      final flown = runner.flown;
+      await tester.pump(const Duration(milliseconds: 16));
+      final closer = runner.flown - flown;
+      expect(closer, closeTo(runner.speed * 0.016, 1e-9));
+      expect(star.eyeDistance, closeTo(6 - closer, 1e-9));
+      final turn = wrapped(star.point.direction - from.direction);
+      final ratio =
+          StarFieldComponent.turnRatio *
+          StarFieldComponent.bright /
+          star.eyeDistance;
+      final bend = runner.endlessTube.bendAt(
+        runner.flown,
+        StarFieldComponent.bendAhead,
+      );
+      expect(
+        turn,
+        closeTo(StarFieldComponent.bendTurn * bend * closer * ratio, 1e-9),
+      );
+      expect(star.point.distance, closeTo(from.distance, 1e-9));
+      return bend;
+    }
+
+    final bends = <double>[];
+    for (var i = 0; i < 30; i++) {
+      // The ship's moves don't turn them.
+      runner.moveShipBy(i.isEven ? 1 : -1);
+      bends.add(await frame());
+    }
+    // Where the tube bends, so that they do turn.
+    expect(bends.map((bend) => bend.abs()), everyElement(greaterThan(0.05)));
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('the Stars knob changes how many stars there are in the '
       'running game, even in a still world', (tester) async {
     await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas));

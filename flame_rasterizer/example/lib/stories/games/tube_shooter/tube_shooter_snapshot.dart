@@ -3,8 +3,9 @@ part of 'shooter_mode.dart';
 /// What a game for another renderer goes on from: the first level, the
 /// round, its state and how long it has lasted, whether its drop flies on
 /// down a run, the run's runner once it plays, the score, the lives, the
-/// purge, the camera and the eye, the ship, the spikes, the enemies still to
-/// come and in the tube, and the shots.
+/// purge, the kills that speed the stars up, the camera and the eye, the
+/// ship, the spikes, the enemies still to come and in the tube, and the
+/// shots.
 typedef TubeShooterSnapshot = ({
   int firstLevel,
   int levelIndex,
@@ -18,6 +19,7 @@ typedef TubeShooterSnapshot = ({
   int lives,
   bool purgeReady,
   double purgeLeft,
+  int kills,
   double sinceSpawn,
   double pulseClock,
   Offset look,
@@ -54,6 +56,7 @@ extension TubeShooterSnapshots on ShooterMode {
     lives: gameRef.lives,
     purgeReady: purgeReady,
     purgeLeft: _purgeLeft,
+    kills: _kills,
     sinceSpawn: _sinceSpawn,
     pulseClock: _pulseClock,
     look: _look,
@@ -77,6 +80,7 @@ extension TubeShooterSnapshots on ShooterMode {
     gameRef.score = from.score;
     gameRef.lives = from.lives;
     purgeReady = from.purgeReady;
+    _kills = from.kills;
     _sinceSpawn = from.sinceSpawn;
     _pulseClock = from.pulseClock;
     _look = from.look;

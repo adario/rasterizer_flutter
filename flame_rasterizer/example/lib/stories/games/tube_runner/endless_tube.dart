@@ -250,6 +250,13 @@ class EndlessTube({var TubeCourse? course}) {
     return _turnTo(_rings[index - _rings.first.index], distance, index);
   }
 
+  /// Returns how far the axis's way [ahead] past [distance] along it points
+  /// to the right of the ring at [distance], which [advanceTo] made the rings
+  /// for: from -1, wholly to its left, to 1, wholly to its right, through 0
+  /// where the axis goes straight on, or bends only up or down.
+  double bendAt(double distance, double ahead) =>
+      _forwardAt(distance + ahead).dot(ringAt(distance).right);
+
   /// Returns the tube's lines, as quads to fill, as the eye sees them with the
   /// ship [distance] along the axis, round the outline of [view]'s tube.
   ///
