@@ -61,6 +61,12 @@ abstract class TubeHost({
   /// as fast again as the finger, or half as fast, until it's under it.
   static const circleCatchUp = 0.5;
 
+  /// The least angle that a finger that [circles] sweeps to move the ship a
+  /// lane on an open tube, as on a closed tube of 16 lanes: an open tube
+  /// whose lanes take less, such as the Floor, spreads them out evenly over
+  /// more, so that the ship moves slower than the finger.
+  static const circleLaneTurn = 2 * math.pi / 16;
+
   /// Whether a finger moves the ship by circling round the centre of the
   /// tube's near end, on Android and iOS, rather than by dragging sideways.
   static bool get circles => switch (defaultTargetPlatform) {
@@ -207,8 +213,10 @@ abstract class TubeHost({
   final _circlings = <int, ({double angle, double gap})>{};
 
   /// The angle round the centre of [_anglesTube]'s near end of each step of
-  /// the ship's, unwound from the first step on an open tube, and the near
-  /// end's size, its farthest corner's distance.
+  /// the ship's, which a finger points at to move the ship there: on an open
+  /// tube, unwound from the first step, and spread out evenly by
+  /// [circleLaneTurn]. Then the near end's size, its farthest corner's
+  /// distance.
   List<double> _stepAngles = const [];
   double _nearEnd = 0;
   Tube? _anglesTube;
@@ -548,7 +556,9 @@ abstract class TubeHost({
   /// starts from where the ship is, and closes the gap by [circleCatchUp] of
   /// each angle that the finger sweeps, so that the ship doesn't jump. On an
   /// open tube, the ship stops at the ends, and the finger slips past them:
-  /// it moves the ship back as soon as it turns back.
+  /// it moves the ship back as soon as it turns back. Where an open tube's
+  /// lanes take less than [circleLaneTurn], the ship isn't under the finger,
+  /// but moves with it.
   void _circle(int pointer, Vector2 position) {
     final at = camera.globalToLocal(position);
     final tube = view.tube;
@@ -563,6 +573,19 @@ abstract class TubeHost({
           _stepAngles[step] =
               _stepAngles[step - 1] +
               _turnOf(_stepAngles[step] - _stepAngles[step - 1]);
+        }
+        final first = _stepAngles.first;
+        final last = _stepAngles.last;
+        final middle = (first + last) / 2;
+        final steps = _stepAngles.length;
+        final stepTurn =
+            (last - first).sign *
+            math.max(
+              (last - first).abs() / (steps - 1),
+              circleLaneTurn / PlayerComponent.stepsPerLane,
+            );
+        for (var step = 0; step < steps; step++) {
+          _stepAngles[step] = middle + (step - (steps - 1) / 2) * stepTurn;
         }
       }
       _nearEnd = tube.points.map((point) => point.distance).reduce(math.max);

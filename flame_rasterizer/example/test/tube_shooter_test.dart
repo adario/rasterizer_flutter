@@ -524,6 +524,51 @@ void main() {
     });
   }
 
+  for (final (:level, :tube) in [
+    (level: 1, tube: Tubes.floor),
+    (level: 2, tube: Tubes.ridge),
+  ]) {
+    testWidgets('on a phone, on the ${tube.name}, a finger moves the ship a '
+        'lane for each ${TubeHost.circleLaneTurn * 180 / math.pi} degrees '
+        'it sweeps, slower than itself', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final game = await playing(tester, firstLevel: level);
+      expect(game.view.tube, tube);
+      final player = game.shooter.player;
+      final centre = nearEndCentreOf(tester, game);
+      final from = math.atan2(player.position.y, player.position.x);
+      Offset at(double degrees) =>
+          centre + Offset.fromDirection(from - degrees * math.pi / 180, 150);
+      final finger = await tester.startGesture(at(0));
+      await tester.pump();
+      Future<void> sweep(double from, double to) async {
+        for (var degrees = from + 3; degrees <= to; degrees += 3) {
+          await finger.moveTo(at(degrees));
+          await tester.pump();
+        }
+      }
+
+      // Once the ship has caught up with the finger, 45 degrees more.
+      await sweep(0, 30);
+      final step = player.step;
+      await sweep(30, 75);
+      expect(
+        (player.step - step).abs(),
+        closeTo(
+          45 *
+              math.pi /
+              180 /
+              TubeHost.circleLaneTurn *
+              PlayerComponent.stepsPerLane,
+          1,
+        ),
+      );
+      await finger.up();
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
+
   testWidgets('each round is on the next level, whose tube replaces the old '
       'one, with what was in its lanes', (tester) async {
     final game = await playing(tester, firstLevel: 0);
