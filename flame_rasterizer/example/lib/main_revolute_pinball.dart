@@ -1,5 +1,4 @@
 import 'package:flame_rasterizer_example/commons/material.dart';
-import 'package:flame_rasterizer_example/commons/renderer_knob.dart';
 import 'package:flame_rasterizer_example/commons/standalone_game.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
@@ -12,8 +11,8 @@ void main() {
 }
 
 /// Revolute Pinball's story, without a status bar, with a settings dialog for
-/// its knobs in the Widgetbook: its bodies show no pieces, mixed drops, at a
-/// zoom and speed of 1, with flame_svg's default cache.
+/// its knobs in the Widgetbook but zoom and speed, which stay at 1: its bodies
+/// show no pieces, mixed drops, with flame_svg's default cache.
 class const RevolutePinballApp({
   /// Whether the game plays its sounds at the start.
   final bool sound = true,
@@ -29,8 +28,6 @@ class const RevolutePinballApp({
         pieces: settings.pieces,
         drops: settings.drops,
         sound: settings.sound,
-        zoom: settings.zoom,
-        speed: settings.speed,
         // As the cache knobs, which show with Flame SVG only.
         cache: renderer == SvgRenderer.flameSvg
             ? settings.cache
@@ -54,18 +51,6 @@ class const RevolutePinballApp({
           label: 'Sound',
           value: settings.sound,
           onChanged: (sound) => onChanged(settings.copyWith(sound: sound)),
-        ),
-        SettingSlider(
-          label: 'Zoom',
-          value: settings.zoom,
-          range: zoomRange,
-          onChanged: (zoom) => onChanged(settings.copyWith(zoom: zoom)),
-        ),
-        SettingSlider(
-          label: 'Speed',
-          value: settings.speed,
-          range: speedRange,
-          onChanged: (speed) => onChanged(settings.copyWith(speed: speed)),
         ),
         if (renderer == SvgRenderer.flameSvg) ...[
           SettingDropdown<SvgCacheMode>(
@@ -92,7 +77,8 @@ class const RevolutePinballApp({
   }
 }
 
-/// Revolute Pinball's settings, which stand for its knobs in the Widgetbook.
+/// Revolute Pinball's settings, which stand for its knobs in the Widgetbook
+/// but zoom and speed.
 class const RevolutePinballSettings({
   /// Whether the bodies show their convex pieces.
   final bool pieces = false,
@@ -103,12 +89,6 @@ class const RevolutePinballSettings({
   /// Whether the game plays its sounds.
   final bool sound = true,
 
-  /// The camera's zoom.
-  final double zoom = 1,
-
-  /// The game's speed, from 0, which stands still, to 2.
-  final double speed = 1,
-
   /// flame_svg's cache settings, for Flame SVG.
   final SvgCache cache = defaultSvgCache,
 }) {
@@ -117,15 +97,11 @@ class const RevolutePinballSettings({
     bool? pieces,
     PinballDrops? drops,
     bool? sound,
-    double? zoom,
-    double? speed,
     SvgCache? cache,
   }) => RevolutePinballSettings(
     pieces: pieces ?? this.pieces,
     drops: drops ?? this.drops,
     sound: sound ?? this.sound,
-    zoom: zoom ?? this.zoom,
-    speed: speed ?? this.speed,
     cache: cache ?? this.cache,
   );
 }

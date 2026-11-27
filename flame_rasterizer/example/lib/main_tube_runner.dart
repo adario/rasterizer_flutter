@@ -13,8 +13,8 @@ void main() {
 }
 
 /// Tube Runner's story, without a status bar, with a settings dialog for its
-/// knobs in the Widgetbook: it flies down the hexagon at the default flight
-/// speed, with 400 stars, at a zoom and speed of 1.
+/// knobs in the Widgetbook but zoom and speed, which stay at 1: it flies down
+/// the hexagon at the default flight speed, with 400 stars.
 class const TubeRunnerApp({
   /// Whether the game plays its sounds at the start.
   final bool sound = true,
@@ -32,8 +32,6 @@ class const TubeRunnerApp({
         tube: settings.tube,
         sound: settings.sound,
         flightSpeed: settings.flightSpeed,
-        zoom: settings.zoom,
-        speed: settings.speed,
         statusLines: 0,
       ),
       settingsBuilder: (renderer, settings, onChanged) => [
@@ -56,24 +54,13 @@ class const TubeRunnerApp({
           onChanged: (flightSpeed) =>
               onChanged(settings.copyWith(flightSpeed: flightSpeed)),
         ),
-        SettingSlider(
-          label: 'Zoom',
-          value: settings.zoom,
-          range: zoomRange,
-          onChanged: (zoom) => onChanged(settings.copyWith(zoom: zoom)),
-        ),
-        SettingSlider(
-          label: 'Speed',
-          value: settings.speed,
-          range: speedRange,
-          onChanged: (speed) => onChanged(settings.copyWith(speed: speed)),
-        ),
       ],
     );
   }
 }
 
-/// Tube Runner's settings, which stand for its knobs in the Widgetbook.
+/// Tube Runner's settings, which stand for its knobs in the Widgetbook but
+/// zoom and speed.
 class TubeRunnerSettings({
   /// The tube it flies down, one of [TubeRunnerExample.tubes], or the
   /// hexagon.
@@ -84,12 +71,6 @@ class TubeRunnerSettings({
 
   /// How fast the ship flies at first: see [TubeHost.flightSpeed].
   final double flightSpeed = TubeHost.defaultFlightSpeed,
-
-  /// The camera's zoom.
-  final double zoom = 1,
-
-  /// The game's speed, from 0, which stands still, to 2.
-  final double speed = 1,
 }) {
   /// The tube it flies down.
   final Tube tube = tube ?? Tubes.hexagon;
@@ -99,13 +80,9 @@ class TubeRunnerSettings({
     Tube? tube,
     bool? sound,
     double? flightSpeed,
-    double? zoom,
-    double? speed,
   }) => TubeRunnerSettings(
     tube: tube ?? this.tube,
     sound: sound ?? this.sound,
     flightSpeed: flightSpeed ?? this.flightSpeed,
-    zoom: zoom ?? this.zoom,
-    speed: speed ?? this.speed,
   );
 }
