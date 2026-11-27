@@ -10,7 +10,8 @@ import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute
 /// A flipper [_length] meters from its pivot's center to its tip's, on the
 /// left of its [_pivot] if [_side] is 1, or on the right if -1. It lies in a
 /// guide's recess at rest, its flat top along the guide. Holding it kicks it
-/// up, and a motor holds it at the top. Released, it falls back.
+/// up with a spring, which holds it at the top. Released, it falls back,
+/// and bounces.
 class FlipperComponent(
   final Vector2 _pivot,
   final double _length,
@@ -62,11 +63,16 @@ class FlipperComponent(
         : [for (final v in left.reversed) Vector2(-v.x, v.y)];
   }();
 
-  /// The kick's angular speed, and the motor's, in radians a second.
-  static const _kickSpeed = 15.0;
+  /// The spring that kicks it up and holds it there: its frequency, in
+  /// hertz, and its damping ratio, around the pivot, so that it's up in
+  /// about 80 ms, and rebounds about 4°.
+  static const _kickHertz = 6.0;
+  static const _kickDamping = 0.55;
 
-  /// Its angle above the horizontal when fully kicked.
+  /// Its angle above the horizontal when fully kicked, and the room above
+  /// it for the rebound.
   static const _upAngle = 40 * math.pi / 180;
+  static const _reboundAngle = 5 * math.pi / 180;
 
   /// How much faster than the other bodies it falls.
   static const _gravityScale = 16.0;
@@ -108,8 +114,8 @@ class FlipperComponent(
   bool hold(Object holder) {
     final kick = _holders.isEmpty && isLoaded;
     if (kick) {
-      body.angularVelocity += _side * _kickSpeed;
-      _joint.motorEnabled = true;
+      _joint.springEnabled = true;
+      body.isAwake = true;
     }
     _holders.add(holder);
     return kick;
@@ -117,13 +123,40 @@ class FlipperComponent(
 
   void release(Object holder) {
     if (_holders.remove(holder) && _holders.isEmpty && isLoaded) {
-      _joint.motorEnabled = false;
+      _joint.springEnabled = false;
       body.isAwake = true;
     }
   }
 
   /// Releases it from all its holders.
   void releaseAll() => _holders.toList().forEach(release);
+
+  /// The share of its fall's speed that it bounces back up with as it lands
+  /// at rest, from a fall faster than [_minBounce] radians a second.
+  static const _bounce = 0.3;
+  static const _minBounce = 3.0;
+
+  /// How fast it was falling in the last step, in radians a second.
+  double _falling = 0;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    final falling = -_side * body.angularVelocity;
+    final atRest =
+        (_joint.angle + _side * RevolutePinballExample.restAngle).abs() < 0.01;
+    if (_holders.isEmpty && atRest && _falling > _minBounce && falling < 1) {
+      // Around the pivot, so that the joint doesn't take most of it away.
+      final speed = _side * _bounce * _falling;
+      final arm = body.worldCenterOfMass - _pivot;
+      body
+        ..angularVelocity = speed
+        ..linearVelocity = Vector2(-arm.y, arm.x) * speed;
+      _falling = 0;
+    } else {
+      _falling = falling;
+    }
+  }
 
   @override
   Body createBody() {
@@ -147,16 +180,24 @@ class FlipperComponent(
         enableContactEvents: true,
       ),
     );
+    // Box2D's spring works on the inertia around the center of mass, so it's
+    // set stiffer, as for the inertia around the pivot.
+    final inertia = body.rotationalInertia;
+    final stiffer = math.sqrt(
+      (inertia + body.mass * body.localCenterOfMass.length2) / inertia,
+    );
+    const up = _upAngle + _reboundAngle;
     _joint = world.physicsWorld.createRevoluteJoint(
       RevoluteJointDef(
         bodyA: world.createBody(BodyDef()),
         bodyB: body,
         localAnchorA: _pivot.clone(),
         enableLimit: true,
-        lowerAngle: math.min(-_side * angle, _side * _upAngle),
-        upperAngle: math.max(-_side * angle, _side * _upAngle),
-        motorSpeed: _side * _kickSpeed,
-        maxMotorTorque: 2 * body.mass * 10 * _gravityScale * _length,
+        lowerAngle: math.min(-_side * angle, _side * up),
+        upperAngle: math.max(-_side * angle, _side * up),
+        targetAngle: _side * _upAngle,
+        hertz: _kickHertz * stiffer,
+        dampingRatio: _kickDamping * stiffer,
       ),
     );
     return body;
