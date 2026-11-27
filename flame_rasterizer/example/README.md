@@ -29,10 +29,11 @@ with the new settings once it closes:
 - Tube Runner: `flutter run -t lib/main_tube_runner.dart`.
 
 `tool/build_standalone.py` builds one of them for Android (an APK), iOS, macOS or the web, in debug, profile or release
-mode: for instance, `python3 -I tool/build_standalone.py tube_shooter android release`. Arguments after `--` go to
-`flutter build`, such as `-- --no-codesign`. On Android, iOS and macOS the game gets its own app id and name, so it
-installs beside the example: on Android through `--android-project-arg standalone=tube_shooter`
-(`android/app/build.gradle.kts`), on iOS and macOS through the `APP_ID_SUFFIX` and `APP_DISPLAY_NAME` build settings
+mode, and opens the folder with the built app once it's done: for instance, `python3 -I tool/build_standalone.py
+tube_shooter android release`. Arguments after `--` go to `flutter build`, such as `-- --no-codesign`. On Android, iOS and macOS the game gets its own app id and name, so it
+installs beside the example, and its file is named after it, such as `TubeShooter-release.apk` or `TubeShooter.app`: on
+Android through `--android-project-arg standalone=tube_shooter` (`android/app/build.gradle.kts`) and a rename of the
+APK, on iOS and macOS through the `APP_ID_SUFFIX`, `APP_DISPLAY_NAME` and `APP_FILE_NAME` build settings
 (`FLUTTER_XCODE_` environment variables, over the defaults in `ios/Flutter/*.xcconfig` and
 `macos/Runner/Configs/AppInfo.xcconfig`).
 
