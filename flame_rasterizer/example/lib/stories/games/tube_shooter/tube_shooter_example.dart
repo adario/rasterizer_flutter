@@ -130,6 +130,9 @@ abstract class TubeShooterExample({
   void moveShipBy(double lanes) => shooter.moveShipBy(lanes);
 
   @override
+  int get shipStep => shooter.shipStep;
+
+  @override
   void onFiringChanged() => shooter.onFiringChanged();
 
   /// Purges.

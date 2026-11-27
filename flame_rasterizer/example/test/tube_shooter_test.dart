@@ -33,9 +33,12 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'circle_drag.dart';
 import 'pump_while_loading.dart';
 import 'tube_shooter_whole_game.dart';
 
@@ -517,7 +520,8 @@ void main() {
     player.moveBy(1 / 32);
     expect(player.step, 249);
 
-    // A drag of 80 logical pixels to the right: two lanes.
+    // A drag of 80 logical pixels to the right, on a desktop: two lanes.
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     player.step = 8;
     final center = tester.getCenter(
       find.byType(GameWidget<TubeShooterExample>),
@@ -541,6 +545,39 @@ void main() {
     final lanes = (player.step - 40) / PlayerComponent.stepsPerLane;
     expect(lanes, closeTo(3 * 0.5 + 7 * 0.5 / 2, 0.25));
     await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('on a phone, the ship follows a finger round the centre of '
+      "the tube's near end, catching up with it from where it was, but not "
+      'near the centre', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final game = await playing(tester);
+    final player = game.shooter.player;
+    double shipAngle() => math.atan2(player.position.y, player.position.x);
+    final centre = nearEndCentreOf(tester, game);
+    // A finger down on the ship keeps it under itself.
+    var from = shipAngle();
+    await drawCircle(tester, centre, from: from, turns: 0.25);
+    expect(turnOf(shipAngle() - from - math.pi / 2), closeTo(0, 0.05));
+    // One a quarter turn ahead doesn't make it jump, but takes it under
+    // itself by a half turn's sweep.
+    from = shipAngle() + math.pi / 2;
+    final step = player.step;
+    await drawCircle(tester, centre, from: from, turns: 0);
+    expect(player.step, step);
+    await drawCircle(tester, centre, from: from, turns: 0.5);
+    expect(turnOf(shipAngle() - from - math.pi), closeTo(0, 0.05));
+    // And the other way round.
+    from = shipAngle();
+    await drawCircle(tester, centre, from: from, turns: -0.75);
+    expect(turnOf(shipAngle() - from + 1.5 * math.pi), closeTo(0, 0.05));
+    // Near the centre, it doesn't steer.
+    final at = player.step;
+    await drawCircle(tester, centre, from: 0, radius: 40);
+    expect(player.step, at);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('the ship moves a lane a scroll, whatever its size, clockwise '

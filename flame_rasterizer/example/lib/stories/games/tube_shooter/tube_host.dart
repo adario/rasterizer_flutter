@@ -8,10 +8,13 @@ import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/game_sounds.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/sounds.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_glow.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
 
@@ -47,6 +50,23 @@ abstract class TubeHost({
 
   /// How far a drag goes to move the ship one lane, in logical pixels.
   static const dragPerLane = 40.0;
+
+  /// How near the centre of the tube's near end a finger that [circles]
+  /// doesn't steer, as a part of the near end's size: there, small moves
+  /// swing its angle round the centre too much.
+  static const circleHole = 0.3;
+
+  /// How fast the gap between a finger that [circles] and the ship closes,
+  /// as a part of the angle that the finger sweeps: the ship goes up to half
+  /// as fast again as the finger, or half as fast, until it's under it.
+  static const circleCatchUp = 0.5;
+
+  /// Whether a finger moves the ship by circling round the centre of the
+  /// tube's near end, on Android and iOS, rather than by dragging sideways.
+  static bool get circles => switch (defaultTargetPlatform) {
+    TargetPlatform.android || TargetPlatform.iOS => true,
+    _ => false,
+  };
 
   /// The longest a drag can last and still count as a tap, in seconds.
   static const tapTime = 0.25;
@@ -113,6 +133,10 @@ abstract class TubeHost({
   /// Moves the ship [lanes] round the tube, which may be part of a lane.
   void moveShipBy(double lanes);
 
+  /// The step round the tube that the ship is on, out of
+  /// [PlayerComponent.stepsPerLane] a lane.
+  int get shipStep;
+
   /// Called when [isFiring] may have changed.
   void onFiringChanged() {}
 
@@ -175,6 +199,17 @@ abstract class TubeHost({
 
   /// Each drag's start time and distance moved, to tell taps from drags.
   final _drags = <int, ({double start, double distance})>{};
+
+  /// Each circling finger's last angle round the centre of the tube's near
+  /// end, and the angle from it to the ship, which closes as it sweeps: see
+  /// [circles]. A finger that hasn't steered yet has none.
+  final _circlings = <int, ({double angle, double gap})>{};
+
+  /// The angle round the centre of [_anglesTube]'s near end of each step of
+  /// the ship's, and the near end's size, its farthest corner's distance.
+  List<double> _stepAngles = const [];
+  double _nearEnd = 0;
+  Tube? _anglesTube;
 
   /// When the last tap was, for double taps.
   double _lastTap = double.negativeInfinity;
@@ -477,15 +512,23 @@ abstract class TubeHost({
       onFiringChanged();
     }
     _drags[event.pointerId] = (start: _clock, distance: 0);
+    if (circles) {
+      _circle(event.pointerId, event.canvasPosition);
+    }
     super.onDragStart(event);
   }
 
   /// Moves the ship a lane every [dragPerLane] logical pixels left or right,
-  /// whatever the zoom.
+  /// whatever the zoom, or, where a finger [circles], round the tube with
+  /// it.
   @override
   void onDragUpdate(DragUpdateEvent event) {
     final delta = event.canvasDelta;
-    if (canMove) {
+    if (circles) {
+      // Where the finger is now: Flame's end position adds the move again to
+      // Flutter's position, which already has it.
+      _circle(event.pointerId, event.canvasStartPosition);
+    } else if (canMove) {
       moveShipBy(delta.x / dragPerLane);
     }
     final drag = _drags[event.pointerId];
@@ -498,8 +541,80 @@ abstract class TubeHost({
     super.onDragUpdate(event);
   }
 
+  /// Moves the ship toward the step at the angle of the finger [pointer] at
+  /// [position] round the centre of the tube's near end, in the canvas. It
+  /// starts from where the ship is, and closes the gap by [circleCatchUp] of
+  /// each angle that the finger sweeps, so that the ship doesn't jump.
+  void _circle(int pointer, Vector2 position) {
+    final at = camera.globalToLocal(position);
+    final tube = view.tube;
+    if (!identical(tube, _anglesTube)) {
+      _anglesTube = tube;
+      _stepAngles = [
+        for (var step = 0; step < _stepsOn(tube); step++)
+          _pointOn(tube, step).direction,
+      ];
+      _nearEnd = tube.points.map((point) => point.distance).reduce(math.max);
+    }
+    if (at.length < circleHole * _nearEnd * view.rimScale) {
+      _circlings.remove(pointer);
+      return;
+    }
+    final angle = math.atan2(at.y, at.x);
+    final circling = _circlings[pointer];
+    if (circling == null || !canMove) {
+      _circlings[pointer] = (
+        angle: angle,
+        gap: _turnOf(_stepAngles[shipStep % _stepAngles.length] - angle),
+      );
+      return;
+    }
+    final swept = _turnOf(angle - circling.angle).abs();
+    final gap =
+        circling.gap.sign *
+        math.max(0.0, circling.gap.abs() - circleCatchUp * swept);
+    _circlings[pointer] = (angle: angle, gap: gap);
+    final target = angle + gap;
+    var nearest = 0;
+    var least = double.infinity;
+    for (var step = 0; step < _stepAngles.length; step++) {
+      final off = _turnOf(_stepAngles[step] - target).abs();
+      if (off < least) {
+        nearest = step;
+        least = off;
+      }
+    }
+    final steps = _stepAngles.length;
+    var by = nearest - shipStep;
+    if (!tube.isOpen) {
+      by = (by + steps ~/ 2) % steps - steps ~/ 2;
+    }
+    if (by != 0) {
+      moveShipBy(by / PlayerComponent.stepsPerLane);
+    }
+  }
+
+  /// Returns [angle] as a turn between minus and plus pi.
+  static double _turnOf(double angle) =>
+      (angle + math.pi) % (2 * math.pi) - math.pi;
+
+  static int _stepsOn(Tube tube) =>
+      PlayerComponent.stepsPerLane * tube.laneCount;
+
+  /// Returns where the ship is at [step] round [tube], in tube units.
+  static Offset _pointOn(Tube tube, int step) {
+    const stepsPerLane = PlayerComponent.stepsPerLane;
+    final lane = step ~/ stepsPerLane;
+    return Offset.lerp(
+      tube.points[lane],
+      tube.points[tube.pointAfter(lane)],
+      (step % stepsPerLane + 0.5) / stepsPerLane,
+    )!;
+  }
+
   @override
   void onDragEnd(DragEndEvent event) {
+    _circlings.remove(event.pointerId);
     _firePointers.remove(event.pointerId);
     onFiringChanged();
     final drag = _drags.remove(event.pointerId);
@@ -515,6 +630,7 @@ abstract class TubeHost({
 
   @override
   void onDragCancel(DragCancelEvent event) {
+    _circlings.remove(event.pointerId);
     _firePointers.remove(event.pointerId);
     onFiringChanged();
     _drags.remove(event.pointerId);

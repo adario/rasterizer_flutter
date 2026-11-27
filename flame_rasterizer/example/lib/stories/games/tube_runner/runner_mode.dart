@@ -1101,6 +1101,9 @@ class RunnerMode({
 
   /// Moves the ship [lanes] round the tube.
   void moveShipBy(double lanes) => ship.moveBy(lanes);
+
+  /// The step round the tube that the ship is on.
+  int get shipStep => ship.step;
 }
 
 /// A component under a [RunnerMode], which plays by its rules.

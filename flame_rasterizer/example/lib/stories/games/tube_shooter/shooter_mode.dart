@@ -871,6 +871,10 @@ class ShooterMode({
     }
   }
 
+  /// The step round the tube that the ship is on: the runner's, on a run.
+  int get shipStep =>
+      _state == TubeState.run ? _run!.runner.shipStep : player.step;
+
   /// Ends a wait: starts a new game once it's over, on a run too, or else
   /// the round, or the run's play.
   void endWait() {

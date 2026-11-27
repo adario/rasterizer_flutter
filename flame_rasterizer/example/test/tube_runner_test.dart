@@ -19,9 +19,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/s
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'circle_drag.dart';
 import 'pump_while_loading.dart';
 
 void main() {
@@ -385,6 +387,29 @@ void main() {
 
   _snapshotTests();
   _starsTests();
+
+  testWidgets("on a phone, the ship follows a finger round the tube's near "
+      'end', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas));
+    final game = await _gameOf(tester);
+    // A frame mounts the game's drag dispatcher.
+    await tester.pump(const Duration(milliseconds: 16));
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    expect(game.runner.state, RunnerState.play);
+    final ship = game.runner.ship;
+    double shipAngle() => math.atan2(ship.position.y, ship.position.x);
+    final from = shipAngle();
+    await drawCircle(
+      tester,
+      nearEndCentreOf(tester, game),
+      from: from,
+      turns: 0.25,
+    );
+    expect(turnOf(shipAngle() - from - math.pi / 2), closeTo(0, 0.05));
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
 }
 
 /// Returns whether the quad of [corners] hides [point] from [eye]: whether

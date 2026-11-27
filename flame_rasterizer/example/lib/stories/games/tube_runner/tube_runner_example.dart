@@ -182,6 +182,9 @@ abstract class TubeRunnerExample({
   void moveShipBy(double lanes) => runner.moveShipBy(lanes);
 
   @override
+  int get shipStep => runner.shipStep;
+
+  @override
   void advance(double dt) => runner.advance(dt);
 
   @override
