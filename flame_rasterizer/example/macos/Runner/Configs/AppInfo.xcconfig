@@ -5,16 +5,17 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = flame_rasterizer_example
+PRODUCT_NAME = $(APP_FILE_NAME)
 
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = dev.rasterizer.flameRasterizerExample$(APP_ID_SUFFIX)
 
-// A standalone game's own id suffix and name, so that it installs beside the
-// example: tool/build_standalone.py sets them through FLUTTER_XCODE_ build
-// settings.
+// A standalone game's own id suffix, name and app file name (without .app),
+// so that it installs beside the example: tool/build_standalone.py sets them
+// through FLUTTER_XCODE_ build settings.
 APP_ID_SUFFIX =
 APP_DISPLAY_NAME = Flame Rasterizer Example
+APP_FILE_NAME = flame_rasterizer_example
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 dev.rasterizer. All rights reserved.
