@@ -25,6 +25,11 @@ class FlipperComponent(
   /// The room between it and its guide's recess.
   static const gap = 0.1;
 
+  /// The collision group of the flippers and the guides, which don't
+  /// collide, so that a kick, which stretches its joint, doesn't rub the
+  /// flipper against its recess.
+  static const group = -1;
+
   static const _segments = 16;
 
   /// For a left flipper with its pivot at the origin and its top along the
@@ -138,6 +143,7 @@ class FlipperComponent(
         // Below the balls' restitution, so that only SVG bodies bounce more.
         material: SurfaceMaterial(friction: 0.1, restitution: 0.6),
         density: _density,
+        filter: Filter(groupIndex: group),
         enableContactEvents: true,
       ),
     );
