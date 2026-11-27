@@ -454,10 +454,11 @@ abstract class RevolutePinballExample({
   void _buildTable({WheelSnapshot? wheel}) {
     _tableSize.setFrom(size);
     final a = _arena;
-    final drain = math.max(0.06 * a.width, SvgBodies.maxSide);
-    // Longer on a table narrowed for a phone.
-    final flipper = (_fills(size) ? 0.18 : 0.24) * a.width;
+    // From the smaller side, so that a wide table looks as a square one.
     final small = math.min(a.width, a.height);
+    final drain = math.max(0.06 * small, SvgBodies.maxSide);
+    // Longer on a table narrowed for a phone.
+    final flipper = (_fills(size) ? 0.18 : 0.24) * small;
     // The left flipper and guide, mirrored for the right ones: the tip ends
     // at the drain, and the guide's recess under it at the bottom.
     const angle = restAngle;
