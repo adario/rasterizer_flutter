@@ -13,7 +13,8 @@ import 'package:flutter/foundation.dart';
 /// it. Give this widget a key made of whatever else needs a new game, which
 /// starts afresh. The game has the keyboard focus at the start, and a
 /// pointer down on it takes the focus back from the knobs. A spinner shows
-/// until the game has loaded.
+/// until the game has loaded. The game is paused while a [TickerMode] above
+/// is off, as the standalone games' settings dialog sets it.
 class const GameStory<G extends StoryGame, S extends Object>({
   /// The renderer that the game draws with.
   required final SvgRenderer renderer,
@@ -39,7 +40,7 @@ class const GameStory<G extends StoryGame, S extends Object>({
   /// The world's speed, from 0, which stands still, to 2.
   final double speed = 1,
 
-  /// How many lines tall the status bar is.
+  /// How many lines tall the status bar is: 0 for none.
   final int statusLines = 2,
   super.key,
 }) extends StatefulWidget {
@@ -58,7 +59,17 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
 
   G _create() => widget.create(_status, _from)
     ..camera.viewfinder.zoom = widget.zoom
-    ..speed = widget.speed;
+    ..speed = widget.speed
+    ..isPaused = !TickerMode.valuesOf(context).enabled;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final paused = !TickerMode.valuesOf(context).enabled;
+    if (_game.isPaused != paused) {
+      _game.isPaused = paused;
+    }
+  }
 
   @override
   void didUpdateWidget(GameStory<G, S> oldWidget) {
@@ -111,7 +122,7 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
             ),
           ),
         ),
-        _StatusBar(_status, widget.statusLines),
+        if (widget.statusLines > 0) _StatusBar(_status, widget.statusLines),
       ],
     );
   }

@@ -20,8 +20,9 @@ the canvas renderer.
 
 ## Games on their own
 
-A game can also run on its own, outside the Widgetbook, with a small renderer menu over its top right corner and a
-one-line status bar under it, but no other knobs:
+A game can also run on its own, outside the Widgetbook, without the status bar. A settings button over its top right
+corner opens a dialog with the renderer and the game's knobs; the game is paused while the dialog shows, and goes on
+with the new settings once it closes:
 
 - Tube Shooter: `flutter run -t lib/main_tube_shooter.dart`.
 - Revolute Pinball: `flutter run -t lib/main_revolute_pinball.dart`.

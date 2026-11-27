@@ -27,23 +27,47 @@ SvgRenderer rendererKnob(BuildContext context, {bool svgs = true}) {
       : renderer;
 }
 
+/// The range of the Zoom knob, which the standalone games' settings share.
+const zoomRange = (min: 0.25, max: 5.0);
+
+/// The range of the Speed knob, which the standalone games' settings share.
+const speedRange = (min: 0.0, max: 2.0);
+
+/// The range of the Flight speed knob, which Tube Runner's settings share.
+const flightSpeedRange = (min: 0.5, max: 2.0);
+
 /// Returns the Zoom knob: the camera's zoom, from 0.25 to 5, on a continuous
 /// slider.
 double zoomKnob(BuildContext context) => context.knobs.onKnobAdded(
-  _SliderKnob(label: 'Zoom', initialValue: 1, min: 0.25, max: 5),
+  _SliderKnob(
+    label: 'Zoom',
+    initialValue: 1,
+    min: zoomRange.min,
+    max: zoomRange.max,
+  ),
 )!;
 
 /// Returns the Speed knob: the game's speed, from 0, which stands still, to 2,
 /// on a continuous slider.
 double speedKnob(BuildContext context) => context.knobs.onKnobAdded(
-  _SliderKnob(label: 'Speed', initialValue: 1, min: 0, max: 2),
+  _SliderKnob(
+    label: 'Speed',
+    initialValue: 1,
+    min: speedRange.min,
+    max: speedRange.max,
+  ),
 )!;
 
 /// Returns the Flight speed knob: how fast Tube Runner's ship flies at first,
 /// from 0.5 to 2 tube units a second, on a continuous slider. A prototype's,
 /// to pick a speed with.
 double flightSpeedKnob(BuildContext context) => context.knobs.onKnobAdded(
-  _SliderKnob(label: 'Flight speed', initialValue: 1.5, min: 0.5, max: 2),
+  _SliderKnob(
+    label: 'Flight speed',
+    initialValue: 1.5,
+    min: flightSpeedRange.min,
+    max: flightSpeedRange.max,
+  ),
 )!;
 
 /// Returns the Stars knob: how many stars Tube Shooter and Tube Runner show,

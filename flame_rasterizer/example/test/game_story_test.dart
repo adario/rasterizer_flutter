@@ -154,4 +154,76 @@ void main() {
     expect(heights[2], moreOrLessEquals(2 * line + 12));
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('without status lines, there is no status bar', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GameStory<_CountingGame, int>(
+          renderer: SvgRenderer.rasterizerCanvas,
+          create: (status, from) =>
+              _CountingGame(from, Future.value(), status: status)
+                ..status.value = 'status',
+          statusLines: 0,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.textContaining('status'), findsNothing);
+    final game = find.byWidgetPredicate((w) => w is GameWidget);
+    expect(tester.getSize(game).height, 600);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  // As the standalone games' settings dialog pauses them.
+  testWidgets('the game is paused while the ticker mode is off, a new one '
+      'too', (tester) async {
+    final games = <_CountingGame>[];
+    Widget story(SvgRenderer renderer, {required bool ticking}) => MaterialApp(
+      home: TickerMode(
+        enabled: ticking,
+        child: GameStory<_CountingGame, int>(
+          renderer: renderer,
+          create: (status, from) {
+            final game = _CountingGame(from, Future.value(), status: status);
+            games.add(game);
+            return game;
+          },
+          snapshot: (game) => game.count,
+        ),
+      ),
+    );
+    Future<void> pumpFrames() async {
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+    }
+
+    await tester.pumpWidget(
+      story(SvgRenderer.rasterizerCanvas, ticking: true),
+    );
+    await pumpFrames();
+    final first = games.single;
+    expect(first.isPaused, isFalse);
+    expect(first.count, greaterThan(0));
+    // That frame's tick comes before the build that pauses the game.
+    await tester.pumpWidget(
+      story(SvgRenderer.rasterizerCanvas, ticking: false),
+    );
+    final counted = first.count;
+    await pumpFrames();
+    expect(first.isPaused, isTrue);
+    expect(first.count, counted);
+    // A new renderer while paused: the new game waits too, from the old one.
+    await tester.pumpWidget(story(SvgRenderer.flameSvg, ticking: false));
+    await pumpFrames();
+    final second = games.last;
+    expect(second, isNot(same(first)));
+    expect(second.isPaused, isTrue);
+    expect(second.count, counted);
+    await tester.pumpWidget(story(SvgRenderer.flameSvg, ticking: true));
+    await pumpFrames();
+    expect(second.isPaused, isFalse);
+    expect(second.count, greaterThan(counted));
+    await tester.pumpWidget(const SizedBox());
+  });
 }
