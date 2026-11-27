@@ -1,1 +1,7 @@
 #include "Generated.xcconfig"
+
+// A standalone game's own id suffix and name, so that it installs beside the
+// example: tool/build_standalone.py sets them through FLUTTER_XCODE_ build
+// settings.
+APP_ID_SUFFIX =
+APP_DISPLAY_NAME = Flame Rasterizer Example

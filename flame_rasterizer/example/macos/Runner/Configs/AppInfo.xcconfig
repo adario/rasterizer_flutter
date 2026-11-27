@@ -8,7 +8,13 @@
 PRODUCT_NAME = flame_rasterizer_example
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = dev.rasterizer.flameRasterizerExample
+PRODUCT_BUNDLE_IDENTIFIER = dev.rasterizer.flameRasterizerExample$(APP_ID_SUFFIX)
+
+// A standalone game's own id suffix and name, so that it installs beside the
+// example: tool/build_standalone.py sets them through FLUTTER_XCODE_ build
+// settings.
+APP_ID_SUFFIX =
+APP_DISPLAY_NAME = Flame Rasterizer Example
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 dev.rasterizer. All rights reserved.
