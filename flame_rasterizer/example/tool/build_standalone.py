@@ -1,8 +1,9 @@
 """Builds one of the example's games on its own, for a platform and in a
 build mode, with `flutter build`, and opens the folder with the built app once
-it's done. On Android, iOS and macOS the game gets its own app id and name, so
-that it installs beside the example, and its file is named after it, such as
-TubeRunner.app or TubeRunner-release.apk. From flame_rasterizer/example:
+it's done. On Android, iOS and macOS the game gets its own app id, name and
+icon, so that it installs beside the example, and its file is named after it,
+such as TubeRunner.app or TubeRunner-release.apk. tool/make_icons.py makes the
+icons. From flame_rasterizer/example:
 
   python3 -I tool/build_standalone.py tube_shooter android release
 
@@ -170,6 +171,8 @@ def main():
         # The .app's name, and its executable's: not PRODUCT_NAME, which
         # would rename the plugins' Swift packages too.
         settings['APP_FILE_NAME'] = file_name(args.game)
+        # Its icon set, which tool/make_icons.py makes.
+        settings['APP_ICON_NAME'] = 'AppIcon' + file_name(args.game)
         if args.bundle_id:
             settings['APP_BUNDLE_ID'] = args.bundle_id
         if args.team_id:

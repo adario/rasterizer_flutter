@@ -32,5 +32,9 @@ APP_TEAM_ID =
 APP_DISPLAY_NAME = Flame Rasterizer Example
 APP_FILE_NAME = flame_rasterizer_example
 
+// A standalone game's own app icon, a set in Runner's Assets.xcassets that
+// tool/build_standalone.py sets too.
+APP_ICON_NAME = AppIcon
+
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 dev.rasterizer. All rights reserved.
