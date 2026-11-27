@@ -37,6 +37,20 @@ APK, on iOS and macOS through the `APP_ID_SUFFIX`, `APP_DISPLAY_NAME` and `APP_F
 (`FLUTTER_XCODE_` environment variables, over the defaults in `ios/Flutter/*.xcconfig` and
 `macos/Runner/Configs/AppInfo.xcconfig`).
 
+On iOS and macOS, `--bundle-id com.example.tubeShooter` replaces the whole bundle id, and `--team-id ABCDE12345` gives
+the development team that signs the app, through the `APP_BUNDLE_ID` and `APP_TEAM_ID` build settings. Without a team,
+iOS builds take the one that flutter finds, and macOS ones are signed to run locally; with one, macOS builds are signed
+with its Apple Development identity (`APP_SIGN_IDENTITY`). These settings are only the Runner target's: set on the command
+line, `PRODUCT_BUNDLE_IDENTIFIER`, `DEVELOPMENT_TEAM` or `PRODUCT_NAME` would change the plugins' Swift package targets
+too.
+
+With `--archive`, in profile or release mode, an iOS or macOS build makes an Xcode archive instead, such as
+`build/macos/archive/TubeShooter.xcarchive`, to open in Xcode's Organizer later and notarize or distribute the app. On
+iOS `flutter build ipa` makes it, and tries an App Store IPA in `build/ios/ipa` too (none with `-- --no-codesign`); on
+macOS, which flutter doesn't archive, `xcodebuild archive` does, with the same build settings and the Hardened Runtime that
+notarization needs (`APP_HARDENED_RUNTIME`, off in other builds), once `flutter build macos --config-only` has set the
+project up for the game.
+
 ## Shared knobs and SVGs
 
 Every use case has a Renderer knob (see [Svg Renderers](#svg--svg-renderers)) and a status bar under the game. They also

@@ -6,11 +6,26 @@ TubeRunner.app or TubeRunner-release.apk. From flame_rasterizer/example:
 
   python3 -I tool/build_standalone.py tube_shooter android release
 
+On iOS and macOS, --bundle-id replaces the whole bundle id, and --team-id
+gives the development team that signs the app:
+
+  python3 -I tool/build_standalone.py tube_runner ios release \
+      --bundle-id com.example.tubeRunner --team-id ABCDE12345
+
+With --archive, in profile or release mode, an iOS or macOS build makes an
+Xcode archive instead, such as build/macos/archive/TubeRunner.xcarchive, to
+open in Xcode's Organizer later, to notarize or distribute the app. On iOS
+`flutter build ipa` makes it, and tries an App Store IPA in build/ios/ipa too;
+on macOS, which flutter doesn't archive, `xcodebuild archive` does, once
+`flutter build macos --config-only` has set the project up, with the Hardened
+Runtime that notarization needs.
+
 Arguments after `--` go to `flutter build` as they are, such as
 `-- --no-codesign` for iOS, or `-- -o build/web_pinball` for the web.
 """
 import argparse
 import os
+import re
 import subprocess
 import sys
 
@@ -59,8 +74,11 @@ def rename_apks(folder, game, mode):
             print('Renamed %s to %s' % (name, renamed))
 
 
-def output(platform, mode, flutter_args):
-    """The folder that flutter builds the app in, under the example."""
+def output(platform, mode, archive, flutter_args):
+    """The folder that the app or its archive is built in, under the
+    example."""
+    if archive:
+        return os.path.join('build', platform, 'archive')
     if platform == 'android':
         return os.path.join('build', 'app', 'outputs', 'flutter-apk')
     if platform == 'ios':
@@ -88,6 +106,13 @@ def reveal(folder):
         subprocess.run(['xdg-open', folder])
 
 
+def run(command, env):
+    """Runs command in the example with env, once it's printed, and returns
+    its exit code."""
+    print(' '.join(command), flush=True)
+    return subprocess.run(command, cwd=EXAMPLE, env=env).returncode
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Builds one of the example\'s games on its own.',
@@ -98,33 +123,87 @@ def main():
     parser.add_argument('mode', choices=MODES)
     parser.add_argument('flutter_args', nargs='*', metavar='-- ARGS',
                         help='more arguments for flutter build')
+    parser.add_argument('--bundle-id',
+                        help='the whole bundle id, for iOS and macOS, '
+                        'instead of the example\'s with the game\'s suffix')
+    parser.add_argument('--team-id',
+                        help='the development team that signs the app, for '
+                        'iOS and macOS')
+    parser.add_argument('--archive', action='store_true',
+                        help='make an Xcode archive, for iOS and macOS, in '
+                        'profile or release mode')
     args = parser.parse_args()
 
-    if args.platform in ('ios', 'macos') and sys.platform != 'darwin':
+    apple = args.platform in ('ios', 'macos')
+    if apple and sys.platform != 'darwin':
         parser.error('%s builds only on macOS' % args.platform)
+    if not apple and (args.bundle_id or args.team_id or args.archive):
+        parser.error('--bundle-id, --team-id and --archive are for iOS and '
+                     'macOS only')
+    if args.archive and args.mode == 'debug':
+        parser.error('--archive is for profile or release mode')
+    if args.bundle_id and not re.fullmatch(r'[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+',
+                                           args.bundle_id):
+        parser.error('a bundle id has letters, digits and hyphens, in two or '
+                     'more parts with dots between them')
+    if args.team_id and not re.fullmatch(r'[A-Z0-9]{10}', args.team_id):
+        parser.error('a team id has 10 capital letters and digits')
 
+    subcommand = PLATFORMS[args.platform]
+    if args.archive and args.platform == 'ios':
+        subcommand = 'ipa'
     command = [
-        'flutter', 'build', PLATFORMS[args.platform], '--' + args.mode,
+        'flutter', 'build', subcommand, '--' + args.mode,
         '-t', 'lib/main_%s.dart' % args.game,
     ]
+    if args.archive and args.platform == 'macos':
+        command.append('--config-only')
     env = dict(os.environ)
+    # Build settings for xcodebuild, over the defaults in
+    # ios/Flutter/*.xcconfig and macos/Runner/Configs/AppInfo.xcconfig.
+    settings = {}
     if args.platform == 'android':
         command += ['--android-project-arg', 'standalone=' + args.game]
-    elif args.platform in ('ios', 'macos'):
-        # Build settings that flutter hands to xcodebuild, over the defaults
-        # in ios/Flutter/*.xcconfig and macos/Runner/Configs/AppInfo.xcconfig.
-        env['FLUTTER_XCODE_APP_ID_SUFFIX'] = apple_suffix(args.game)
-        env['FLUTTER_XCODE_APP_DISPLAY_NAME'] = GAMES[args.game]
+    elif apple:
+        settings['APP_ID_SUFFIX'] = apple_suffix(args.game)
+        settings['APP_DISPLAY_NAME'] = GAMES[args.game]
         # The .app's name, and its executable's: not PRODUCT_NAME, which
         # would rename the plugins' Swift packages too.
-        env['FLUTTER_XCODE_APP_FILE_NAME'] = file_name(args.game)
+        settings['APP_FILE_NAME'] = file_name(args.game)
+        if args.bundle_id:
+            settings['APP_BUNDLE_ID'] = args.bundle_id
+        if args.team_id:
+            # Without a team, iOS builds take the one that flutter finds, and
+            # macOS ones are signed to run locally.
+            settings['APP_TEAM_ID'] = args.team_id
+            if args.platform == 'macos':
+                settings['APP_SIGN_IDENTITY'] = 'Apple Development'
+        # Flutter hands these to xcodebuild.
+        for key, value in settings.items():
+            env['FLUTTER_XCODE_' + key] = value
     command += args.flutter_args
 
-    print(' '.join(command), flush=True)
-    code = subprocess.run(command, cwd=EXAMPLE, env=env).returncode
+    code = run(command, env)
+    if code == 0 and args.archive and args.platform == 'macos':
+        archive = [
+            'xcodebuild', '-workspace', 'macos/Runner.xcworkspace',
+            '-scheme', 'Runner', '-configuration', args.mode.capitalize(),
+            '-archivePath', os.path.join('build', 'macos', 'archive',
+                                         file_name(args.game)),
+            # Warnings and errors only, as flutter's.
+            'archive', '-quiet',
+        ]
+        if args.team_id:
+            # As flutter does for signed iOS builds, so that Xcode can make
+            # the team's profile.
+            archive.append('-allowProvisioningUpdates')
+        # Notarization needs the Hardened Runtime.
+        settings['APP_HARDENED_RUNTIME'] = 'YES'
+        archive += ['%s=%s' % setting for setting in settings.items()]
+        code = run(archive, env)
     if code == 0:
-        folder = os.path.join(
-            EXAMPLE, output(args.platform, args.mode, args.flutter_args))
+        folder = os.path.join(EXAMPLE, output(
+            args.platform, args.mode, args.archive, args.flutter_args))
         if os.path.isdir(folder):
             if args.platform == 'android':
                 rename_apks(folder, args.game, args.mode)
