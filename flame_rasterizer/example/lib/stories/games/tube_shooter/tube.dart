@@ -437,6 +437,19 @@ class TubeView() {
     }
   }
 
+  /// How many times as wide as [rimPixels] says the tube's lines and the
+  /// shapes' strokes are: 1, or more for the app icons, which show the game
+  /// small. The stars keep their widths.
+  double get lineWidths => _lineWidths;
+  double _lineWidths = 1;
+
+  set lineWidths(double value) {
+    if (value != _lineWidths) {
+      _lineWidths = value;
+      _version++;
+    }
+  }
+
   /// Bumps [version] for a change outside the view, so that the game makes
   /// the view's paths again.
   void invalidate() => _version++;
@@ -453,19 +466,26 @@ class TubeView() {
   /// Returns where an outline [point] at [depth] lands in the world.
   Offset project(Offset point, double depth) => point * scaleAt(depth);
 
-  /// Returns the width of a line at [depth]: [rimPixels] device pixels at the
-  /// rim in play, and never under one device pixel.
-  double lineWidthAt(double depth) => lineWidthOf(distanceOf(depth));
+  /// Returns the width of the tube's line at [depth]: [tubeLineWidthOf] its
+  /// distance from the eye.
+  double lineWidthAt(double depth) => tubeLineWidthOf(distanceOf(depth));
 
-  /// Returns the width of a line [distance] from the eye, as for [lineWidthAt].
+  /// Returns the width of a line [distance] from the eye: [rimPixels] device
+  /// pixels at the rim in play, and never under one device pixel.
   double lineWidthOf(double distance) =>
       math.max(_devicePixel, rimPixels * _devicePixel * Tube.eye / distance);
 
+  /// Returns the width of the tube's line [distance] from the eye: the
+  /// [lineWidthOf] it, [lineWidths] times as wide.
+  double tubeLineWidthOf(double distance) =>
+      _lineWidths * lineWidthOf(distance);
+
   /// The width of the shapes' strokes, in lane units: [rimPixels] device
-  /// pixels at the rim in play. A shape's scale is its lane's width, so its
-  /// strokes get thinner with depth, as the tube's lines do.
+  /// pixels at the rim in play, [lineWidths] times as wide. A shape's scale
+  /// is its lane's width, so its strokes get thinner with depth, as the
+  /// tube's lines do.
   double get shapeStroke =>
-      rimPixels * _devicePixel / (tube.laneWidth * _rimScale);
+      _lineWidths * rimPixels * _devicePixel / (tube.laneWidth * _rimScale);
 
   /// Returns the tube's lines, as filled quads: its spokes, its rim and its far
   /// end.

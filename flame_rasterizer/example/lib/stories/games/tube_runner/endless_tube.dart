@@ -873,9 +873,9 @@ class _Lines(final TubeView view) {
   /// quad [widths] times as wide as a tube's line.
   void _addLine(Point3 a, Point3 b, double widths) => _addQuad(
     _project(a),
-    widths * view.lineWidthOf(a.z),
+    widths * view.tubeLineWidthOf(a.z),
     _project(b),
-    widths * view.lineWidthOf(b.z),
+    widths * view.tubeLineWidthOf(b.z),
   );
 
   /// Returns where [point] lands in the world.
