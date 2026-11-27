@@ -484,6 +484,46 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  for (final (:level, :tube) in [
+    (level: 1, tube: Tubes.floor),
+    (level: 2, tube: Tubes.ridge),
+    (level: 3, tube: Tubes.horseshoe),
+  ]) {
+    testWidgets('on a phone, on the ${tube.name}, the ship stops at an end '
+        'while the finger goes on round, and comes back as soon as it turns '
+        'back', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final game = await playing(tester, firstLevel: level);
+      expect(game.view.tube, tube);
+      final player = game.shooter.player;
+      final centre = nearEndCentreOf(tester, game);
+      final from = math.atan2(player.position.y, player.position.x);
+      Offset at(double turns) =>
+          centre + Offset.fromDirection(from + 2 * math.pi * turns, 150);
+      final finger = await tester.startGesture(at(0));
+      await tester.pump();
+      // A whole turn clockwise: the ship goes to the end at step 0, the way it
+      // goes, and stays there, even as the finger comes in from the other end.
+      final steps = [player.step];
+      for (var move = 1; move <= 36; move++) {
+        await finger.moveTo(at(move / 36));
+        await tester.pump();
+        steps.add(player.step);
+      }
+      for (var i = 1; i < steps.length; i++) {
+        expect(steps[i], lessThanOrEqualTo(steps[i - 1]));
+      }
+      expect(steps.last, 0);
+      // Back a little, and the ship leaves the end.
+      await finger.moveTo(at(35 / 36));
+      await tester.pump();
+      expect(player.step, greaterThan(0));
+      await finger.up();
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
+
   testWidgets('each round is on the next level, whose tube replaces the old '
       'one, with what was in its lanes', (tester) async {
     final game = await playing(tester, firstLevel: 0);

@@ -201,12 +201,14 @@ abstract class TubeHost({
   final _drags = <int, ({double start, double distance})>{};
 
   /// Each circling finger's last angle round the centre of the tube's near
-  /// end, and the angle from it to the ship, which closes as it sweeps: see
-  /// [circles]. A finger that hasn't steered yet has none.
+  /// end, unwound as it goes round, and the angle from it to the ship, which
+  /// closes as it sweeps: see [circles]. A finger that hasn't steered yet has
+  /// none.
   final _circlings = <int, ({double angle, double gap})>{};
 
   /// The angle round the centre of [_anglesTube]'s near end of each step of
-  /// the ship's, and the near end's size, its farthest corner's distance.
+  /// the ship's, unwound from the first step on an open tube, and the near
+  /// end's size, its farthest corner's distance.
   List<double> _stepAngles = const [];
   double _nearEnd = 0;
   Tube? _anglesTube;
@@ -544,7 +546,9 @@ abstract class TubeHost({
   /// Moves the ship toward the step at the angle of the finger [pointer] at
   /// [position] round the centre of the tube's near end, in the canvas. It
   /// starts from where the ship is, and closes the gap by [circleCatchUp] of
-  /// each angle that the finger sweeps, so that the ship doesn't jump.
+  /// each angle that the finger sweeps, so that the ship doesn't jump. On an
+  /// open tube, the ship stops at the ends, and the finger slips past them:
+  /// it moves the ship back as soon as it turns back.
   void _circle(int pointer, Vector2 position) {
     final at = camera.globalToLocal(position);
     final tube = view.tube;
@@ -554,31 +558,50 @@ abstract class TubeHost({
         for (var step = 0; step < _stepsOn(tube); step++)
           _pointOn(tube, step).direction,
       ];
+      if (tube.isOpen) {
+        for (var step = 1; step < _stepAngles.length; step++) {
+          _stepAngles[step] =
+              _stepAngles[step - 1] +
+              _turnOf(_stepAngles[step] - _stepAngles[step - 1]);
+        }
+      }
       _nearEnd = tube.points.map((point) => point.distance).reduce(math.max);
     }
     if (at.length < circleHole * _nearEnd * view.rimScale) {
       _circlings.remove(pointer);
       return;
     }
-    final angle = math.atan2(at.y, at.x);
+    final raw = math.atan2(at.y, at.x);
     final circling = _circlings[pointer];
     if (circling == null || !canMove) {
-      _circlings[pointer] = (
-        angle: angle,
-        gap: _turnOf(_stepAngles[shipStep % _stepAngles.length] - angle),
-      );
+      final ship = _stepAngles[shipStep % _stepAngles.length];
+      final angle = ship + _turnOf(raw - ship);
+      _circlings[pointer] = (angle: angle, gap: ship - angle);
       return;
     }
-    final swept = _turnOf(angle - circling.angle).abs();
-    final gap =
+    final turn = _turnOf(raw - circling.angle);
+    final angle = circling.angle + turn;
+    var gap =
         circling.gap.sign *
-        math.max(0.0, circling.gap.abs() - circleCatchUp * swept);
+        math.max(0.0, circling.gap.abs() - circleCatchUp * turn.abs());
+    var target = angle + gap;
+    if (tube.isOpen) {
+      final first = _stepAngles.first;
+      final last = _stepAngles.last;
+      final stop = math.max(
+        math.min(first, last),
+        math.min(math.max(first, last), target),
+      );
+      gap += stop - target;
+      target = stop;
+    }
     _circlings[pointer] = (angle: angle, gap: gap);
-    final target = angle + gap;
     var nearest = 0;
     var least = double.infinity;
     for (var step = 0; step < _stepAngles.length; step++) {
-      final off = _turnOf(_stepAngles[step] - target).abs();
+      final off = tube.isOpen
+          ? (_stepAngles[step] - target).abs()
+          : _turnOf(_stepAngles[step] - target).abs();
       if (off < least) {
         nearest = step;
         least = off;
