@@ -269,6 +269,7 @@ class const RevolutePinballStory({
   required final bool pieces,
   required final bool sound,
   final PinballDrops drops = PinballDrops.mixed,
+  final bool square = false,
   final double zoom = 1,
   final double speed = 1,
   final SvgCache cache = defaultSvgCache,
@@ -289,11 +290,13 @@ class const RevolutePinballStory({
               from: from,
             )
             ..drops = drops
+            ..square = square
             ..sound = sound,
       snapshot: (game) => game.snapshot,
       update: (game) => game
         ..pieces = pieces
         ..drops = drops
+        ..square = square
         ..sound = sound,
       zoom: zoom,
       speed: speed,

@@ -25,7 +25,8 @@ corner opens a dialog with the renderer and the game's knobs; the game is paused
 with the new settings once it closes:
 
 - Tube Shooter: `flutter run -t lib/main_tube_shooter.dart`.
-- Revolute Pinball: `flutter run -t lib/main_revolute_pinball.dart`.
+- Revolute Pinball: `flutter run -t lib/main_revolute_pinball.dart`. On a desktop or in a desktop browser, in landscape,
+  its Square setting, off at first, narrows the table to the window's height.
 - Tube Runner: `flutter run -t lib/main_tube_runner.dart`.
 
 `tool/build_standalone.py` builds one of them for Android (an APK), iOS, macOS or the web, in debug, profile or release

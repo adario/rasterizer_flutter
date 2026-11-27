@@ -169,14 +169,34 @@ abstract class RevolutePinballExample({
 
   /// Whether the table fills the game, with the HUD over its bottom corners:
   /// on a desktop, in a game at least as wide as high.
-  static bool _fills(Vector2 size) =>
-      size.x >= size.y &&
+  static bool fills(double width, double height) =>
+      width >= height &&
       switch (defaultTargetPlatform) {
         TargetPlatform.macOS ||
         TargetPlatform.windows ||
         TargetPlatform.linux => true,
         _ => false,
       };
+
+  static bool _fills(Vector2 size) => fills(size.x, size.y);
+
+  /// Whether a table that [fills] the game is only as wide as high, in its
+  /// middle.
+  bool get square => _square;
+  bool _square = false;
+
+  set square(bool value) {
+    if (value != _square) {
+      _square = value;
+      if (isLoaded && _fills(size)) {
+        metersToPixels = _zoomFor(size);
+        _buildTable();
+      }
+    }
+  }
+
+  /// The table's width in logical pixels, if it [fills] the game.
+  double _filledWidth(Vector2 size) => _square ? size.y : size.x;
 
   /// The band below the table for the HUD: none if the table [_fills] the
   /// game, or if, narrowed to leave room for the HUD beside it, it's still
@@ -193,10 +213,10 @@ abstract class RevolutePinballExample({
   static const _minWidth = 60.0;
   static const _minHeight = 45.0;
 
-  static double _zoomFor(Vector2 size) => math.min(
+  double _zoomFor(Vector2 size) => math.min(
     _maxZoom,
     math.min(
-      size.x / _minWidth,
+      (_fills(size) ? _filledWidth(size) : size.x) / _minWidth,
       math.max(1, size.y - _bandFor(size)) / _minHeight,
     ),
   );
@@ -378,14 +398,15 @@ abstract class RevolutePinballExample({
   /// The table's largest width, in its heights.
   static const _maxAspect = 1.2;
 
-  /// The table, in meters: the whole game if it [_fills] the game. Else the
-  /// game's area above the HUD's band, or between the HUD's sides without
-  /// the band, centered and at most [_maxAspect] times as wide as high.
+  /// The table, in meters: the whole game if it [_fills] the game, or its
+  /// middle if [square]. Else the game's area above the HUD's band, or
+  /// between the HUD's sides without the band, centered and at most
+  /// [_maxAspect] times as wide as high.
   Rect get _arena {
     if (_fills(size)) {
       return Rect.fromCenter(
         center: Offset.zero,
-        width: size.x / metersToPixels,
+        width: _filledWidth(size) / metersToPixels,
         height: size.y / metersToPixels,
       );
     }

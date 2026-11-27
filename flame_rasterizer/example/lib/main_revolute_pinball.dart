@@ -12,7 +12,8 @@ void main() {
 
 /// Revolute Pinball's story, without a status bar, with a settings dialog for
 /// its knobs in the Widgetbook but zoom and speed, which stay at 1: its bodies
-/// show no pieces, mixed drops, with flame_svg's default cache.
+/// show no pieces, mixed drops, with flame_svg's default cache. On a desktop
+/// in landscape, a Square setting narrows the table to the game's height.
 class const RevolutePinballApp({
   /// Whether the game plays its sounds at the start.
   final bool sound = true,
@@ -27,6 +28,7 @@ class const RevolutePinballApp({
         renderer: renderer,
         pieces: settings.pieces,
         drops: settings.drops,
+        square: settings.square,
         sound: settings.sound,
         // As the cache knobs, which show with Flame SVG only.
         cache: renderer == SvgRenderer.flameSvg
@@ -46,6 +48,20 @@ class const RevolutePinballApp({
           options: PinballDrops.values,
           labelOf: (drops) => drops.label,
           onChanged: (drops) => onChanged(settings.copyWith(drops: drops)),
+        ),
+        // Only where the table fills the game: on a desktop, in landscape.
+        Builder(
+          builder: (context) {
+            final size = MediaQuery.sizeOf(context);
+            return RevolutePinballExample.fills(size.width, size.height)
+                ? SettingSwitch(
+                    label: 'Square',
+                    value: settings.square,
+                    onChanged: (square) =>
+                        onChanged(settings.copyWith(square: square)),
+                  )
+                : const SizedBox.shrink();
+          },
         ),
         SettingSwitch(
           label: 'Sound',
@@ -86,6 +102,10 @@ class const RevolutePinballSettings({
   /// What drops onto the table.
   final PinballDrops drops = PinballDrops.mixed,
 
+  /// Whether a table that fills the game is only as wide as high: see
+  /// [RevolutePinballExample.square].
+  final bool square = false,
+
   /// Whether the game plays its sounds.
   final bool sound = true,
 
@@ -96,11 +116,13 @@ class const RevolutePinballSettings({
   RevolutePinballSettings copyWith({
     bool? pieces,
     PinballDrops? drops,
+    bool? square,
     bool? sound,
     SvgCache? cache,
   }) => RevolutePinballSettings(
     pieces: pieces ?? this.pieces,
     drops: drops ?? this.drops,
+    square: square ?? this.square,
     sound: sound ?? this.sound,
     cache: cache ?? this.cache,
   );
