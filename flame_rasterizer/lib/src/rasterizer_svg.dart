@@ -9,37 +9,39 @@ import 'package:flame_rasterizer/src/svg_hitbox.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
-/// An SVG that any number of components draw with rasterizer_gpu, in a game
-/// with [HasRasterizer].
+/// An SVG that any number of components can draw with rasterizer_gpu in a
+/// game with [HasRasterizer].
 ///
-/// [load] and [RasterizerSvg.fromBytes] import it for the GPU renderer `gpu`
-/// where that renderer is supported, else for the canvas renderer
-/// ([RasterizerGpuBackend.backend]). That must still be the game's renderer
-/// when components draw the SVG, so the game's
-/// [HasRasterizer.rasterizerGpu] must be `gpu`. It keeps the SVG's bytes, to
-/// parse its paths for dart:ui if it's drawn into a picture of its own (see
-/// [render]).
+/// [load] and [RasterizerSvg.fromBytes] import the SVG: they make its
+/// [scene] for the GPU renderer `gpu` when that renderer is supported, or
+/// else for the canvas renderer ([RasterizerGpuBackend.backend]). The game
+/// must still use that renderer when components draw the SVG, so the game's
+/// [HasRasterizer.rasterizerGpu] must be `gpu`.
+///
+/// The SVG also keeps its bytes, so that it can parse its paths for dart:ui
+/// if it's drawn into a picture of its own (see [render]).
 class RasterizerSvg._(
   final Uint8List _bytes,
 
   /// The SVG imported for the renderer, which [render] draws.
   final RasterizerScene scene,
 ) {
-  /// Imports an SVG's bytes for the GPU renderer [gpu], the mesh renderer by
-  /// default, where it's supported.
+  /// Creates an SVG from [bytes], imported for the GPU renderer [gpu] (the
+  /// mesh renderer by default) when that renderer is supported.
   ///
-  /// Throws [ArgumentError] if the bytes can't be parsed, or, for the mesh
-  /// renderer, if [maxSize] isn't positive.
+  /// Throws [ArgumentError] if the bytes can't be parsed, or if [maxSize]
+  /// isn't positive for the mesh renderer.
   ///
   /// For the mesh renderer, [maxSize] is the largest size, in device pixels, at
   /// which the game draws the SVG's longer side. The mesh renderer flattens the
-  /// curves for that size, to within 1/4 of a pixel. Drawn larger, the curves
-  /// show their segments sooner. It defaults to the view's longer side, for a
-  /// full-screen SVG. Pass the largest size the game draws the SVG at, such as
-  /// its component's longer side times the camera's largest zoom and the device
-  /// pixel ratio. The mesh renderer makes the triangles once, for that size,
-  /// and draws them at every size, with no level of detail. So a larger
-  /// [maxSize] costs the GPU more wherever the game draws the SVG small.
+  /// curves for that size, to within 1/4 of a pixel. When the SVG is drawn
+  /// larger, the segments of its curves start to show. [maxSize] defaults to
+  /// the view's longer side, which suits a full-screen SVG. Pass the largest
+  /// size the game draws the SVG at, such as its component's longer side times
+  /// the camera's largest zoom and the device pixel ratio. The mesh renderer
+  /// makes the triangles once for that size, and draws the same triangles at
+  /// every size, with no level of detail. So a larger [maxSize] costs the GPU
+  /// more wherever the game draws the SVG small.
   RasterizerSvg.fromBytes(
     Uint8List bytes, {
     RasterizerBackend gpu = RasterizerBackend.mesh,
@@ -71,8 +73,8 @@ class RasterizerSvg._(
 
   /// The default `maxSize` of [RasterizerSvg.fromBytes], in device pixels.
   ///
-  /// It's the implicit view's longer side when the SVG is loaded, or 2048
-  /// without a view.
+  /// It's the implicit view's longer side when the SVG is loaded, or 2048 if
+  /// there's no view or its size is empty.
   static double get defaultMaxSize {
     final size = PlatformDispatcher.instance.implicitView?.physicalSize;
     if (size == null || size.isEmpty) {
@@ -81,11 +83,12 @@ class RasterizerSvg._(
     return size.width > size.height ? size.width : size.height;
   }
 
-  /// Loads an SVG asset with [cache], [Flame.assets] by default.
+  /// Loads an SVG asset with [cache], which defaults to [Flame.assets].
   ///
-  /// [fileName] is the asset's full path, such as `assets/coin.svg`, in
-  /// [package] if given, as for [AssetsCache.readBinaryFile]. [gpu] and
-  /// [maxSize] are as for [RasterizerSvg.fromBytes].
+  /// [fileName] is the asset's full path, such as `assets/coin.svg`, and
+  /// [package] is the package that holds it, if any, as for
+  /// [AssetsCache.readBinaryFile]. [gpu] and [maxSize] are as for
+  /// [RasterizerSvg.fromBytes].
   static Future<RasterizerSvg> load(
     String fileName, {
     AssetsCache? cache,
@@ -101,11 +104,12 @@ class RasterizerSvg._(
   /// The SVG's outline, for hitboxes such as [SvgHitbox].
   ///
   /// The first time it's read, it parses the SVG's paths in Dart, whatever
-  /// the backend of [scene].
+  /// [scene]'s backend is.
   late final SvgOutline outline = SvgOutline.fromSvg(_bytes);
 
-  // The SVG imported for the canvas renderer, when [scene] isn't, once it's
-  // drawn into a picture of its own. Null if the import failed.
+  // The SVG imported for the canvas renderer when [scene] is for another
+  // renderer. It's made the first time the SVG is drawn into a picture of its
+  // own, and is null if that import failed.
   RasterizerScene? _paths;
   bool _parsedPaths = false;
 
@@ -116,9 +120,9 @@ class RasterizerSvg._(
   /// its width and height, or else its paths' bounds.
   final Rect rect = scene.rect;
 
-  /// The SVG's size, as [rect]'s.
+  /// The SVG's size, which is [rect]'s size.
   ///
-  /// It's one vector, shared, so don't change it.
+  /// Everything that reads it shares this one vector, so don't change it.
   late final Vector2 size = Vector2(rect.width, rect.height);
 
   /// Draws the SVG with its [rect] stretched from (0, 0) to [drawnSize], in
@@ -127,13 +131,14 @@ class RasterizerSvg._(
   /// The alpha of [overridePaint] fades each path. Its other fields apply to
   /// the SVG as a whole, as to a sprite (see [RasterizerCanvas.drawScene]).
   ///
-  /// Into a game's [RasterizerCanvas], the SVG draws with the frame. Into any
-  /// other canvas, such as the picture of a `Snapshot`, a camera post process
-  /// or a Flame `Layer`, it draws its paths with dart:ui, as rasterizer_gpu's
-  /// canvas renderer does, in a layer with the paint's other fields. Unless
-  /// [scene] is for the canvas renderer, the first such draw also imports the
-  /// SVG for the canvas renderer, which parses its paths in Dart. Into the
-  /// game's own canvas, before its renderer is ready, the SVG draws nothing.
+  /// Drawn into a game's [RasterizerCanvas], the SVG becomes part of the
+  /// renderer's frame. Drawn into any other canvas, such as the picture of a
+  /// `Snapshot`, a camera post process or a Flame `Layer`, it draws its paths
+  /// with dart:ui as rasterizer_gpu's canvas renderer does, inside a canvas
+  /// layer that applies the paint's other fields. Unless [scene] is for the
+  /// canvas renderer, the first such draw also imports the SVG for the canvas
+  /// renderer, which parses its paths in Dart. In the game's own canvas,
+  /// before the game's renderer is ready, the SVG draws nothing.
   void render(Canvas canvas, Vector2 drawnSize, {Paint? overridePaint}) {
     final r = rect;
     if (r.isEmpty) {
@@ -162,7 +167,7 @@ class RasterizerSvg._(
   /// Draws the SVG's paths into [canvas], with its [rect] scaled by [sx] and
   /// [sy] from (0, 0), and with [paint] as [render] describes.
   void _drawPaths(Canvas canvas, double sx, double sy, Paint? paint) {
-    // A paint that draws nothing parses nothing.
+    // Skip parsing for a paint that draws nothing.
     if (!((paint?.color.a ?? 1) > 0)) {
       return;
     }
@@ -180,8 +185,9 @@ class RasterizerSvg._(
     });
   }
 
-  /// Returns the SVG imported for the canvas renderer: [scene], or else an
-  /// import made the first time. Null if that import failed.
+  /// Returns the SVG imported for the canvas renderer: [scene] if it's for
+  /// that renderer, or else an import made on the first call. Returns null if
+  /// that import failed.
   RasterizerScene? _pathScene() {
     if (scene.backend == RasterizerBackend.canvas) {
       return scene;
@@ -211,8 +217,8 @@ class RasterizerSvg._(
   /// Frees the SVG's memory. Don't draw it afterwards.
   ///
   /// Call it outside the game's render, such as from an update or an
-  /// `onRemove`. Not between drawing the SVG and its frame's render, which
-  /// reads it (see [RasterizerScene.dispose]).
+  /// `onRemove`. Never call it between drawing the SVG and rendering its
+  /// frame, which still reads it (see [RasterizerScene.dispose]).
   void dispose() {
     scene.dispose();
     _paths?.dispose();

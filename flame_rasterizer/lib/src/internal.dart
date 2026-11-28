@@ -2,8 +2,7 @@ import 'dart:ui';
 
 // Shared by the package's files, and not exported.
 
-/// The canvas of a game whose renderer isn't ready yet, while the game draws
-/// its tree.
+/// The canvas of a game that draws its tree before its renderer is ready.
 ///
 /// Vector content drawn into this canvas draws nothing. Otherwise it would
 /// draw its paths with dart:ui, and the game's first frames would parse each

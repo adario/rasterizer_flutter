@@ -1,4 +1,4 @@
-/// Flame components drawn with rasterizer_gpu.
+/// Flame components that draw paths, polygons and SVGs with rasterizer_gpu.
 ///
 /// A game with [HasRasterizer] draws its [RasterizerSvg]s, such as those of
 /// [RasterizerSvgComponent]s, with rasterizer_gpu's mesh renderer. The mesh
@@ -7,17 +7,18 @@
 /// transforms. [RasterizerPathComponent]s, which are Flame `PathComponent`s,
 /// draw their paths the same way.
 ///
-/// Vector content drawn one item after another makes a run (see
-/// [RasterizerCanvas]). The GPU renderers draw each run as one image, at its
-/// place in the paint order. They render that image at the device's
-/// resolution, under the camera, perspective included.
+/// Vector content that the game draws consecutively, with nothing else in
+/// between, forms a run (see [RasterizerCanvas]). The GPU renderers draw each
+/// run as one image, at its place in the paint order. They render that image
+/// at the device's resolution, with the camera's transform applied,
+/// perspective included.
 ///
 /// [HasRasterizer.rasterizerGpu] can pick rasterizer_gpu's atlas renderer
 /// instead ([RasterizerBackend.gpu]), which rasterizes the SVGs into an atlas
-/// each frame. Where the chosen GPU renderer isn't supported
-/// ([RasterizerGpu.of]), or with [RasterizerGpu.forceCanvas], rasterizer_gpu's
-/// canvas renderer draws instead. It draws each run's paths straight into the
-/// game's canvas.
+/// each frame. When the chosen GPU renderer isn't supported
+/// ([RasterizerGpu.of]), or when [RasterizerGpu.forceCanvas] is set,
+/// rasterizer_gpu's canvas renderer draws instead. It draws each run's paths
+/// straight into the game's canvas.
 ///
 /// ```dart
 /// class MyGame extends FlameGame with HasRasterizer {

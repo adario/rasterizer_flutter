@@ -11,58 +11,65 @@ import 'package:flame_rasterizer/src/shared_scenes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
-/// A Flame [PathComponent] drawn with rasterizer_gpu, in a game with
+/// A Flame [PathComponent] that draws with rasterizer_gpu in a game with
 /// [HasRasterizer].
 ///
-/// It draws into the game's runs as [RasterizerSvgComponent]s do, like an SVG
-/// of its path with one `<path>` per paint layer. The first time it's drawn,
-/// it imports its path, with each of its paint layers, for the game's
-/// renderer ([HasRasterizer.rasterizerGpu]). Each frame then draws that
-/// import under its transform, with its [paint] over it, as a
-/// [RasterizerSvgComponent] does. Its polygons and [containsPoint] are
-/// [PathComponent]'s.
+/// It draws as a [RasterizerSvgComponent] does, as if it were an SVG of its
+/// path with one `<path>` per paint layer. The first time it's drawn, it
+/// imports its path with each of its paint layers: it makes a
+/// [RasterizerScene] of them for the game's renderer
+/// ([HasRasterizer.rasterizerGpu]). Each frame then draws that import under
+/// the component's transform, with its [paint] applied over it, as a
+/// [RasterizerSvgComponent] does. Its polygons and [containsPoint] are those
+/// of [PathComponent].
 ///
-/// So, unlike a [PathComponent], it draws its [paint] when it has paint
-/// layers. The paint's opacity fades each layer. The filters of `tint`,
-/// [ColorEffect] and [HueEffect] filter each layer, as
-/// [RasterizerColorTransform] makes them. So tinted and faded components cost
-/// no new import, and share runs and imports. The paint's other fields apply
-/// to the component as a whole, as to a sprite, and start a new run. `hue`
-/// leaves the layers' own filters alone. Fade the component with an
-/// [OpacityEffect] on it, not on `opacityProviderOfList()`, which fades the
-/// layers themselves, and the [paint] too.
+/// So, unlike a [PathComponent], it applies its [paint] even when it has
+/// paint layers. The paint's opacity fades each layer. The filters that
+/// `tint`, [ColorEffect] and [HueEffect] set, which [RasterizerColorTransform]
+/// makes, filter each layer. So tinted and faded components don't need a new
+/// import, and they share imports and runs: consecutive draws that the
+/// renderer batches together (see [RasterizerCanvas]). The paint's other
+/// fields apply to the component as a whole, as they do to a sprite, and
+/// start a new run. `hue` leaves the layers' own filters unchanged.
+///
+/// Fade the component with an [OpacityEffect] on the component itself, not
+/// on `opacityProviderOfList()`, which fades the layers themselves and the
+/// [paint] too.
 ///
 /// Without paint layers, its [paint] does both jobs. Its color's RGB, style,
-/// strokes, antialiasing and shader draw as a layer's would. Its alpha and
-/// other fields apply over that layer.
+/// stroke settings, antialiasing and shader draw the path as a layer's would,
+/// and its alpha and other fields apply over the result.
 ///
-/// The GPU renderers flatten its path once into polylines, within 1/4 of a
-/// device pixel when its longer side is drawn [maxSize] device pixels long,
-/// the most it's drawn at (see [RasterizerScene.fromPaths]). So the path
-/// must not change. Each time it draws, the component compares its paint
-/// layers with those of its import, which costs little. When they differ, it
-/// imports the path again, as for an edited SVG, from the path's contours,
-/// which it doesn't flatten again. It applies a layer's own color filter made
-/// by [RasterizerColorTransform] to the layer's color. While the GPU
-/// renderers can't draw a layer ([RasterizerScene.canDraw]), such as one
-/// with another color filter, or a hairline stroke, the component draws with
-/// [Canvas.drawPath]. That ends the run, as other canvas draws do.
+/// The GPU renderers flatten its path into polylines once, to within 1/4 of a
+/// device pixel when the path's longer side is drawn [maxSize] device pixels
+/// long, the largest size it's drawn at (see [RasterizerScene.fromPaths]). So
+/// the path must not change.
+///
+/// Each time it draws, the component compares its paint layers with those of
+/// its import, which costs little. When they differ, it imports the path
+/// again, as for an edited SVG. It reuses the path's flattened contours, so it
+/// doesn't flatten them again. When a layer has its own color filter made by
+/// [RasterizerColorTransform], the component applies that filter to the
+/// layer's color. While the GPU renderers can't draw a layer
+/// ([RasterizerScene.canDraw]), such as one with another color filter or a
+/// hairline stroke, the component draws with [Canvas.drawPath] instead. That
+/// ends the run, as other canvas draws do.
 ///
 /// Components made with the same [Path] object share an import while they
 /// draw it for the same renderer, with the same [maxSize], [glow] and paint
 /// layers. Without paint layers, their paints must also match in the fields
-/// that draw as a layer's. The first component imports the path, and the
-/// last one to stop using the import frees it: when its layers change, or
-/// when it or its game is removed. So make the components of one shape from
-/// one path, and size them with [scale] rather than with paths of their own.
-/// They then cost one import.
+/// that draw as a layer's. The first component imports the path. The last one
+/// to stop using the import frees it, when its layers change or when it or its
+/// game is removed. So make all the components of one shape from one path,
+/// and size them with [scale] rather than with paths of their own: they then
+/// cost one import.
 ///
-/// Into any canvas but the game's [RasterizerCanvas], such as a `Snapshot`'s
-/// or a camera post process's, or outside a game with [HasRasterizer], it
-/// draws its layers with [Canvas.drawPath] too, with its [paint] over them as
-/// in the game's runs. Into the game's own canvas, before the renderer is
-/// ready, it draws nothing, as a [RasterizerSvg] does, unless a layer can't
-/// be imported.
+/// When drawn into any canvas other than the game's [RasterizerCanvas], such
+/// as a `Snapshot`'s or a camera post process's, or outside a game with
+/// [HasRasterizer], it also draws its layers with [Canvas.drawPath], with its
+/// [paint] applied over them as in the game's runs. In the game's own canvas,
+/// before the renderer is ready, it draws nothing, as a [RasterizerSvg] does,
+/// unless a layer can't be imported.
 class RasterizerPathComponent({
   required super.path,
   super.sampling,
@@ -96,7 +103,7 @@ class RasterizerPathComponent({
   }
 
   /// The largest size, in device pixels, at which it draws its path's longer
-  /// side, the size it imports the path for.
+  /// side, and the size it imports the path for.
   ///
   /// It defaults to [RasterizerSvg.defaultMaxSize], the view's longer side.
   /// Pass the largest size the game draws the path at, as for
@@ -108,14 +115,14 @@ class RasterizerPathComponent({
   /// [RasterizerGlow]).
   ///
   /// The component's opacity and tint apply to the glow. Only the mesh
-  /// renderer draws it: the atlas and canvas renderers, and
+  /// renderer draws it. The atlas and canvas renderers, and
   /// [Canvas.drawPath], draw the path without it. Setting another glow
   /// imports the path again, as a change to a paint layer does.
   RasterizerGlow? glow = glow;
 
   // The path it was made with, whose import it shares, and that path's top
-  // left. PathComponent moves [path] to the origin, so the import is drawn
-  // moved back by that top left.
+  // left. PathComponent moves [path] to the origin, so the component draws
+  // the import shifted back by that top left.
   final Path _source = path;
   final Offset _topLeft = path.getBounds().topLeft;
 
@@ -125,25 +132,25 @@ class RasterizerPathComponent({
 
   SharedScene? _shared;
 
-  // The fields of the paint layers that its import is for, or that couldn't
-  // be imported. Without paint layers, the fields of its paint that draw as a
-  // layer's. Empty before it's first drawn.
+  // The fields of the paint layers of its import, or of its last failed
+  // attempt to import. Without paint layers, it holds the fields of its paint
+  // that draw as a layer's. Empty before it's first drawn.
   List<PaintFields> _fields = const [];
 
-  // The glow when [_fields] were kept.
+  // The glow at the time [_fields] were set.
   RasterizerGlow? _glow;
 
   // Imports that no component uses any more. The next update frees them,
-  // once the frames that drew them have rendered.
+  // after the frames that drew them have rendered.
   final List<RasterizerScene> _retired = [];
 
   // Copies of its paint layers, which [_drawPaths] fades or filters, and the
-  // fields they were copied from. A layer's change makes new copies.
+  // fields they were copied from. A change to any layer makes new copies.
   List<Paint> _copies = const [];
   List<PaintFields> _copied = const [];
 
-  // The canvas layer through which a color transform filters the pixels of a
-  // paint layer that has its own filter.
+  // The paint of the canvas layer through which a color transform filters
+  // the pixels of a paint layer that has its own filter.
   static final _filterLayer = Paint();
 
   /// For tests: the import it draws, or null before it's drawn into a game's
@@ -190,14 +197,14 @@ class RasterizerPathComponent({
     _drawPaths(canvas);
   }
 
-  /// Draws its path with [Canvas.drawPath], with each of its paint layers and
-  /// its [paint] over them.
+  /// Draws its path with [Canvas.drawPath] in each of its paint layers, with
+  /// its [paint] applied over them.
   ///
   /// It draws as a [RasterizerSvg] draws its paths into a picture of its own.
   /// The paint's alpha fades each layer, and its [RasterizerColorTransform]
-  /// filters each layer. Its other fields apply to a canvas layer around them
-  /// all. Without paint layers, it draws with its [paint], as a
-  /// [PathComponent] does.
+  /// filter, if any, filters each layer. Its other fields apply to a canvas
+  /// layer around them all. Without paint layers, it draws with its [paint],
+  /// as a [PathComponent] does.
   void _drawPaths(Canvas canvas) {
     if (!hasPaintLayers) {
       super.render(canvas);
@@ -233,7 +240,8 @@ class RasterizerPathComponent({
     });
   }
 
-  /// Copies of [layers], made again if any layer changed since the last copy.
+  /// Returns copies of [layers], made again if any layer changed since the
+  /// last copy.
   List<Paint> _copiesOf(List<Paint> layers) {
     var changed = _copied.length != layers.length;
     for (var i = 0; i < layers.length && !changed; i++) {
@@ -246,10 +254,10 @@ class RasterizerPathComponent({
     return _copies;
   }
 
-  /// Returns its import for its paint layers and [glow] as they are now. It
-  /// imports the path again if they changed.
+  /// Returns its import for its current paint layers and [glow], and imports
+  /// the path again if they changed.
   ///
-  /// Null outside a game with [HasRasterizer], or if a layer can't be
+  /// Returns null outside a game with [HasRasterizer], or if a layer can't be
   /// imported.
   RasterizerScene? _currentScene() {
     final gpu = _gpu;
@@ -266,8 +274,7 @@ class RasterizerPathComponent({
           !fields.matches(layers?[i] ?? paint);
     }
     if (changed) {
-      // Kept first, so that an import that can't be made isn't tried again
-      // each frame.
+      // Set first, so that it doesn't retry a failed import every frame.
       _fields = layers == null
           ? [PaintFields(paint, layerOnly: true)]
           : [for (final layer in layers) PaintFields(layer)];
@@ -295,9 +302,10 @@ class RasterizerPathComponent({
     return _shared?.scene;
   }
 
-  /// Returns [layer], or, if its color filter is one that
-  /// [RasterizerColorTransform] made, a copy without the filter, its color
-  /// filtered instead.
+  /// Returns [layer], or a copy of it if its color filter is one that
+  /// [RasterizerColorTransform] made.
+  ///
+  /// The copy has no color filter, and has its color filtered instead.
   static Paint _filtered(Paint layer) {
     final filter = layer.colorFilter;
     final transform = filter == null
@@ -313,8 +321,8 @@ class RasterizerPathComponent({
 
   /// Stops using its import, and frees it if no other component uses it.
   ///
-  /// It frees the import [now], or else at its next update, once the frames
-  /// that drew it have rendered.
+  /// It frees the import right away if [now], or else at its next update,
+  /// after the frames that drew it have rendered.
   void _release({bool now = false}) {
     final shared = _shared;
     if (shared == null) {
@@ -339,7 +347,7 @@ class RasterizerPathComponent({
     _retired.clear();
   }
 
-  /// Stops using its import, and frees right away the imports that no other
+  /// Stops using its import, and immediately frees the imports that no other
   /// component uses.
   ///
   /// [onRemove] and `releaseScenes` call it outside a frame, when the

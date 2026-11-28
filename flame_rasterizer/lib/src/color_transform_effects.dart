@@ -4,14 +4,14 @@ import 'package:flame/components.dart';
 import 'package:flame/rendering.dart' show hueRotationMatrix;
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
-/// Makes Flame's `tint` and `hue` set filters that apply to each path of a
-/// component's vector content.
+/// Makes Flame's `tint` and `hue` set color filters that apply to each path
+/// of a component's vector content.
 ///
-/// For components that draw their content with their [paint], as
+/// It's for components that draw their content with their [paint], as
 /// [RasterizerCanvas.drawScene] does. [RasterizerColorTransform] makes the
-/// filters, and can read them back, so tinted components still share a run.
-/// [RasterizerCanvas] can't read any other filter on [paint], which starts a
-/// new run.
+/// filters and can read them back, so tinted components can still share a
+/// run of [RasterizerCanvas]. [RasterizerCanvas] can't read any other filter
+/// on [paint], so such a filter starts a new run.
 mixin ColorTransformEffects on HasPaint {
   /// Tints [paint] as Flame does, with a filter from
   /// [RasterizerColorTransform] when it can make one.
@@ -28,8 +28,9 @@ mixin ColorTransformEffects on HasPaint {
   /// Rotates the hue of [paint] as Flame does, with a filter from
   /// [RasterizerColorTransform].
   ///
-  /// Flame also sets the filter on each paint layer. Here the layers keep
-  /// their own filters, as the filter of [paint] already applies over them.
+  /// Flame also sets the filter on each paint layer. This mixin leaves the
+  /// layers' own filters unchanged, because the filter of [paint] already
+  /// applies over them.
   @override
   set hue(double value) {
     if (value == hue) {
@@ -49,7 +50,7 @@ mixin ColorTransformEffects on HasPaint {
         _setFilter(paint, transform.filter);
       }
     }
-    // Flame's setter called it before the filters above were set.
+    // Flame's setter calls onChanged before the filters above are set.
     onChanged();
   }
 

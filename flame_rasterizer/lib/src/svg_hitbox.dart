@@ -14,9 +14,9 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// A Flame [PathHitbox] in the shape of an SVG's paths, made from an
 /// [outline] such as [RasterizerSvg.outline].
 ///
-/// Its parent is a component such as a [RasterizerSvgComponent]. The hitbox
-/// stretches the outline's rect to the parent's size, as the component draws
-/// the SVG, and again whenever that size changes.
+/// Add it to a component such as a [RasterizerSvgComponent]. The hitbox
+/// stretches the outline's rect to the parent's size, the way the component
+/// draws the SVG, and stretches it again whenever that size changes.
 ///
 /// ```dart
 /// final coin = await RasterizerSvg.load('assets/coin.svg');
@@ -27,22 +27,25 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 /// );
 /// ```
 ///
-/// Its polygons come from the outline's closed contours (see
+/// The hitbox's polygons come from the outline's closed contours (see
 /// [PathComponent.new]). The outline closes the contours of filled paths, as
-/// SVG fills them. Stroked-only paths collide along their middle, and their
-/// open contours not at all.
+/// SVG does when it fills them. The closed contours of paths that are only
+/// stroked collide along the middle of the stroke, and their open contours
+/// don't collide at all.
 ///
-/// Making the polygons is most of what a hitbox costs. So the hitboxes of an
-/// outline sampled the same way, such as for the same size, share them, for
-/// the last 8 ways it was sampled. The outline's path must not change once it
-/// has hitboxes, nor the vertices of their polygons.
+/// Making the polygons is most of what a hitbox costs. So hitboxes that
+/// sample one outline the same way, such as for the same size, share their
+/// polygons. They keep the polygons of the last 8 ways the outline was
+/// sampled. Once the outline has hitboxes, don't change its path or the
+/// vertices of their polygons.
 ///
-/// Its [aabb], which the collision detection needs again each frame the
-/// hitbox moves, is the box around its polygons' bounds. It transforms only
-/// the bounds' 4 corners, under its and its ancestors' transforms composed
-/// once, rather than all the polygons' vertices, as [PathHitbox] does. The
-/// box is as tight, except while the hitbox is turned by other than right
-/// angles. It transforms the polygons only when the box overlaps another
+/// Its [aabb], which collision detection computes again in each frame where
+/// the hitbox moves, is the box around its polygons' bounds. To compute it,
+/// the hitbox composes its own and its ancestors' transforms once, and
+/// transforms only the bounds' 4 corners. [PathHitbox] transforms all the
+/// polygons' vertices instead. The box is just as tight, except while the
+/// hitbox is rotated by an angle that isn't a multiple of 90 degrees. The
+/// hitbox transforms its polygons only when its box overlaps another
 /// hitbox's.
 class SvgHitbox(
   /// The SVG outline that the hitbox is made from.
@@ -56,14 +59,15 @@ class SvgHitbox(
 }) extends PathHitbox {
   /// Creates a hitbox from [outline], for a parent of [size].
   ///
-  /// It samples the polygons every [sampling], and simplifies them within
-  /// [tolerance], half the sampling by default, both in the units of [size].
-  /// [size] defaults to the outline's rect's. See [PathComponent.new], also
-  /// for [filter].
+  /// It samples the polygons every [sampling] and simplifies them within
+  /// [tolerance], which defaults to half the sampling. Both are in the units
+  /// of [size], which defaults to the size of the outline's rect. See
+  /// [PathComponent.new] for these and for [filter].
   this
     : super(
         // PathComponent samples its path in its constructor. An empty path
-        // makes that free, and the body takes the shared polygons instead.
+        // makes that free, and the constructor body takes the shared
+        // polygons instead.
         path: Path(),
         sampling: sampling / _units(outline, size),
         tolerance: tolerance == null ? null : tolerance / _units(outline, size),
@@ -88,8 +92,8 @@ class SvgHitbox(
     return units > 0 && units.isFinite ? units : 1;
   }
 
-  /// The outline's path rooted at the origin, as [PathComponent.path], shared
-  /// with the outline's other hitboxes.
+  /// The outline's path moved to the origin, as [PathComponent.path] is, and
+  /// shared with the outline's other hitboxes.
   @override
   Path get path => _path ?? super.path;
 
@@ -115,7 +119,7 @@ class SvgHitbox(
     }
     final sx = size.x / rect.width;
     final sy = size.y / rect.height;
-    // The path's polygons are rooted at its bounds' top left.
+    // The polygons are relative to the top left of the path's bounds.
     final bounds = outline.path.getBounds();
     position.setValues(
       (bounds.left - rect.left) * sx,
@@ -125,14 +129,14 @@ class SvgHitbox(
   }
 
   // PathComponent keeps its polygons, and what it derives from them, private.
-  // So the members below that read them copy PathComponent's, but read the
-  // shared polygons. PathComponent's other members reach the polygons through
-  // these.
+  // So the members below copy PathComponent's members that read them, except
+  // that they read the shared polygons. PathComponent's other members reach
+  // the polygons through these.
 
   late final _Polygons _polygons;
 
-  // Its polygons' vertices and edges in the game's coordinates, overwritten
-  // as it moves.
+  // Its polygons' vertices and edges in the game's coordinates, updated in
+  // place as it moves.
   late final _globalPolygons = [
     for (final polygon in _polygons.vertices)
       List.generate(polygon.length, (_) => Vector2.zero(), growable: false),
@@ -171,8 +175,8 @@ class SvgHitbox(
           globalPolygon[j].setFrom(absolutePositionOf(polygon[j]));
         }
         if (shouldReverse) {
-          // Mirrored, the vertices go clockwise. Reversed, they go
-          // counterclockwise again.
+          // A mirroring transform makes the vertices go clockwise.
+          // Reversing them restores the counterclockwise order.
           globalPolygon.reverse();
         }
       }
@@ -188,8 +192,8 @@ class SvgHitbox(
 
   @override
   bool containsLocalPoint(Vector2 point) {
-    // Checks in the game's coordinates, as PathComponent's check of local
-    // points is private.
+    // Checks in the game's coordinates, because PathComponent's check of
+    // local points is private.
     return containsPoint(absolutePositionOf(point));
   }
 
@@ -220,7 +224,8 @@ class SvgHitbox(
 
   @override
   void renderDebugMode(Canvas canvas) {
-    // PathComponent's draws its own polygons' path, which is empty here.
+    // PathComponent's version draws its own polygons' path, which is empty
+    // here.
     super.renderDebugMode(canvas);
     canvas.drawPath(polygonsPath, debugPaint);
   }
@@ -253,8 +258,8 @@ class SvgHitbox(
         m[1] * tx + m[5] * ty + m[13],
       );
     }
-    // Each coordinate's least and most, from the least and most of each of
-    // its terms.
+    // The minimum and maximum of each coordinate, as the sums of the minimum
+    // and maximum of its terms.
     final (ax0, ax1) = (a * bounds.left, a * bounds.right);
     final (bx0, bx1) = (b * bounds.left, b * bounds.right);
     final (cy0, cy1) = (c * bounds.top, c * bounds.bottom);
@@ -269,28 +274,29 @@ class SvgHitbox(
     );
   }
 
-  /// Returns [v] moved by a few float32 steps in [direction], as points on a
-  /// box's edges count as outside it.
+  /// Returns [v] moved a few float32 steps in [direction], because points on
+  /// a box's edges count as outside it.
   ///
-  /// PathHitbox adds 1e-15 for the same reason. But the box's vectors are
+  /// PathHitbox adds 1e-15 for the same reason, but the box's vectors are
   /// float32, which round that away at coordinates past about 1e-8.
   static double _outward(double v, double direction) =>
       v + direction * (v.abs() + 1) * 1e-6;
 }
 
-/// What the hitboxes of an outline share: its path rooted at the origin, and
-/// its polygons for each of the last ways it was sampled.
+/// What the hitboxes of an outline share: its path moved to the origin, and
+/// its polygons for each of the last few ways it was sampled.
 class _Shared(SvgOutline outline) {
-  /// What each outline's hitboxes share, kept as long as the outline is.
+  /// What each outline's hitboxes share, kept for as long as the outline
+  /// lives.
   static final _all = Expando<_Shared>();
 
   factory _Shared.of(SvgOutline outline) => _all[outline] ??= _Shared(outline);
 
   /// How many ways of sampling an outline keep their polygons, so that
-  /// hitboxes made for ever new sizes don't keep ever more polygons.
+  /// hitboxes made for ever-changing sizes don't pile up polygons.
   static const _kept = 8;
 
-  /// The outline's path rooted at the origin.
+  /// The outline's path moved to the origin.
   final Path path = outline.path.toOrigin;
 
   // Polygons by sampling, tolerance and filter, the most recently used last.

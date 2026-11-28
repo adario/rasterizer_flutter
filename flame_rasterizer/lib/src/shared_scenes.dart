@@ -3,39 +3,38 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
-// The imports that the package's components share, kept by the path or
-// polygons they draw. The package's files use these, and the package doesn't
-// export them.
+// Lets the package's components share imports: the RasterizerScenes made
+// from a path or polygons, kept per path or polygons object. The package
+// doesn't export these.
 
-/// The function that releases all of a component's imports, for each
-/// component that has any.
+/// For each component that has imports, the function that releases them all.
 final _releases = Expando<void Function()>('scene releases');
 
-/// Registers [release] as the function that releases all of [component]'s
-/// imports, for [releaseScenes].
+/// Registers [release] as the function that [releaseScenes] calls to release
+/// all of [component]'s imports.
 void onReleaseScenes(Component component, void Function() release) =>
     _releases[component] = release;
 
-/// Releases the imports of all the components in [game]'s tree, when the
-/// game is removed.
+/// Releases the imports of all the components in [game]'s tree when the game
+/// is removed.
 ///
-/// Flame doesn't remove the game's components then, so they can't release
-/// their imports themselves.
+/// Flame doesn't remove a game's components when it removes the game, so the
+/// components can't release their imports themselves.
 void releaseScenes(Component game) {
   for (final component in game.descendants()) {
     _releases[component]?.call();
   }
 }
 
-/// The imports of each path or polygons, which the components made with it
-/// share.
+/// The imports of each path or polygons, shared by the components made with
+/// it.
 final _scenes = Expando<List<SharedScene>>('shared scenes');
 
-/// Returns an import of [source], a path or polygons, with [paints], [glow]
-/// and [separate], for [gpu] and [maxSize].
+/// Returns an import of [source], a path or polygons, for [gpu], [maxSize],
+/// [glow], [separate] and [paints].
 ///
-/// It returns an import that another component made, if one matches, or else
-/// a new one that [import] makes.
+/// It returns a matching import that another component made, if there is
+/// one. Otherwise it calls [import] to make a new one.
 SharedScene acquireScene(
   Object source,
   RasterizerBackend gpu,
@@ -46,8 +45,8 @@ SharedScene acquireScene(
   bool separate = false,
 }) {
   final scenes = _scenes[source] ??= [];
-  // The backend that a new import gets: the canvas renderer where the GPU
-  // renderer isn't supported, or with RasterizerGpu.forceCanvas.
+  // The backend that a new import would get: the canvas renderer when the
+  // GPU renderer isn't supported or RasterizerGpu.forceCanvas is set.
   final backend = RasterizerGpu.of(gpu).backend;
   for (final shared in scenes) {
     if (shared.matches(gpu, maxSize, backend, glow, separate, paints)) {
@@ -102,14 +101,18 @@ class SharedScene(
   /// The import.
   final RasterizerScene scene,
 ) {
-  /// Keeps [scene], which one component draws.
+  /// Creates a shared import of [scene], drawn by one component.
   this;
 
   /// How many components draw it.
   int users = 1;
 
-  /// Returns whether it's the import for [gpu], [maxSize], [glow],
-  /// [separate] and [paints], now that [gpu]'s imports are for [backend].
+  /// Returns whether this is the import for [gpu], [maxSize], [glow],
+  /// [separate] and [paints].
+  ///
+  /// [backend] is the backend that a new import for [gpu] would get. An
+  /// import made for another backend, such as one made before the GPU
+  /// renderer fell back to the canvas renderer, doesn't match.
   bool matches(
     RasterizerBackend gpu,
     double maxSize,
@@ -149,7 +152,7 @@ class PaintFields(
   /// Whether [matches] compares only the fields that a layer draws with.
   final bool layerOnly = false,
 }) {
-  /// Copies [paint]'s fields.
+  /// Creates a copy of [paint]'s fields.
   this;
 
   final Color _color = paint.color;
@@ -158,9 +161,9 @@ class PaintFields(
   final StrokeCap _strokeCap = paint.strokeCap;
   final StrokeJoin _strokeJoin = paint.strokeJoin;
 
-  // The getter's value, which isn't the real limit in Flutter 3.47.
-  // rasterizer_gpu corrects it when it imports the path. Comparing two
-  // getter values still finds a change.
+  // In Flutter 3.47, the getter doesn't return the real limit, which
+  // rasterizer_gpu corrects when it imports the path. Comparing two getter
+  // values still detects a change.
   final double _strokeMiterLimit = paint.strokeMiterLimit;
   final BlendMode _blendMode = paint.blendMode;
   final bool _isAntiAlias = paint.isAntiAlias;
@@ -200,8 +203,9 @@ class PaintFields(
 /// Returns the paint that a component without paint layers draws its layer
 /// with.
 ///
-/// It's [paint] with an opaque color, and without the fields that the
-/// component applies to the layer afterwards.
+/// It's a copy of [paint] with an opaque color, and without the fields that
+/// the component applies to the layer afterwards: the blend mode, the color,
+/// image and mask filters, and color inversion.
 Paint layerOf(Paint paint) => Paint.from(paint)
   ..color = paint.color.withValues(alpha: 1)
   ..blendMode = BlendMode.srcOver

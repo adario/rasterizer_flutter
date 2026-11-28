@@ -12,30 +12,35 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show MediaQuery;
 import 'package:rasterizer_gpu/rasterizer_gpu.dart';
 
-/// Draws a game's [RasterizerSvg]s with rasterizer_gpu.
+/// Draws a game's [RasterizerSvg]s, [RasterizerPathComponent]s and
+/// [RasterizerPolygonsComponent]s with rasterizer_gpu.
 ///
-/// While the game draws its tree, the mixin wraps the game's canvas in a
-/// [RasterizerCanvas], which adds the vector content to a frame of the
-/// renderer, in runs. After the tree, before Flutter rasterizes the painting,
-/// the mixin renders the frame once. The mesh renderer renders each run into
-/// an image of its own, and the atlas renderer renders all runs into an
-/// atlas. The canvas renderer has nothing to render, as it draws each run's
-/// paths into the game's canvas.
+/// While the game draws its component tree, the mixin wraps the game's canvas
+/// in a [RasterizerCanvas]. That canvas adds the vector content to the
+/// renderer's frame in runs: consecutive draws that the renderer batches
+/// together. After the tree is drawn, and before Flutter rasterizes the
+/// painting, the mixin renders the frame once. The mesh renderer renders each
+/// run into an image of its own, and the atlas renderer renders all runs into
+/// an atlas. The canvas renderer has nothing left to render, because it draws
+/// each run's paths straight into the game's canvas.
 ///
 /// The game creates its renderer when it's first drawn, or when
-/// [rasterizerReady] is first read, such as in `onLoad`. It's a renderer for
-/// [rasterizerGpu] where that's supported, else the canvas renderer, the same
-/// choice as for the [RasterizerSvg]s' imports. Until the renderer is ready,
-/// vector content drawn into the game's canvas draws nothing. On OpenGL ES,
-/// creating a GPU renderer compiles its shaders, which takes up to a second
-/// ([RasterizerGpu.allowOpenGles]). [rasterizerReady] completes after, so a
-/// game that awaits it in `onLoad` shows `GameWidget`'s `loadingBuilder`
-/// meanwhile.
+/// [rasterizerReady] is first read, such as in `onLoad`. It creates the
+/// [rasterizerGpu] renderer when that's supported, or else the canvas
+/// renderer, the same choice that [RasterizerSvg] makes for its imports.
+/// Until the renderer is ready, vector content drawn into the game's canvas
+/// draws nothing.
 ///
-/// For a game larger than the renderer takes
-/// ([RasterizerRenderer.maxViewportSize] a side), such as a window over 4096
-/// device pixels wide on OpenGL ES, the renderer draws the vectors at a lower
-/// resolution, to fit, and their images scale up, a little softer.
+/// On OpenGL ES, creating a GPU renderer compiles its shaders, which takes up
+/// to a second ([RasterizerGpu.allowOpenGles]). [rasterizerReady] completes
+/// after that, so a game that awaits it in `onLoad` shows `GameWidget`'s
+/// `loadingBuilder` in the meantime.
+///
+/// When the game is larger than the renderer's largest viewport
+/// ([RasterizerRenderer.maxViewportSize] per side), such as a window over
+/// 4096 device pixels wide on OpenGL ES, the renderer draws the vectors at a
+/// lower resolution that fits. Their images then scale up and look a little
+/// softer.
 ///
 /// It works on a [FlameGame] with any world [W], such as a `Forge2DGame`.
 /// Dart infers [W] from the game's class, so `with HasRasterizer` is enough.
@@ -45,57 +50,59 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
 
   /// How many frames the renderer keeps in flight, at least 1.
   ///
-  /// It's [RasterizerRenderer.create]'s `slots`. Each frame in flight has its
-  /// own atlas pages or run targets, and costs their memory. So a frame's
-  /// images stay valid until that many frames later. 2 are enough, unless
-  /// the app takes an image of the game's frames later, such as with
-  /// `RepaintBoundary.toImage` after the frame: then it needs 3. The game
-  /// reads it once, when it creates the renderer.
+  /// It's passed to [RasterizerRenderer.create] as `slots`. Each frame in
+  /// flight has its own atlas pages or run targets, and costs their memory.
+  /// A frame's images stay valid until that many frames later. 2 are enough,
+  /// unless the app captures the game's frames after they're drawn, such as
+  /// with `RepaintBoundary.toImage`: then it needs 3. The game reads this
+  /// once, when it creates the renderer.
   int get rasterizerSlots => 2;
 
-  /// The GPU renderer to draw with where it's supported, else the canvas
+  /// The GPU renderer to draw with when it's supported; otherwise the canvas
   /// renderer draws.
   ///
-  /// By default it's [RasterizerBackend.mesh], the mesh renderer, which draws
-  /// SVGs imported once into triangles. [RasterizerBackend.gpu] picks the
-  /// atlas renderer, which rasterizes them each frame. The game's
+  /// By default it's [RasterizerBackend.mesh], the mesh renderer, which
+  /// imports each SVG once into triangles. [RasterizerBackend.gpu] picks the
+  /// atlas renderer, which rasterizes the SVGs each frame. The game's
   /// [RasterizerSvg]s must be loaded for the same renderer
-  /// ([RasterizerSvg.load]'s `gpu`). Drawing one loaded for the other throws.
-  /// The game reads it once, when it creates the renderer.
+  /// ([RasterizerSvg.load]'s `gpu`). Drawing one loaded for the other
+  /// renderer throws. The game reads this once, when it creates the renderer.
   RasterizerBackend get rasterizerGpu => RasterizerBackend.mesh;
 
   /// The mesh renderer's samples per pixel, 4 or 1.
   ///
-  /// It's [RasterizerRenderer.create]'s `meshSamples`. With 4, the renderer
-  /// antialiases edges where offscreen MSAA is supported. With 1, edges are
-  /// aliased, which costs the GPU less. The game reads it once, when it
-  /// creates the renderer.
+  /// It's passed to [RasterizerRenderer.create] as `meshSamples`. With 4, the
+  /// renderer antialiases edges where offscreen MSAA is supported. With 1,
+  /// edges are aliased, which costs the GPU less. The game reads this once,
+  /// when it creates the renderer.
   int get rasterizerMeshSamples => 4;
 
-  /// Whether the atlas renderer draws curves as quadratics, else as line
-  /// segments.
+  /// Whether the atlas renderer draws curves as quadratics rather than as
+  /// line segments.
   ///
-  /// The mesh renderer flattens its curves once, when the SVGs are loaded.
+  /// The mesh renderer ignores it, as it flattens curves once, when the SVGs
+  /// are loaded.
   bool rasterizerCurves = true;
 
-  /// The renderer, once it's ready.
+  /// The renderer, or null until it's ready.
   RasterizerRenderer? get rasterizer => _renderer;
 
   /// The last frame drawn, with its runs, entries, timings and atlas pages.
   ///
-  /// The renderer reuses one frame object. So during the game's render, this
-  /// is the frame in progress. It's valid until the next frame begins, and
-  /// null once the game is removed.
+  /// The renderer reuses one frame object, so during the game's render this
+  /// is the frame in progress. It stays valid until the next frame begins,
+  /// and is null after the game is removed.
   RasterizerFrame? get rasterizerFrame => _lastFrame;
   RasterizerFrame? _lastFrame;
 
-  /// Completes with the renderer, once it can draw: on OpenGL ES, once its
-  /// shaders have compiled.
+  /// Completes with the renderer when it can draw, which on OpenGL ES is
+  /// after its shaders have compiled.
   ///
-  /// If the game is removed meanwhile, it completes with a renderer that's
-  /// already disposed of. While [rasterizerSlots] or [rasterizerMeshSamples]
-  /// hold a value that [RasterizerRenderer.create] doesn't take, reading it
-  /// throws an [ArgumentError] at once, and so does each frame drawn.
+  /// If the game is removed in the meantime, it completes with a renderer
+  /// that's already disposed of. If [rasterizerSlots] or
+  /// [rasterizerMeshSamples] has a value that [RasterizerRenderer.create]
+  /// rejects, reading this throws an [ArgumentError] right away, and so does
+  /// every frame the game draws.
   Future<RasterizerRenderer> get rasterizerReady {
     if (_creating == null) {
       _checkSettings();
@@ -105,8 +112,9 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
 
   Future<RasterizerRenderer>? _creating;
 
-  // Checks the settings as RasterizerRenderer.create does, but at once:
-  // create's future would fail, and nothing awaits it while the game draws.
+  // Checks the settings as RasterizerRenderer.create does, but synchronously.
+  // Otherwise create's future would fail, and nothing awaits it while the
+  // game draws.
   void _checkSettings() {
     final slots = rasterizerSlots;
     if (slots < 1) {
@@ -122,8 +130,9 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
     }
   }
 
-  // How many times the game was removed. A renderer whose creation ends after
-  // a removal is disposed of, rather than kept by a game that isn't drawn.
+  // How many times the game was removed. _create disposes of a renderer whose
+  // creation finishes after a removal, so that a game that isn't drawn
+  // doesn't keep it.
   int _removals = 0;
 
   Future<RasterizerRenderer> _create() async {
@@ -179,9 +188,10 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
       }
       return;
     }
-    // Larger than the renderer takes, such as a window over 4096 pixels wide
-    // on OpenGL ES. The vectors render at a lower pixel ratio, to fit, and
-    // their images are scaled up and smoothed.
+    // When the canvas is larger than the renderer's largest viewport, such as
+    // a window over 4096 pixels wide on OpenGL ES, the vectors render at a
+    // lower pixel ratio that fits. Their images are then scaled up and
+    // smoothed.
     final maxSize = renderer.maxViewportSize;
     var filterQuality = FilterQuality.none;
     if (maxSize != null && (w > maxSize || h > maxSize)) {
@@ -195,17 +205,17 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
     try {
       super.render(_canvas);
     } finally {
-      // The frame renders even if a component threw: the canvas already
-      // holds the images of the runs that ended before.
+      // Render the frame even if a component threw, because the canvas
+      // already holds the images of the runs that ended before the error.
       _canvas.end();
       frame.render();
       _lastFrame = frame;
     }
   }
 
-  // The device pixel ratio of the game's view, read each frame. It doesn't
-  // depend on MediaQuery from paint, which would make the game widget
-  // rebuild.
+  // The device pixel ratio of the game's view, read each frame. It reads
+  // MediaQuery without depending on it, because a dependency taken during
+  // paint would make the game widget rebuild.
   double _pixelRatio() =>
       buildContext
           ?.getInheritedWidgetOfExactType<MediaQuery>()
@@ -214,10 +224,11 @@ mixin HasRasterizer<W extends World> on FlameGame<W> {
       PlatformDispatcher.instance.implicitView?.devicePixelRatio ??
       1;
 
-  /// Disposes of the renderer, and releases the imports of the game's
+  /// Disposes of the renderer and releases the imports of the game's
   /// [RasterizerPathComponent]s and [RasterizerPolygonsComponent]s.
   ///
-  /// The components import their paths again if the game is drawn again.
+  /// If the game is drawn again, the components import their paths and
+  /// polygons again.
   @override
   void onRemove() {
     releaseScenes(this);
