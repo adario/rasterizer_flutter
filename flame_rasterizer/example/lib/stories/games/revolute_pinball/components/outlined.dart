@@ -3,8 +3,8 @@ import 'package:flame/geometry.dart' show convexPieces;
 import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 
-/// A body drawn as its [outline], in its own coordinates, that collides as
-/// the outline's convex pieces.
+/// A body drawn as its [outline], in its own coordinates, whose collision
+/// shapes are the outline's convex pieces.
 mixin Outlined on GlowingBody {
   List<Vector2> get outline;
 

@@ -77,18 +77,18 @@ WidgetbookComponent svgStories() {
   );
 }
 
-/// The Svg Renderers game for [settings], over a status bar.
+/// The Svg Renderers game for [settings], above a status bar.
 ///
-/// A new renderer makes a new game, as a game draws with one renderer, which
-/// goes on from the angles where the old one stopped. The other knobs change
-/// the same game.
+/// A new renderer makes a new game, as a game draws with a single renderer. The
+/// new game resumes from the angles where the old one stopped. The other knobs
+/// change the running game.
 class const SvgRenderersStory({
   required final SvgRenderersSettings settings,
 
   /// The camera's zoom.
   final double zoom = 1,
 
-  /// The rotation's speed, from 0, which stands still, to 2.
+  /// The rotation's speed, from 0 (standing still) to 2.
   final double speed = 1,
   super.key,
 }) extends StatelessWidget {
@@ -106,17 +106,17 @@ class const SvgRenderersStory({
   }
 }
 
-/// The Collidable Svgs game for [settings], over a status bar.
+/// The Collidable Svgs game for [settings], above a status bar.
 ///
-/// A new renderer or flame_svg [cache] makes a new game, which goes on with
-/// the same SVGs, from where they were. The other knobs change the same game.
+/// A new renderer or flame_svg [cache] makes a new game, which resumes with the
+/// same SVGs where they were. The other knobs change the running game.
 class const CollidableSvgsStory({
   required final CollidableSvgsSettings settings,
 
   /// The camera's zoom.
   final double zoom = 1,
 
-  /// The SVGs' speed, from 0, which stands still, to 2.
+  /// The SVGs' speed, from 0 (standing still) to 2.
   final double speed = 1,
 
   /// flame_svg's cache settings, for Flame SVG.

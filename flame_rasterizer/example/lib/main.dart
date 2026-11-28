@@ -6,7 +6,8 @@ import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/svg/svg.dart';
 import 'package:widgetbook/widgetbook.dart';
 
-/// flame_rasterizer's examples, in a Widgetbook, as Flame's are.
+/// Runs flame_rasterizer's examples in a Widgetbook, as Flame does with its
+/// own.
 void main() {
   runApp(const FlameRasterizerExamples());
 }
@@ -19,9 +20,9 @@ class const FlameRasterizerExamples({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // In the safe area: Flutter's menus can be as tall as the app, but sit in
-    // its safe area, so on a phone the knobs' longer menus end below the
-    // screen, out of reach.
+    // Flutter's menus stay inside the safe area but can be as tall as the
+    // app. Outside a SafeArea, the knobs' longer menus on a phone would end
+    // below the screen, out of reach.
     return SafeArea(
       child: Widgetbook(
         appBuilder: (_, child) => ExampleApp(child: child),

@@ -3,24 +3,27 @@ import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 
 /// An app that runs a game's story on its own, outside the Widgetbook.
 ///
-/// A settings button over the story's top right corner opens a dialog with
-/// the renderer, which starts at [SvgRenderer.firstChoice], and the rows that
-/// [settingsBuilder] builds for the game's other settings, its knobs in the
-/// Widgetbook. While the dialog shows, the story is under a [TickerMode] that
-/// is off, which pauses a `GameStory`'s game. Once the dialog closes,
-/// whichever way, the story goes on with the dialog's renderer and settings:
-/// a `GameStory` goes on from a snapshot of the old game when the renderer
-/// changes.
+/// A settings button in the story's top-right corner opens a dialog. The
+/// dialog has a row for the renderer, which starts at
+/// [SvgRenderer.firstChoice], and the rows that [settingsBuilder] builds for
+/// the game's other settings: the ones that are knobs in the Widgetbook.
+///
+/// While the dialog shows, the story sits under a [TickerMode] that is off,
+/// which pauses a `GameStory`'s game. However the dialog closes, the story
+/// then continues with the dialog's renderer and settings. When the renderer
+/// changes, a `GameStory` continues from a snapshot of the old game.
 class const StandaloneGame<S extends Object>({
-  /// The app's title, for the platform: the task switcher, or the browser
-  /// tab.
+  /// The app's title, which the platform shows in the task switcher or the
+  /// browser tab.
   required final String title,
 
   /// The game's settings at the start.
   required final S settings,
 
-  /// Builds the story for a renderer and settings. The story can change its
-  /// settings with the callback it gets, such as the level that it plays.
+  /// Builds the story for a renderer and settings.
+  ///
+  /// The story can change its settings, such as the level that it plays, with
+  /// the callback it gets.
   required final Widget Function(
     SvgRenderer renderer,
     S settings,
@@ -28,8 +31,10 @@ class const StandaloneGame<S extends Object>({
   )
   builder,
 
-  /// Builds the dialog's rows for the settings, under the renderer's, which
-  /// has the renderer picked so far.
+  /// Builds the dialog's rows for the settings, which go under the renderer's
+  /// row.
+  ///
+  /// It gets the renderer picked in the dialog so far.
   required final List<Widget> Function(
     SvgRenderer renderer,
     S settings,
@@ -37,8 +42,10 @@ class const StandaloneGame<S extends Object>({
   )
   settingsBuilder,
 
-  /// Whether the game draws SVGs: without them, the renderers show Flame for
-  /// Flame SVG, as Flame's own components draw then.
+  /// Whether the game draws SVGs.
+  ///
+  /// Without them, the renderer row shows Flame instead of Flame SVG, because
+  /// Flame's own components draw in that case.
   final bool svgs = true,
   super.key,
 }) extends StatefulWidget {
@@ -51,11 +58,11 @@ class _StandaloneGameState<S extends Object>()
   var _renderer = SvgRenderer.firstChoice;
   late var _settings = widget.settings;
 
-  /// Whether the settings dialog shows, which pauses the game.
+  /// Whether the settings dialog is showing, which pauses the game.
   var _paused = false;
 
-  /// Shows the settings dialog over the paused game, and goes on with its
-  /// renderer and settings once it closes.
+  /// Shows the settings dialog over the paused game, and continues with the
+  /// dialog's renderer and settings after it closes.
   Future<void> _showSettings(BuildContext context) async {
     var renderer = _renderer;
     var settings = _settings;
@@ -129,8 +136,8 @@ class _StandaloneGameState<S extends Object>()
               Positioned(
                 top: 4,
                 right: 4,
-                // Out of the focus, so that the game keeps the keys once the
-                // dialog closes.
+                // Excluded from focus, so that the game keeps the keyboard
+                // focus after the dialog closes.
                 child: ExcludeFocus(
                   child: Material(
                     color: Colors.black54,
@@ -156,8 +163,10 @@ class _StandaloneGameState<S extends Object>()
   }
 }
 
-/// A settings row with a dropdown of [options], which shows each one's
-/// [labelOf], and makes inactive those that aren't [enabledOf].
+/// A settings row with a dropdown of [options].
+///
+/// The dropdown shows each option's [labelOf], and makes inactive the options
+/// for which [enabledOf] returns false.
 class const SettingDropdown<T extends Object>({
   required final String label,
   required final T value,

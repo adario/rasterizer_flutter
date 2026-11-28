@@ -11,43 +11,45 @@ import 'package:flame_rasterizer_example/commons/vector_text_component.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/outlined.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 
-/// An open-top bucket around [inner], a U path that collides as its convex
-/// pieces, which glows once it's [full]. Once a body has stayed in it for
-/// [_countTime], its count fades in above it for a while; once all its bodies
-/// are at rest, so does how close they are to filling it, as a percentage,
-/// below it. A body scores only once. Once another bucket starts emptying,
-/// it [kick]s its bodies up and out.
+/// An open-top, U-shaped bucket around [inner], which takes a bright color
+/// while it's [full].
+///
+/// It collides as its outline's convex pieces. When a body has stayed in it for
+/// [_countTime], the bucket's body count fades in above it for a while. When
+/// all its bodies are at rest, how close they are to filling it fades in below
+/// it, as a percentage. A body scores only once. When another bucket starts
+/// emptying, this one [kick]s its bodies up and out.
 class BucketComponent(final Rect inner)
     extends BodyComponent
     with GlowingBody, Outlined {
   this : super(paint: Paint()..color = ExampleColors.slate);
 
-  /// It's full with at least [_fullCount] bodies, all at rest, whose area is
-  /// at least [_fullShare] of its own.
+  /// It's full when it holds at least [_fullCount] bodies, all at rest, whose
+  /// total area is at least [_fullShare] of its own.
   static const _fullCount = 2;
   static const _fullShare = 0.4;
 
-  /// How long a body stays in it to count, in seconds.
+  /// How long a body must stay in it to count, in seconds.
   static const _countTime = 1.0;
 
-  /// The score for each square meter of a body coming to rest in it, times
-  /// its share.
+  /// The score for each square meter of a body that comes to rest in it,
+  /// multiplied by the share of the bucket that its bodies fill.
   static const _scorePerArea = 400;
 
-  /// How many times its bodies' area it gives back to the energy once full.
+  /// How many times its bodies' area it gives back to the energy when full.
   static const _refund = 2.0;
 
   static const _countCap = 2.4;
 
-  /// How high a kick throws its bodies, in times its inner height; their
-  /// sideways speed, up to a share of the upward one; and their spin, up to
-  /// radians a second.
+  /// A kick throws its bodies up [_kickHeight] times its inner height, with a
+  /// sideways speed of up to [_kickSpread] times the upward one, and a spin of
+  /// up to [_kickSpin] radians a second.
   static const _kickHeight = 3.0;
   static const _kickSpread = 0.15;
   static const _kickSpin = 2.0;
 
-  /// How far a kick jolts its drawing up, in times its inner height, and for
-  /// how long up and back, in seconds.
+  /// A kick jolts its drawing up by [_jolt] times its inner height, taking
+  /// [_joltUp] seconds to go up and [_joltBack] seconds to come back.
   static const _jolt = 0.08;
   static const _joltUp = 0.05;
   static const _joltBack = 0.15;
@@ -58,8 +60,8 @@ class BucketComponent(final Rect inner)
   /// How many segments make each of the bottom's half ellipses.
   static const _segments = 48;
 
-  /// The radii and the center of the bottom's inner half ellipse, as wide as
-  /// [inner], and at most as deep.
+  /// The radii and the center of the bottom's inner half ellipse, which is as
+  /// wide as [inner] and at most as deep.
   late final _rx = inner.width / 2;
   late final _ry = math.min(_rx, inner.height);
   late final _center = Offset(inner.center.dx, inner.bottom - _ry);
@@ -93,11 +95,12 @@ class BucketComponent(final Rect inner)
     ];
   }();
 
-  /// Its bodies, with how long each has been in it, and still.
+  /// Its bodies, with how long each has been in it and how long it has been
+  /// still.
   var _inside = <BodyComponent, double>{};
   var _still = <BodyComponent, double>{};
 
-  /// How many bodies counted at the last [track], null before the first.
+  /// How many bodies counted at the last [track], or null before the first.
   int? _count;
 
   /// The bodies that count and haven't scored yet.
@@ -106,17 +109,18 @@ class BucketComponent(final Rect inner)
   /// Whether it's full, and so emptying.
   bool get full => _emptying.isNotEmpty;
 
-  /// Whether [body] is one of the bodies that it empties.
+  /// Whether [body] is one of the bodies it's emptying.
   bool empties(BodyComponent body) => _emptying.containsKey(body);
 
   RevolutePinballExample get _game => findGame()! as RevolutePinballExample;
 
-  /// How long emptying takes, and each body's share of it, in seconds.
+  /// How long emptying takes in all, and how long each body takes to shrink, in
+  /// seconds.
   static const _emptyTime = 5.0;
   static const _shrinkTime = 2.0;
 
-  /// The bodies emptying, which shrink from the bottom up, and the time since
-  /// it started.
+  /// The bodies being emptied, which shrink from the bottom up, and the time
+  /// since emptying started.
   final _emptying = <BodyComponent, _Shrink>{};
   double _emptyClock = 0;
 
@@ -126,17 +130,19 @@ class BucketComponent(final Rect inner)
   /// Whether [body] has stayed in it for [_countTime].
   bool counts(BodyComponent body) => (_inside[body] ?? 0) >= _countTime;
 
-  /// The area of its bodies when its share last showed, as a share of what
-  /// fills it, up to 1, or 0 once it has emptied. The bodies from a game
-  /// with another renderer set it without showing it, and so do those left
-  /// after a [kick], once at rest.
+  /// How close its bodies were to filling it when its percentage last showed,
+  /// up to 1, or 0 after it has emptied.
+  ///
+  /// Bodies carried over from a game with another renderer set it without
+  /// showing the percentage. So do the bodies left after a [kick], when they
+  /// come to rest.
   double get level => _level ?? 0;
   double? _level;
 
   /// Sets [level] back to 0, for a new game.
   void restart() => _level = 0;
 
-  /// Whether [level] still counts the bodies that it empties.
+  /// Whether [level] still includes the bodies it's emptying.
   var _stale = false;
 
   /// The texts above and below it.
@@ -159,8 +165,10 @@ class BucketComponent(final Rect inner)
   static double _bottom(BodyComponent b) =>
       b.body.shapes.map((s) => s.aabb.upperBound.y).reduce(math.max);
 
-  /// Updates its bodies from [bodies], after [dt] more seconds: once they're
-  /// all at rest, scores those that came in, and starts emptying once full.
+  /// Updates its bodies from [bodies], after [dt] more seconds.
+  ///
+  /// When they're all at rest, it scores those that came in, and starts
+  /// emptying if it's full.
   void track(Iterable<BodyComponent> bodies, double dt) {
     _empty(dt);
     final inside = <BodyComponent, double>{};
@@ -235,7 +243,8 @@ class BucketComponent(final Rect inner)
         ..applyLinearImpulse(Vector2(spread, -speed) * b.body.mass)
         ..angularVelocity += (2 * random.nextDouble() - 1) * _kickSpin;
     }
-    // The bodies left in it set its level once at rest, unless it's emptying.
+    // Unless it's emptying, the bodies left in it set its level when they come
+    // to rest.
     if (!full) {
       _level = null;
     }
@@ -247,8 +256,8 @@ class BucketComponent(final Rect inner)
     );
   }
 
-  /// Frees [_refund] times the drained area that [bodies] take, kicks the
-  /// other buckets, and shrinks the bodies from the bottom up.
+  /// Subtracts [_refund] times the area of [bodies] from the drained area,
+  /// kicks the other buckets, and shrinks the bodies from the bottom up.
   void _startEmptying(List<BodyComponent> bodies) {
     final game = _game
       ..play(PinballSound.empty)
@@ -277,12 +286,12 @@ class BucketComponent(final Rect inner)
     _arrivals.clear();
   }
 
-  /// Goes on emptying, [dt] seconds further, without tracking the bodies, for
-  /// a game that's over.
+  /// Continues emptying by [dt] seconds without tracking the bodies, for a game
+  /// that's over.
   void finishEmptying(double dt) => _empty(dt);
 
-  /// Shrinks the emptying bodies [dt] seconds further, and removes them once
-  /// done.
+  /// Shrinks the emptying bodies by [dt] more seconds, and removes them when
+  /// emptying is done.
   void _empty(double dt) {
     _emptying.removeWhere((b, _) => b.isRemoving || b.isRemoved);
     if (_emptying.isEmpty) {
@@ -307,7 +316,7 @@ class BucketComponent(final Rect inner)
     super.update(dt);
   }
 
-  /// Fades in [text] for a while, [below] it or above.
+  /// Fades in [text] for a while, below the bucket if [below], or above it.
   void _show(String text, {required bool below}) {
     _texts[below]?.removeFromParent();
     add(
@@ -349,7 +358,7 @@ class BucketComponent(final Rect inner)
   }
 }
 
-/// Shrinks [_body], its shapes and its drawing, as it empties from a bucket,
+/// Shrinks [_body]'s shapes and drawing as a bucket empties it, starting
 /// [start] seconds after the emptying starts.
 class _Shrink(final BodyComponent _body, final double start) {
   static const _smallest = 0.2;
@@ -403,7 +412,7 @@ class _Shrink(final BodyComponent _body, final double start) {
       try {
         body.createShape(scaled, def);
       } on ArgumentError {
-        // Too small for a hull: it goes.
+        // Too small for a hull: the shape is dropped.
       }
     }
     for (final (:component, :position, :scale) in _children) {

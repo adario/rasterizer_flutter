@@ -3,18 +3,18 @@ import 'dart:ui';
 
 /// A tube, in tube units.
 ///
-/// The outline's [points] lie round the tube's axis, at most 1 from it across
-/// and down, and go round to the right along the bottom. Each point starts a
-/// lane, and all the lanes are as wide. A closed tube's last lane goes back to
-/// its first point. An open tube's last point only ends its last lane, and the
-/// ship stops there.
+/// The outline's [points] lie round the tube's axis, at most 1 from it
+/// horizontally and vertically, and run from left to right along the bottom.
+/// Each point starts a lane, and all the lanes have the same width. A closed
+/// tube's last lane goes back to its first point. An open tube's last point
+/// only ends its last lane, and the ship stops there.
 ///
-/// Every tube is [depth] deep, from its rim, at 0, to its far end. The eye is
-/// on the axis, [eye] in front of the rim, so the far end looks
-/// (eye + depth) / eye, 3.8, times smaller than the rim.
+/// Every tube is [depth] deep, from its rim at depth 0 to its far end. The eye
+/// is on the axis, [eye] in front of the rim, so the far end looks
+/// (eye + depth) / eye = 3.8 times smaller than the rim.
 ///
-/// A lane's angle turns a shape's x axis along the lane, and its y axis
-/// toward the inside of the tube, which is deeper.
+/// Turning a shape by a lane's angle lays its x axis along the lane and points
+/// its y axis toward the inside of the tube, which is deeper.
 class Tube(
   final String name,
   final List<Offset> points, {
@@ -32,9 +32,10 @@ class Tube(
     );
   }
 
-  /// Creates a closed star of [tips] tips, with [lanes] lanes an edge. Its
-  /// inner corners are [ratio] as far from the axis as its tips, the first
-  /// inner one at angle [first].
+  /// Creates a closed star with [tips] tips and [lanes] lanes an edge.
+  ///
+  /// Its inner corners are [ratio] times as far from the axis as its tips,
+  /// and the first inner corner is at angle [first].
   factory Tube.star(
     String name,
     int tips,
@@ -52,17 +53,19 @@ class Tube(
     );
   }
 
-  /// Creates a closed gear of [teeth] teeth, with a lane on each tooth's top,
-  /// on each of its flanks and in each gap's root. The flanks slant by [slant]
-  /// off the way to the axis, so that each tooth narrows outward and no lane
-  /// points at the axis. The first tooth's top is centred at angle [first].
+  /// Creates a closed gear with [teeth] teeth, with one lane on each tooth's
+  /// top, on each of its flanks and in each gap's root.
+  ///
+  /// The flanks slant by [slant] away from the direction to the axis, so that
+  /// each tooth narrows outward and no lane points at the axis. The first
+  /// tooth's top is centred at angle [first].
   factory Tube.gear(String name, int teeth, double slant, double first) {
     final turn = 2 * math.pi / teeth;
     // A lane's width is a flank's length, from the rim to the root's radius.
     double widthAt(double root) =>
         math.sqrt(1 + root * root - 2 * root * math.cos(slant));
-    // The root is where a tooth's top, its flanks and a gap's root, all as
-    // wide, take a tooth's turn.
+    // The root's radius is where a tooth's top, its two flanks and a gap's
+    // root, all of the same width, together span a tooth's share of the turn.
     final root = _solve(
       (radius) {
         final width = widthAt(radius);
@@ -90,9 +93,11 @@ class Tube(
     );
   }
 
-  /// Creates a closed clover, as the outline of the example's `clover.svg`: 4
-  /// round lobes of [lanes] lanes, and a side of a lane between each two, the
-  /// first at the bottom.
+  /// Creates a closed clover shaped like the outline of the example's
+  /// `clover.svg`.
+  ///
+  /// It has 4 round lobes of [lanes] lanes each, with a one-lane side between
+  /// each two lobes. The first side is at the bottom.
   ///
   /// The lobes are the SVG's circles. The sides are a little closer to the
   /// axis than the SVG's, so that they're as long as a lane round a lobe.
@@ -101,9 +106,10 @@ class Tube(
     // middles are, and the lobes' radius.
     const middle = 161.562;
     const radius = 132.188;
-    // For sides that far from the axis: how far along a side its ends are
-    // from the lobes' middles, and the angles, from a lobe's middle, at which
-    // its outer arc starts and that it sweeps.
+    // For sides `distance` from the axis, returns how far along a side its
+    // ends are from the lobes' middles. It also returns, seen from a lobe's
+    // middle, the angle where the lobe's outer arc starts and the angle that
+    // the arc sweeps.
     ({double along, double start, double sweep}) lobe(double distance) {
       final along = math.sqrt(
         radius * radius - (distance - middle) * (distance - middle),
@@ -175,9 +181,9 @@ class Tube(
       (points[i] - points[pointAfter(i)]).direction,
   ];
 
-  /// Each lane's angle, unwound: the first lane's, then each lane's the short
-  /// way round from the one before, so that the change from one lane to
-  /// another is how far the outline turns between them.
+  /// Each lane's angle, unwound: the first lane's angle, then each next lane's
+  /// angle, reached the short way round from the one before. So the change
+  /// from one lane to another is how far the outline turns between them.
   late final List<double> headings = () {
     final headings = [angles.first];
     for (var i = 1; i < laneCount; i++) {
@@ -186,11 +192,12 @@ class Tube(
     return headings;
   }();
 
-  /// Returns the angle of a shape [along] [lane], from 0 at its first point to
-  /// 1 at its second, unwound as [headings].
+  /// Returns the angle of a shape at [along] in [lane], unwound as in
+  /// [headings].
   ///
-  /// Within a quarter lane of a corner, it turns between the angles of the
-  /// two lanes there, halfway at the corner.
+  /// [along] runs from 0 at the lane's first point to 1 at its second. Within
+  /// a quarter of a lane from a corner, the angle blends between the angles of
+  /// the two lanes there, and it's halfway between them at the corner.
   double headingAt(int lane, double along) {
     final own = headings[lane];
     final before = neighbour(lane, -1);
@@ -208,8 +215,9 @@ class Tube(
   /// A lane's width, at the rim.
   late final double laneWidth = (points[1] - points[0]).distance;
 
-  /// The lane closest to straight below the axis, where the ship starts; the
-  /// first one, if several are as close.
+  /// The lane closest to straight below the axis, where the ship starts.
+  ///
+  /// If several lanes are equally close, it's the first of them.
   late final int bottomLane = _bottomLane();
 
   /// Where the camera looks, in tube units: a closed tube's axis, or the
@@ -237,19 +245,22 @@ class Tube(
   /// Returns the point that lane [from] and its neighbour [to] share.
   int cornerOf(int from, int to) => to == pointAfter(from) ? to : from;
 
-  /// Returns the angle a shape in lane [from] turns by, about the corner it
-  /// shares with lane [to], to flip onto [to] through the inside of the tube.
+  /// Returns the angle by which a shape in lane [from] turns about the corner
+  /// it shares with lane [to], to flip onto [to] through the inside of the
+  /// tube.
   ///
-  /// The angle is half a turn along a side, less round a convex corner, and
-  /// more round a concave one. The shape lands half a turn off [to]'s angle.
+  /// The angle is half a turn between two lanes on the same side, less round a
+  /// convex corner, and more round a concave one. The shape lands half a turn
+  /// off [to]'s angle.
   double flipAngle(int from, int to) {
     final corner = points[cornerOf(from, to)];
     final start = middles[from] - corner;
     final end = middles[to] - corner;
     final angle = (end.direction - start.direction) % (2 * math.pi);
-    // Turning clockwise, the lane's middle first moves a quarter turn on from
-    // where it is. If that's not toward the inside of the lane, its y axis,
-    // the flip turns the other way.
+    // Turning clockwise about the corner, the lane's middle starts moving a
+    // quarter turn clockwise from its direction from the corner. If that
+    // isn't toward the inside of the lane (its y axis), the flip turns the
+    // other way.
     final inside = rotate(const Offset(0, 1), angles[from]);
     final first = rotate(start, math.pi / 2);
     return first.dx * inside.dx + first.dy * inside.dy > 0
@@ -293,14 +304,14 @@ class Tube(
     );
   }
 
-  /// Returns [from], and the points after it that split the way to [to] into
+  /// Returns [from] and the points after it that split the line to [to] into
   /// [lanes] lanes.
   static List<Offset> _split(Offset from, Offset to, int lanes) => [
     for (var i = 0; i < lanes; i++) Offset.lerp(from, to, i / lanes)!,
   ];
 
-  /// Returns where [f] crosses 0, between [low] and [high], at which its signs
-  /// differ.
+  /// Returns where [f] crosses 0 between [low] and [high], where [f] must have
+  /// opposite signs.
   static double _solve(double Function(double) f, double low, double high) {
     final rising = f(low) < 0;
     var below = low;
@@ -317,7 +328,8 @@ class Tube(
   }
 
   /// Returns the points of a closed outline through [corners], with [lanes]
-  /// lanes an edge, scaled to reach 1 from the axis, across or down.
+  /// lanes an edge, scaled so that it reaches at most 1 from the axis
+  /// horizontally and vertically.
   static List<Offset> _closed(List<Offset> corners, int lanes) {
     final points = [
       for (var k = 0; k < corners.length; k++)
@@ -375,13 +387,12 @@ abstract final class Tubes() {
 
 /// How the game projects its [tube] into the world.
 ///
-/// In play, the rim is [rimScale] times its size in tube units, with lines
-/// [rimPixels] device pixels wide. Lines get thinner with depth, but never
-/// under a device pixel. On the zoom and the drop, [eyeShift] moves the eye
-/// along the axis.
+/// During play, the rim is [rimScale] times its size in tube units, with
+/// lines [rimPixels] device pixels wide. Lines get thinner with depth, but
+/// never thinner than a device pixel. During the zoom and the drop,
+/// [eyeShift] moves the eye along the axis.
 ///
-/// Each change bumps [version], so that the game makes the view's paths
-/// again.
+/// Each change bumps [version], so that the game rebuilds the view's paths.
 class TubeView() {
   /// The width of the tube's lines and of the shapes' strokes at the rim in
   /// play, in device pixels.
@@ -395,7 +406,7 @@ class TubeView() {
   Tube get tube => _tube;
   Tube _tube = Tubes.octagon;
 
-  /// The world units that a tube unit at the rim takes in play.
+  /// The world units that a tube unit at the rim spans during play.
   double get rimScale => _rimScale;
   double _rimScale = 1;
 
@@ -403,8 +414,8 @@ class TubeView() {
   double get devicePixel => _devicePixel;
   double _devicePixel = 1;
 
-  /// How far the eye has moved into the tube from where it is in play, in
-  /// tube units; negative while it zooms in.
+  /// How far the eye has moved into the tube from where it is during play,
+  /// in tube units; negative while it zooms in.
   double get eyeShift => _eyeShift;
   double _eyeShift = 0;
 
@@ -437,9 +448,11 @@ class TubeView() {
     }
   }
 
-  /// How many times as wide as [rimPixels] says the tube's lines and the
-  /// shapes' strokes are: 1, or more for the app icons, which show the game
-  /// small. The stars keep their widths.
+  /// How many times as wide as [rimPixels] the tube's lines and the shapes'
+  /// strokes are.
+  ///
+  /// It's 1, or more for the app icons, which show the game small. The stars
+  /// keep their widths.
   double get lineWidths => _lineWidths;
   double _lineWidths = 1;
 
@@ -450,17 +463,17 @@ class TubeView() {
     }
   }
 
-  /// Bumps [version] for a change outside the view, so that the game makes
-  /// the view's paths again.
+  /// Bumps [version] for a change outside the view, so that the game rebuilds
+  /// the view's paths.
   void invalidate() => _version++;
 
   /// Returns how far from the eye [depth] is, in tube units.
   double distanceOf(double depth) => Tube.eye + depth - _eyeShift;
 
-  /// Returns the world units that a tube unit at [depth] takes.
+  /// Returns the world units that a tube unit at [depth] spans.
   double scaleAt(double depth) => scaleOf(distanceOf(depth));
 
-  /// Returns the world units that a tube unit [distance] from the eye takes.
+  /// Returns the world units that a tube unit [distance] from the eye spans.
   double scaleOf(double distance) => _rimScale * Tube.eye / distance;
 
   /// Returns where an outline [point] at [depth] lands in the world.
@@ -471,17 +484,17 @@ class TubeView() {
   double lineWidthAt(double depth) => tubeLineWidthOf(distanceOf(depth));
 
   /// Returns the width of a line [distance] from the eye: [rimPixels] device
-  /// pixels at the rim in play, and never under one device pixel.
+  /// pixels at the rim during play, and never thinner than one device pixel.
   double lineWidthOf(double distance) =>
       math.max(_devicePixel, rimPixels * _devicePixel * Tube.eye / distance);
 
   /// Returns the width of the tube's line [distance] from the eye: the
-  /// [lineWidthOf] it, [lineWidths] times as wide.
+  /// [lineWidthOf] that distance, times [lineWidths].
   double tubeLineWidthOf(double distance) =>
       _lineWidths * lineWidthOf(distance);
 
   /// The width of the shapes' strokes, in lane units: [rimPixels] device
-  /// pixels at the rim in play, [lineWidths] times as wide. A shape's scale
+  /// pixels at the rim during play, times [lineWidths]. A shape's scale
   /// is its lane's width, so its strokes get thinner with depth, as the
   /// tube's lines do.
   double get shapeStroke =>
@@ -531,8 +544,8 @@ class TubeView() {
   /// The most depth that a segment of a bolt spans.
   static const boltStep = Tube.depth / 10;
 
-  /// Bolts down the middles of the lanes of [bolts], each from its depth to
-  /// the rim, as lines like [tubePath]'s.
+  /// Returns the [bolts] along the middles of their lanes, each from its
+  /// depth to the rim, as lines like [tubePath]'s.
   ///
   /// Each bolt zigzags, with a segment every [boltStep] at most, and corners
   /// at random places across the middle third of its lane.
@@ -566,16 +579,17 @@ class TubeView() {
   /// With 4x MSAA, an edge's coverage changes a quarter of a pixel at a time,
   /// as it crosses rows of samples a quarter of a pixel apart. A tapering line
   /// whose axis lies on a pixel's edge or middle would have both edges cross a
-  /// row at once, so its width would jump by half a pixel. A sixteenth off,
-  /// its edges cross the rows in turn, a quarter of a pixel each.
+  /// row at once, so its width would jump by half a pixel. Moved by a
+  /// sixteenth, its edges cross the rows in turn, so its width changes a
+  /// quarter of a pixel at a time.
   Offset get _lineOffset => Offset(_devicePixel / 16, _devicePixel / 16);
 
   /// Adds a line from [from] at [fromDepth] to [to] at [toDepth] to [path],
   /// as a quad.
   ///
-  /// Each end is [lineWidthAt] its depth wide, and extends by half that
-  /// width, so that lines meeting at a corner close it. It clips the line
-  /// closer than [near], and moves it by [_lineOffset].
+  /// Each end is [lineWidthAt] its depth wide and extends by half that width,
+  /// so that lines meeting at a corner close it. It clips the part of the
+  /// line closer than [near], and moves the line by [_lineOffset].
   void _addLine(
     Path path,
     Offset from,
@@ -610,9 +624,9 @@ class TubeView() {
   /// Adds a filled quad from [a], [aWidth] wide, to [b], [bWidth] wide, to
   /// [path].
   ///
-  /// Its contour stays open, as the fill closes it anyway. Each time the game
-  /// makes a path again, Flame's `PathComponent` would walk a closed contour
-  /// into polygons, which the game doesn't use.
+  /// Its contour stays open, because the fill closes it anyway. For a closed
+  /// contour, Flame's `PathComponent` would compute polygons each time the
+  /// game rebuilds a path, and the game doesn't use them.
   static void _addQuad(
     Path path,
     Offset a,

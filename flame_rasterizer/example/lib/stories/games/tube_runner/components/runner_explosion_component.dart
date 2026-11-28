@@ -8,13 +8,14 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// A burst of rays in [color], placed, turned and scaled as what it destroyed,
-/// as Tube Shooter's `ExplosionComponent` is, with the same shapes and times.
+/// A burst of rays in [color], placed, turned and scaled like what it
+/// destroyed, as Tube Shooter's `ExplosionComponent` is, with the same shapes
+/// and times.
 ///
 /// Over [duration] seconds, it grows to twice its size and its rays fade out.
-/// 8 more rays, between those, fly out from its middle for twice as long,
-/// fading out over the second half, in [rayColor]. Then it removes itself,
-/// after [lifetime].
+/// Eight more rays in [rayColor], between those, fly out from its middle for
+/// twice as long and fade out over the second half. It removes itself after
+/// [lifetime].
 class RunnerExplosionComponent({
   super.position,
   super.angle,
@@ -31,7 +32,7 @@ class RunnerExplosionComponent({
   static const lifetime = 2 * duration;
 
   /// How fast the flying rays move away from the middle, in the burst's own
-  /// units a second, which grow with it.
+  /// units a second, which grow with the burst.
   static const flySpeed = 0.5;
 
   /// The components that draw its burst and its flying rays.
@@ -80,7 +81,9 @@ class RunnerExplosionComponent({
 }
 
 /// A [RunnerExplosionComponent] at [mark], which stays there as the tube
-/// flies, and the game places with [placeAt] where the tube says it shows.
+/// flies by.
+///
+/// The game places it with [placeAt] where the tube says it shows.
 class PlacedExplosionComponent(
   @override final TubeMark mark, {
   final Color? rayColor,

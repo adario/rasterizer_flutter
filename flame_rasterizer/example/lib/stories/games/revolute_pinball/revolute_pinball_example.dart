@@ -38,7 +38,7 @@ enum PinballSound(final String file) {
   String get path => 'assets/audio/$file.wav';
 }
 
-/// The bodies that each drop has: balls and SVGs in turn, or only one kind.
+/// Which bodies each drop holds: balls and SVGs taking turns, or only one kind.
 enum PinballDrops(final String label) {
   mixed('Mixed'),
   balls('Balls'),
@@ -77,11 +77,11 @@ abstract class RevolutePinballExample({
           from: from,
         );
 
-  /// The snapshot that it goes on from, if any.
+  /// The snapshot that the game continues from, if any.
   final RevolutePinballSnapshot? _from = from;
 
-  /// The bodies that were in a bucket before a renderer switch, which the
-  /// bucket takes as at rest.
+  /// The bodies that were in a bucket before a renderer switch. The bucket
+  /// treats them as already at rest.
   final settled = <BodyComponent>{};
 
   static const description = '''
@@ -99,17 +99,17 @@ abstract class RevolutePinballExample({
     balls or only SVGs. The Sound knob turns sounds on and off.
   ''';
 
-  /// The Drops knob's value, for the next drops.
+  /// The Drops knob's value, which applies from the next drop.
   PinballDrops drops = PinballDrops.mixed;
 
-  /// The Sound knob's value. The sounds load the first time it's on.
+  /// The Sound knob's value. The sounds load the first time it's turned on.
   bool get sound => _sound;
   bool _sound = false;
 
   set sound(bool value) {
     _sound = value;
     if (value && _sounds == null) {
-      // At most 3 of each sound at once, as in Tube Shooter, so 24 at most.
+      // GameSounds plays at most 3 of each sound at once, so at most 24 in all.
       (_sounds = GameSounds([
         for (final sound in PinballSound.values) sound.path,
       ])).load();
@@ -142,33 +142,34 @@ abstract class RevolutePinballExample({
   static const _dropped = 10;
   static const _maxBodies = 200;
 
-  /// How long a body below [_restSpeed] stays so to be at rest, in seconds.
+  /// How long a body must stay below [_restSpeed] to be at rest, in seconds.
   static const restTime = 0.5;
   static const _restSpeed = 0.5;
 
-  /// The game ends once [drainedArea] reaches [_drainShare] of the arena's
-  /// area. A drained body adds [_drainCost] times its area to it.
+  /// The game ends when [drainedArea] reaches [_drainShare] of the arena's
+  /// area. Each drained body adds [_drainCost] times its area to it.
   static const _drainShare = 0.1;
   static const _drainCost = 2.0;
 
   static const _hudCap = 12.0;
 
-  /// The room below the table for the HUD's 2 lines, in logical pixels.
+  /// The height below the table that the HUD's 2 lines need, in logical pixels.
   static const _hudBand =
       2 * StoryGame.hudMargin + (1 + VectorTextComponent.lineSpacing) * _hudCap;
 
-  /// The room beside the table for the HUD's widest line, in logical
-  /// pixels: ENERGY 100% or a 5-digit score, with a margin on each side.
+  /// The width beside the table that the HUD's widest line needs, in logical
+  /// pixels: ENERGY 100% or a 5-digit score, plus a margin on each side.
   static final _hudWidth =
       VectorFont.widthOf('ENERGY 100%') * _hudCap / VectorFont.capHeight +
       2 * StoryGame.hudMargin;
 
-  /// The table's smallest width, in its heights, for the HUD to go beside
-  /// it.
+  /// The smallest width-to-height ratio that the table can keep with the HUD
+  /// beside it.
   static const _minAspect = 0.9;
 
-  /// Whether the table fills the game, with the HUD over its bottom corners:
-  /// on a desktop, in a game at least as wide as high.
+  /// Whether the table fills the game, with the HUD over its bottom corners.
+  ///
+  /// It does on a desktop, when the game is at least as wide as it is high.
   static bool fills(double width, double height) =>
       width >= height &&
       switch (defaultTargetPlatform) {
@@ -180,8 +181,8 @@ abstract class RevolutePinballExample({
 
   static bool _fills(Vector2 size) => fills(size.x, size.y);
 
-  /// Whether a table that [fills] the game is only as wide as high, in its
-  /// middle.
+  /// Whether a table that [fills] the game is narrowed to a square in the
+  /// game's middle.
   bool get square => _square;
   bool _square = false;
 
@@ -198,17 +199,18 @@ abstract class RevolutePinballExample({
   /// The table's width in logical pixels, if it [fills] the game.
   double _filledWidth(Vector2 size) => _square ? size.y : size.x;
 
-  /// The band below the table for the HUD: none if the table [_fills] the
-  /// game, or if, narrowed to leave room for the HUD beside it, it's still
+  /// The height of the HUD's band below the table.
+  ///
+  /// It's 0 when the table [_fills] the game. It's also 0 when the table,
+  /// narrowed to make room for the HUD on both sides, is still at least
   /// [_minAspect] times as wide as high, as in landscape on a phone.
   static double _bandFor(Vector2 size) =>
       _fills(size) || size.x - 2 * _hudWidth >= _minAspect * size.y
       ? 0
       : _hudBand;
 
-  /// The pixels a meter: 10, as in Flame's examples, or fewer on a small
-  /// screen, so that the arena is at least [_minWidth] by [_minHeight]
-  /// meters.
+  /// The pixels per meter: 10, as in Flame's examples, or fewer on a small
+  /// screen, so that the arena is at least [_minWidth] by [_minHeight] meters.
   static const _maxZoom = 10.0;
   static const _minWidth = 60.0;
   static const _minHeight = 45.0;
@@ -231,11 +233,12 @@ abstract class RevolutePinballExample({
   @override
   double get minBallRadius => 0.7;
 
-  /// Half the balls', so that a kick throws them farther.
+  /// Half the balls' density, so that a kick throws SVG bodies farther.
   @override
   double get svgDensity => 0.5;
 
-  /// MultipleShapes' path colors: each SVG's own, and the balls' in turn.
+  /// The path colors, as in the MultipleShapes example: each SVG's own color,
+  /// and the next one in turn for each ball.
   @override
   Color nextColor([String? svg]) {
     const colors = OutlinePaints.colors;
@@ -247,15 +250,17 @@ abstract class RevolutePinballExample({
   static const _wireframed = ['spaceship', 'robot'];
   final _wireframes = <String, ExampleSvg>{};
 
-  /// The flame as it is, the [_wireframed] SVGs' wireframes, and the others'
-  /// outlines, drawn as MultipleShapes' paths.
+  /// Draws the flame SVG as it is, the [_wireframed] SVGs as their wireframes,
+  /// and the others as their outlines, with paths as in the MultipleShapes
+  /// example.
   @override
   PositionComponent svgImage(SvgBody body) {
     if (body.name == 'flame') {
       return super.svgImage(body);
     }
     if (_wireframes[body.name] case final wireframe?) {
-      // Its viewBox is the SVG's, grown by half its stroke a side.
+      // The wireframe's viewBox is the SVG's, grown by half its stroke width on
+      // each side.
       final size = body.size.clone()
         ..multiply(wireframe.size)
         ..divide(body.svg.size);
@@ -290,11 +295,11 @@ abstract class RevolutePinballExample({
     super.addBody(body);
   }
 
-  /// A unit circle, which every ball draws, scaled to its radius.
+  /// A unit circle that every ball draws, scaled to its radius.
   static final _circle = Path()
     ..addOval(Rect.fromCircle(center: Offset.zero, radius: 1));
 
-  /// Draws [ball] as MultipleShapes' paths.
+  /// Draws [ball] with paths as in the MultipleShapes example.
   void _drawAsPath(Ball ball) {
     ball
       ..glows = false
@@ -310,16 +315,18 @@ abstract class RevolutePinballExample({
       );
   }
 
-  /// Creates a component of the game's renderer that draws [path] with
-  /// [paintLayers], imported for [maxSize], at a device pixel ratio of up to
-  /// 3.
+  /// Creates a component that draws [path] with [paintLayers] using the game's
+  /// renderer.
+  ///
+  /// [maxSize] is the largest size it's imported for, which allows for a device
+  /// pixel ratio of up to 3.
   PathComponent outlineComponent(
     Path path,
     List<Paint> paintLayers, {
     required double maxSize,
   });
 
-  /// The last trail of each body a flipper kicked.
+  /// The latest trail of each body that a flipper kicked or that hit the wheel.
   final _trails = <BodyComponent, TrailComponent>{};
 
   TableComponent? _table;
@@ -361,8 +368,8 @@ abstract class RevolutePinballExample({
   /// The bodies that have scored in a bucket, which don't score again.
   final scored = <BodyComponent>{};
 
-  /// Kicks the bodies in the buckets other than [except], which starts
-  /// emptying.
+  /// Kicks the bodies in every bucket except [except], which is starting to
+  /// empty.
   void kickBuckets({required BucketComponent except}) {
     for (final bucket in _buckets) {
       if (bucket != except) {
@@ -372,9 +379,8 @@ abstract class RevolutePinballExample({
     play(PinballSound.flip);
   }
 
-  /// The energy that the bodies gone through the drain took, as
-  /// [_drainCost] times their area, less what full buckets gave back, in
-  /// square meters.
+  /// The energy that drained bodies have taken, in square meters: [_drainCost]
+  /// times their area, minus what full buckets gave back.
   double drainedArea = 0.0;
 
   var _over = false;
@@ -395,13 +401,15 @@ abstract class RevolutePinballExample({
   /// The last bodies dropped, with how long each has been at rest.
   var _current = <BodyComponent, double>{};
 
-  /// The table's largest width, in its heights.
+  /// The table's largest width-to-height ratio.
   static const _maxAspect = 1.2;
 
-  /// The table, in meters: the whole game if it [_fills] the game, or its
-  /// middle if [square]. Else the game's area above the HUD's band, or
-  /// between the HUD's sides without the band, centered and at most
-  /// [_maxAspect] times as wide as high.
+  /// The table's rectangle, in meters.
+  ///
+  /// When the table [_fills] the game, it covers the whole game, or only the
+  /// game's middle square if [square]. Otherwise it covers the game's area
+  /// above the HUD's band or, without a band, between the HUD's two sides. It's
+  /// centered and at most [_maxAspect] times as wide as high.
   Rect get _arena {
     if (_fills(size)) {
       return Rect.fromCenter(
@@ -461,7 +469,8 @@ abstract class RevolutePinballExample({
       banner.scale.setAll(bannerScale);
     }
     super.onGameResize(size);
-    // A rebuilt widget resizes the game to the same size.
+    // A rebuilt widget resizes the game to the same size, which needs no new
+    // table.
     if (isLoaded && size != _tableSize) {
       _buildTable();
     }
@@ -471,17 +480,19 @@ abstract class RevolutePinballExample({
   final _tableSize = Vector2.zero();
 
   /// Rebuilds the walls, the guides, the flippers, the wheel and the buckets
-  /// for the arena's size. The wheel goes on from [wheel], if any.
+  /// for the arena's size. The wheel continues from [wheel], if given.
   void _buildTable({WheelSnapshot? wheel}) {
     _tableSize.setFrom(size);
     final a = _arena;
-    // From the smaller side, so that a wide table looks as a square one.
+    // Sized from the smaller side, so that a wide table looks like a square
+    // one.
     final small = math.min(a.width, a.height);
     final drain = math.max(0.06 * small, SvgBodies.maxSide);
-    // Longer on a table narrowed for a phone.
+    // Longer when the table doesn't fill the game, as on a phone.
     final flipper = (_fills(size) ? 0.18 : 0.24) * small;
-    // The left flipper and guide, mirrored for the right ones: the tip ends
-    // at the drain, and the guide's recess under it at the bottom.
+    // Builds the left flipper and guide, and mirrors them for the right ones.
+    // The flipper's tip ends at the drain, and the guide's recess under the tip
+    // reaches the table's bottom.
     const angle = restAngle;
     const gap = FlipperComponent.gap;
     final bottom = FlipperComponent.bottomAngle(flipper);
@@ -517,8 +528,9 @@ abstract class RevolutePinballExample({
       Vector2(a.left, a.bottom),
     ];
     final bucketWidth = math.max(0.2 * a.width, 2 * SvgBodies.maxSide);
-    // As deep on a table taller than wide, for as many bodies as on a wider
-    // one, where its height is the smaller side.
+    // From the height even on a table taller than wide, so that the bucket
+    // holds as many bodies as on a wider table, where the height is the smaller
+    // side.
     final bucketHeight = 0.2 * a.height;
     final bucketTop = a.top + 0.15 * a.height;
     final bucketBottom = bucketTop + bucketHeight + BucketComponent.thickness;
@@ -538,8 +550,9 @@ abstract class RevolutePinballExample({
           FlipperComponent(Vector2(-side * pivot.x, pivot.y), flipper, side),
       ],
       _wheel = CircleShuffler(
-        // Level with the buckets' bottom, or, on a table taller than wide,
-        // with its top there, so that it throws the bodies under the buckets.
+        // Its center is level with the buckets' bottom. On a table taller than
+        // wide, its top is there instead, so that it throws the bodies under
+        // the buckets.
         Vector2(0, bucketBottom + (a.height > a.width ? wheelReach : 0)),
         scale: wheelReach / CircleShuffler.reach,
         color: ExampleColors.dynamicColor(0),
@@ -575,9 +588,10 @@ abstract class RevolutePinballExample({
     }
   }
 
-  /// Releases the flippers and shows GAME OVER until a key or a tap. The
-  /// table goes on, but drained bodies take no energy, and the buckets don't
-  /// score.
+  /// Releases the flippers and shows GAME OVER until a key press or a tap.
+  ///
+  /// The table keeps running, except that drained bodies take no energy and the
+  /// buckets don't score.
   void _endGame() {
     _over = true;
     for (final flipper in _flippers) {
@@ -642,8 +656,8 @@ abstract class RevolutePinballExample({
     }
   }
 
-  /// Whether [body] is gone through the drain, counts in a bucket, or has
-  /// been at rest for [restTime], after [dt] more seconds.
+  /// Whether [body] has drained, counts in a bucket, or has been at rest for
+  /// [restTime], after [dt] more seconds.
   bool _done(BodyComponent body, double dt) {
     if (body.isRemoving || body.isRemoved) {
       return true;
@@ -677,13 +691,15 @@ abstract class RevolutePinballExample({
     return false;
   }
 
-  /// How long a body that hits the wheel and trails slows it down, in
-  /// seconds for each meter a second that it hits it with, once
-  /// [_dropGrace] seconds have passed since the last drop.
+  /// How long a body that hits the wheel and starts a trail brakes the wheel,
+  /// in seconds per meter a second of its hit speed.
+  ///
+  /// Hits brake the wheel only after [_dropGrace] seconds have passed since the
+  /// last drop.
   static const _brakePerSpeed = 0.05;
   static const _dropGrace = 2.5;
 
-  /// How fast a body must hit a wall, a slide or a bucket to sound, in
+  /// How fast a body must hit a wall, a slide or a bucket to make a sound, in
   /// meters a second.
   static const _minHitSpeed = 4.0;
   var _sinceDrop = double.infinity;
@@ -710,7 +726,8 @@ abstract class RevolutePinballExample({
         body.isLoaded && body.body.position.y > bottom;
     final gone = [...svgBodies.where(drained), ...balls.where(drained)];
     if (gone.isNotEmpty) {
-      // Once the game is over, they go without a sound or energy.
+      // After the game is over, drained bodies take no energy and make no
+      // sound.
       if (!_over) {
         drainedArea +=
             _drainCost * gone.fold(0.0, (sum, body) => sum + area(body));
@@ -796,8 +813,8 @@ class RevolutePinballWorld()
         flipper.touching.forEach(gameRef._kicked);
       }
     }
-    // Besides the wheel's, hits come from the walls, the slides and the
-    // buckets, which alone report them.
+    // Except for the wheel, only the walls, the slides and the buckets report
+    // hits.
     final wheelBody = gameRef._wheel?.isLoaded ?? false
         ? gameRef._wheel!.body
         : null;
@@ -815,8 +832,8 @@ class RevolutePinballWorld()
         gameRef.play(bucket ? PinballSound.bucket : PinballSound.bump);
       }
     }
-    // A body hitting the wheel trails as if kicked, and slows it down by how
-    // hard it hit it.
+    // A body that hits the wheel starts a trail as if kicked, and brakes the
+    // wheel by how hard it hit.
     if (gameRef._wheel case final wheel? when wheel.isLoaded) {
       Body? other(Shape a, Shape b) => !a.isValid || !b.isValid
           ? null

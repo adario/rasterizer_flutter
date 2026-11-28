@@ -11,19 +11,20 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flutter/foundation.dart';
 
-/// What a game for another renderer goes on from: its runner's snapshot, the
-/// score and the lives.
+/// What the game resumes from when it switches to another renderer: its
+/// runner's snapshot, the score and the lives.
 typedef TubeRunnerSnapshot = ({RunnerSnapshot runner, int score, int lives});
 
 /// A prototype of an endless runner, where running is flying: see
 /// [description].
 ///
 /// It borrows Tube Shooter's tube, ship, stars and view. Its [runner] flies
-/// the ship, and plays by the rules: it hands the mode the player's input.
-/// Subclasses pick the component that draws a path: see [pathComponent].
+/// the ship and plays by the rules, and the game hands that mode the
+/// player's input. Subclasses pick the component that draws a path: see
+/// [pathComponent].
 ///
-/// Given the snapshot of a game with another renderer, it goes on from there:
-/// see [snapshot].
+/// Given the snapshot of a game with another renderer, it resumes from
+/// there: see [snapshot].
 abstract class TubeRunnerExample({
   required super.status,
   super.random,
@@ -41,13 +42,15 @@ abstract class TubeRunnerExample({
   /// The run, and the rules it plays by.
   final runner = RunnerMode(from: from?.runner);
 
-  /// What a game for another renderer goes on from.
+  /// What a game with another renderer resumes from.
   TubeRunnerSnapshot get snapshot =>
       (runner: runner.snapshot, score: score, lives: lives);
 
-  /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
-  /// SVG, down [tube], one of [tubes], or the hexagon, which goes on from
-  /// [from], if any.
+  /// Creates the game for [renderer], using Flame's `PathComponent` for
+  /// Flame SVG.
+  ///
+  /// The ship flies down [tube], one of [tubes], or else the hexagon. Given
+  /// [from], the game resumes from that snapshot.
   factory TubeRunnerExample.of(
     SvgRenderer renderer,
     ValueNotifier<String> status, {
@@ -69,7 +72,8 @@ abstract class TubeRunnerExample({
           from: from,
         );
 
-  /// The tubes it can fly down: Tube Shooter's, in the order of its levels.
+  /// The tubes the ship can fly down: Tube Shooter's, in the order of its
+  /// levels.
   static final tubes = [for (final level in levels) level.tube];
 
   static const description = '''
@@ -135,10 +139,10 @@ abstract class TubeRunnerExample({
     numbers, the tube's quads and the paths made each second.
   ''';
 
-  /// The tube it flies down, one of [tubes].
+  /// The tube the ship flies down, one of [tubes].
   Tube get tube => view.tube;
 
-  /// Changes the tube where the ship is, without a stop: see
+  /// Switches to another tube where the ship is, without stopping: see
   /// [RunnerMode.switchTube].
   set tube(Tube value) {
     final from = view.tube;
@@ -153,7 +157,8 @@ abstract class TubeRunnerExample({
 
   @override
   Future<void> onLoad() async {
-    // Fits the view before the ship loads: it sizes its import for the view.
+    // Fits the view before the ship loads, as the ship sizes the import of
+    // its shape for the view.
     await super.onLoad();
     world.add(runner);
     startStatus();

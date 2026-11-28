@@ -3,21 +3,22 @@ import 'dart:ui';
 /// A font of straight lines: capitals, digits, a space, a colon,
 /// a period, a dash, a slash and a percent sign.
 ///
-/// Each glyph is polylines through the points of a grid [width] wide and
-/// [capHeight] tall, half points included, with y down and the baseline at
-/// the bottom. Glyphs are stroked [stroke] wide, with miter
-/// joins and square ends. The font makes each glyph's path once, and all the
-/// glyph's components share it, so each glyph costs one import.
+/// Each glyph is a set of polylines through the points of a grid [width]
+/// wide and [capHeight] tall, including half points. The y axis points down,
+/// and the baseline is at the bottom. Glyphs are stroked [stroke] wide, with
+/// miter joins and square ends. The font makes each glyph's path once, and
+/// every component that shows the glyph shares it, so each glyph is imported
+/// only once.
 ///
 /// No join is sharper than 60°, so that its miter stays within a stroke's
 /// width of its point, whatever the renderer's miter limit. Sharper corners
-/// are two polylines.
+/// are drawn as two separate polylines.
 abstract final class VectorFont() {
   static const width = 4.0;
   static const capHeight = 6.0;
 
-  /// From one glyph's left edge to the next's: the glyph's width, plus a gap
-  /// of 2.
+  /// The distance from one glyph's left edge to the next one's: the glyph's
+  /// width plus a gap of 2.
   static const advance = 6.0;
 
   /// The strokes' width, an eighth of the cap height.
@@ -51,8 +52,8 @@ abstract final class VectorFont() {
 
   /// Each glyph's polylines, with their points written as in an SVG polyline.
   ///
-  /// A closed shape starts and ends in the middle of a straight line, where
-  /// its square ends meet unseen.
+  /// A closed shape starts and ends in the middle of a straight line, so that
+  /// its two square ends meet there without a visible seam.
   static const _polylines = {
     'A': ['0,6 0,2 2,0 4,2 4,6', '0,4 4,4'],
     'B': ['0,3 3,3 4,4 4,5 3,6 0,6 0,0 3,0 4,1 4,2 3,3'],

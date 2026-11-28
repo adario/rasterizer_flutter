@@ -7,11 +7,12 @@ import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/components/outlined.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 
-/// A flipper [_length] meters from its pivot's center to its tip's, on the
-/// left of its [_pivot] if [_side] is 1, or on the right if -1. It lies in a
-/// guide's recess at rest, its flat top along the guide. Holding it kicks it
-/// up with a spring, which holds it at the top. Released, it falls back,
-/// and bounces.
+/// A flipper [_length] meters long from its pivot's center to its tip's.
+///
+/// It extends to the left of its [_pivot] if [_side] is 1, or to the right if
+/// it's -1. At rest, it lies in a guide's recess, with its flat top along the
+/// guide. Holding it kicks it up with a spring, which keeps it at the top. When
+/// released, it falls back and bounces.
 class FlipperComponent(
   final Vector2 _pivot,
   final double _length,
@@ -23,12 +24,14 @@ class FlipperComponent(
   static const radius = 0.6;
   static const tipRadius = 0.3;
 
-  /// The room between it and its guide's recess.
+  /// The gap between it and its guide's recess.
   static const gap = 0.1;
 
-  /// The collision group of the flippers and the guides, which don't
-  /// collide, so that a kick, which stretches its joint, doesn't rub the
-  /// flipper against its recess.
+  /// The collision group of the flippers and the guides, which keeps them from
+  /// colliding.
+  ///
+  /// A kick stretches the flipper's joint, and this keeps the flipper from
+  /// rubbing against its recess.
   static const group = -1;
 
   static const _segments = 16;
@@ -63,21 +66,22 @@ class FlipperComponent(
         : [for (final v in left.reversed) Vector2(-v.x, v.y)];
   }();
 
-  /// The spring that kicks it up and holds it there: its frequency, in
-  /// hertz, and its damping ratio, around the pivot, so that it's up in
-  /// about 80 ms, and rebounds about 4°.
+  /// The frequency, in hertz, and the damping ratio of the spring that kicks it
+  /// up and holds it there, around the pivot. With these, it's up in about
+  /// 80 ms and rebounds about 4°.
   static const _kickHertz = 6.0;
   static const _kickDamping = 0.55;
 
-  /// Its angle above the horizontal when fully kicked, and the room above
-  /// it for the rebound.
+  /// Its angle above the horizontal when fully kicked, and the extra angle
+  /// above that for the rebound.
   static const _upAngle = 40 * math.pi / 180;
   static const _reboundAngle = 5 * math.pi / 180;
 
   /// How much faster than the other bodies it falls.
   static const _gravityScale = 16.0;
 
-  /// Less than the other bodies', so that they slow it as it hits them.
+  /// Lower than the other bodies' density, so that they slow it down when it
+  /// hits them.
   static const _density = 0.3;
 
   final _holders = <Object>{};
@@ -110,7 +114,8 @@ class FlipperComponent(
     touching.removeWhere((other) => !other.isValid);
   }
 
-  /// Whether it kicked.
+  /// Adds [holder], and kicks the flipper if it's the first holder. Returns
+  /// whether it kicked.
   bool hold(Object holder) {
     final kick = _holders.isEmpty && isLoaded;
     if (kick) {
@@ -131,8 +136,8 @@ class FlipperComponent(
   /// Releases it from all its holders.
   void releaseAll() => _holders.toList().forEach(release);
 
-  /// The share of its fall's speed that it bounces back up with as it lands
-  /// at rest, from a fall faster than [_minBounce] radians a second.
+  /// The share of its falling speed that it bounces back up with when it lands
+  /// at rest after falling faster than [_minBounce] radians a second.
   static const _bounce = 0.3;
   static const _minBounce = 3.0;
 
@@ -146,7 +151,8 @@ class FlipperComponent(
     final atRest =
         (_joint.angle + _side * RevolutePinballExample.restAngle).abs() < 0.01;
     if (_holders.isEmpty && atRest && _falling > _minBounce && falling < 1) {
-      // Around the pivot, so that the joint doesn't take most of it away.
+      // Spins it around the pivot, so that the joint doesn't absorb most of the
+      // bounce.
       final speed = _side * _bounce * _falling;
       final arm = body.worldCenterOfMass - _pivot;
       body
@@ -180,8 +186,8 @@ class FlipperComponent(
         enableContactEvents: true,
       ),
     );
-    // Box2D's spring works on the inertia around the center of mass, so it's
-    // set stiffer, as for the inertia around the pivot.
+    // Box2D's spring uses the inertia around the center of mass, so this makes
+    // it stiffer to match the inertia around the pivot.
     final inertia = body.rotationalInertia;
     final stiffer = math.sqrt(
       (inertia + body.mass * body.localCenterOfMass.length2) / inertia,

@@ -4,15 +4,17 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// Draws the tube's lines, and the ship's [lane] over them in the ship's
-/// colour, but for while the ship arrives from a run, when the run draws
-/// them.
+/// Draws the tube's lines, with the ship's [lane] over them in the ship's
+/// colour.
+///
+/// While the ship arrives from a run, this draws neither, because the run
+/// draws them.
 ///
 /// flame_rasterizer treats a path as immutable, so whenever the view changes,
-/// this makes both paths again, each with a new component in the game's tube
-/// group. The view changes on every frame of the zoom and the drop, and when
-/// the window or the Zoom knob changes. The lane's path also changes as the
-/// ship changes lanes.
+/// this rebuilds both paths, each as a new component in the game's tube group.
+/// The view changes on every frame of the zoom and the drop, and when the
+/// window or the Zoom knob changes. The lane's path also changes when the ship
+/// moves to another lane.
 ///
 /// Its priority makes it update after the components that move, so that it
 /// draws the view they moved in.
@@ -21,7 +23,7 @@ class TubeComponent()
     with HasGameRef<TubeHost>, InShooterMode {
   this : super(priority: 10);
 
-  /// The lane to show over the tube, if any: the ship's, in play.
+  /// The lane to highlight over the tube, if any: the ship's lane during play.
   int? lane;
 
   PathComponent? _tube;

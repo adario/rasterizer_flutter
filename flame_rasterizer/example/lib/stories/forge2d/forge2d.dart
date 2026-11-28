@@ -30,18 +30,18 @@ WidgetbookComponent forge2dStories() {
   );
 }
 
-/// The Revolute Joint Svgs game for [settings], over a status bar.
+/// The Revolute Joint Svgs game for [settings], above a status bar.
 ///
-/// A new renderer or flame_svg [cache] makes a new game, with a new physics
-/// world, which goes on with the same bodies, from where they were. The other
-/// knobs change the same game.
+/// A new renderer or flame_svg [cache] makes a new game with a new physics
+/// world, which resumes with the same bodies where they were. The other knobs
+/// change the running game.
 class const RevoluteJointSvgsStory({
   required final RevoluteJointSvgsSettings settings,
 
-  /// The camera's zoom, on top of the world's 10 pixels a meter.
+  /// The camera's zoom, on top of the world's scale of 10 pixels a meter.
   final double zoom = 1,
 
-  /// The physics' speed, from 0, which stands still, to 2.
+  /// The physics' speed, from 0 (standing still) to 2.
   final double speed = 1,
 
   /// flame_svg's cache settings, for Flame SVG.

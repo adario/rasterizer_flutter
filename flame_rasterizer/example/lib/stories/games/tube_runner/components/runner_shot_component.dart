@@ -7,13 +7,15 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// What a shot in a game for another renderer goes on from: its lane, where
-/// it is along the axis, and where it was before it last moved.
+/// What a shot resumes from when the game switches to another renderer: its
+/// lane, where it is along the axis, and where it was before it last moved.
 typedef RunnerShotSnapshot = ({int lane, double at, double previousAt});
 
-/// A shot from the ship, which flies down its [lane] from [at], as Tube
-/// Shooter's `ShotComponent` does, with the same shape, colour and speed
-/// ahead of the ship, and is gone [range] ahead of it.
+/// A shot from the ship that flies down its [lane] from [at], as Tube
+/// Shooter's `ShotComponent` does.
+///
+/// It has the same shape and colour, and flies ahead of the ship at the same
+/// speed. It is gone when it gets [range] ahead of the ship.
 ///
 /// The game moves it with [fly].
 class RunnerShotComponent(final int lane, var double at)
@@ -21,8 +23,8 @@ class RunnerShotComponent(final int lane, var double at)
     with HasGameRef<TubeHost>, HasVisibility, TubePlaced {
   this : super(priority: 2);
 
-  /// How fast it flies ahead of the ship, in tube units a second: across
-  /// Tube Shooter's tube in its `ShotComponent.crossTime`.
+  /// How fast it flies ahead of the ship, in tube units a second: fast
+  /// enough to cross Tube Shooter's tube in `ShotComponent.crossTime`.
   static const speed = Tube.depth / ShotComponent.crossTime;
 
   /// How far ahead of the ship it goes, in tube units.
@@ -52,27 +54,27 @@ class RunnerShotComponent(final int lane, var double at)
     gameRef.keepStroke(drawing);
   }
 
-  /// Flies over [dt] seconds, with the ship, at [shipSpeed], and [speed]
-  /// ahead of it.
+  /// Flies over [dt] seconds at the ship's [shipSpeed] plus its own
+  /// [speed].
   void fly(double dt, double shipSpeed) {
     previousAt = at;
     at += (shipSpeed + speed) * dt;
   }
 }
 
-/// A shot from a climber, which climbs its [lane] toward the ship from [at],
-/// [speed] along the axis, with the shape and colour of Tube Shooter's
-/// `EnemyShotComponent`.
+/// A shot from a climber that climbs its [lane] toward the ship from [at],
+/// at [speed] along the axis.
 ///
-/// The game moves it with [climb], and removes it once it passes the ship,
-/// which it destroys if the ship is in its lane.
+/// It has the shape and colour of Tube Shooter's `EnemyShotComponent`. The
+/// game moves it with [climb], and removes it when it reaches the ship. If
+/// the ship is in its lane, the shot destroys it.
 class RunnerEnemyShotComponent(final int lane, var double at)
     extends PositionComponent
     with HasGameRef<TubeHost>, HasVisibility, TubePlaced {
   this : super(priority: 2);
 
-  /// How fast it climbs its lane, along the axis, in tube units a second:
-  /// faster than the climber that fires it, by half as much.
+  /// How fast it climbs its lane along the axis, in tube units a second:
+  /// half as fast again as the climber that fires it.
   static const speed = 1.5;
 
   /// Where it was along the axis before it last climbed.

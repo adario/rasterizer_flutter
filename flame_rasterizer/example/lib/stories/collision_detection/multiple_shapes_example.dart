@@ -21,8 +21,8 @@ typedef MultipleShapesSettings = ({
   int count,
 });
 
-/// A shape's pick: the index of its SVG or outline's size, and its width at
-/// a scale of 1.
+/// What a shape picks at random: the index of its SVG's or outline's size, and
+/// its width at a scale of 1.
 typedef ShapePick = ({int sizeIndex, double width});
 
 /// What the example's shapes are.
@@ -31,19 +31,22 @@ enum Shapes(final String label) {
   svgs('SVGs'),
 
   /// SVGs' outlines, each as one path, filled and stroked in a color of its
-  /// own. A [RasterizerPathComponent] draws each with flame_rasterizer, and
-  /// Flame's [PathComponent] with Flame SVG.
+  /// own.
+  ///
+  /// A [RasterizerPathComponent] draws each one with flame_rasterizer, and
+  /// Flame's [PathComponent] draws it with Flame SVG.
   paths('Paths'),
 }
 
 /// Shapes and a snowman that move, spin and collide: see [description].
 ///
-/// [count] shapes, from SVGs picked at random, fill the arena in rows. The
-/// arena is a rectangle of the game's size, centred on the world's origin.
-/// The shapes are the SVGs, or their outlines, as [shapes] says. The status
-/// adds the shapes and those colliding now to [ExampleGame]'s.
+/// [count] shapes, made from SVGs picked at random, fill the arena in rows. The
+/// arena is a rectangle of the game's size, centered on the world's origin. The
+/// shapes are the SVGs or their outlines, as [shapes] says. The status adds the
+/// number of shapes, and of those colliding at the moment, to what
+/// [ExampleGame] shows.
 ///
-/// Given the snapshot of a game with another renderer, it goes on from there,
+/// Given the snapshot of a game with another renderer, the game resumes from it
 /// with the same shapes: see [MultipleShapesSnapshots].
 abstract class MultipleShapesExample({
   required final Shapes shapes,
@@ -52,8 +55,10 @@ abstract class MultipleShapesExample({
   math.Random? random,
   MultipleShapesSnapshot? from,
 }) extends ExampleGame with ExampleSvgs, HasCollisionDetection {
-  /// Creates the game for [settings]' renderer and shapes, with flame_svg's
-  /// [cache] for Flame SVG, which goes on from [from], if any.
+  /// Creates the game for the renderer and shapes in [settings], resuming from
+  /// [from] if given.
+  ///
+  /// Flame SVG uses flame_svg's [cache] settings.
   factory MultipleShapesExample.of(
     MultipleShapesSettings settings,
     ValueNotifier<String> status, {
@@ -119,14 +124,14 @@ abstract class MultipleShapesExample({
 
   final math.Random random = random ?? math.Random();
 
-  /// The snapshot that it goes on from, if any.
+  /// The snapshot that the game resumes from, if any.
   final MultipleShapesSnapshot? _from = from;
 
-  /// The Shape Number knob's value, the snowman aside.
+  /// The value of the Shape Number knob, not counting the snowman.
   ///
-  /// A new value changes the running game: it adds shapes where there's
-  /// room, or removes the last ones. Then it resizes them all to the scale at
-  /// which as many fit in the rows.
+  /// A new value changes the running game: it adds shapes where there's room or
+  /// removes the last ones. Then it resizes them all to the largest scale at
+  /// which that many shapes fit in the rows.
   int get count => _count;
   set count(int value) {
     if (value == _count) {
@@ -157,18 +162,21 @@ abstract class MultipleShapesExample({
   /// Paths.
   final _outlines = <SvgOutline>[];
 
-  /// The size of each SVG or outline. Its shapes keep its aspect ratio.
+  /// The size of each SVG or outline. The shapes made from it keep its aspect
+  /// ratio.
   final _sizes = <Vector2>[];
 
-  /// For each shape, the index in [_sizes] and the width at a scale of 1
-  /// picked for it. It holds at least as many as there are shapes.
+  /// The index in [_sizes] and the width at a scale of 1 picked for each shape.
+  ///
+  /// It holds at least one pick for each shape.
   final _picks = <ShapePick>[];
 
   /// Whether [onLoad] has laid out the first shapes in rows.
   bool _laidOut = false;
 
-  /// Creates a component that draws [path] with [paintLayers]. Its polygons
-  /// sample the path every [sampling], in the path's units.
+  /// Creates a component that draws [path] with [paintLayers].
+  ///
+  /// Its polygons sample the path every [sampling] units of the path.
   PathComponent pathComponent(
     ui.Path path,
     List<ui.Paint> paintLayers,
@@ -219,8 +227,8 @@ abstract class MultipleShapesExample({
     startStatus();
   }
 
-  /// Keeps its first [count] shapes and adds new ones, all at the scale at
-  /// which [count] shapes fit in the rows.
+  /// Keeps the first [count] shapes and adds new ones, all at the largest scale
+  /// at which [count] shapes fit in the rows.
   ///
   /// At the start, the new shapes go in the rows. Later, they go wherever
   /// there's room.
@@ -256,8 +264,8 @@ abstract class MultipleShapesExample({
     }
   }
 
-  /// Creates a shape of the [k]th SVG, or of its outline, at [position] and
-  /// of [size], with a random velocity and rotation speed.
+  /// Creates a shape from the [k]th SVG or its outline, at [position] and of
+  /// [size], with a random velocity and rotation speed.
   TintedShape _shape(
     int k, {
     required Vector2 position,
@@ -276,7 +284,8 @@ abstract class MultipleShapesExample({
     }
     final outline = _outlines[k];
     final rect = outline.rect;
-    // Sample its polygons every unit of its size, as its hitbox does.
+    // Sample the polygons once per unit of the shape's size, as its hitbox
+    // does.
     final units = math.max(size.x / rect.width, size.y / rect.height);
     return TintedPath(
       outline,
@@ -288,24 +297,25 @@ abstract class MultipleShapesExample({
     );
   }
 
-  /// Creates [OutlinePaints] for the [k]th outline's path, in its color.
+  /// Creates [OutlinePaints] for the path of the [k]th outline, in the
+  /// outline's color.
   ///
-  /// Every shape of the outline gets equal paints, so with flame_rasterizer
-  /// they all share one import. Each shape still gets its own paints, so
-  /// that each is tinted on its own.
+  /// All the shapes of an outline get equal paints, so with flame_rasterizer
+  /// they share one import. Each shape still gets its own paint objects, so
+  /// that each one is tinted separately.
   List<ui.Paint> _pathPaints(int k) => OutlinePaints.of(
     OutlinePaints.colors[k % OutlinePaints.colors.length],
     _outlines[k].rect.longestSide,
   );
 
-  /// Returns the size of its [i]th shape at [scale].
+  /// Returns the size of the [i]th shape at [scale].
   Vector2 _sizeOf(int i, double scale) {
     final (:sizeIndex, :width) = _picks[i];
     final aspect = _sizes[sizeIndex];
     return Vector2(width, width * aspect.y / aspect.x)..scale(scale);
   }
 
-  /// Returns the largest scale, up to 1 and in hundredths, at which [target]
+  /// Returns the largest scale, up to 1 and in steps of 0.01, at which [target]
   /// shapes fit in the rows.
   double _scaleFor(int target) {
     for (var percent = 100; percent > 1; percent--) {
@@ -316,11 +326,12 @@ abstract class MultipleShapesExample({
     return 0.01;
   }
 
-  /// Returns the centers of as many of the first [target] shapes as fit in
-  /// Flame's example's rows at [scale], from the arena's top left corner.
+  /// Returns the centers of as many of the first [target] shapes as fit in the
+  /// rows of Flame's example at [scale], relative to the arena's top left
+  /// corner.
   ///
-  /// The first shape goes after the snowman, taking the snowman's top left
-  /// corner as its center. Each other shape goes after the one before, or at
+  /// The first shape goes after the snowman, treating the snowman's top left
+  /// corner as its center. Each other shape goes after the one before it, or at
   /// the start of a new row.
   List<Vector2> _rows(double scale, int target) {
     final gap = _gap * scale;
@@ -356,8 +367,8 @@ abstract class MultipleShapesExample({
 /// A component that moves with [velocity] and spins at [rotationSpeed], in
 /// radians a second.
 ///
-/// It wraps around the game's arena once it's outside. It stops while
-/// dragged, and the drag throws it when it ends.
+/// It wraps around to the other side of the game's arena when it leaves it. It
+/// stops while dragged, and the drag throws it when it ends.
 abstract class MovingCollidable({
   required super.position,
   required super.size,
@@ -380,8 +391,10 @@ abstract class MovingCollidable({
     _wrap();
   }
 
-  /// Brings it back in on the other side of the arena once it's wholly
-  /// outside, as in Flame's example. Its rotation doesn't count.
+  /// Brings it back in on the other side of the arena when it's wholly outside,
+  /// as in Flame's example.
+  ///
+  /// Its rotation doesn't count: the check uses its unrotated size.
   void _wrap() {
     final game = findGame();
     if (game is! MultipleShapesExample) {
@@ -440,9 +453,9 @@ class _DragIndicator() extends PositionComponent {
 /// A shape with an [SvgHitbox] from an SVG's [outline], tinted while it
 /// collides.
 ///
-/// It's tinted green while it collides with another shape, and purple with
-/// the arena's walls, as in Flame's example. The tint is a color filter, as
-/// Flame's `tint` sets.
+/// It's tinted green while it collides with another shape, and purple while it
+/// collides with the arena's walls, as in Flame's example. The tint is a color
+/// filter, like the one that Flame's `tint` sets.
 abstract class TintedShape(
   final SvgOutline outline, {
   required super.position,
@@ -464,8 +477,8 @@ abstract class TintedShape(
   @protected
   void fitImage();
 
-  /// The color filter that it's drawn with: `tint`'s while it collides, else
-  /// none.
+  /// The color filter that it's drawn with: the one from `tint` while it
+  /// collides, or null otherwise.
   @visibleForTesting
   ui.ColorFilter? get tintFilter;
 
@@ -480,7 +493,7 @@ abstract class TintedShape(
     addAll([image, SvgHitbox(outline, size: size)]);
   }
 
-  /// Resizes it, and its image, to [value]. Its hitbox follows its size.
+  /// Resizes it and its image to [value]. Its hitbox follows its size.
   void resize(Vector2 value) {
     size = value;
     fitImage();
@@ -540,13 +553,13 @@ class TintedSvg(
   }
 }
 
-/// An SVG's outline, which [image], a [PathComponent] of its path, draws.
+/// An SVG's outline, drawn by [image], a [PathComponent] of the outline's path.
 ///
-/// A [RasterizerPathComponent] applies its `paint` over its paint layers, as
-/// a [RasterizerSvgComponent] does. So it's tinted with Flame's `tint`, and
-/// flame_rasterizer makes the tint's filter, so that tinted paths share a
-/// run. Flame's own [PathComponent] doesn't apply its `paint` with paint
-/// layers, so each of its layers gets `tint`'s filter instead.
+/// A [RasterizerPathComponent] applies its `paint` over its paint layers, as a
+/// [RasterizerSvgComponent] does. So it's tinted with Flame's `tint`, and
+/// flame_rasterizer makes the tint's filter, so that tinted paths share a run.
+/// Flame's own [PathComponent] doesn't apply its `paint` when it has paint
+/// layers, so each of its layers gets a filter like `tint`'s instead.
 class TintedPath(
   super.outline,
   @override final PathComponent image, {
@@ -555,8 +568,8 @@ class TintedPath(
   required super.velocity,
   required super.rotationSpeed,
 }) extends TintedShape {
-  /// Places and scales [image], as [SvgHitbox] does its polygons, so that
-  /// the outline's rect stretches to its size.
+  /// Places and scales [image], as [SvgHitbox] does with its polygons, so that
+  /// the outline's rect stretches to the shape's size.
   @override
   void fitImage() {
     final rect = outline.rect;
@@ -635,8 +648,8 @@ class CollidableSnowman({
   }
 }
 
-/// A white circle of the snowman, which turns [hitColor] while it collides
-/// with anything but the arena's walls.
+/// A white circle of the snowman, which turns [hitColor] while it collides with
+/// anything except the arena's walls.
 class SnowmanPart({
   required super.radius,
   required super.position,
@@ -714,7 +727,7 @@ class FlameMultipleShapesExample({
   String get rendererText =>
       shapes == Shapes.paths ? 'Flame' : super.rendererText;
 
-  /// No numbers with paths, which have no flame_svg cache.
+  /// Shows no renderer numbers with paths, which have no flame_svg cache.
   @override
   Iterable<String> get rendererStats =>
       shapes == Shapes.paths ? const [] : super.rendererStats;

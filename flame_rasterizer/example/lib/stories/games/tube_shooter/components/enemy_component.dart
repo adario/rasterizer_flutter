@@ -44,7 +44,7 @@ enum EnemyKind(final int score) {
         edgeWalker => EdgeWalkerComponent(lane: lane, depth: depth),
       };
 
-  /// Creates an enemy of this kind that goes on from [from], the snapshot of
+  /// Creates an enemy of this kind that resumes from [from], the snapshot of
   /// an enemy in a game with another renderer.
   EnemyComponent goOnFrom(EnemySnapshot from) {
     final (:lane, :depth, previousDepth: _) = from.at;
@@ -58,9 +58,10 @@ enum EnemyKind(final int score) {
   }
 }
 
-/// What an enemy in a game for another renderer goes on from: its kind, where
-/// it is, its flip, if any, and what its kind keeps, as
-/// [EnemyComponent.ownSnapshot] gives it.
+/// The state that an enemy in a game with another renderer resumes from.
+///
+/// It holds the enemy's kind, where it is, its flip if it's flipping, and the
+/// state that its kind keeps, as [EnemyComponent.ownSnapshot] gives it.
 typedef EnemySnapshot = ({
   EnemyKind kind,
   LaneSnapshot at,
@@ -70,7 +71,7 @@ typedef EnemySnapshot = ({
 
 /// An enemy in a lane of the tube, which can flip onto a neighbouring lane.
 ///
-/// Given [from], it goes on from there.
+/// Given [from], it resumes from that snapshot.
 abstract class EnemyComponent(
   final EnemyKind kind, {
   required super.lane,
@@ -83,10 +84,10 @@ abstract class EnemyComponent(
   double _flipProgress = from?.flip?.progress ?? 0;
   double _flipAngle = from?.flip?.angle ?? 0;
 
-  /// What a game with another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   ///
-  /// An enemy that hasn't loaded yet has made no picks of its kind, so the
-  /// new game's makes them.
+  /// An enemy that hasn't loaded yet hasn't made its kind's random picks, so
+  /// the new game's enemy makes them.
   EnemySnapshot get snapshot => (
     kind: kind,
     at: laneSnapshot,
@@ -97,8 +98,8 @@ abstract class EnemyComponent(
     own: isLoaded ? ownSnapshot : null,
   );
 
-  /// What its kind keeps beyond [snapshot]'s, if anything, for a game with
-  /// another renderer to go on from.
+  /// The state that its kind keeps beyond [snapshot]'s, if any, for a game
+  /// with another renderer to resume from.
   Record? get ownSnapshot => null;
 
   bool get isFlipping => _flipTo != null;
@@ -114,8 +115,8 @@ abstract class EnemyComponent(
   double between(Range range) =>
       range.least + (range.most - range.least) * gameRef.random.nextDouble();
 
-  /// The lane it counts as in, for hits: halfway through a flip, it's the
-  /// lane it flips to.
+  /// The lane it counts as being in, for hits. From halfway through a flip,
+  /// that's the lane it flips to.
   int get currentLane {
     final to = _flipTo;
     return to != null && _flipProgress >= 0.5 ? to : lane;

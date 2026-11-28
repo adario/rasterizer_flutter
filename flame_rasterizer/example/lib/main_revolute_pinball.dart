@@ -4,16 +4,19 @@ import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 
-/// Revolute Pinball on its own, outside the Widgetbook: run it with
-/// `flutter run -t lib/main_revolute_pinball.dart`.
+/// Runs Revolute Pinball on its own, outside the Widgetbook.
+///
+/// Start it with `flutter run -t lib/main_revolute_pinball.dart`.
 void main() {
   runApp(const RevolutePinballApp());
 }
 
-/// Revolute Pinball's story, without a status bar, with a settings dialog for
-/// its knobs in the Widgetbook but zoom and speed, which stay at 1: its bodies
-/// show no pieces, mixed drops, with flame_svg's default cache. On a desktop
-/// in landscape, a Square setting narrows the table to the game's height.
+/// Revolute Pinball's story without a status bar.
+///
+/// A settings dialog holds the story's Widgetbook knobs, except zoom and
+/// speed, which stay at 1. The game starts with no pieces shown on its
+/// bodies, mixed drops and flame_svg's default cache. On a desktop in
+/// landscape, a Square setting narrows the table to the game's height.
 class const RevolutePinballApp({
   /// Whether the game plays its sounds at the start.
   final bool sound = true,
@@ -30,7 +33,7 @@ class const RevolutePinballApp({
         drops: settings.drops,
         square: settings.square,
         sound: settings.sound,
-        // As the cache knobs, which show with Flame SVG only.
+        // Like the cache knobs, the cache settings apply only with Flame SVG.
         cache: renderer == SvgRenderer.flameSvg
             ? settings.cache
             : defaultSvgCache,
@@ -49,7 +52,8 @@ class const RevolutePinballApp({
           labelOf: (drops) => drops.label,
           onChanged: (drops) => onChanged(settings.copyWith(drops: drops)),
         ),
-        // Only where the table fills the game: on a desktop, in landscape.
+        // Shown only where the table fills the game: on a desktop in
+        // landscape.
         Builder(
           builder: (context) {
             final size = MediaQuery.sizeOf(context);
@@ -93,8 +97,8 @@ class const RevolutePinballApp({
   }
 }
 
-/// Revolute Pinball's settings, which stand for its knobs in the Widgetbook
-/// but zoom and speed.
+/// Revolute Pinball's settings, which stand in for its Widgetbook knobs
+/// except zoom and speed.
 class const RevolutePinballSettings({
   /// Whether the bodies show their convex pieces.
   final bool pieces = false,
@@ -102,7 +106,7 @@ class const RevolutePinballSettings({
   /// What drops onto the table.
   final PinballDrops drops = PinballDrops.mixed,
 
-  /// Whether a table that fills the game is only as wide as high: see
+  /// Whether a table that fills the game is only as wide as it is high: see
   /// [RevolutePinballExample.square].
   final bool square = false,
 
@@ -112,7 +116,7 @@ class const RevolutePinballSettings({
   /// flame_svg's cache settings, for Flame SVG.
   final SvgCache cache = defaultSvgCache,
 }) {
-  /// Returns these settings, with those given changed.
+  /// Returns a copy of these settings with the given ones changed.
   RevolutePinballSettings copyWith({
     bool? pieces,
     PinballDrops? drops,

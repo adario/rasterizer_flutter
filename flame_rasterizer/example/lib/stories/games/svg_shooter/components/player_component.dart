@@ -11,9 +11,10 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/ex
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/missile_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
 
-/// What a player in a game for another renderer goes on from: where it is,
-/// its health, the seconds since its last hit and volley, and, once
-/// destroyed, since then.
+/// The state that the player in a game with another renderer resumes from.
+///
+/// It holds the player's position and health, the seconds since its last hit
+/// and its last volley, and, if it's destroyed, the seconds since then.
 typedef PlayerSnapshot = ({
   Vector2 position,
   int health,
@@ -22,22 +23,24 @@ typedef PlayerSnapshot = ({
   double? sinceDestroyed,
 });
 
-/// The player's spaceship, which draws [svg] and collides with an
-/// [SvgHitbox] in the SVG's shape.
+/// The player's spaceship, which draws [svg] and collides with an [SvgHitbox]
+/// in the SVG's shape.
 ///
 /// It fires a volley of missiles every [firePeriod] while the game is dragged
 /// or the fire key is held. Each enemy that hits it takes [hitDamage] off its
-/// [health]. After [healDelay] without a hit, its health comes back at
-/// [healRate] a second. At 0, it blows up, turns red and fades out, and then
-/// the game is over.
+/// [health]. After [healDelay] seconds without a hit, its health comes back at
+/// [healRate] a second. When its health reaches 0, it blows up, turns red and
+/// fades out, and then the game is over.
 ///
-/// Given [from], the snapshot of the player in a game with another renderer,
-/// it goes on from there.
+/// Given [from], the snapshot of the player in a game with another renderer, it
+/// resumes from there.
 class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
     extends PositionComponent
     with HasGameRef<SvgShooterExample>, CollisionCallbacks {
-  /// About 15% narrower than Rogue Shooter's player, which is 75 wide. The
-  /// SVG's viewBox, 64 by 42, fits the spaceship and its stroke, so the
+  /// The player's size: about 15% narrower than Rogue Shooter's player, which
+  /// is 75 wide.
+  ///
+  /// The SVG's viewBox, 64 by 42, fits the spaceship and its stroke, so the
   /// height keeps its proportions.
   static final Vector2 initialSize = Vector2(64, 42);
 
@@ -56,15 +59,15 @@ class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
   /// How fast the keys move it, in world units a second.
   static const keySpeed = 400.0;
 
-  /// Seconds from a volley to the next: three times Rogue Shooter's 0.05, so
+  /// Seconds from one volley to the next: three times Rogue Shooter's 0.05, so
   /// that the volleys stay apart.
   static const firePeriod = 0.15;
 
-  /// Seconds it takes to turn red once destroyed, as long as the explosion's
-  /// flash.
+  /// Seconds it takes to turn red after it's destroyed, as long as the
+  /// explosion's flash.
   static const reddenTime = 0.25;
 
-  /// Seconds it takes to fade out once destroyed.
+  /// Seconds it takes to fade out after it's destroyed.
   static const fadeTime = 2.0;
 
   /// Fires a volley every [firePeriod] while it runs.
@@ -75,15 +78,17 @@ class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
   /// Its health in percent, from [maxHealth] down to 0.
   int health = maxHealth;
 
-  /// Seconds since the last hit, less those that have healed it.
+  /// Seconds since the last hit, minus those that have already healed it.
   double _sinceHit = 0;
 
-  /// Seconds since the last volley. It starts at [firePeriod], so that the
-  /// first volley fires at once.
+  /// Seconds since the last volley.
+  ///
+  /// It starts at [firePeriod], so that the first volley fires right away.
   double _sinceVolley = firePeriod;
 
-  /// Whether its health ran out. It then neither moves, fires nor gets hit
-  /// until a new game.
+  /// Whether its health ran out.
+  ///
+  /// It then doesn't move, fire or get hit until a new game starts.
   bool get isDestroyed => _sinceDestroyed != null;
 
   /// Seconds since its health ran out, or null while it hasn't.
@@ -115,7 +120,7 @@ class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
     }
   }
 
-  /// What a player in a game for another renderer goes on from.
+  /// The state that the player in a game with another renderer resumes from.
   PlayerSnapshot get snapshot => (
     position: position.clone(),
     health: health,
@@ -134,7 +139,7 @@ class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
     }
     _move(gameRef.keyDirection, dt);
     _sinceHit += dt;
-    // One percent back every 1 / healRate seconds, once healDelay has passed.
+    // One percent back every 1 / healRate seconds, after healDelay has passed.
     while (health < maxHealth && _sinceHit >= healDelay + 1 / healRate) {
       health++;
       _sinceHit -= 1 / healRate;
@@ -156,8 +161,8 @@ class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
     y = _within(y + direction.y * distance, y, half.y, gameRef.size.y - half.y);
   }
 
-  /// Clamps [value] between [min] and [max], widened to take in [from] when
-  /// it's outside them.
+  /// Clamps [value] between [min] and [max], widened to include [from] when
+  /// [from] is outside them.
   static double _within(double value, double from, double min, double max) =>
       value.clamp(math.min(from, min), math.max(from, max));
 
@@ -179,11 +184,11 @@ class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
     );
   }
 
-  /// Starts firing, unless it's destroyed or firing already.
+  /// Starts firing, unless it's destroyed or already firing.
   ///
-  /// It fires a volley at once, unless the last was less than [firePeriod]
-  /// ago, and then one every [firePeriod]. So taps don't fire faster than a
-  /// drag.
+  /// It fires a volley right away, unless the last one was less than
+  /// [firePeriod] ago, and then one every [firePeriod]. So taps don't fire
+  /// faster than a drag.
   void beginFire() {
     final timer = missileCreator.timer;
     if (isDestroyed || timer.isRunning()) {
@@ -214,11 +219,11 @@ class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
     }
   }
 
-  /// Blows it up in red, and turns it red as it fades out. Then the game is
+  /// Blows it up in red and turns it red as it fades out. Then the game is
   /// over.
   ///
-  /// A player destroyed [since] seconds before, in a game with another
-  /// renderer, is as red and as faded as it was, without the explosion.
+  /// A player that was destroyed [since] seconds earlier, in a game with
+  /// another renderer, is as red and as faded as it was, without the explosion.
   void _destroy({double since = 0}) {
     _sinceDestroyed = since;
     stopFire();
@@ -230,7 +235,8 @@ class PlayerComponent(final ExampleSvg svg, {final PlayerSnapshot? from})
         ExplosionComponent(ExplosionKind.playerDestroyed, position: position),
       );
     } else {
-      // The effects are linear, so they go on from here over the time left.
+      // The effects are linear, so they can continue from here over the time
+      // left.
       (_ship as HasPaint)
         ..tint(Colors.red.withValues(alpha: reddened))
         ..opacity = 1 - faded;

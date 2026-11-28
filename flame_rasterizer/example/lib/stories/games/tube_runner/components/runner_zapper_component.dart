@@ -4,14 +4,16 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.d
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 
-/// A zapper, which climbs its [lane] toward the ship from [at] without
-/// firing, flips now and then, and electrifies its lane, as Tube Shooter's
-/// `ZapperComponent` does at its first level's pace, but as fast as a seeder.
+/// A zapper that climbs its [lane] toward the ship from [at] without firing,
+/// flips now and then, and electrifies its lane.
 ///
-/// While the zappers pulse, as [RunnerMode.isPulsing] says, a bolt
-/// runs from it down its lane to the ship's ring, and destroys the ship
-/// there. Just before a pulse, it flashes white. One that comes too late to
-/// flash, or flips, waits for the next pulse.
+/// It acts as Tube Shooter's `ZapperComponent` does at its first level's
+/// pace, except that it climbs as fast as a seeder.
+///
+/// While the zappers pulse, as [RunnerMode.isPulsing] says, a bolt runs from
+/// it down its lane to the ship's ring and destroys the ship there. Just
+/// before a pulse, it flashes white. A zapper that comes too late to flash
+/// waits for the next pulse, and no bolt runs from it while it flips.
 class RunnerZapperComponent(int lane, double at, {super.from})
     extends RunnerFlipperComponent {
   this : super(EnemyKind.zapper, lane, at);
@@ -19,11 +21,11 @@ class RunnerZapperComponent(int lane, double at, {super.from})
   @override
   Range get flipPeriod => RunnerFlipperComponent.level.zapperFlipPeriod;
 
-  /// Whether it's tinted white. It tints itself again as it updates, as the
+  /// Whether it's tinted white. Each update sets the tint again, as the
   /// pulse says.
   bool _white = false;
 
-  /// Whether it flashed white before the pulse coming or going on.
+  /// Whether it flashed white before the pulse that is coming or under way.
   late bool _warned = switch (from?.own) {
     (:final bool warned) => warned,
     _ => false,
@@ -32,7 +34,7 @@ class RunnerZapperComponent(int lane, double at, {super.from})
   @override
   Record get ownSnapshot => (warned: _warned);
 
-  /// Whether its bolt runs down its lane now.
+  /// Whether its bolt is running down its lane.
   bool get isZapping => _warned && runner.isPulsing && !isFlipping;
 
   @override

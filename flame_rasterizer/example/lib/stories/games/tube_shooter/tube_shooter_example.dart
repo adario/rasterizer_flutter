@@ -12,12 +12,12 @@ import 'package:flutter/foundation.dart';
 /// A tube shooter inspired by Atari's Tempest, drawn entirely with paths: see
 /// [description].
 ///
-/// Its [shooter] plays the rounds, from [firstLevel]: it hands the mode the
-/// player's input. Subclasses pick the component that draws a path: see
-/// [pathComponent].
+/// Its [shooter] plays the rounds, starting from [firstLevel], and the game
+/// hands that mode the player's input. Subclasses pick the component that
+/// draws a path (see [pathComponent]).
 ///
-/// Given the snapshot of a game with another renderer, it goes on from there:
-/// see [TubeShooterSnapshots].
+/// Given the snapshot of a game with another renderer, it resumes from there
+/// (see [TubeShooterSnapshots]).
 abstract class TubeShooterExample({
   required super.status,
   super.random,
@@ -26,8 +26,10 @@ abstract class TubeShooterExample({
   final int firstLevel = 0,
   TubeShooterSnapshot? from,
 }) extends TubeHost {
-  /// Creates the game for [renderer], with Flame's `PathComponent` for Flame
-  /// SVG, which goes on from [from], if any, at its first level and pace.
+  /// Creates the game for [renderer], using Flame's `PathComponent` for Flame
+  /// SVG.
+  ///
+  /// Given [from], the game resumes from it, with its first level and pace.
   factory TubeShooterExample.of(
     SvgRenderer renderer,
     ValueNotifier<String> status, {
@@ -87,7 +89,7 @@ abstract class TubeShooterExample({
   /// The rounds, and the rules they play by.
   final shooter = ShooterMode(firstLevel: firstLevel, from: from);
 
-  /// What a game for another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   TubeShooterSnapshot get snapshot => shooter.snapshot;
 
   /// The Runs knob's value: see [ShooterMode.runs].
@@ -98,14 +100,15 @@ abstract class TubeShooterExample({
   void Function(int levelIndex)? get onLevel => shooter.onLevel;
   set onLevel(void Function(int levelIndex)? value) => shooter.onLevel = value;
 
-  /// Twice the widest lane, a shape's longest side, as explosions grow to
-  /// twice their size.
+  /// Twice the widest lane, which is a shape's longest side, because
+  /// explosions grow to twice their size.
   @override
   double get shapeGrowth => 2;
 
   @override
   Future<void> onLoad() async {
-    // Fits the view before the ship loads: it sizes its import for the view.
+    // This fits the view before the ship loads, because the ship sizes its
+    // import for the view.
     await super.onLoad();
     world.add(shooter);
     startStatus();

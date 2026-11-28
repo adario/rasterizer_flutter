@@ -9,9 +9,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// What the ship in a game for another renderer goes on from: its step and
-/// the fraction of a step past it, whether it's visible, and how faded out it
-/// is.
+/// What the ship resumes from when the game switches to another renderer:
+/// its step and the fraction of a step past it, whether it's visible, and how
+/// far it has faded out.
 typedef ShipSnapshot = ({
   int step,
   double partStep,
@@ -20,14 +20,14 @@ typedef ShipSnapshot = ({
 });
 
 /// The ship, which moves round the tube's ring at the ship as Tube Shooter's
-/// moves round the rim: see [PlayerComponent], whose numbers it shares.
+/// ship moves round the rim: see [PlayerComponent], whose numbers it shares.
 ///
-/// The eye looks at that ring as Tube Shooter's looks at the rim, so the ship
-/// is where Tube Shooter's is on screen. It moves only while the game is on,
-/// and fades out when destroyed.
+/// The eye looks at that ring as Tube Shooter's eye looks at the rim, so the
+/// ship shows where Tube Shooter's ship does on screen. It moves only while
+/// the game is on, and fades out when destroyed.
 ///
-/// Given [from], it goes on from there. The keys, which the new game hasn't
-/// seen go down, don't move it.
+/// Given [from], it resumes from that snapshot. Keys held down before don't
+/// move it, as the new game hasn't seen them go down.
 class ShipComponent({final ShipSnapshot? from})
     extends PositionComponent
     with HasGameRef<TubeHost>, HasVisibility {
@@ -42,7 +42,7 @@ class ShipComponent({final ShipSnapshot? from})
   /// The fraction of a step it has moved, short of a whole step.
   double _partStep = from?.partStep ?? 0;
 
-  /// How long a key has moved it without a stop.
+  /// How long a key has moved it without stopping.
   double _keyTime = 0;
 
   /// The component that draws its shape.
@@ -62,7 +62,7 @@ class ShipComponent({final ShipSnapshot? from})
     place();
   }
 
-  /// What a game with another renderer goes on from.
+  /// What a game with another renderer resumes from.
   ShipSnapshot get snapshot => (
     step: step,
     partStep: _partStep,
@@ -103,7 +103,8 @@ class ShipComponent({final ShipSnapshot? from})
   }
 
   /// Fades it out over [PlayerComponent.fadeTime], as Tube Shooter's ship
-  /// does when destroyed, or, [from] an opacity, over the time left.
+  /// does when destroyed. Starting [from] a lower opacity, it fades out over
+  /// the time that is left.
   void fadeOut({double from = 1}) {
     drawing.opacity = from;
     if (from > 0) {
@@ -123,8 +124,8 @@ class ShipComponent({final ShipSnapshot? from})
       ..opacity = 1;
   }
 
-  /// Moves it onto the view's tube, to the step nearest the angle round the
-  /// axis at which it was on [from], its tube before, and places it there.
+  /// Moves it onto the view's tube and places it there, on the step nearest
+  /// the angle round the axis that it had on [from], its previous tube.
   void switchFrom(Tube from) {
     final angle = _pointAt(from, step).direction;
     final tube = gameRef.view.tube;

@@ -3,9 +3,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/runner_mode.d
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 
-/// A climber, which climbs its [lane] toward the ship from [at], flips now
-/// and then, and fires down its lane, as Tube Shooter's `ClimberComponent`
-/// does at its first level's pace, but as fast as a seeder.
+/// A climber that climbs its [lane] toward the ship from [at], flips now and
+/// then, and fires down its lane.
+///
+/// It acts as Tube Shooter's `ClimberComponent` does at its first level's
+/// pace, except that it climbs as fast as a seeder.
 ///
 /// It fires with [RunnerMode.fireFrom].
 class RunnerClimberComponent(
@@ -19,7 +21,7 @@ class RunnerClimberComponent(
   @override
   Range get flipPeriod => RunnerFlipperComponent.level.flipPeriod;
 
-  /// Seconds until it fires, once it picked them, as it first climbed.
+  /// The seconds until it fires, picked when it first climbed.
   late double? _untilFire = switch (from?.own) {
     (:final double? untilFire) => untilFire,
     _ => null,

@@ -1,8 +1,9 @@
 part of 'svg_shooter_example.dart';
 
-/// What a game for another renderer goes on from: the score, the player, the
-/// seconds since the last wave, and the enemies and the missiles, where they
-/// are.
+/// The state that a game with another renderer resumes from.
+///
+/// It holds the score, the player, the seconds since the last wave, and the
+/// enemies and the missiles with their positions.
 typedef SvgShooterSnapshot = ({
   int score,
   PlayerSnapshot? player,
@@ -11,15 +12,15 @@ typedef SvgShooterSnapshot = ({
   List<({Vector2 position, double angle})> missiles,
 });
 
-/// Takes a [SvgShooterExample]'s snapshot, and goes on from one.
+/// Takes a snapshot of an [SvgShooterExample] and resumes from one.
 ///
-/// The explosions and the stars start again in the new game, and so do the
-/// keys and the drags, which the new game hasn't seen go down.
+/// The explosions and the stars start afresh in the new game. So do the keys
+/// and the drags, as the new game hasn't seen them go down.
 extension SvgShooterSnapshots on SvgShooterExample {
-  /// What a game for another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   ///
-  /// It leaves out what hasn't loaded yet, such as the enemies of a wave
-  /// that came at this frame.
+  /// It leaves out what hasn't loaded yet, such as the enemies of a wave that
+  /// came in this frame.
   SvgShooterSnapshot get snapshot => (
     score: score,
     player: player.isLoaded ? player.snapshot : null,
@@ -41,7 +42,7 @@ extension SvgShooterSnapshots on SvgShooterExample {
     ],
   );
 
-  /// Puts back the snapshot's score, and its enemies and missiles, where they
+  /// Puts back the snapshot's score, and its enemies and missiles where they
   /// were.
   void _restoreEnemiesAndMissiles() {
     if (_from case final from?) {

@@ -5,8 +5,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
 /// A splitter, which climbs its lane slowly.
 ///
-/// When shot, or at the rim, it splits into two climbers, which flip onto the
-/// lanes on either side.
+/// When it's shot or reaches the rim, it splits into two climbers that flip
+/// onto the lanes on either side.
 class SplitterComponent({
   required super.lane,
   required super.depth,

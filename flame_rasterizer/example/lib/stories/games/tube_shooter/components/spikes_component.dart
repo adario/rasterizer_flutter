@@ -10,9 +10,9 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.da
 /// Draws the spikes, at most one per lane, each reaching from the far end
 /// toward the rim.
 ///
-/// All the spikes make one path. Whenever a spike grows or shortens, or the
-/// view changes, this makes the path again, with a new component in the game's
-/// tube group.
+/// All the spikes share one path. Whenever a spike grows or shortens, or the
+/// view changes, this rebuilds the path as a new component in the game's tube
+/// group.
 class SpikesComponent()
     extends Component
     with HasGameRef<TubeHost>, InShooterMode {

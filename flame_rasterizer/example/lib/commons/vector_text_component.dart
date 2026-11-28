@@ -7,8 +7,8 @@ import 'package:flame_rasterizer/flame_rasterizer.dart';
 import 'package:flame_rasterizer_example/commons/example_game.dart';
 import 'package:flame_rasterizer_example/commons/vector_font.dart';
 
-/// A game that creates path components of its renderer, for
-/// [VectorTextComponent].
+/// A game that creates path components for its renderer, which
+/// [VectorTextComponent] uses.
 mixin PathComponents<W extends World> on FlameGame<W> {
   /// Creates a component of the game's renderer that draws [path] with
   /// [paint], and with [glow] if the renderer draws glows.
@@ -45,9 +45,10 @@ mixin RasterizerPathComponents<W extends World> on PathComponents<W> {
   );
 }
 
-/// [PathComponents] that creates Flame's [PathComponent]s, which apply their
-/// paint's color filter, such as a tint, to their paint layers too, as
-/// [RasterizerPathComponent]s do.
+/// [PathComponents] that creates Flame's [PathComponent]s.
+///
+/// Like [RasterizerPathComponent]s, these components apply their paint's
+/// color filter, such as a tint, to their paint layers too.
 mixin FlamePathComponents<W extends World> on PathComponents<W> {
   @override
   PathComponent pathComponent(
@@ -85,20 +86,22 @@ class _FlamePathComponent({
   }
 }
 
-/// A text in `VectorFont`, with capitals [capHeight] logical pixels high, in
-/// [color].
+/// A text in `VectorFont` and in [color], whose capitals are [capHeight]
+/// logical pixels high.
 ///
-/// It draws each glyph with a path component of the game's renderer. All the
-/// components of a glyph share its path. Setting a new text replaces only the
-/// components of the characters that changed, and imports only the glyphs
-/// that no other text shows.
+/// It draws each glyph with a path component of the game's renderer, and all
+/// the components of a glyph share its path. Setting a new text replaces only
+/// the components of the characters that changed, and imports only the
+/// glyphs that no other text shows.
 ///
 /// With a [line], the text sits at the bottom right of its parent, or at the
-/// bottom left if [left], [line] lines above the last one; without, at its
-/// middle, or [below] it, in logical pixels. It keeps its place when the
-/// parent is resized. Its priority puts it under the FPS counter, so that it
-/// draws in the same run as the world. Its [opacity] fades all its glyphs,
-/// and its [tint] colors them.
+/// bottom left if [left] is true, [line] lines above the bottom line. Without
+/// a [line], it sits at the parent's center, [below] logical pixels lower. It
+/// keeps its place when the parent is resized.
+///
+/// Its priority puts it under the FPS counter, so that it draws in the same
+/// run as the world. Its [opacity] fades all its glyphs, and its [tint]
+/// colors them.
 class VectorTextComponent({
   required final double capHeight,
   String text = '',
@@ -118,7 +121,7 @@ class VectorTextComponent({
         priority: -1,
       );
 
-  /// From a line's baseline to the next's, in cap heights.
+  /// The distance from one line's baseline to the next one's, in cap heights.
   static const lineSpacing = 1.6;
 
   /// The largest text's cap height.
@@ -127,9 +130,9 @@ class VectorTextComponent({
   /// The size every glyph is imported for: [maxCapHeight], at a device pixel
   /// ratio of 3.
   ///
-  /// One size lets texts of every size share each glyph's import. Glyphs are
-  /// straight lines, which flatten the same at any size, so the large size
-  /// loses nothing.
+  /// A single size lets texts of every size share each glyph's import. Glyphs
+  /// are straight lines, which flatten the same at any size, so importing
+  /// them at the large size costs nothing extra.
   static const glyphMaxSize = 3 * maxCapHeight;
 
   @override
@@ -197,12 +200,14 @@ class VectorTextComponent({
   /// The text its glyphs show.
   String _laidOut = '';
 
-  /// Its glyphs' components, by their characters' indices in [_laidOut]:
-  /// null for a space.
+  /// The glyphs' components, indexed by their characters' positions in
+  /// [_laidOut], with null for a space.
   final _glyphs = <PathComponent?>[];
 
   /// Replaces the components of the glyphs that changed with new ones for
-  /// [text]. A character that stays in its place keeps its component.
+  /// [text].
+  ///
+  /// A character that stays in its place keeps its component.
   void _layOut() {
     size.setValues(VectorFont.widthOf(_text), VectorFont.capHeight);
     while (_glyphs.length > _text.length) {

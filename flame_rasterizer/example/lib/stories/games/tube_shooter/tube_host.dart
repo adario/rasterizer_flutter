@@ -18,15 +18,19 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show KeyEventResult, MediaQuery;
 
-/// What Tube Shooter and Tube Runner share: the view of the tube, the score
-/// and the lives, the texts at the bottom, READY and Game Over, the
-/// player's keys, drags, taps and scrolls, the glow, the sounds, and the
-/// components that draw shapes and quads.
+/// The game base that Tube Shooter and Tube Runner share.
+///
+/// It holds:
+/// - the view of the tube, the score and the lives;
+/// - the texts at the bottom, READY and Game Over;
+/// - the player's keys, drags, taps and scrolls;
+/// - the glow and the sounds;
+/// - the components that draw shapes and quads.
 ///
 /// Each frame, [update] fits the view, applies the game's rules with
 /// [advance], updates the components, then calls [afterUpdate] and shows
 /// the tube's name, the lives and the score. Subclasses say when the game
-/// waits for the player, and what ends the wait: see [isWaiting].
+/// waits for the player, and what ends the wait (see [isWaiting]).
 abstract class TubeHost({
   required super.status,
   math.Random? random,
@@ -51,24 +55,29 @@ abstract class TubeHost({
   /// How far a drag goes to move the ship one lane, in logical pixels.
   static const dragPerLane = 40.0;
 
-  /// How near the centre of the tube's near end a finger that [circles]
-  /// doesn't steer, as a part of the near end's size: there, small moves
-  /// swing its angle round the centre too much.
+  /// How close to the centre of the tube's near end a finger that [circles]
+  /// stops steering, as a fraction of the near end's size.
+  ///
+  /// That close to the centre, small moves swing the finger's angle round it
+  /// too much.
   static const circleHole = 0.3;
 
   /// How fast the gap between a finger that [circles] and the ship closes,
-  /// as a part of the angle that the finger sweeps: the ship goes up to half
-  /// as fast again as the finger, or half as fast, until it's under it.
+  /// as a fraction of the angle that the finger sweeps.
+  ///
+  /// Until the ship is under the finger, it moves at between half and one
+  /// and a half times the finger's speed.
   static const circleCatchUp = 0.5;
 
-  /// The least angle that a finger that [circles] sweeps to move the ship a
-  /// lane on an open tube, as on a closed tube of 16 lanes: an open tube
-  /// whose lanes take less, such as the Floor, spreads them out evenly over
-  /// more, so that the ship moves slower than the finger.
+  /// The least angle that a finger that [circles] sweeps to move the ship one
+  /// lane on an open tube, the same as on a closed tube of 16 lanes.
+  ///
+  /// An open tube whose lanes span less, such as the Floor, spreads them out
+  /// evenly over a wider angle, so the ship moves slower than the finger.
   static const circleLaneTurn = 2 * math.pi / 16;
 
   /// Whether a finger moves the ship by circling round the centre of the
-  /// tube's near end, on Android and iOS, rather than by dragging sideways.
+  /// tube's near end instead of dragging sideways, as on Android and iOS.
   static bool get circles => switch (defaultTargetPlatform) {
     TargetPlatform.android || TargetPlatform.iOS => true,
     _ => false,
@@ -84,12 +93,12 @@ abstract class TubeHost({
   /// The most seconds between the two taps of a double tap.
   static const doubleTapTime = 0.35;
 
-  /// The glow of the shapes' lines: 3 times as wide as the lines, and thinner
-  /// with depth, as they are.
+  /// The glow of the shapes' lines: 3 times as wide as the lines, and
+  /// thinner with depth as the lines are.
   static const lineGlow = RasterizerGlow.widths(3);
 
   /// The glow of the lines of the tube, its lane, the spikes and the bolts:
-  /// twice as wide as the lines, and thinner with depth, as they are.
+  /// twice as wide as the lines, and thinner with depth as the lines are.
   static const tubeGlow = RasterizerGlow.widths(2);
 
   final math.Random random = random ?? math.Random();
@@ -112,41 +121,45 @@ abstract class TubeHost({
   /// READY, in the camera's viewport while the game waits for the player.
   final readyText = VectorTextComponent(text: 'READY', capHeight: bannerCap);
 
-  /// Game Over, in the camera's viewport once the game is over.
+  /// Game Over, in the camera's viewport while the game is over.
   final gameOverText = VectorTextComponent(
     text: 'GAME OVER',
     capHeight: bannerCap,
   );
 
-  /// Whether the ship moves at the player's will.
+  /// Whether the player can move the ship.
   bool get canMove;
 
-  /// Whether the game waits for the player, at READY or Game Over, so that
-  /// a tap ends the wait, rather than firing.
+  /// Whether the game waits for the player at READY or Game Over, so that a
+  /// tap ends the wait instead of firing.
   bool get isWaiting;
 
-  /// Whether the game waits at READY, where any key but a modifier ends the
-  /// wait.
+  /// Whether the game waits at READY, where any key except a modifier ends
+  /// the wait.
   bool get isReady;
 
-  /// Whether the game is over, where Enter ends the wait, and the world
-  /// stands still, whatever [speed] is.
+  /// Whether the game is over.
+  ///
+  /// Enter then ends the wait, and the world stands still whatever [speed]
+  /// is.
   bool get isOver;
 
-  /// Ends a wait: starts a new game once it's over, or else plays.
+  /// Ends a wait: starts a new game if the game is over, or else starts
+  /// play.
   void endWait();
 
-  /// Moves the ship [lanes] round the tube, which may be part of a lane.
+  /// Moves the ship [lanes] round the tube, which may be a fraction of a
+  /// lane.
   void moveShipBy(double lanes);
 
-  /// The step round the tube that the ship is on, out of
-  /// [PlayerComponent.stepsPerLane] a lane.
+  /// The step round the tube that the ship is on, with
+  /// [PlayerComponent.stepsPerLane] steps to a lane.
   int get shipStep;
 
   /// Called when [isFiring] may have changed.
   void onFiringChanged() {}
 
-  /// Called on a double tap, while the game doesn't wait.
+  /// Called on a double tap, while the game isn't waiting.
   void onDoubleTap() {}
 
   /// Called on Enter, while the game isn't over.
@@ -156,11 +169,12 @@ abstract class TubeHost({
   /// the world's components update.
   void advance(double dt) {}
 
-  /// Does what updates would do in a moving world, where they don't happen,
-  /// for a change of the lines' glow.
+  /// Does what updates would do in a moving world, for a change of the lines'
+  /// glow while the world is paused and doesn't update.
   void updateStillLines() {}
 
-  /// Called once the components updated, [dt] seconds after the last frame.
+  /// Called after the components have updated, [dt] seconds after the last
+  /// frame.
   void afterUpdate(double dt) {}
 
   /// The Speed knob's value. It sets the world's time scale, except while the
@@ -200,23 +214,26 @@ abstract class TubeHost({
   @override
   Iterable<String> get exampleStats => ['$_pathsPerSecond paths/s'];
 
-  /// The game's own time, which the Speed knob doesn't scale, to time taps.
+  /// The game's own time, for timing taps. The Speed knob doesn't scale it.
   double _clock = 0;
 
   /// Each drag's start time and distance moved, to tell taps from drags.
   final _drags = <int, ({double start, double distance})>{};
 
-  /// Each circling finger's last angle round the centre of the tube's near
-  /// end, unwound as it goes round, and the angle from it to the ship, which
-  /// closes as it sweeps: see [circles]. A finger that hasn't steered yet has
-  /// none.
+  /// For each circling finger (see [circles]), its last angle round the
+  /// centre of the tube's near end, unwound as it goes round, and the gap
+  /// angle from the finger to the ship, which closes as the finger sweeps.
+  ///
+  /// A finger that hasn't steered yet has no entry.
   final _circlings = <int, ({double angle, double gap})>{};
 
-  /// The angle round the centre of [_anglesTube]'s near end of each step of
-  /// the ship's, which a finger points at to move the ship there: on an open
-  /// tube, unwound from the first step, and spread out evenly by
-  /// [circleLaneTurn]. Then the near end's size, its farthest corner's
-  /// distance.
+  /// The angle of each of the ship's steps round the centre of
+  /// [_anglesTube]'s near end, where a finger points to move the ship to that
+  /// step.
+  ///
+  /// On an open tube, the angles are unwound from the first step and spread
+  /// out evenly to at least [circleLaneTurn] a lane. [_nearEnd] is the near
+  /// end's size: the distance of its farthest corner.
   List<double> _stepAngles = const [];
   double _nearEnd = 0;
   Tube? _anglesTube;
@@ -224,17 +241,19 @@ abstract class TubeHost({
   /// When the last tap was, for double taps.
   double _lastTap = double.negativeInfinity;
 
-  /// The pointers that went down while the game waits, at READY or Game
-  /// Over. Each ends the wait when it goes up, as a tap; pointers that were
-  /// already down don't.
+  /// The pointers that went down while the game was waiting at READY or Game
+  /// Over.
+  ///
+  /// Each ends the wait when it goes up, as a tap. Pointers that were already
+  /// down don't.
   final _waitPointers = <int>{};
 
   /// The pointers that went down while the game wasn't waiting. The ship
   /// fires while any of them is down, or while [_fireKey] is held.
   final _firePointers = <int>{};
 
-  /// The keys that move the ship, fire and end the game's waits, by their
-  /// places on the keyboard, whatever its layout.
+  /// The keys that move the ship, fire and end the game's waits, identified
+  /// by their places on the keyboard, whatever its layout.
   static final _leftKeys = {
     PhysicalKeyboardKey.arrowLeft,
     PhysicalKeyboardKey.keyA,
@@ -263,37 +282,37 @@ abstract class TubeHost({
     PhysicalKeyboardKey.fn,
   };
 
-  /// The keys held that went down while the game had the focus.
+  /// The held keys that went down while the game had the focus.
   final _heldKeys = <PhysicalKeyboardKey>{};
 
-  /// Where the keys held move the ship: 1 to the right along the bottom, -1
-  /// to the left, or 0.
+  /// Which way the held keys move the ship: 1 to the right along the bottom,
+  /// -1 to the left, or 0.
   int get keyDirection =>
       (_heldKeys.any(_rightKeys.contains) ? 1 : 0) -
       (_heldKeys.any(_leftKeys.contains) ? 1 : 0);
 
-  /// Whether the player fires: while a drag is down, or the fire key is
-  /// held.
+  /// Whether the player fires: while a drag is down or the fire key is held.
   bool get isFiring => _firePointers.isNotEmpty || _heldKeys.contains(_fireKey);
 
-  /// Forgets the pointers that went down while the game waited, as the game
-  /// changes state: they don't end the next wait.
+  /// Forgets the pointers that went down while the game waited, when the
+  /// game changes state, so that they don't end the next wait.
   void forgetWaitPointers() => _waitPointers.clear();
 
   /// Forgets the last tap, so that it doesn't count toward a double tap.
   void forgetTaps() => _lastTap = double.negativeInfinity;
 
   /// Whether the renderer draws the lines' glow with them, as the mesh
-  /// renderer does. Otherwise, [TubeGlow] draws the Glow knob's.
+  /// renderer does. Otherwise, [TubeGlow] draws the Glow knob's glow.
   bool get rendererGlows => false;
 
   /// The Glow knob's value: whether the lines glow.
   ///
   /// If [rendererGlows], the lines glow with [lineGlow] and [tubeGlow], so a
-  /// change imports them again: the tube's paths, as a change of the view
-  /// does, and the shapes as they keep their stroke. In a still world, where
-  /// nothing updates, this happens at once: see [updateStillLines].
-  /// Otherwise, a [TubeGlow] is the camera's post process while it's on.
+  /// change imports them again. The tube's paths are imported again as for a
+  /// change of the view, and the shapes when they keep their stroke. While
+  /// the world is paused and nothing updates, this happens at once (see
+  /// [updateStillLines]). Otherwise, a [TubeGlow] is the camera's post
+  /// process while the knob is on.
   bool get glow => _glow;
   bool _glow = false;
 
@@ -324,10 +343,10 @@ abstract class TubeHost({
   /// draws it.
   RasterizerGlow? get linesGlow => _glow && rendererGlows ? tubeGlow : null;
 
-  /// The Sound knob's value: whether the game plays its sounds. Off by
-  /// default, so that tests stay silent.
+  /// The Sound knob's value: whether the game plays its sounds.
   ///
-  /// The sounds load the first time it's on, and stay loaded when it's off.
+  /// It's off by default, so that tests stay silent. The sounds load the
+  /// first time it's turned on, and stay loaded when it's off.
   bool get sound => _sound;
   bool _sound = false;
 
@@ -338,7 +357,7 @@ abstract class TubeHost({
     }
   }
 
-  /// The sounds, once [sound] was on.
+  /// The sounds, after [sound] has been on.
   GameSounds? _sounds;
 
   /// Loads the sounds, unless they're loaded or loading.
@@ -358,14 +377,14 @@ abstract class TubeHost({
     }
   }
 
-  /// How many times as long as the widest lane the shapes grow, at most, so
-  /// that their imports are fine enough.
+  /// The most that the shapes grow, in multiples of the widest lane, so that
+  /// their imports are fine enough.
   double get shapeGrowth => 1;
 
   /// Creates a component that draws [shape], one of `Shapes`, stroked in
   /// [color] about its origin, [widths] times as wide as the view's shapes.
   ///
-  /// All the components of a shape share one import of it, until the view
+  /// All the components of a shape share one import of it until the view
   /// changes.
   PathComponent shapeComponent(Path shape, Color color, {double widths = 1}) {
     final bounds = shape.getBounds();
@@ -397,9 +416,8 @@ abstract class TubeHost({
   /// draws glows. If the glow changed, this imports the shape again.
   void glowShape(PathComponent drawing, RasterizerGlow? glow) {}
 
-  /// Gives [drawing], made by [shapeComponent], the view's stroke width,
-  /// [widths] times as wide. If the width changed, this imports the shape
-  /// again.
+  /// Gives [drawing], made by [shapeComponent], the view's stroke width
+  /// times [widths]. If the width changed, this imports the shape again.
   void keepStroke(PathComponent drawing, {double widths = 1}) {
     final width = widths * view.shapeStroke;
     if (drawing.paint.strokeWidth != width) {
@@ -407,13 +425,13 @@ abstract class TubeHost({
     }
   }
 
-  /// Creates a component that fills [quads] in [color], where they are in
-  /// the world, at [priority], with [glow] if [rendererGlows]: a path of
-  /// them, by default.
+  /// Creates a component that fills [quads] in [color] where they are in the
+  /// world, at [priority], with [glow] if [rendererGlows].
   ///
-  /// Its contours stay open, as the fill closes them anyway. Flame's
-  /// `PathComponent` would walk each closed contour into a polygon, which the
-  /// game doesn't use, as [RasterizerPolygons.path]'s are.
+  /// By default, the component draws a path of the quads. Its contours stay
+  /// open, because the fill closes them anyway. Flame's `PathComponent` would
+  /// compute a polygon for each closed contour, such as those of
+  /// [RasterizerPolygons.path], and the game doesn't use those polygons.
   PositionComponent quadsComponent(
     RasterizerPolygons quads,
     Color color, {
@@ -443,15 +461,16 @@ abstract class TubeHost({
 
   @override
   Future<void> onLoad() async {
-    // Before the components that size their imports for the view load.
+    // Fit the view before the components that size their imports for it
+    // load.
     fitView();
-    // In the camera's viewport, as StoryGame's FPS counter is: above the
-    // world, and unzoomed.
+    // In the camera's viewport, like StoryGame's FPS counter: above the world
+    // and unzoomed.
     camera.viewport.addAll([tubeText, roundText, livesText, scoreText]);
     if (_glow && !rendererGlows) {
       _updateGlow();
     }
-    // Before the game starts, so that its first sounds play.
+    // Load the sounds before the game starts, so that its first sounds play.
     if (_sound) {
       await _loadSounds();
     }
@@ -496,8 +515,9 @@ abstract class TubeHost({
     if (size.x <= 0 || size.y <= 0) {
       return;
     }
-    // The ratio the renderer uses: from the game's MediaQuery, which
-    // Widgetbook's device frames set, read without depending on it.
+    // The pixel ratio that the renderer uses, from the game's MediaQuery,
+    // which Widgetbook's device frames set. This reads the MediaQuery without
+    // depending on it.
     final ratio =
         buildContext
             ?.getInheritedWidgetOfExactType<MediaQuery>()
@@ -511,9 +531,10 @@ abstract class TubeHost({
     );
   }
 
-  /// Starts firing, unless the game waits at READY or Game Over. Then the
-  /// pointer only ends the wait when it goes up, as a tap: taps start drags
-  /// too.
+  /// Starts firing, unless the game waits at READY or Game Over.
+  ///
+  /// While the game waits, the pointer only ends the wait when it goes up,
+  /// as a tap, because taps start drags too.
   @override
   void onDragStart(DragStartEvent event) {
     if (isWaiting) {
@@ -529,15 +550,17 @@ abstract class TubeHost({
     super.onDragStart(event);
   }
 
-  /// Moves the ship a lane every [dragPerLane] logical pixels left or right,
-  /// whatever the zoom, or, where a finger [circles], round the tube with
-  /// it.
+  /// Moves the ship a lane for every [dragPerLane] logical pixels left or
+  /// right, whatever the zoom.
+  ///
+  /// Where a finger [circles], it moves the ship round the tube with the
+  /// finger instead.
   @override
   void onDragUpdate(DragUpdateEvent event) {
     final delta = event.canvasDelta;
     if (circles) {
-      // Where the finger is now: Flame's end position adds the move again to
-      // Flutter's position, which already has it.
+      // Where the finger is now. Flame's end position adds the move to
+      // Flutter's position a second time, but Flutter's already includes it.
       _circle(event.pointerId, event.canvasStartPosition);
     } else if (canMove) {
       moveShipBy(delta.x / dragPerLane);
@@ -552,14 +575,15 @@ abstract class TubeHost({
     super.onDragUpdate(event);
   }
 
-  /// Moves the ship toward the step at the angle of the finger [pointer] at
-  /// [position] round the centre of the tube's near end, in the canvas. It
-  /// starts from where the ship is, and closes the gap by [circleCatchUp] of
-  /// each angle that the finger sweeps, so that the ship doesn't jump. On an
-  /// open tube, the ship stops at the ends, and the finger slips past them:
-  /// it moves the ship back as soon as it turns back. Where an open tube's
-  /// lanes take less than [circleLaneTurn], the ship isn't under the finger,
-  /// but moves with it.
+  /// Moves the ship toward the step at the angle of finger [pointer], at
+  /// [position] in the canvas, round the centre of the tube's near end.
+  ///
+  /// The ship starts from where it is, and the gap closes by [circleCatchUp]
+  /// of each angle that the finger sweeps, so that the ship doesn't jump. On
+  /// an open tube, the ship stops at the ends while the finger can slip past
+  /// them, and the finger moves the ship back as soon as it turns back. Where
+  /// an open tube's lanes span less than [circleLaneTurn], the ship isn't
+  /// under the finger, but moves with it.
   void _circle(int pointer, Vector2 position) {
     final at = camera.globalToLocal(position);
     final tube = view.tube;
@@ -685,10 +709,11 @@ abstract class TubeHost({
     super.onDragCancel(event);
   }
 
-  /// Moves the ship a lane for each scroll, whatever its size: clockwise for
-  /// a scroll down, and as a drag would for one sideways. Scrolling in circles
-  /// on a Steam Deck trackpad set to Steam Input's Scroll Wheel mode turns it
-  /// round the tube.
+  /// Moves the ship one lane for each scroll, whatever its size: clockwise
+  /// for a scroll down, and as a drag would for a sideways scroll.
+  ///
+  /// Scrolling in circles on a Steam Deck trackpad set to Steam Input's
+  /// Scroll Wheel mode turns the ship round the tube.
   @override
   void onScroll(ScrollEvent event) {
     final delta = event.raw.scrollDelta;
@@ -712,10 +737,12 @@ abstract class TubeHost({
     }
   }
 
-  /// Handles a key: at READY, any key but a modifier ends the wait. Enter
-  /// ends it once the game is over, and otherwise calls [onEnter]. The keys
-  /// that move the ship or fire count as held while down, and it ignores the
-  /// others.
+  /// Handles a key.
+  ///
+  /// At READY, any key except a modifier ends the wait. Enter ends the wait
+  /// when the game is over, and otherwise calls [onEnter]. The keys that move
+  /// the ship or fire count as held while they're down. This ignores all
+  /// other keys.
   @override
   KeyEventResult onKeyEvent(
     KeyEvent event,
@@ -764,7 +791,7 @@ mixin RasterizerTubeHost on TubeHost, ExampleRasterizer<ExampleWorld> {
     (drawing as RasterizerPathComponent).glow = glow;
   }
 
-  /// Fills the quads separate, which the mesh renderer imports much faster
+  /// Fills the quads separately, which the mesh renderer imports much faster
   /// than their union. Where glows overlap, they add up.
   @override
   PositionComponent quadsComponent(

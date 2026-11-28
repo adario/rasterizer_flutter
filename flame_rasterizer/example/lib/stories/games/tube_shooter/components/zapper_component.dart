@@ -4,12 +4,13 @@ import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
-/// A zapper, which climbs its lane without firing, and electrifies it.
+/// A zapper, which climbs its lane without firing and electrifies it.
 ///
 /// Now and then, it flips onto a neighbouring lane. At the rim, it flips
-/// toward the ship. While the zappers pulse, a bolt runs from it down its lane
-/// to the rim, and destroys the ship there. Just before a pulse, it flashes
-/// white. One that arrives too late to flash waits for the next pulse.
+/// toward the ship. During a pulse, a bolt runs from it along its lane to the
+/// rim and destroys the ship if the ship is there. It flashes white just
+/// before each pulse. A zapper that arrives too late to flash waits for the
+/// next pulse.
 class ZapperComponent({
   required super.lane,
   required super.depth,
@@ -17,14 +18,14 @@ class ZapperComponent({
 }) extends EnemyComponent {
   this : super(EnemyKind.zapper);
 
-  /// Seconds until it flips, at the first round's pace.
+  /// Seconds until it flips, counted at the first round's pace.
   double _untilFlip = 0;
   bool _white = false;
 
-  /// Whether it flashed white before the pulse coming or going on.
+  /// Whether it flashed white before the current or next pulse.
   bool _warned = false;
 
-  /// Whether its bolt runs down its lane now.
+  /// Whether its bolt is running along its lane.
   bool get isZapping => _warned && shooter.isPulsing && !isFlipping;
 
   @override

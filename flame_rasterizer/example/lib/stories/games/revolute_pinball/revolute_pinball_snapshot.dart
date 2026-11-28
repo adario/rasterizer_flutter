@@ -1,11 +1,13 @@
 part of 'revolute_pinball_example.dart';
 
-/// What a game for another renderer goes on from: the wheel, the bodies with
-/// how long the last ones dropped have been at rest and whether they've
-/// scored, the next body's color, and the HUD's values.
+/// The state that a game with another renderer continues from.
 ///
-/// It leaves out the trails, the kicks, and the bodies that a bucket empties.
-/// The bodies in a bucket are at rest in the new game.
+/// It holds the wheel, the bodies, the next ball's color and the HUD's values.
+/// Each body records whether it has scored and, for the last ones dropped, how
+/// long it has been at rest.
+///
+/// It leaves out the trails, the kicks, and the bodies that a bucket is
+/// emptying. The new game treats the bodies in a bucket as at rest.
 typedef RevolutePinballSnapshot = ({
   WheelSnapshot? wheel,
   List<({BallSnapshot ball, double? rest, bool scored})> balls,
@@ -19,7 +21,7 @@ typedef RevolutePinballSnapshot = ({
   bool queued,
 });
 
-/// Takes a [RevolutePinballExample]'s snapshot, and goes on from one.
+/// Takes a [RevolutePinballExample]'s snapshot, and continues a game from one.
 extension RevolutePinballSnapshots on RevolutePinballExample {
   RevolutePinballSnapshot get snapshot {
     bool kept(BodyComponent body) =>
@@ -57,8 +59,8 @@ extension RevolutePinballSnapshots on RevolutePinballExample {
     );
   }
 
-  /// Adds the snapshot's bodies again, and its values. Call it once the table
-  /// is built.
+  /// Adds the snapshot's bodies back and restores its values. Call it after the
+  /// table is built.
   void _goOnFrom(RevolutePinballSnapshot from) {
     void add(
       BodyComponent body,

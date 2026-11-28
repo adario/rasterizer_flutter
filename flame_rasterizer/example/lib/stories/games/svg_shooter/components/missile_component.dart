@@ -19,9 +19,11 @@ class MissileComponent(
   /// Its speed, in world units a second.
   static const speed = 500.0;
 
-  /// In the same ratio to the player's width as Rogue Shooter's bullets, 20
-  /// high, to its player, 75 wide. The SVG's content fills the full height of
-  /// its square.
+  /// The missile's size, in the same ratio to the player's width as in Rogue
+  /// Shooter.
+  ///
+  /// There, the bullets are 20 high and the player is 75 wide. The SVG's
+  /// content fills the full height of its square.
   static final Vector2 initialSize = Vector2.all(
     PlayerComponent.initialSize.x * 20 / 75,
   );

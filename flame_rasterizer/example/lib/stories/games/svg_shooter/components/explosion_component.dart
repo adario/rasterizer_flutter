@@ -7,27 +7,30 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/en
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/player_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
 
-/// What blows up: an enemy that a missile hit, an enemy that hit the player,
-/// or the player once its health runs out.
+/// What blows up: an enemy that a missile hit, an enemy that hit the player, or
+/// the player when its health runs out.
 enum ExplosionKind() {
   missileHit,
   playerHit,
   playerDestroyed,
 }
 
-/// The Explosion of Flame's particles example, played once: a flash and
-/// debris.
+/// The Explosion of Flame's particles example, played once: a flash and debris.
 ///
-/// Its distances scale so that it's twice as wide as what blows up, as in
-/// Rogue Shooter, while the debris' dots keep their sizes. A missile's hit
-/// has the particles example's colors, from white to yellows and reds. A hit
-/// on the player, and the player's own explosion, go from white to reds. It
-/// removes itself once both the flash and the debris are done.
+/// Its distances scale so that it's twice as wide as what blows up, as in Rogue
+/// Shooter, while the debris dots keep their sizes.
+///
+/// A missile hit has the particles example's colors, from white to yellows and
+/// reds. A hit on the player, and the player's own explosion, go from white to
+/// reds. It removes itself after both the flash and the debris are done.
 class ExplosionComponent(final ExplosionKind kind, {super.position})
     extends PositionComponent
     with HasGameRef<SvgShooterExample> {
-  /// Returns the width of an explosion of [kind]: twice that of what blows up,
-  /// as Rogue Shooter's explosions, 50 wide, are twice its enemies' width.
+  /// Returns the width of an explosion of [kind]: twice the width of what blows
+  /// up.
+  ///
+  /// Rogue Shooter's explosions, 50 wide, are also twice the width of its
+  /// enemies.
   static double acrossOf(ExplosionKind kind) =>
       2 *
       switch (kind) {
@@ -36,7 +39,7 @@ class ExplosionComponent(final ExplosionKind kind, {super.position})
         ExplosionKind.playerDestroyed => PlayerComponent.initialSize.x,
       };
 
-  /// The least and the most speed of the particles example's debris.
+  /// The lowest and the highest speed of the particles example's debris.
   static const _debrisSpeed = (least: 40.0, most: 300.0);
 
   /// The longest life of the particles example's debris, in seconds.
@@ -87,9 +90,9 @@ class ExplosionComponent(final ExplosionKind kind, {super.position})
   /// through the colors in [flash] and [debris] as they age.
   ///
   /// Distances scale by about 0.25 for an enemy's explosion. Unlike the
-  /// particles example's, the emitters don't loop and have no duration: each
-  /// is done once its particles are. Each has room for just the particles of
-  /// its one burst.
+  /// particles example's emitters, these don't loop and have no duration: each
+  /// is done when its particles are. Each has room for just the particles of
+  /// its single burst.
   static ({ParticleEmitter flash, ParticleEmitter debris}) _emittersOf(
     ExplosionKind kind, {
     required List<Color> flash,

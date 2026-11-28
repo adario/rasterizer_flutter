@@ -6,9 +6,12 @@ import 'package:flame_forge2d/flame_forge2d.dart' hide World;
 import 'package:flame_rasterizer_example/commons/forge2d.dart';
 import 'package:flame_rasterizer_example/stories/games/revolute_pinball/revolute_pinball_example.dart';
 
-/// A trail of [_body]'s center of mass for [_time] seconds, below all else:
-/// one curve per step, which matches its positions and velocities at both
-/// ends. From [_fadeStart] on, it fades from its oldest curve to its newest.
+/// A trail behind [_body]'s center of mass that lasts [_time] seconds, drawn
+/// below everything else.
+///
+/// It adds one cubic curve per step, matching the body's positions and
+/// velocities at both ends. From [_fadeStart] on, it fades out from its oldest
+/// curve to its newest.
 class TrailComponent(final BodyComponent _body)
     extends Component
     with HasGameRef<RevolutePinballExample> {

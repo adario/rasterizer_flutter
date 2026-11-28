@@ -2,7 +2,8 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/l
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
-/// A shot from the ship, which flies down its lane and is gone at the far end.
+/// A shot from the ship, which flies down its lane and disappears at the far
+/// end.
 class ShotComponent({
   required super.lane,
   required super.depth,

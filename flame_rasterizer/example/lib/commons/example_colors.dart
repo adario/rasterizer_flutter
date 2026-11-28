@@ -1,7 +1,8 @@
 import 'dart:ui';
 
-/// The palette of Flame's Forge2D examples. Svg Shooter's enemies use its
-/// colors too.
+/// The palette of Flame's Forge2D examples.
+///
+/// Svg Shooter's enemies use these colors too.
 abstract final class ExampleColors() {
   /// The Forge2D games' background.
   static const background = Color(0xFF0B1020);
@@ -9,7 +10,7 @@ abstract final class ExampleColors() {
   /// The color of the bodies that don't move, such as the walls.
   static const slate = Color(0xFF64748B);
 
-  /// The colors of the bodies that move, which they take in turn.
+  /// The colors of the moving bodies, which take them in turn.
   static const dynamics = [
     Color(0xFF7C9CFF),
     Color(0xFF38BDF8),

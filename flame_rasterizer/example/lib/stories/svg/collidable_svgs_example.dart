@@ -16,11 +16,11 @@ typedef CollidableSvgsSettings = ({SvgRenderer renderer, int count});
 /// SVGs that move, spin, and bounce off each other and the walls: see
 /// [description].
 ///
-/// The walls are an [arena] of the game's size, centred on the world's
-/// origin. The status adds the collisions so far to [ExampleGame]'s.
+/// The walls are an [arena] of the game's size, centered on the world's origin.
+/// The status adds the number of collisions so far to what [ExampleGame] shows.
 /// Subclasses pick what loads and draws the SVGs: see [ExampleSvgs].
 ///
-/// Given the snapshot of a game with another renderer, it goes on from there,
+/// Given the snapshot of a game with another renderer, the game resumes from it
 /// with the same SVGs: see [CollidableSvgsSnapshots].
 abstract class CollidableSvgsExample({
   required var int _count,
@@ -28,8 +28,10 @@ abstract class CollidableSvgsExample({
   math.Random? random,
   CollidableSvgsSnapshot? from,
 }) extends ExampleGame with ExampleSvgs, HasCollisionDetection {
-  /// Creates the game for [settings]' renderer, with flame_svg's [cache] for
-  /// Flame SVG, which goes on from [from], if any.
+  /// Creates the game for the renderer in [settings], resuming from [from] if
+  /// given.
+  ///
+  /// Flame SVG uses flame_svg's [cache] settings.
   factory CollidableSvgsExample.of(
     CollidableSvgsSettings settings,
     ValueNotifier<String> status, {
@@ -79,17 +81,18 @@ abstract class CollidableSvgsExample({
   /// The fastest speed, in world units a second.
   static const _maxSpeed = 420.0;
 
-  /// The most of the arena's area that the SVGs' rectangles cover.
+  /// The largest fraction of the arena's area that the SVGs' rectangles cover.
   static const _cover = 0.25;
 
   final math.Random random = random ?? math.Random();
 
-  /// The snapshot that it goes on from, if any.
+  /// The snapshot that the game resumes from, if any.
   final CollidableSvgsSnapshot? _from = from;
 
-  /// The SVG Number knob's value. A new value changes the running game: it
-  /// adds SVGs where there's room, or removes the last ones, and shrinks them
-  /// all again to fit.
+  /// The value of the SVG Number knob.
+  ///
+  /// A new value changes the running game: it adds SVGs where there's room or
+  /// removes the last ones, and then resizes them all to fit.
   int get count => _count;
   set count(int value) {
     if (value == _count) {
@@ -110,11 +113,13 @@ abstract class CollidableSvgsExample({
   /// The number of collisions between SVGs so far.
   int collisions = 0;
 
-  /// The names of its SVGs, at least as many as it has had. They go through
-  /// all the names in a random order, then again in another, and so on.
+  /// The names of the SVGs, at least one for each SVG that the game has had.
+  ///
+  /// The list goes through all the names in a random order, then through all of
+  /// them again in another order, and so on.
   final _names = <String>[];
 
-  /// The widths picked for its SVGs, before [_fit] shrinks them.
+  /// The widths picked for the SVGs, before [_fit] shrinks them.
   final _widthsPicked = <double>[];
 
   /// The SVGs loaded so far, by name.
@@ -123,7 +128,8 @@ abstract class CollidableSvgsExample({
   /// Whether [onLoad] has run.
   bool _started = false;
 
-  /// Whether [_apply] is running, so that another call leaves the work to it.
+  /// Whether [_apply] is running. A second call then returns at once and leaves
+  /// the work to the running one.
   bool _applying = false;
 
   @override
@@ -142,9 +148,10 @@ abstract class CollidableSvgsExample({
     startStatus();
   }
 
-  /// Gives it [count] SVGs, loading those it lacks.
+  /// Gives the game [count] SVGs, loading the ones that aren't loaded yet.
   ///
-  /// It goes on until it has [count], as [count] can change while SVGs load.
+  /// It loops until there are [count] SVGs, as [count] can change while SVGs
+  /// load.
   Future<void> _apply() async {
     if (_applying) {
       return;
@@ -168,8 +175,9 @@ abstract class CollidableSvgsExample({
     }
   }
 
-  /// Keeps its first [target] SVGs and adds new ones where there's room,
-  /// shrinking them all so that they cover at most [_cover] of the arena.
+  /// Keeps the first [target] SVGs and adds new ones where there's room.
+  ///
+  /// It shrinks them all so that they cover at most [_cover] of the arena.
   void _fit(int target) {
     while (_widthsPicked.length < target) {
       _widthsPicked.add(_widths[random.nextInt(_widths.length)]);
@@ -230,8 +238,8 @@ abstract class CollidableSvgsExample({
   }
 }
 
-/// The walls that the SVGs bounce off: a rectangle of the game's size,
-/// centred on the world's origin, which the camera looks at.
+/// The walls that the SVGs bounce off: a rectangle of the game's size, centered
+/// on the world's origin, which the camera looks at.
 class CollidableArena({required super.size}) extends PositionComponent {
   this : super(anchor: Anchor.center);
 
@@ -240,11 +248,11 @@ class CollidableArena({required super.size}) extends PositionComponent {
     add(RectangleHitbox(collisionType: CollisionType.passive));
   }
 
-  /// Returns a center in the arena for a component of [size], whose circle
-  /// overlaps none of [others]' circles.
+  /// Returns a center in the arena for a component of [size] whose bounding
+  /// circle overlaps none of the circles of [others].
   ///
-  /// It tries 100 centers from [random], and returns the last one if none
-  /// fits.
+  /// It tries 100 random centers from [random], and returns the last one if
+  /// none fits.
   Vector2 freePosition(
     Vector2 size,
     Iterable<PositionComponent> others,
@@ -270,10 +278,10 @@ class CollidableArena({required super.size}) extends PositionComponent {
   }
 }
 
-/// An SVG that moves with [velocity] and spins, with an [SvgHitbox] in its
-/// shape.
+/// An SVG that moves with [velocity] and spins, with an [SvgHitbox] that
+/// follows its shape.
 ///
-/// When it collides with another, the two swap their velocities. When it
+/// When it collides with another SVG, the two swap their velocities. When it
 /// hits the walls of [arena], it turns back.
 class CollidableSvg(
   final ExampleSvg svg, {
@@ -302,7 +310,7 @@ class CollidableSvg(
     ]);
   }
 
-  /// Resizes it, and its SVG, to [value]. Its hitbox follows its size.
+  /// Resizes it and its SVG to [value]. Its hitbox follows its size.
   void resize(Vector2 value) {
     size = value;
     _image.size = value;
@@ -315,11 +323,11 @@ class CollidableSvg(
     _comeBack();
   }
 
-  /// Brings it back to any wall of the arena that its center went past,
-  /// moving away from it.
+  /// Moves it back onto any arena wall that its center went past, with its
+  /// velocity pointing away from that wall.
   ///
-  /// Flame checks collisions once a frame, after the moves. On a long frame,
-  /// a small and fast SVG can cross a wall without touching it.
+  /// Flame checks collisions once a frame, after the moves. On a long frame, a
+  /// small, fast SVG can cross a wall without touching it.
   void _comeBack() {
     final rect = arena.toRect();
     if (position.x < rect.left) {
@@ -349,11 +357,11 @@ class CollidableSvg(
     }
   }
 
-  /// Bounces off the walls at every frame that it touches them, not only as
-  /// it starts to.
+  /// Bounces off the walls on every frame that it touches them, not only on the
+  /// first one.
   ///
-  /// Another SVG can send it back toward the walls while it still touches
-  /// them. With no new contact, it would then leave the arena.
+  /// Another SVG can send it back toward the walls while it still touches them.
+  /// With no new contact, it would then leave the arena.
   @override
   void onCollision(List<Vector2> intersectionPoints, PositionComponent other) {
     super.onCollision(intersectionPoints, other);
@@ -385,11 +393,10 @@ class CollidableSvg(
   /// Reflects off the walls of [arena] that [intersectionPoints] are on, as a
   /// mirror would.
   ///
-  /// Only the velocity's component across a wall turns, and only if it points
-  /// into the wall. A spinning SVG's corner can touch a wall again right
-  /// after a bounce, or another SVG can have sent it away already. In a
-  /// corner of the arena, turning the whole velocity would send it into the
-  /// other wall.
+  /// Only the velocity component across a wall flips, and only if it points
+  /// into the wall. A spinning SVG's corner can touch a wall again right after
+  /// a bounce, or another SVG may already have sent it away. In a corner of the
+  /// arena, reversing the whole velocity would send it into the other wall.
   void _bounceOffWalls(
     CollidableArena arena,
     List<Vector2> intersectionPoints,

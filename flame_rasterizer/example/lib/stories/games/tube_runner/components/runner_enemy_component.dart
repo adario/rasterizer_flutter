@@ -10,11 +10,15 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// What an enemy in a game for another renderer goes on from: its kind, the
-/// lane it came in and the one it's in, where it is, and was before it last
-/// climbed, how long it has climbed, its flip, if any, the seconds until it
-/// flips, if it picked them, and what its kind keeps, as
-/// [RunnerEnemyComponent.ownSnapshot] gives it.
+/// What an enemy resumes from when the game switches to another renderer.
+///
+/// It holds:
+/// - the enemy's kind;
+/// - the lane it came in, and the lane it's in;
+/// - where it is, and where it was before it last climbed;
+/// - how long it has climbed;
+/// - its flip, if any, and the seconds until it flips, if it picked them;
+/// - what its kind keeps, as [RunnerEnemyComponent.ownSnapshot] gives it.
 typedef RunnerEnemySnapshot = ({
   EnemyKind kind,
   int spawnLane,
@@ -27,20 +31,22 @@ typedef RunnerEnemySnapshot = ({
   Record? own,
 });
 
-/// An enemy of [kind], which comes at the far end of [spawnLane] and climbs
-/// the tube toward the ship, with the shape and colour of Tube Shooter's, and
-/// [strokeWidths] as wide a stroke.
+/// An enemy of [kind] that comes at the far end of [spawnLane] and climbs
+/// the tube toward the ship.
+///
+/// It has the shape and colour of Tube Shooter's enemy of that kind, with a
+/// stroke [strokeWidths] times as wide as the ship's.
 ///
 /// The game moves it with [climb], and places it with [placeAt] where the
-/// tube says it shows. It goes once it passes the ship.
+/// tube says it shows. It goes when it passes the ship.
 ///
 /// For [flashTime] after it comes, it glows in its colour, fading out as
-/// [flash] says: with [TubeHost.glowShape] if the renderer draws
-/// glows, or else under a wider, see-through copy of its shape, as wide as
-/// that glow. A splitter's climbers don't flash, as they don't come down the
-/// tube.
+/// [flash] says. If the renderer draws glows, it glows with
+/// [TubeHost.glowShape]. Otherwise a wider, see-through copy of its shape,
+/// as wide as that glow, shows under it. A splitter's climbers don't flash,
+/// as they don't come down the tube.
 ///
-/// Given [from], it goes on from there.
+/// Given [from], it resumes from that snapshot.
 abstract class RunnerEnemyComponent(
   final EnemyKind kind,
   final int spawnLane, {
@@ -54,7 +60,7 @@ abstract class RunnerEnemyComponent(
   /// second.
   static const climbSpeed = 0.275;
 
-  /// How many times as wide as the ship's its stroke is.
+  /// How many times as wide as the ship's stroke its stroke is.
   static const strokeWidths = 2.0;
 
   /// How long it flashes after it comes, in seconds of the game.
@@ -69,21 +75,21 @@ abstract class RunnerEnemyComponent(
   /// The lane it's in, or flips from.
   int get lane;
 
-  /// The lane it counts as in, for hits.
+  /// The lane it counts as being in, for hits.
   int get currentLane;
 
   /// Whether a shot down its [currentLane] can destroy it.
   bool get canBeShot => true;
 
-  /// Whether it destroys the ship in [shipLane] once it reaches the ship's
+  /// Whether it destroys the ship in [shipLane] when it reaches the ship's
   /// ring.
   bool hits(int shipLane) => currentLane == shipLane;
 
-  /// How long it has climbed, in seconds of the game, or [flashTime] at
-  /// first if it doesn't flash.
+  /// How long it has climbed, in seconds of the game. It starts at
+  /// [flashTime] if the enemy doesn't flash.
   double _age = from?.age ?? (flashes ? 0 : flashTime);
 
-  /// What a game with another renderer goes on from.
+  /// What a game with another renderer resumes from.
   RunnerEnemySnapshot get snapshot {
     final self = this;
     final flipper = self is RunnerFlipperComponent ? self : null;
@@ -107,8 +113,8 @@ abstract class RunnerEnemyComponent(
     );
   }
 
-  /// What its kind keeps beyond [snapshot]'s, if anything, for a game with
-  /// another renderer to go on from.
+  /// What its kind keeps beyond [snapshot], if anything, for a game with
+  /// another renderer to resume from.
   Record? get ownSnapshot => null;
 
   /// How strong its flash is: 1 as it comes, fading to 0 over [flashTime].
@@ -117,8 +123,8 @@ abstract class RunnerEnemyComponent(
   /// The component that draws its shape.
   late final PathComponent drawing;
 
-  /// The component that draws the copy of its shape under it, while it
-  /// flashes, if the renderer doesn't draw the glow.
+  /// The component that draws the wider copy of its shape under it while it
+  /// flashes, when the renderer doesn't draw glows.
   PathComponent? _halo;
 
   /// How many times as wide as the ship's the halo's stroke is.
@@ -178,10 +184,13 @@ abstract class RunnerEnemyComponent(
   void move(double dt);
 }
 
-/// An enemy that climbs from [at] in [spawnLane], and flips onto a
+/// An enemy that climbs from [at] in [spawnLane] and flips onto a
 /// neighbouring lane after a random time within [flipPeriod], as Tube
-/// Shooter's do, over its first level's flip time: it turns about the corner
-/// the two lanes share, through the inside of the tube.
+/// Shooter's enemies do.
+///
+/// Each flip takes the flip time of Tube Shooter's first level. The enemy
+/// turns about the corner the two lanes share, through the inside of the
+/// tube.
 abstract class RunnerFlipperComponent(
   super.kind,
   super.spawnLane,
@@ -192,19 +201,19 @@ abstract class RunnerFlipperComponent(
   @override
   late int lane = from?.lane ?? spawnLane;
 
-  /// The pace of Tube Shooter's first level, which its kind goes at.
+  /// Tube Shooter's first level, which sets the pace of its kind.
   static final level = levels.first;
 
   /// The range of times between its flips.
   Range get flipPeriod;
 
-  /// The lane it flips onto, if it's flipping, how far through the flip it
-  /// is, from 0 to 1, and the angle the whole flip turns by.
+  /// While it flips: the lane it flips onto, how far through the flip it is,
+  /// from 0 to 1, and the angle the whole flip turns by.
   int? _flipTo = from?.flip?.to;
   double _flipProgress = from?.flip?.progress ?? 0;
   double _flipAngle = from?.flip?.angle ?? 0;
 
-  /// Seconds until it flips, once it picked them, as it first climbed.
+  /// The seconds until it flips, picked when it first climbed.
   double? _untilFlip = from?.untilFlip;
 
   bool get isFlipping => _flipTo != null;

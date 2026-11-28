@@ -7,12 +7,13 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shapes.dart'
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// A burst of rays in [color], placed, turned and scaled as what it destroyed.
+/// A burst of rays in [color], with the position, angle and scale of what was
+/// destroyed.
 ///
 /// Over [duration] seconds, it grows to twice its size and its rays fade out.
-/// Unless it's deeper than [farDepth], 8 more rays, between those, fly out
-/// from its middle for twice as long, fading out over the second half, in
-/// [rayColor]. Then it removes itself.
+/// Unless it's deeper than [farDepth], 8 more rays in [rayColor] fly out from
+/// its middle, angled between the burst's rays. They fly for twice as long and
+/// fade out over the second half. Then it removes itself.
 class ExplosionComponent({
   required super.position,
   required super.angle,
@@ -22,8 +23,8 @@ class ExplosionComponent({
   required final double depth,
   final Color color = TubeColors.explosion,
 
-  /// The colour of its flying rays, such as that of what it destroyed, or
-  /// null for [color].
+  /// The colour of its flying rays, such as the colour of what was destroyed,
+  /// or null to use [color].
   final Color? rayColor,
 }) extends PositionComponent with HasGameRef<TubeHost> {
   static const duration = 0.5;
@@ -32,7 +33,7 @@ class ExplosionComponent({
   static const farDepth = 0.85 * Tube.depth;
 
   /// How fast the flying rays move away from the middle, in the burst's own
-  /// units a second, which grow with it.
+  /// units a second. Those units grow as the burst grows.
   static const flySpeed = 0.5;
 
   /// The components that draw its burst and its flying rays.
@@ -63,7 +64,7 @@ class ExplosionComponent({
               EffectController(duration: duration, startDelay: duration),
             ),
           );
-        // A tint, unlike a paint of another colour, shares the import of the
+        // Unlike a paint of another colour, a tint reuses the import of the
         // ray in [color].
         if (rayColor case final tint?) {
           ray.tint(tint);

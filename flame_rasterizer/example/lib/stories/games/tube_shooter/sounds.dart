@@ -7,14 +7,15 @@ enum Sound(
   /// How many times the sound can play at once.
   final int size = 3,
 }) {
-  /// The ship fires: as often as every `PlayerComponent.firePeriod`, so as
-  /// many times at once as fit in the sound, and one more.
+  /// The ship fires, as often as every `PlayerComponent.firePeriod`, so the
+  /// sound can play as many times at once as shots fit in its length, plus
+  /// one.
   fire('fire', size: 7),
 
   /// An enemy fires.
   enemyFire('enemy_fire'),
 
-  /// An enemy is destroyed: often a few, close together.
+  /// An enemy is destroyed, often a few close together.
   explosion('explosion', size: 6),
 
   /// The ship is destroyed.
@@ -23,7 +24,7 @@ enum Sound(
   /// A shot shortens a spike.
   spike('spike'),
 
-  /// The zappers' bolts run down their lanes.
+  /// The zappers' bolts run along their lanes.
   zap('zap'),
 
   /// The purge destroys every enemy.

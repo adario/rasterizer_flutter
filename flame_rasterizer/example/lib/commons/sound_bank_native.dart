@@ -1,10 +1,10 @@
 import 'package:flame_audio/flame_audio.dart';
 
-/// A game's sounds on native platforms, which audioplayers plays: a
+/// A game's sounds on native platforms, which audioplayers plays with a
 /// [SoundPool] for each sound.
 class SoundBank._(final Map<String, SoundPool> _pools) {
-  /// Loads the sound at each of [sizes]' paths into as many players as it
-  /// says.
+  /// Loads the sound at each path in [sizes] into as many players as [sizes]
+  /// gives for it.
   static Future<SoundBank> load(Map<String, int> sizes) async {
     await FlameAudio.audioCache.loadAll([...sizes.keys]);
     return SoundBank._({
@@ -13,8 +13,8 @@ class SoundBank._(final Map<String, SoundPool> _pools) {
     });
   }
 
-  /// Plays the sound at [path] with one of its players that isn't busy, if
-  /// any: otherwise, skips it.
+  /// Plays the sound at [path] with one of its idle players, or skips it when
+  /// they're all busy.
   void play(String path) => _pools[path]!.play();
 
   /// Releases the players, which can't be used anymore.
@@ -26,12 +26,12 @@ class SoundBank._(final Map<String, SoundPool> _pools) {
 /// A few players of the same sound, which are reused rather than created
 /// each time the sound plays.
 class SoundPool._(final List<AudioPlayer> _players) {
-  /// Mixed with the other sounds, without taking the audio focus.
+  /// Mixes the sounds with other audio, without taking the audio focus.
   static final _audioContext = AudioContextConfig(
     focus: AudioContextConfigFocus.mixWithOthers,
   ).build();
 
-  /// The players asked to play, which haven't started yet.
+  /// The players that were asked to play and haven't started yet.
   final Set<AudioPlayer> _starting = {};
 
   /// Loads the sound at [path] into [size] players.
@@ -40,11 +40,11 @@ class SoundPool._(final List<AudioPlayer> _players) {
     for (var i = 0; i < size; i++) {
       final player = AudioPlayer()
         ..audioCache = FlameAudio.audioCache
-        // Otherwise, while it plays, it asks the platform for its position
-        // every frame, which costs frames.
+        // Without this, the player asks the platform for its position every
+        // frame while it plays, which costs frame time.
         ..positionUpdater = null;
       await player.setAudioContext(_audioContext);
-      // Back to the start when it ends, ready to play again.
+      // Rewinds to the start when the sound ends, ready to play again.
       await player.setReleaseMode(ReleaseMode.stop);
       await player.setSource(AssetSource(path));
       players.add(player);
@@ -52,14 +52,13 @@ class SoundPool._(final List<AudioPlayer> _players) {
     return SoundPool._(players);
   }
 
-  /// Plays the sound with a player that isn't busy, if any: otherwise, skips
-  /// it.
+  /// Plays the sound with an idle player, or skips it when they're all busy.
   void play() {
     final player = _players.where((player) => !_isBusy(player)).firstOrNull;
     if (player == null) {
       return;
     }
-    // Busy until it starts, or fails to.
+    // The player counts as busy until it starts or fails to start.
     _starting.add(player);
     player.resume().whenComplete(() => _starting.remove(player));
   }

@@ -3,11 +3,11 @@ import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:widgetbook/widgetbook.dart';
 
-/// The app around each use case, with a bar above it, as in Flame's
+/// The app that wraps each use case, with a bar above it, as in Flame's
 /// examples.
 ///
-/// The bar shows the use case's name, and buttons for its description and
-/// its code.
+/// The bar shows the use case's name and buttons for its description and its
+/// code.
 class const ExampleApp({required final Widget child, super.key})
     extends StatelessWidget {
   @override
@@ -77,8 +77,9 @@ class const _InfoDialog(final ExampleUseCase useCase) extends StatelessWidget {
   /// The description, with the lines of each paragraph joined so that the
   /// text wraps freely.
   ///
-  /// The descriptions are written like Markdown, with blank lines between
-  /// paragraphs and line breaks by hand. List items stay on their own lines.
+  /// The descriptions are written like Markdown: blank lines separate the
+  /// paragraphs, and the lines are wrapped by hand. List items stay on their
+  /// own lines.
   String get _description {
     return useCase.info
         .split('\n')

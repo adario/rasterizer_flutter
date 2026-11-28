@@ -5,11 +5,10 @@ import 'package:flame/extensions.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/components/star_component.dart';
 import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_example.dart';
 
-/// Adds Rogue Shooter's stars: rows of falling stars, with a new row at the
-/// top each time they've fallen by a row's gap.
+/// Adds Rogue Shooter's stars: rows of falling stars, with a new row at the top
+/// each time the rows have fallen by one row's gap.
 ///
-/// Each star is a sprite of [image], which [starImage] makes, at a random
-/// size.
+/// Each star is a sprite of [image], which [starImage] makes, at a random size.
 class StarBackgroundCreator(final Image image)
     extends Component
     with HasGameRef<SvgShooterExample> {

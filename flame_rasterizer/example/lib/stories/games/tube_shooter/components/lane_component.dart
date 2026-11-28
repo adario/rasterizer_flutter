@@ -6,7 +6,7 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
 /// Where something in a lane of the tube is, for a game with another renderer
-/// to go on from: its lane, its depth, and its depth before its last update.
+/// to resume from: its lane, its depth, and its depth before its last update.
 typedef LaneSnapshot = ({int lane, double depth, double previousDepth});
 
 /// Something in a [lane] of the tube, at a [depth], drawn as [shape] in
@@ -28,7 +28,7 @@ abstract class LaneComponent(
   /// other within one frame still hit.
   double previousDepth = previousDepth ?? depth;
 
-  /// Where it is, for a game with another renderer to go on from.
+  /// Where it is, for a game with another renderer to resume from.
   LaneSnapshot get laneSnapshot =>
       (lane: lane, depth: depth, previousDepth: previousDepth);
 
@@ -54,8 +54,8 @@ abstract class LaneComponent(
   /// Moves it over [dt] seconds.
   void move(double dt) {}
 
-  /// Places it in the middle of its lane at its depth, turned as the lane and
-  /// scaled to the lane's width there.
+  /// Places it in the middle of its lane at its depth, turned to match the
+  /// lane and scaled to the lane's width at that depth.
   void place() {
     final view = gameRef.view;
     final tube = view.tube;

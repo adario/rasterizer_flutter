@@ -19,18 +19,18 @@ typedef RevoluteJointSvgsSettings = ({SvgRenderer renderer, bool pieces});
 /// Flame's Forge2D revolute joint example, as flame_path_shapes extends it,
 /// with SVGs: see [description].
 ///
-/// Walls along the game's edges, at a zoom of 1, hold a wheel that a motor
+/// Walls along the game's edges at a zoom of 1 enclose a wheel that a motor
 /// turns, under a funnel of two ramps. Each tap drops [dropped] bodies: half
-/// balls, and half SVGs from 3 to 3.5 meters at their larger side. The SVG
-/// bodies draw above the others, so that flame_rasterizer draws them all in
-/// one run of a [RasterizerCanvas]. Their convex pieces draw over them, in
-/// the same run, while [pieces] is true.
+/// are balls, and half are SVGs whose longer side is 3 to 3.5 meters. The SVG
+/// bodies draw above the others, so that flame_rasterizer draws them all in one
+/// run of a [RasterizerCanvas]. While [pieces] is true, their convex pieces
+/// draw over them in the same run.
 ///
-/// The status adds the bodies dropped to [StoryGame]'s. As in
-/// flame_path_shapes, the number of bodies at the top right counts the
-/// walls, the ramps and the wheel too.
+/// The status adds the number of bodies dropped to what [StoryGame] shows. As
+/// in flame_path_shapes, the body count at the top right also includes the
+/// walls, the ramps and the wheel.
 ///
-/// Given the snapshot of a game with another renderer, it goes on from there,
+/// Given the snapshot of a game with another renderer, the game resumes from it
 /// with the same bodies: see [RevoluteJointSvgsSnapshots].
 abstract class RevoluteJointSvgsExample({
   @override required var bool pieces,
@@ -41,8 +41,10 @@ abstract class RevoluteJointSvgsExample({
     with ExampleSvgs, SvgBodies, PathComponents<Forge2DExampleWorld> {
   this : super(world: RevoluteJointSvgsWorld());
 
-  /// Creates the game for [settings]' renderer, with flame_svg's [cache] for
-  /// Flame SVG, which goes on from [from], if any.
+  /// Creates the game for the renderer in [settings], resuming from [from] if
+  /// given.
+  ///
+  /// Flame SVG uses flame_svg's [cache] settings.
   factory RevoluteJointSvgsExample.of(
     RevoluteJointSvgsSettings settings,
     ValueNotifier<String> status, {
@@ -94,21 +96,21 @@ abstract class RevoluteJointSvgsExample({
   /// second.
   static const _spreadSpeed = 2.0;
 
-  /// The wheel's depth below the funnel's center, in meters, as in
-  /// flame_path_shapes.
+  /// The wheel's depth below the funnel's center in flame_path_shapes, in
+  /// meters, and the deepest it goes here.
   static const _maxWheelDepth = 25.0;
 
   /// The room that the wheel leaves for the largest SVG, in meters.
   static const _wheelClearance = SvgBodies.maxSide;
 
-  /// The wheel's least depth, in meters, which leaves [_wheelClearance]
-  /// between it and the ramps' tips, 6 meters from the funnel's center.
+  /// The wheel's smallest depth, in meters, which leaves [_wheelClearance]
+  /// between the wheel and the ramps' tips, 6 meters from the funnel's center.
   static const _minWheelDepth = 9.0;
 
   @override
   final math.Random random = random ?? math.Random();
 
-  /// The snapshot that it goes on from, if any.
+  /// The snapshot that the game resumes from, if any.
   final RevoluteJointSvgsSnapshot? _from = from;
 
   /// The wheel, from [onLoad] on.
@@ -127,10 +129,11 @@ abstract class RevoluteJointSvgsExample({
     height: size.y / metersToPixels,
   );
 
-  /// The wheel's center: [_maxWheelDepth] below the funnel's center, or
-  /// higher in a short game, to leave [_wheelClearance] above the bottom
-  /// wall. In a game shorter still, it stays at [_minWheelDepth], over the
-  /// bottom wall.
+  /// The wheel's center: [_maxWheelDepth] below the funnel's center, or higher
+  /// in a short game, to leave [_wheelClearance] above the bottom wall.
+  ///
+  /// In an even shorter game, it stays at [_minWheelDepth], even if that leaves
+  /// less than [_wheelClearance] above the bottom wall.
   Vector2 get _wheelPosition {
     final depth =
         _arena.bottom - Wall.width - CircleShuffler.reach - _wheelClearance;
@@ -154,8 +157,10 @@ abstract class RevoluteJointSvgsExample({
     startStatus();
   }
 
-  /// Drops [dropped] bodies around [tap], a point in the world. They're
-  /// spread out so that they don't overlap, and move away from [tap].
+  /// Drops [dropped] bodies around [tap], a point in the world.
+  ///
+  /// They're spread out so that they don't overlap, and they move away from
+  /// [tap].
   void drop(Vector2 tap) {
     if (!isLoaded) {
       return;
@@ -204,8 +209,9 @@ abstract class RevoluteJointSvgsExample({
   }
 }
 
-/// The example's world, which drops bodies where it's tapped. Its HUD shows
-/// the number of bodies, the fixed ones included.
+/// The example's world, which drops bodies where it's tapped.
+///
+/// Its HUD shows the number of bodies, including the fixed ones.
 class RevoluteJointSvgsWorld()
     extends Forge2DExampleWorld
     with TapCallbacks, HasGameRef<RevoluteJointSvgsExample>, BodiesHud {

@@ -4,7 +4,7 @@ import 'package:flame/components.dart';
 
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// A dot of [color], such as a star or an enemy waiting to come.
+/// A dot of [color], such as a star or an enemy that hasn't come out yet.
 ///
 /// Its position is where it's drawn, and its scale is its width in world
 /// units. A filled path scales with its transform, so dots of every size share

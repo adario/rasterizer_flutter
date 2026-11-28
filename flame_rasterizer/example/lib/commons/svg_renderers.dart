@@ -9,7 +9,9 @@ import 'package:flame_svg/flame_svg.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 
-/// The SVGs in `assets/svgs/` and its directories, by path without `.svg`.
+/// The SVGs in `assets/svgs/` and its subdirectories, named by their paths
+/// without `.svg`.
+///
 /// Svg Renderers' SVG knob lists them all.
 const svgNames = [
   'android',
@@ -45,12 +47,12 @@ const svgNames = [
 ///
 /// - setup_merge and recycle_merge pair with setup and recycle, to show how
 ///   each renderer merges strokes.
-/// - prism and spaceship_2 stay in Svg Renderers.
-/// - rocket_ship, missile, spaceship_game and the wireframes are Svg
-///   Shooter's.
-/// - tiger stays out until the cost of its hitboxes, and of its pieces in
-///   Box2D, is measured.
-/// - android doesn't really support collisions
+/// - prism and spaceship_2 appear only in Svg Renderers.
+/// - rocket_ship, missile, spaceship_game and the wireframes belong to Svg
+///   Shooter.
+/// - tiger stays out until the cost of its hitboxes and of its Box2D pieces
+///   is measured.
+/// - android doesn't really support collisions.
 const notRandomSvgNames = {
   'setup_merge',
   'recycle_merge',
@@ -75,10 +77,12 @@ final randomSvgNames = [
     if (!notRandomSvgNames.contains(name)) name,
 ];
 
-/// What draws an example's SVGs: the Renderer knob's entries, each with its
-/// [label] in links and its [text] on screen.
+/// What draws an example's SVGs: the Renderer knob's entries.
+///
+/// Each entry uses its [label] in links and its [text] on screen.
 enum SvgRenderer(final String label) {
-  /// flame_rasterizer with rasterizer_gpu's mesh renderer, its default.
+  /// flame_rasterizer with rasterizer_gpu's mesh renderer, which is
+  /// flame_rasterizer's default.
   ///
   /// Where the mesh renderer isn't [supported], flame_rasterizer draws with
   /// the canvas renderer, and the Renderer knob shows this entry inactive.
@@ -95,11 +99,11 @@ enum SvgRenderer(final String label) {
   /// flame_rasterizer with rasterizer_gpu's canvas renderer, everywhere.
   rasterizerCanvas('Canvas'),
 
-  /// flame_svg, which draws each SVG as images that it caches per size on
-  /// screen.
+  /// flame_svg, which draws each SVG as images that it caches for each size
+  /// on screen.
   flameSvg('Flame SVG');
 
-  /// The GPU entries, in the order of the [firstChoice].
+  /// The GPU entries, in the order that [firstChoice] tries them.
   static const _gpus = [rasterizer, rasterizerAtlas];
 
   /// The first renderer to offer: the first [supported] GPU entry, else
@@ -109,29 +113,36 @@ enum SvgRenderer(final String label) {
     orElse: () => rasterizerCanvas,
   );
 
-  /// What a renderer menu shows for it: its [text], or, without [svgs], for
-  /// a game that draws no SVGs, Flame for [flameSvg], as Flame's own
-  /// components draw then.
+  /// Returns what a renderer menu shows for this entry: its [text], except
+  /// Flame for [flameSvg] when [svgs] is false.
+  ///
+  /// A game without [svgs] draws no SVGs, so Flame's own components draw in
+  /// that case.
   String entryText({required bool svgs}) =>
       this == flameSvg && !svgs ? 'Flame' : text;
 
   /// The GPU renderer that flame_rasterizer tries for this entry, as
   /// [HasRasterizer.rasterizerGpu]: the atlas renderer for [rasterizerAtlas],
-  /// else the mesh renderer.
+  /// and the mesh renderer for the other entries.
   RasterizerBackend get gpu =>
       this == rasterizerAtlas ? RasterizerBackend.gpu : RasterizerBackend.mesh;
 
-  /// What the Renderer knob and the status bar show for it: its [label], or,
-  /// for a GPU entry whose renderer runs, the graphics API that Impeller
-  /// renders with, such as Metal (mesh).
+  /// What the Renderer knob and the status bar show for this entry.
+  ///
+  /// This is its [label], except for a GPU entry whose renderer runs: that
+  /// entry shows the graphics API that Impeller renders with, such as Metal
+  /// (mesh).
   String get text => switch (this) {
     rasterizer when supported => '${_gpuApi()} (mesh)',
     rasterizerAtlas when supported => '${_gpuApi()} (atlas)',
     _ => label,
   };
 
-  /// Returns the graphics API that Impeller renders with, where a GPU renderer
-  /// runs: OpenGL ES, else Metal on Apple's platforms and Vulkan elsewhere.
+  /// Returns the graphics API that Impeller renders with where a GPU renderer
+  /// runs.
+  ///
+  /// That's OpenGL ES when Impeller uses it, and otherwise Metal on Apple's
+  /// platforms and Vulkan elsewhere.
   static String _gpuApi() => RasterizerGpu.openGles
       ? 'GLES'
       : switch (defaultTargetPlatform) {
@@ -139,10 +150,10 @@ enum SvgRenderer(final String label) {
           _ => 'Vulkan',
         };
 
-  /// Whether it draws as its label says, on this device.
+  /// Whether this entry draws as its label says on this device.
   ///
-  /// For [rasterizer] and [rasterizerAtlas], it's whether their GPU renderer
-  /// runs. It doesn't on the web, nor without Impeller.
+  /// For [rasterizer] and [rasterizerAtlas], this is whether their GPU
+  /// renderer runs, which it doesn't on the web or without Impeller.
   bool get supported => switch (this) {
     rasterizer || rasterizerAtlas =>
       RasterizerGpu.of(gpu).support == RasterizerSupport.supported,
@@ -152,12 +163,12 @@ enum SvgRenderer(final String label) {
 
 /// How flame_svg's cache keys its images.
 enum SvgCacheMode() {
-  /// By their size on the device: zoomed, flame_svg rasterizes new images,
-  /// which stay sharp.
+  /// By their size on the device: when zoomed, flame_svg rasterizes new
+  /// images, which stay sharp.
   integral,
 
-  /// By their size in the game, with a fixed ratio: zoomed, flame_svg scales
-  /// the images it cached.
+  /// By their size in the game, with a fixed ratio: when zoomed, flame_svg
+  /// scales the images it cached.
   fixed,
 }
 
@@ -214,11 +225,11 @@ mixin ExampleSvgs<W extends World> on StoryGame<W> {
   /// outline but not the SVG.
   Future<SvgOutline> loadOutline(String path);
 
-  /// Frees [svg], which the game loaded and none of its components draws any
-  /// more.
+  /// Frees [svg], which the game loaded and which none of its components
+  /// draws anymore.
   ///
-  /// The game frees the SVGs that it still has as it's removed. It frees any
-  /// SVG that finishes loading after that at once.
+  /// The game frees the SVGs that it still has when it's removed, and frees
+  /// any SVG that finishes loading after that right away.
   void unloadSvg(ExampleSvg svg);
 
   /// Creates a paint that fades an SVG to [opacity].
@@ -226,13 +237,13 @@ mixin ExampleSvgs<W extends World> on StoryGame<W> {
       ui.Paint()..color = ui.Color.fromRGBO(255, 255, 255, opacity);
 }
 
-/// A game that flame_rasterizer draws, with [renderer]'s GPU renderer where
-/// it's supported, else with the canvas renderer.
+/// A game that flame_rasterizer draws with [renderer]'s GPU renderer where
+/// it's supported, and with the canvas renderer otherwise.
 ///
 /// [forceCanvas] picks the canvas renderer everywhere. The game's class sets
 /// `RasterizerGpu.forceCanvas` from it in its constructor, before the game's
-/// renderer and its SVGs' imports exist, so that they all use one backend.
-/// The status names the renderer that draws, and shows its numbers.
+/// renderer and its SVGs' imports exist, so that they all use the same
+/// backend. The status names the renderer that draws and shows its numbers.
 mixin ExampleRasterizer<W extends World> on StoryGame<W>, HasRasterizer<W> {
   /// What draws: [SvgRenderer.rasterizer], [SvgRenderer.rasterizerAtlas] or
   /// [SvgRenderer.rasterizerCanvas].
@@ -245,19 +256,22 @@ mixin ExampleRasterizer<W extends World> on StoryGame<W>, HasRasterizer<W> {
   @override
   RasterizerBackend get rasterizerGpu => renderer.gpu;
 
-  /// Loads the game while its renderer is created, and completes once both
+  /// Loads the game while its renderer is created, and completes when both
   /// are done, so that the story's spinner shows until then.
   ///
-  /// On OpenGL ES, creating the renderer compiles its shaders. Without the
-  /// wait, the game would start meanwhile: its first frame would create the
-  /// renderer and stall, and its SVGs would show only once it's ready.
+  /// On OpenGL ES, creating the renderer compiles its shaders. Without this
+  /// wait, the game would start in the meantime: its first frame would create
+  /// the renderer and stall, and its SVGs would show only after the renderer
+  /// is ready.
   @override
   Future<void> onLoad() async {
     await Future.wait([Future.sync(super.onLoad), rasterizerReady]);
   }
 
-  /// The renderer's entry. When the canvas renderer draws for a GPU entry, it
-  /// says why the GPU renderer doesn't run.
+  /// The renderer's entry text.
+  ///
+  /// When the canvas renderer draws for a GPU entry, the text says why the
+  /// GPU renderer doesn't run.
   @override
   String get rendererText {
     final gpu = RasterizerGpu.of(rasterizerGpu);
@@ -268,11 +282,11 @@ mixin ExampleRasterizer<W extends World> on StoryGame<W>, HasRasterizer<W> {
     return 'Canvas (${gpu.support.name})';
   }
 
-  /// The frame's runs (see [RasterizerCanvas]) and entries.
+  /// The number of the frame's runs (see [RasterizerCanvas]) and entries.
   ///
-  /// With a GPU renderer, it adds the atlas pages, or the mesh renderer's
-  /// targets, with their memory. It also adds the frame's cpu, upload and
-  /// encode times.
+  /// With a GPU renderer, it adds the number of atlas pages, or of the mesh
+  /// renderer's targets, and their memory. It also adds the frame's CPU,
+  /// upload and encode times.
   @override
   Iterable<String> get rendererStats sync* {
     final frame = rasterizerFrame;
@@ -360,7 +374,7 @@ class _RasterizerSvg(final RasterizerSvg svg) implements ExampleSvg {
 }
 
 /// Loads SVGs that flame_svg's `SvgComponent`s draw, as images that it
-/// caches as [cacheMode] and [cacheSize] say.
+/// caches according to [cacheMode] and [cacheSize].
 mixin FlameSvgs<W extends World> on ExampleSvgs<W> {
   /// The game's own asset cache, as with [RasterizerSvgs].
   final _assets = AssetsCache();
@@ -398,8 +412,9 @@ mixin FlameSvgs<W extends World> on ExampleSvgs<W> {
   Future<SvgOutline> loadOutline(String path) async =>
       SvgOutline.fromSvg(await _bytes.readBinaryFile(path));
 
-  /// Frees the SVG's cached images. Its components also free them as they're
-  /// removed.
+  /// Frees the SVG's cached images.
+  ///
+  /// Its components also free them when they're removed.
   @override
   void unloadSvg(ExampleSvg svg) {
     final flameSvg = (svg as _FlameSvg).svg;
@@ -416,8 +431,10 @@ mixin FlameSvgs<W extends World> on ExampleSvgs<W> {
   @override
   String get rendererText => 'flame_svg';
 
-  /// Frees the SVGs' cached images. Removing a game doesn't remove its
-  /// components, so their own `onRemove` doesn't run.
+  /// Frees the SVGs' cached images.
+  ///
+  /// Removing a game doesn't remove its components, so their own `onRemove`
+  /// doesn't run.
   @override
   void onRemove() {
     super.onRemove();

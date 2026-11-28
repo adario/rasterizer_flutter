@@ -14,8 +14,8 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_e
 /// down, and whether it swings.
 typedef EnemyKind = ({ExampleSvg svg, bool turned, bool swings});
 
-/// What an enemy picks at random: its tint, the angle that it swings by,
-/// either way, or tilts by, and its velocity.
+/// What an enemy picks at random: its tint, the angle that it swings by to each
+/// side or tilts by, and its velocity.
 typedef EnemyPicks = ({
   Color color,
   double swing,
@@ -25,16 +25,17 @@ typedef EnemyPicks = ({
 
 /// An enemy of [kind], which falls down the game and explodes when hit.
 ///
-/// It tints its SVG with one of [ExampleColors.dynamics], at random, and
-/// has a passive [SvgHitbox]. An enemy that swings falls straight down at
-/// [speed], and swings like a pendulum around its center, by a random angle.
-/// Its swing starts [age] seconds in, as the first wave's enemies have been
-/// falling that long, and [age] goes on with the seconds that it falls. Other
-/// enemies tilt by a random angle, and fly where
-/// they point at a random speed around [speed].
+/// It tints its SVG with a random color from [ExampleColors.dynamics], and has
+/// a passive [SvgHitbox].
 ///
-/// Given the picks of an enemy in a game with another renderer, it makes
-/// those, not random ones.
+/// An enemy that swings falls straight down at [speed], and swings like a
+/// pendulum around its center by a random angle. Its swing starts [age] seconds
+/// in, as the first wave's enemies have already been falling that long. [age]
+/// then grows by the seconds that it falls. Other enemies tilt by a random
+/// angle, and fly where they point at a random speed around [speed].
+///
+/// Given the picks of an enemy in a game with another renderer, it uses those
+/// instead of random ones.
 class EnemyComponent(
   final EnemyKind kind, {
   required super.position,
@@ -45,30 +46,32 @@ class EnemyComponent(
   /// Shooter's 150.
   static const speed = 135;
 
-  /// The most that an enemy that doesn't swing tilts, either way, in whole
+  /// The largest tilt to either side of an enemy that doesn't swing, in whole
   /// degrees.
   static const tiltDegrees = 15;
 
-  /// The most that a tilted enemy's speed differs from [speed], either way,
-  /// as a fraction of it.
+  /// The largest difference, either way, between a tilted enemy's speed and
+  /// [speed], as a fraction of [speed].
   static const speedSpread = 0.1;
 
-  /// The least and the most that a swing turns, either way, in whole
-  /// degrees.
+  /// The smallest and the largest angle that a swing turns to each side, in
+  /// whole degrees.
   static const swingDegrees = (least: 5, most: 15);
 
-  /// Seconds that a swing takes, from upright to one side, then to the other
-  /// side, and back.
+  /// The seconds that a full swing takes: from upright to one side, then to the
+  /// other side, and back.
   static const swingPeriod = 2.0;
 
-  /// About 15% larger than Rogue Shooter's enemies, which are 25 across. The
-  /// SVGs' content fills the full height of their square.
+  /// The enemies' size: about 15% larger than Rogue Shooter's enemies, which
+  /// are 25 across.
+  ///
+  /// The SVGs' content fills the full height of their square.
   static final Vector2 initialSize = Vector2.all(29);
 
-  /// The picks that it makes, if given.
+  /// The picks to use instead of random ones, if any.
   final EnemyPicks? _from = from;
 
-  /// What it picked as it loaded.
+  /// What it picked when it loaded.
   late final EnemyPicks picks;
 
   /// The tint of its SVG.
@@ -140,28 +143,30 @@ class EnemyComponent(
     super.update(dt);
     age += dt;
     position.addScaled(velocity, dt);
-    // Remove it past the bottom, or once it's wholly out of a side, where a
-    // tilted enemy can fly.
+    // Remove it when it passes the bottom, or when it's wholly outside a side,
+    // where a tilted enemy can fly.
     final reach = size.length / 2;
     if (y >= gameRef.size.y || x < -reach || x > gameRef.size.x + reach) {
       removeFromParent();
     }
   }
 
-  /// Explodes as a missile hits it, and scores a point.
+  /// Explodes when a missile hits it, and scores a point.
   void takeHit() {
     if (_explode(ExplosionKind.missileHit)) {
       gameRef.increaseScore();
     }
   }
 
-  /// Explodes in red as it hits the player, without scoring.
+  /// Explodes in red when it hits the player, without scoring.
   ///
-  /// Returns whether it exploded: once hit, it does nothing.
+  /// Returns whether it exploded: after the first hit, it does nothing.
   bool hitPlayer() => _explode(ExplosionKind.playerHit);
 
-  /// Removes it with an explosion of [kind], and returns true, unless it's
-  /// removed already. A missile and the player can hit it in the same frame.
+  /// Removes it with an explosion of [kind] and returns true, unless it's
+  /// removed already.
+  ///
+  /// A missile and the player can hit it in the same frame.
   bool _explode(ExplosionKind kind) {
     if (isRemoving || isRemoved) {
       return false;

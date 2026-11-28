@@ -6,10 +6,12 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/e
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 
-/// An edge-walker, which climbs the tube on the edges between lanes, and
-/// crosses a neighbouring lane now and then, as Tube Shooter's does at its
-/// first level's pace. Only while it crosses can a shot destroy it. It
-/// destroys the ship while crossing the ship's lane, or on one of its edges.
+/// An edge-walker that climbs the tube on the edges between lanes and
+/// crosses a neighbouring lane now and then.
+///
+/// It acts as Tube Shooter's edge-walker does at its first level's pace. A
+/// shot can destroy it only while it crosses a lane. It destroys the ship
+/// while crossing the ship's lane, or while on one of that lane's edges.
 class RunnerEdgeWalkerComponent(int lane, @override var double at, {super.from})
     extends RunnerEnemyComponent {
   this : super(EnemyKind.edgeWalker, lane);

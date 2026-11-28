@@ -8,17 +8,19 @@ typedef MovingSnapshot = ({
   double rotationSpeed,
 });
 
-/// What a game for another renderer goes on from: the shapes picked, and
-/// where the snowman and the shapes are and how they move.
+/// The state that a game with another renderer resumes from.
+///
+/// It holds the shapes picked, and the positions and motion of the snowman and
+/// the shapes.
 typedef MultipleShapesSnapshot = ({
   List<ShapePick> picks,
   MovingSnapshot snowman,
   List<MovingSnapshot> shapes,
 });
 
-/// Takes a [MultipleShapesExample]'s snapshot, and goes on from one.
+/// Takes a snapshot of a [MultipleShapesExample] and resumes from one.
 extension MultipleShapesSnapshots on MultipleShapesExample {
-  /// What a game for another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   MultipleShapesSnapshot get snapshot => (
     picks: [..._picks],
     snowman: snowman._snapshot,
@@ -32,8 +34,8 @@ extension MultipleShapesSnapshots on MultipleShapesExample {
     }
   }
 
-  /// Places the snowman and the shapes where the snapshot's were, moving and
-  /// spinning as they were.
+  /// Places the snowman and the shapes where the snapshot's were, with the same
+  /// velocities, angles and rotation speeds.
   void _restoreCollidables() {
     if (_from case final from?) {
       snowman._restore(from.snowman);

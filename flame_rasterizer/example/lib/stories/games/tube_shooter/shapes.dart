@@ -3,10 +3,10 @@ import 'dart:ui';
 
 /// The game's colours, on black.
 ///
-/// The first tube, the ship and the enemies take colours of
-/// `ExampleColors.dynamics`, except the edge-walker's fuchsia. The other tubes
-/// are orange, lime and slate. The shots, explosions, stars and texts are
-/// white.
+/// The first tube, the ship and the enemies take colours from
+/// `ExampleColors.dynamics`, except the edge-walker, which is fuchsia. The
+/// other tubes are orange, lime and slate. The shots, explosions, stars and
+/// texts are white.
 abstract final class TubeColors() {
   static const tube = Color(0xFFA78BFA);
   static const tubeOrange = Color(0xFFF97316);
@@ -31,7 +31,7 @@ abstract final class TubeColors() {
 ///
 /// Each shape is one path, which all its components share, so it costs one
 /// import. Shapes are in lane units: a lane is 1 wide along x, with its middle
-/// at the origin, and y grows toward the tube's axis, deeper.
+/// at the origin, and y grows deeper, toward the tube's axis.
 abstract final class Shapes() {
   /// The ship: a manta, with its prongs pointing out of the tube.
   static final ship = _polygon(const [
@@ -43,8 +43,8 @@ abstract final class Shapes() {
     Offset(0, 0.28),
   ]);
 
-  /// A climber: a hooked Z across its lane, which looks the same turned half
-  /// a turn, as it is after a flip.
+  /// A climber: a hooked Z across its lane, which looks the same when turned
+  /// half a turn, as it is after a flip.
   static final climber = Path()
     ..addPolygon(const [
       Offset(-0.5, 0.06),
@@ -74,8 +74,8 @@ abstract final class Shapes() {
     Offset(0.24, 0.08),
   ])..addPolygon(const [Offset(0, 0.08), Offset(0, 0.3)], false);
 
-  /// A zapper: a zigzag across its lane, which looks the same turned half a
-  /// turn, as it is after a flip.
+  /// A zapper: a zigzag across its lane, which looks the same when turned
+  /// half a turn, as it is after a flip.
   static final zapper = Path()
     ..addPolygon(const [
       Offset(-0.5, 0),
@@ -120,7 +120,7 @@ abstract final class Shapes() {
   }();
 
   /// One of the rays that fly out of an explosion: the same as a ray of
-  /// [burst], but halfway between its first two.
+  /// [burst], except that it lies halfway between the burst's first two.
   static final ray = _addRay(Path(), math.pi / 8);
 
   /// Adds to [path] a ray at [angle], from 0.12 to 0.4 away from the origin,
@@ -133,9 +133,9 @@ abstract final class Shapes() {
   /// A dot, for the enemies still to come and for the stars: a regular
   /// octagon, 1 across between opposite sides, centred on the origin.
   ///
-  /// Its contour stays open, as the fill closes it anyway. For each of its
-  /// components, Flame's `PathComponent` would walk a closed contour into
-  /// polygons, which the game doesn't use.
+  /// Its contour stays open, because the fill closes it anyway. For a closed
+  /// contour, Flame's `PathComponent` would compute polygons for each of the
+  /// dot's components, and the game doesn't use them.
   static final dot = Path()
     ..addPolygon([
       for (var k = 0; k < 8; k++)

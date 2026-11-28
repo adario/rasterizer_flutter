@@ -4,16 +4,16 @@ import 'package:flame_rasterizer_example/stories/games/svg_shooter/svg_shooter_e
 
 /// Sends a wave of 5 enemies every [wavePeriod], each of a random kind.
 ///
-/// The waves come a quarter less often than Rogue Shooter's. A game starts
-/// with the enemies that would be falling already in the top
-/// [firstWaveDepth] of the game, well above the player.
+/// The waves come a quarter less often than Rogue Shooter's. A game starts with
+/// the enemies that would already be falling in the top [firstWaveDepth] of the
+/// game, well above the player.
 ///
 /// Given [sinceWave], the seconds since the last wave in a game with another
-/// renderer, it goes on from there, without a first wave.
+/// renderer, it resumes from there without a first wave.
 class EnemyCreator({final double? sinceWave})
     extends TimerComponent
     with HasGameRef<SvgShooterExample> {
-  /// Seconds from a wave to the next: a third longer than Rogue Shooter's
+  /// Seconds from one wave to the next: a third longer than Rogue Shooter's
   /// 0.05, so that 75 enemies come each second, not 100.
   static const wavePeriod = 1 / 15;
 
@@ -36,11 +36,12 @@ class EnemyCreator({final double? sinceWave})
     }
   }
 
-  /// Adds the waves that would be falling already, down to [firstWaveDepth]
-  /// of the game's height.
+  /// Adds the waves that would already be falling, down to [firstWaveDepth] of
+  /// the game's height.
   ///
   /// The waves are as far apart as an enemy falls in [wavePeriod]. None go
-  /// further down, near the player, which starts at the game's center.
+  /// further down, where they would be near the player, which starts at the
+  /// game's center.
   void createFirstWave() {
     final bottom = gameRef.size.y * firstWaveDepth;
     final halfHeight = EnemyComponent.initialSize.y / 2;
@@ -53,10 +54,10 @@ class EnemyCreator({final double? sinceWave})
     }
   }
 
-  /// Adds a wave at [y], each enemy wholly within the game's width.
+  /// Adds a wave at [y], with each enemy wholly within the game's width.
   ///
-  /// Each enemy's [EnemyComponent.age] is how long it would take to fall
-  /// there from the top.
+  /// Each enemy's [EnemyComponent.age] is how long it would take to fall there
+  /// from the top.
   void _spawn([double y = 0]) {
     final random = gameRef.random;
     final kinds = gameRef.enemyKinds;

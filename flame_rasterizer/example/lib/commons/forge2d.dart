@@ -16,17 +16,17 @@ import 'package:flutter/foundation.dart';
 /// A Forge2D example's world, which runs at its game's
 /// [Forge2DExampleGame.speed].
 ///
-/// Its physics run at that speed too, as [Forge2DWorld.update] steps them by
-/// the world's scaled time.
+/// Its physics run at that speed too, because [Forge2DWorld.update] steps
+/// them by the world's scaled time.
 class Forge2DExampleWorld()
     extends Forge2DWorld
     with CustomTraversal, HasTimeScale;
 
-/// Shows the number of a Forge2D world's bodies at the game's top right, as
-/// in flame_path_shapes.
+/// Shows the number of a Forge2D world's bodies in the game's top-right
+/// corner, as in flame_path_shapes.
 ///
 /// It counts all of the world's body components as they're added and
-/// removed, those that don't move, such as the walls, included.
+/// removed, including the ones that don't move, such as the walls.
 mixin BodiesHud on Forge2DWorld {
   var _bodyCount = 0;
   final _bodyCountText = _TopRightText();
@@ -34,8 +34,8 @@ mixin BodiesHud on Forge2DWorld {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    // Like StoryGame's FPS text, it goes in the viewport, so that it's drawn
-    // above the world and not zoomed.
+    // Like StoryGame's FPS text, the count goes in the viewport, so that it
+    // draws over the world without zooming.
     findGame()!.camera.viewport.add(_bodyCountText);
     _updateBodyCount();
   }
@@ -54,7 +54,7 @@ mixin BodiesHud on Forge2DWorld {
   }
 }
 
-/// A text in StoryGame's style at the top right corner of its parent.
+/// A text in StoryGame's style in the top-right corner of its parent.
 ///
 /// It stays there when the parent is resized.
 class _TopRightText() extends TextComponent<TextPaint> {
@@ -68,10 +68,10 @@ class _TopRightText() extends TextComponent<TextPaint> {
   }
 }
 
-/// A Forge2D example's game, in [world], at 10 pixels a meter as in Flame's
-/// examples, on [ExampleColors.background].
+/// A Forge2D example's game, which shows [world] at 10 pixels a meter, as in
+/// Flame's examples, on [ExampleColors.background].
 ///
-/// It destroys its physics world as it's removed. Box2D has room for only
+/// It destroys its physics world when it's removed. Box2D has room for only
 /// 128 worlds at once, and removing a game from its widget doesn't remove
 /// its bodies one by one.
 abstract class Forge2DExampleGame({
@@ -80,8 +80,10 @@ abstract class Forge2DExampleGame({
 }) extends Forge2DGame<Forge2DExampleWorld> with StoryGame {
   this : super(world: world, metersToPixels: 10);
 
-  /// Whether Forge2D is initialized, so that the physics world exists and
-  /// can be destroyed. On the web, Box2D's WebAssembly loads first.
+  /// Whether Forge2D is initialized, which means that the physics world
+  /// exists and can be destroyed.
+  ///
+  /// On the web, Box2D's WebAssembly has to load first.
   bool _initialized = false;
 
   @override
@@ -109,8 +111,8 @@ abstract class Forge2DExampleGame({
   }
 }
 
-/// The paints of Flame's Forge2D examples' bodies: a translucent fill of
-/// [color], and a bright outline [outlineWidth] wide.
+/// The paints of the bodies in Flame's Forge2D examples: a translucent fill
+/// in [color] and a bright outline [outlineWidth] wide.
 class GlowPaints(final Color color, final double outlineWidth) {
   late final fill = Paint()..color = color.withValues(alpha: 0.28);
   late final outline = Paint()
@@ -119,17 +121,17 @@ class GlowPaints(final Color color, final double outlineWidth) {
     ..strokeWidth = outlineWidth;
 }
 
-/// Draws a body's [glowPath] with [GlowPaints] of its paint's color, as a
-/// child path component of the game's [PathComponents].
+/// Draws a body's [glowPath] with [GlowPaints] in its paint's color, as a
+/// child path component that the game's [PathComponents] creates.
 ///
-/// The paints are white, and the child is tinted with the color. So the
+/// The paints are white, and the child is tinted with the color, so the
 /// bodies that share a [glowPath] object share its import, whatever their
 /// color. The body's own shapes aren't drawn.
 mixin GlowingBody on BodyComponent {
   /// The width of the outline, in meters.
   double get outlineWidth => 0.12;
 
-  /// The path to draw, in the body's coordinates: its shapes, by default.
+  /// The path to draw, in the body's coordinates: by default, its shapes.
   Path get glowPath => pathOf(body.shapes);
 
   /// The paint layers to draw [glowPath] with, in white.
@@ -138,15 +140,15 @@ mixin GlowingBody on BodyComponent {
     return [paints.fill, paints.outline];
   }
 
-  /// Whether it draws [glowPath]: false for a body that its game draws
-  /// otherwise.
+  /// Whether it draws [glowPath]: false for a body that its game draws in
+  /// another way.
   bool glows = true;
 
-  /// The child that draws [glowPath], once loaded, if it [glows].
+  /// The child that draws [glowPath] after the body loads, if it [glows].
   PathComponent? get glow => _glow;
   PathComponent? _glow;
 
-  /// The color it's tinted with.
+  /// The color that [glow] is tinted with.
   Color? _tint;
 
   @override
@@ -178,8 +180,9 @@ mixin GlowingBody on BodyComponent {
     }
   }
 
-  /// Returns [shapes] as one path. A circle has a radius line that shows it
-  /// turning, if [spokes].
+  /// Returns [shapes] as one path.
+  ///
+  /// If [spokes] is true, each circle has a radius line that shows it turning.
   static Path pathOf(Iterable<Shape> shapes, {bool spokes = true}) {
     final path = Path();
     for (final shape in shapes) {
@@ -207,7 +210,7 @@ mixin GlowingBody on BodyComponent {
 }
 
 /// A wall from [start] to [end], in meters, which reports the bodies that
-/// hit it if [hitEvents].
+/// hit it when [hitEvents] is true.
 class Wall(
   final Vector2 start,
   final Vector2 end, {
@@ -218,8 +221,8 @@ class Wall(
   /// Its width as drawn, in meters.
   static const width = 0.15;
 
-  /// Its collision category, for a body to leave out of its mask so that it
-  /// passes through the walls.
+  /// Its collision category. A body leaves it out of its mask to pass through
+  /// the walls.
   static const category = 2;
 
   /// Creates the walls along [rect]'s edges.
@@ -252,8 +255,8 @@ class Wall(
     );
 }
 
-/// Where a body is and how it moves, for a body in a game with another
-/// renderer to go on from.
+/// Where a body is and how it moves, so that a body in a game with another
+/// renderer can continue from it.
 typedef BodySnapshot = ({
   Vector2 position,
   Rot rotation,
@@ -262,7 +265,7 @@ typedef BodySnapshot = ({
   bool isAwake,
 });
 
-/// Takes a [Body]'s snapshot, and goes on from one.
+/// Takes a [Body]'s snapshot, and continues from one.
 extension BodySnapshots on Body {
   /// Where it is and how it moves.
   BodySnapshot get snapshot => (
@@ -273,11 +276,12 @@ extension BodySnapshots on Body {
     isAwake: isAwake,
   );
 
-  /// Puts it where [from] was, moving as it was, if [from] is given.
+  /// Puts the body where [from] was, moving as it was, if [from] is given.
   ///
-  /// Call it after creating its shapes, before the physics' first step.
-  /// Box2D's linear velocity is its center of mass's, which each new shape
-  /// moves. So it would go on a little faster or slower if it spins.
+  /// Call it after creating the body's shapes and before the physics' first
+  /// step. Box2D's linear velocity is the velocity of the center of mass, and
+  /// each new shape moves that center. Called earlier, a spinning body would
+  /// continue a little faster or slower.
   void goOnFrom(BodySnapshot? from) {
     if (from case final from?) {
       setTransform(from.position, from.rotation);
@@ -288,10 +292,10 @@ extension BodySnapshots on Body {
   }
 }
 
-/// What a [Ball] in a game with another renderer goes on from.
+/// What a [Ball] in a game with another renderer continues from.
 typedef BallSnapshot = ({double radius, Color color, BodySnapshot body});
 
-/// What an [SvgBody] in a game with another renderer goes on from.
+/// What an [SvgBody] in a game with another renderer continues from.
 typedef SvgBodySnapshot = ({
   String name,
   int side,
@@ -299,8 +303,10 @@ typedef SvgBodySnapshot = ({
   BodySnapshot body,
 });
 
-/// A ball with a radius of [radius] meters, in `color`, which starts at
-/// [_position], moving at [_velocity], or goes on from [from], if any.
+/// A ball in `color` with a radius of [radius] meters.
+///
+/// It starts at [_position], moving at [_velocity], or continues from [from]
+/// if it's given.
 class Ball(
   final Vector2 _position,
   final Vector2 _velocity, {
@@ -310,7 +316,7 @@ class Ball(
 }) extends BodyComponent with GlowingBody {
   this : super(paint: Paint()..color = color);
 
-  /// A ball that goes on from [from].
+  /// Creates a ball that continues from [from].
   factory Ball.from(BallSnapshot from) => Ball(
     from.body.position,
     from.body.linearVelocity,
@@ -319,11 +325,11 @@ class Ball(
     from: from.body,
   );
 
-  /// What a ball in a game with another renderer goes on from.
+  /// What a ball in a game with another renderer continues from.
   BallSnapshot get snapshot =>
       (radius: radius, color: paint.color, body: body.snapshot);
 
-  /// The balls' paths, by radius, so that the balls of a size share one.
+  /// The balls' paths by radius, so that balls of the same size share one.
   static final _paths = <double, Path>{};
 
   @override
@@ -349,12 +355,13 @@ class Ball(
 
 /// Box2D's linear slop, in meters, with the default length units.
 ///
-/// It's the value of `Tolerances.linearSlop`, which needs the native
-/// library. Box2D's `b2ComputeHull` welds a polygon's points closer than 4
-/// times it, and drops points closer than twice it to an edge.
+/// It's the value of `Tolerances.linearSlop`, which needs the native library
+/// to read. Box2D's `b2ComputeHull` welds a polygon's points that are closer
+/// than 4 times this value, and drops points that are closer than twice this
+/// value to an edge.
 const linearSlop = 0.005;
 
-/// The least length, in meters, of a convex piece's larger side.
+/// The smallest length, in meters, of a convex piece's larger side.
 ///
 /// flame_forge2d warns about smaller shapes: those under 5 times Box2D's
 /// speculative distance, which is 4 times [linearSlop].
@@ -364,8 +371,9 @@ const minPieceSide = 5 * 4 * linearSlop;
 /// for Box2D to take as polygons.
 ///
 /// It splits the polygons of the outline's [SvgHitbox], sampled every 0.1
-/// meters, as a hitbox at 10 pixels a meter samples every pixel. It leaves
-/// out the pieces under [minPieceSide] across, about a pixel at that scale.
+/// meters, which matches a hitbox at 10 pixels a meter that samples every
+/// pixel. It leaves out the pieces less than [minPieceSide] across, which is
+/// about a pixel at that scale.
 List<List<Vector2>> convexPiecesOf(SvgOutline outline, Vector2 size) {
   final hitbox = SvgHitbox(outline, size: size, sampling: 0.1)..place(size);
   final half = size / 2;
@@ -390,10 +398,11 @@ double pieceSide(List<Vector2> piece) {
   );
 }
 
-/// Returns the area that [pieces] cover together, where they overlap too, as
-/// an SVG's overlapping shapes make them.
+/// Returns the area that [pieces] cover together, counting each overlap
+/// once.
 ///
-/// It sums the union of the pieces' spans along [rows] horizontal lines.
+/// The pieces can overlap, as an SVG's shapes can. It sums the union of the
+/// pieces' spans along [rows] horizontal lines.
 double coveredArea(List<List<Vector2>> pieces, {int rows = 400}) {
   if (pieces.isEmpty) {
     return 0;
@@ -437,16 +446,16 @@ double coveredArea(List<List<Vector2>> pieces, {int rows = 400}) {
 /// have [radii].
 ///
 /// The bodies overlap neither each other nor the shapes in [world], and lie
-/// within [bounds]. From flame_path_shapes' `spreadAround`.
+/// within [bounds]. It's based on flame_path_shapes' `spreadAround`.
 ///
 /// Box2D separates overlapping circles easily. Bodies made of several convex
 /// pieces, as concave shapes are, can push each other in opposite directions
-/// at once, and stay stuck together. So new bodies shouldn't start
+/// at once and stay stuck together, so new bodies shouldn't start out
 /// overlapping.
 ///
-/// It tries each position at random within a disc around [center], which
+/// It tries each position at random within a disc around [center]. The disc
 /// starts at [startRadius] and grows by [step] after each failed try. After
-/// [maxTries] tries, it uses the last one anyway.
+/// [maxTries] tries, it uses the last position anyway.
 List<Vector2> spreadAround(
   Vector2 center,
   List<double> radii, {
@@ -459,7 +468,8 @@ List<Vector2> spreadAround(
 }) {
   final placed = <({Vector2 position, double radius})>[];
   for (final radius in radii) {
-    // Within the bounds, or at their center if the body doesn't fit.
+    // Keeps the body within the bounds, or at their center if it doesn't
+    // fit.
     final inner = bounds.deflate(radius);
     final minX = inner.width > 0 ? inner.left : bounds.center.dx;
     final maxX = inner.width > 0 ? inner.right : bounds.center.dx;
@@ -494,8 +504,8 @@ List<Vector2> spreadAround(
 /// Returns a velocity of [speed] meters a second away from [from], for a
 /// body at [position], or in a random direction if it's at [from].
 ///
-/// So the bodies spread from a tap, as they would if they had started
-/// overlapping.
+/// This makes the bodies spread out from a tap, as they would if they had
+/// started out overlapping.
 Vector2 awayFrom(
   Vector2 from,
   Vector2 position,
@@ -509,7 +519,7 @@ Vector2 awayFrom(
   return velocity..scaleTo(speed);
 }
 
-/// Returns whether the circle at [center] of [radius] overlaps any shape in
+/// Returns whether the circle of [radius] at [center] overlaps any shape in
 /// [world].
 bool _overlapsWorld(forge2d.World world, Vector2 center, double radius) {
   final extent = Vector2.all(radius);
@@ -517,7 +527,7 @@ bool _overlapsWorld(forge2d.World world, Vector2 center, double radius) {
   return candidates.any((shape) => _overlapsShape(shape, center, radius));
 }
 
-/// Returns whether the circle at [center] of [radius] overlaps [shape], whose
+/// Returns whether the circle of [radius] at [center] overlaps [shape], whose
 /// bounding box overlaps the circle's.
 bool _overlapsShape(Shape shape, Vector2 center, double radius) {
   // The circle's center in the body's coordinates.
@@ -584,8 +594,8 @@ typedef NewBody = ({
   BodyComponent Function(Vector2 position, Vector2 velocity) create,
 });
 
-/// An SVG's size, and its convex pieces at that size, also as one path, and
-/// the area that they cover.
+/// An SVG's size, its convex pieces at that size, the pieces as one path,
+/// and the area that they cover.
 typedef _SizedPieces = ({
   Vector2 size,
   List<List<Vector2>> pieces,
@@ -593,26 +603,28 @@ typedef _SizedPieces = ({
   double area,
 });
 
-/// A Forge2D example that drops balls, and SVG bodies from 3 to 3.5 meters at
-/// their larger side. The SVGs' convex pieces draw over them while [pieces]
-/// is true.
+/// A Forge2D example that drops balls and SVG bodies whose larger side is 3
+/// to 3.5 meters.
+///
+/// The SVGs' convex pieces draw over them while [pieces] is true.
 mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
-  /// The balls' smallest radius, in meters. Box2D works best with bodies
-  /// from 0.1 to 10 meters.
+  /// The balls' smallest radius, in meters.
+  ///
+  /// Box2D works best with bodies from 0.1 to 10 meters.
   double get minBallRadius => 0.4;
 
   /// The balls' largest radius, in meters.
   static const _maxBallRadius = 1.0;
 
-  /// How many radii the balls come in, evenly spaced, so that the balls of a
-  /// radius share their path's import.
+  /// How many evenly spaced radii the balls come in, so that balls of the
+  /// same radius share their path's import.
   static const _ballSizes = 6;
 
   /// The larger side of the smallest SVGs, in meters.
   ///
-  /// The SVGs come in [_sides] sizes, from 3 to 3.5 meters by tenths, as in
-  /// flame_path_shapes. So [_sizeAndPieces] works out each SVG's pieces once
-  /// per size.
+  /// The SVGs come in [_sides] sizes, from 3 to 3.5 meters in steps of 0.1
+  /// meters, as in flame_path_shapes, so [_sizeAndPieces] works out each
+  /// SVG's pieces only once per size.
   static const _minSide = 3.0;
 
   /// How many sizes the SVGs come in.
@@ -629,8 +641,10 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// Whether the SVG bodies' convex pieces draw over them.
   bool get pieces;
 
-  /// The paints of the convex pieces, in white, as each body tints them with
-  /// its color. The outline is 0.04 meters wide, as in flame_path_shapes.
+  /// The paints of the convex pieces, in white, because each body tints them
+  /// with its color.
+  ///
+  /// The outline is 0.04 meters wide, as in flame_path_shapes.
   static final _piecesPaints = GlowPaints(const Color(0xFFFFFFFF), 0.04);
 
   /// The SVG bodies dropped so far.
@@ -643,7 +657,8 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   /// synchronous.
   final _svgs = <String, ExampleSvg>{};
 
-  /// Each SVG's size and convex pieces, by its name and its size's index.
+  /// Each SVG's size and convex pieces, keyed by its name and its size's
+  /// index.
   final _pieces = <({String name, int side}), _SizedPieces>{};
 
   /// The index of the next body's color: the bodies take the colors in turn.
@@ -657,8 +672,10 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     return ['$ballCount, $svgCount'];
   }
 
-  /// Loads the SVGs of [randomSvgNames]. Returns false if the game was removed
-  /// while they loaded, and its physics world is destroyed.
+  /// Loads the SVGs of [randomSvgNames].
+  ///
+  /// Returns false if the game was removed while they loaded, in which case
+  /// its physics world is destroyed.
   Future<bool> loadBodySvgs() async {
     for (final name in randomSvgNames) {
       _svgs[name] = await loadSvg('assets/svgs/$name.svg');
@@ -687,22 +704,23 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     world.removeAll(bodies);
   }
 
-  /// Returns the next body's color, a ball's or the SVG [svg]'s: the next of
-  /// [ExampleColors.dynamics].
+  /// Returns the color of the next body, a ball or the SVG [svg]: the next
+  /// color in [ExampleColors.dynamics].
   Color nextColor([String? svg]) => ExampleColors.dynamicColor(tint++);
 
   /// Creates the component that draws [body]'s SVG, centered on it.
   ///
-  /// It's sized in pixels and scaled back to meters, as flame_svg's fixed
-  /// cache mode rasterizes an SVG at its component's size, without the
-  /// camera's.
+  /// It's sized in pixels and scaled back to meters, because flame_svg's
+  /// fixed cache mode rasterizes an SVG at its component's size, without the
+  /// camera's zoom.
   PositionComponent svgImage(SvgBody body) => body.svg.component()
     ..size = body.size * metersToPixels
     ..scale = Vector2.all(1 / metersToPixels)
     ..anchor = Anchor.center;
 
   /// Creates the component that draws [body]'s convex pieces over its SVG.
-  /// The bodies of an SVG's size share its path's import.
+  ///
+  /// The bodies of the same SVG and size share its path's import.
   PathComponent piecesOutline(SvgBody body) {
     final (size: _, pieces: _, :path, area: _) = _sizeAndPieces(
       body.name,
@@ -718,8 +736,10 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
       ..tint(body.color);
   }
 
-  /// Picks a ball of random radius, in the next color. Returns its radius,
-  /// and a function that creates it with a position and a velocity.
+  /// Picks a ball of random radius in the next color.
+  ///
+  /// Returns its radius and a function that creates it at a position, with a
+  /// velocity.
   NewBody randomBall() {
     final radius =
         minBallRadius +
@@ -734,9 +754,11 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     );
   }
 
-  /// Picks a random SVG, at a random size and angle, spinning at up to [spin]
-  /// radians a second, in the next color. Returns its bounding radius, and a
-  /// function that creates its body with a position and a velocity.
+  /// Picks a random SVG in the next color, at a random size and angle,
+  /// spinning at up to [spin] radians a second.
+  ///
+  /// Returns its bounding radius and a function that creates its body at a
+  /// position, with a velocity.
   NewBody randomSvg({double spin = 0}) {
     final name = randomSvgNames[random.nextInt(randomSvgNames.length)];
     final side = random.nextInt(_sides);
@@ -758,9 +780,10 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     );
   }
 
-  /// Creates the body of the SVG [name] at its [side]th size, in [color],
-  /// which starts at [position] and [angle], moving at [velocity] and
-  /// [angularVelocity], or goes on from [from], if any.
+  /// Creates the body of the SVG [name] at its [side]th size, in [color].
+  ///
+  /// The body starts at [position] and [angle], moving at [velocity] and
+  /// [angularVelocity], or continues from [from] if it's given.
   SvgBody createSvgBody(
     String name,
     int side,
@@ -789,7 +812,7 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
     );
   }
 
-  /// Creates an SVG's body that goes on from [from].
+  /// Creates an SVG's body that continues from [from].
   SvgBody svgBodyFrom(SvgBodySnapshot from) => createSvgBody(
     from.name,
     from.side,
@@ -818,12 +841,12 @@ mixin SvgBodies on Forge2DExampleGame, ExampleSvgs<Forge2DExampleWorld> {
   }();
 }
 
-/// A body that draws [svg], [size] meters large and centered on it, and
-/// collides as the SVG's convex [pieces].
+/// A body that draws [svg] centered on it, [size] meters large, and collides
+/// as the SVG's convex [pieces].
 ///
-/// It starts at [_position] and [_angle], moving at [_velocity], or goes on
-/// from [from], if any, and draws above the other bodies. Its pieces draw over
-/// it in [color] while the game's [SvgBodies.pieces] is true.
+/// It starts at [_position] and [_angle], moving at [_velocity], or continues
+/// from [from] if it's given. It draws above the other bodies. While the
+/// game's [SvgBodies.pieces] is true, its pieces draw over it in [color].
 class SvgBody(
   final ExampleSvg svg,
   final Vector2 size,
@@ -831,8 +854,9 @@ class SvgBody(
   final Vector2 _position,
   final Vector2 _velocity, {
 
-  /// The area that its [pieces] cover, in square meters. Its mass counts
-  /// their overlaps more than once.
+  /// The area that its [pieces] cover, in square meters.
+  ///
+  /// Its mass counts their overlaps more than once.
   required final double area,
   required final double _angle,
   required final Color color,
@@ -851,7 +875,7 @@ class SvgBody(
   /// The component that draws its pieces, while the game shows them.
   PathComponent? _piecesOutline;
 
-  /// What it goes on from in a game with another renderer.
+  /// What it continues from in a game with another renderer.
   SvgBodySnapshot get snapshot =>
       (name: name, side: side, color: color, body: body.snapshot);
 
@@ -898,19 +922,21 @@ class SvgBody(
   }
 }
 
-/// What a [CircleShuffler] in a game with another renderer goes on from: its
-/// body, and its motor's speed and the speed that it heads for.
+/// What a [CircleShuffler] in a game with another renderer continues from:
+/// its body, its motor's speed and the speed that the motor heads for.
 typedef WheelSnapshot = ({
   BodySnapshot body,
   double motorSpeed,
   double targetSpeed,
 });
 
-/// flame_path_shapes' wheel: five circles around [_position] that a motor
-/// turns, [scale] times as large. It's filled, or drawn as the other glowing
-/// bodies in [color], if given. It goes on from [from], if any.
+/// flame_path_shapes' wheel, [scale] times as large: five circles around
+/// [_position] that a motor turns.
 ///
-/// It passes through the walls, which a short game brings into its way.
+/// It's drawn as a plain fill, or, if [color] is given, like the other
+/// glowing bodies in that color. It continues from [from] if it's given. It
+/// passes through the walls, which can cross its path when the game is
+/// short.
 class CircleShuffler(
   final Vector2 _position, {
   final WheelSnapshot? from,
@@ -927,7 +953,7 @@ class CircleShuffler(
       ? [Paint()..color = const Color(0xFFFFFFFF)]
       : super.glowLayers;
 
-  /// The distance of the circles' centers from the wheel's, in meters.
+  /// The distance from the wheel's center to the circles' centers, in meters.
   static const _radius = 6.0;
 
   /// The circles' radius, in meters.
@@ -947,34 +973,36 @@ class CircleShuffler(
   /// The speed that the motor heads for.
   late double _targetSpeed = from?.targetSpeed ?? _speed;
 
-  /// The motor's speed, kept here: Box2D's is a float, which never equals
-  /// [_targetSpeed].
+  /// The motor's speed, kept here because Box2D stores it as a float, which
+  /// never equals [_targetSpeed].
   late double _motorSpeed = from?.motorSpeed ?? _speed;
 
-  /// What it goes on from in a game with another renderer.
+  /// What it continues from in a game with another renderer.
   WheelSnapshot get snapshot => (
     body: body.snapshot,
     motorSpeed: _motorSpeed,
     targetSpeed: _targetSpeed,
   );
 
-  /// Its color, and the one it takes while [reversing].
+  /// Its color, and the color it takes while [reversing].
   late final _color = paint.color;
   static final _reversingColor = ExampleColors.dynamicColor(2);
 
   /// Slows the wheel down, then turns it the other way.
   void reverse() => _targetSpeed = -_targetSpeed;
 
-  /// The brake left, in seconds: it turns at 1 / (1 + [_brake]) of its speed,
-  /// and the brake wears off by a second each second.
+  /// The brake time left, in seconds.
+  ///
+  /// The wheel turns at 1 / (1 + [_brake]) of its speed, and the brake wears
+  /// off by one second every second.
   double _brake = 0;
   static const _maxBrake = 3.0;
 
   /// Slows it down for [seconds] more, up to [_maxBrake].
   void brake(double seconds) => _brake = math.min(_maxBrake, _brake + seconds);
 
-  /// Whether it's turning the other way after [reverse], until it's at full
-  /// speed.
+  /// Whether it's still turning around after [reverse], which lasts until it
+  /// reaches full speed in the other direction.
   bool get reversing => _motorSpeed != _targetSpeed;
 
   @override
@@ -1004,7 +1032,7 @@ class CircleShuffler(
       density: 50,
       material: SurfaceMaterial(friction: 0.4, restitution: 0.6),
       filter: Filter(maskBits: Filter.allCategories & ~Wall.category),
-      // So that a game can tell which bodies hit it, and how hard.
+      // Lets a game tell which bodies hit it, and how hard.
       enableContactEvents: true,
       enableHitEvents: true,
     );
@@ -1019,7 +1047,8 @@ class CircleShuffler(
         shapeDef,
       );
     }
-    // The joint holds the wheel to an empty static body, as its ground.
+    // The joint pins the wheel to an empty static body, which acts as its
+    // ground.
     final ground = world.createBody(BodyDef());
     _joint = world.physicsWorld.createRevoluteJoint(
       RevoluteJointDef(
@@ -1035,8 +1064,9 @@ class CircleShuffler(
   }
 }
 
-/// One of the two ramps of flame_path_shapes' funnel above the wheel. It's on
-/// the right of [_center], or on the left if [isMirrored].
+/// One of the two ramps of flame_path_shapes' funnel above the wheel.
+///
+/// It's on the right of [_center], or on the left if [isMirrored] is true.
 class CornerRamp(final Vector2 _center, {final bool isMirrored = false})
     extends BodyComponent
     with GlowingBody {
@@ -1045,8 +1075,8 @@ class CornerRamp(final Vector2 _center, {final bool isMirrored = false})
   @override
   Body createBody() {
     final mirror = isMirrored ? -1 : 1;
-    // The two tips are 12 meters apart: about three and a half SVGs, and a
-    // little less than the wheel's 14.4 meters. At 8 meters, SVGs dropped
+    // The two tips are 12 meters apart: about three and a half SVGs wide, and
+    // a little less than the wheel's 14.4 meters. At 8 meters, SVGs dropped
     // above the opening sometimes clogged it.
     final tip = 6.0 * mirror;
     // A solid polygon, not a chain loop. Chains are one-sided in Box2D v3, so

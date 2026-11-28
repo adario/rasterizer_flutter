@@ -1,11 +1,17 @@
 part of 'shooter_mode.dart';
 
-/// What a game for another renderer goes on from: the first level, the
-/// round, its state and how long it has lasted, whether its drop flies on
-/// down a run, the run's runner once it plays, the score, the lives, the
-/// purge, the kills that speed the stars up, the camera and the eye, the
-/// ship, the spikes, the enemies still to come and in the tube, and the
-/// shots.
+/// The state that a game with another renderer resumes from.
+///
+/// It holds:
+/// - the first level and the round, with the round's state and how long that
+///   state has lasted;
+/// - whether the round's drop flies on down a run, and the run's runner once
+///   the run plays;
+/// - the score, the lives and the purge;
+/// - the kills, which speed up the stars;
+/// - the camera and the eye;
+/// - the ship, the spikes, the enemies still to come and in the tube, and the
+///   shots.
 typedef TubeShooterSnapshot = ({
   int firstLevel,
   int levelIndex,
@@ -34,19 +40,19 @@ typedef TubeShooterSnapshot = ({
   List<LaneSnapshot> enemyShots,
 });
 
-/// Takes a [ShooterMode]'s snapshot, and goes on from one.
+/// Takes a [ShooterMode]'s snapshot, and resumes from one.
 ///
-/// The explosions and the stars start again in the new game, and so do the
-/// keys, the drags and the taps, which the new game hasn't seen go down. The
-/// new game plays no sound for what the old one did, and its random picks
-/// differ from those that the old one would have made.
+/// The explosions and the stars start over in the new game. So do held keys,
+/// drags and taps, because the new game never saw them go down. The new game
+/// plays no sounds for what the old one did, and its random picks differ from
+/// those that the old one would have made.
 extension TubeShooterSnapshots on ShooterMode {
-  /// What a game for another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   TubeShooterSnapshot get snapshot => (
     firstLevel: firstLevel,
     levelIndex: _levelIndex,
     round: round,
-    // Game Over on a run is the round's, for the new game.
+    // For the new game, a Game Over during a run counts as the round's.
     state: isOver ? TubeState.over : _state,
     stateTime: _stateTime,
     hasRun: !isOver && _run != null,
@@ -71,7 +77,7 @@ extension TubeShooterSnapshots on ShooterMode {
     enemyShots: [for (final shot in enemyShots) shot.laneSnapshot],
   );
 
-  /// Goes on with [from]'s round, as [_startRound] would start it: its tube,
+  /// Resumes [from]'s round, setting up what [_startRound] would: its tube,
   /// spikes, enemies and shots, its state, and the texts that show in it.
   void _restoreRound(TubeShooterSnapshot from) {
     _levelIndex = from.levelIndex;
@@ -116,20 +122,21 @@ extension TubeShooterSnapshots on ShooterMode {
       enemyShots.add(component);
       shotGroup.add(component);
     }
-    // An arrival doesn't go on in the new game: the round starts.
+    // The new game doesn't resume an arrival: it starts the round instead.
     if (from.state == TubeState.arrive) {
       _startRound();
       return;
     }
-    // Before the state, whose stars show at once in a still world.
+    // Pause the world before setting the state, so that the state's stars
+    // show at once.
     if (from.state == TubeState.over) {
       gameRef.world.timeScale = 0;
     }
     _setState(from.state);
     _stateTime = from.stateTime;
     // The drop flies on down a run if the old game's did, whatever the new
-    // game's runs, so that the eye doesn't jump, and the run goes on. The
-    // eye is where the ship is along the run.
+    // game's Runs knob says, so that the eye doesn't jump and the run goes
+    // on. The eye is where the ship is along the run.
     if (from.hasRun) {
       _makeRun(from: from.runner);
       _run!.flown = from.eyeShift;

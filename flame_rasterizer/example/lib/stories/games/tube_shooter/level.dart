@@ -45,8 +45,8 @@ typedef Level = ({
   int maxEnemyShots,
   double enemyShotTime,
 
-  /// A zapper flips as a climber does, after a random time within
-  /// [zapperFlipPeriod], and at the rim every [zapperRimFlipPeriod]. All the
+  /// A zapper flips like a climber: after a random time within
+  /// [zapperFlipPeriod], and every [zapperRimFlipPeriod] at the rim. All the
   /// zappers pulse together every [pulsePeriod], for [pulseTime]. Each one
   /// flashes white for [pulseWarning] before a pulse.
   Range zapperFlipPeriod,
@@ -70,8 +70,8 @@ typedef Range = ({double least, double most});
 const roundSpeedUp = 1.05;
 
 /// The levels, from the easiest to the hardest. Rounds play them in turn, then
-/// start again from the first. Each has about one enemy per lane, at least 12,
-/// of every kind.
+/// start again from the first. Each level has enemies of every kind, about one
+/// per lane and at least 12 in all.
 final List<Level> levels = [
   _level(
     Tubes.hexagon,
@@ -165,8 +165,8 @@ final List<Level> levels = [
   ),
 ];
 
-/// Returns a level on [tube], in [color], with those enemies and the numbers
-/// that all levels share.
+/// Returns a level on [tube], in [color], with the given enemy counts and the
+/// numbers that all levels share.
 Level _level(
   Tube tube,
   Color color, {

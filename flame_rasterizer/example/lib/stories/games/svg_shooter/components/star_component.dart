@@ -1,7 +1,7 @@
 import 'package:flame/components.dart';
 
-/// A star sprite that falls slowly, half again as fast as Rogue Shooter's
-/// stars, and doesn't twinkle.
+/// A star sprite that falls slowly, 1.5 times as fast as Rogue Shooter's stars,
+/// and doesn't twinkle.
 class StarComponent({super.sprite, super.position, super.size})
     extends SpriteComponent
     with HasGameRef {

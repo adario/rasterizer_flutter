@@ -8,20 +8,21 @@ const _label = 'Renderer';
 /// Returns the Renderer knob: a dropdown of the [SvgRenderer]s.
 ///
 /// A GPU entry is inactive where its renderer isn't [SvgRenderer.supported]:
-/// on the web and without Impeller. The first choice is GPU (mesh), else GPU
-/// (atlas), else Canvas, whichever is active first. Widgetbook's own dropdown
+/// on the web and without Impeller. The first choice is the first active
+/// entry among GPU (mesh), GPU (atlas) and Canvas. Widgetbook's own dropdown
 /// can't make an entry inactive, so this knob has a dropdown of its own.
 ///
 /// The entries show their [SvgRenderer.text], such as Metal (mesh) for an
-/// active GPU (mesh). Without [svgs], for a game that draws no SVGs, Flame
-/// SVG shows Flame, as Flame's own components draw then. Links keep their
-/// [SvgRenderer.label], so that a link picks the same entry on every device
-/// and in every use case.
+/// active GPU (mesh). Without [svgs], for a game that draws no SVGs, the
+/// Flame SVG entry shows Flame, because Flame's own components draw in that
+/// case. Links hold each entry's [SvgRenderer.label], so that a link picks
+/// the same entry on every device and in every use case.
 SvgRenderer rendererKnob(BuildContext context, {bool svgs = true}) {
   final renderer = context.knobs.onKnobAdded(
     _RendererKnob(initialValue: SvgRenderer.firstChoice, svgs: svgs),
   );
-  // A link can pick a GPU entry where it's inactive: Canvas draws then.
+  // A link can pick a GPU entry where it's inactive. Canvas draws in that
+  // case.
   return renderer == null || !renderer.supported
       ? SvgRenderer.rasterizerCanvas
       : renderer;
@@ -47,8 +48,8 @@ double zoomKnob(BuildContext context) => context.knobs.onKnobAdded(
   ),
 )!;
 
-/// Returns the Speed knob: the game's speed, from 0, which stands still, to 2,
-/// on a continuous slider.
+/// Returns the Speed knob: the game's speed, from 0 (standing still) to 2, on
+/// a continuous slider.
 double speedKnob(BuildContext context) => context.knobs.onKnobAdded(
   _SliderKnob(
     label: 'Speed',
@@ -59,8 +60,9 @@ double speedKnob(BuildContext context) => context.knobs.onKnobAdded(
 )!;
 
 /// Returns the Flight speed knob: how fast Tube Runner's ship flies at first,
-/// from 0.5 to 2 tube units a second, on a continuous slider. A prototype's,
-/// to pick a speed with.
+/// from 0.5 to 2 tube units a second, on a continuous slider.
+///
+/// This is a prototyping knob, for picking a speed.
 double flightSpeedKnob(BuildContext context) => context.knobs.onKnobAdded(
   _SliderKnob(
     label: 'Flight speed',
@@ -71,7 +73,7 @@ double flightSpeedKnob(BuildContext context) => context.knobs.onKnobAdded(
 )!;
 
 /// Returns the Stars knob: how many stars Tube Shooter and Tube Runner show,
-/// from 0 to 1000 in steps of 20, 400 at first.
+/// from 0 to 1000 in steps of 20, starting at 400.
 int starsKnob(BuildContext context) => intSliderKnob(
   context,
   label: 'Stars',
@@ -82,7 +84,9 @@ int starsKnob(BuildContext context) => intSliderKnob(
 );
 
 /// Returns an integer slider knob from [min] to [max], in [divisions] steps,
-/// like Widgetbook's. Like [zoomKnob], it shows its value in tabular figures.
+/// like Widgetbook's.
+///
+/// Like [zoomKnob], it shows its value in tabular figures.
 int intSliderKnob(
   BuildContext context, {
   required String label,
@@ -102,9 +106,10 @@ int intSliderKnob(
 
 /// Returns the Cache mode and Cache size knobs, which set flame_svg's cache.
 ///
-/// They show only while [shown], which the examples set with Flame SVG.
-/// Otherwise this returns flame_svg's defaults. Widgetbook registers the
-/// knobs again on each build, so hidden knobs keep their values.
+/// They show only while [shown] is true, which the examples set when Flame
+/// SVG draws. While they're hidden, this returns flame_svg's defaults.
+/// Widgetbook registers the knobs again on each build, so hidden knobs keep
+/// their values.
 SvgCache cacheKnobs(BuildContext context, {required bool shown}) {
   if (!shown) {
     return defaultSvgCache;
@@ -152,9 +157,10 @@ class _RendererField({
   this
     : super(values: SvgRenderer.values, labelBuilder: (value) => value.label);
 
-  /// Builds Widgetbook's dropdown, with the GPU entries inactive where their
-  /// renderers aren't supported, and each entry's text. The URL has the
-  /// entry's label, from [labelBuilder].
+  /// Builds Widgetbook's dropdown with each entry's text, and with the GPU
+  /// entries inactive where their renderers aren't supported.
+  ///
+  /// The URL holds the entry's label, from [labelBuilder].
   @override
   Widget toWidget(BuildContext context, String group, SvgRenderer? value) {
     return DropdownMenu<SvgRenderer>(
@@ -252,8 +258,8 @@ class _IntSliderField({
 ///
 /// Widgetbook sizes the value for the wider of the slider's min and max.
 /// With proportional figures, such as those of macOS' system font, a value
-/// can be wider, and gets cut: "3." for 3.6, or an integer without its last
-/// digit.
+/// can be wider than both and gets cut off: "3." for 3.6, or an integer
+/// without its last digit.
 Widget _withTabularFigures(WidgetBuilder builder) => DefaultTextStyle.merge(
   style: const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
   child: Builder(builder: builder),

@@ -22,21 +22,22 @@ part 'svg_shooter_snapshot.dart';
 
 /// Flame's Rogue Shooter, drawn with SVGs: see [description].
 ///
-/// The world uses Rogue Shooter's coordinates, from the game's top left
-/// corner. The camera looks at the middle of the play area, which is the
-/// game's size. Subclasses pick what loads and draws the SVGs: see
+/// The world uses Rogue Shooter's coordinates, with the origin at the game's
+/// top left corner. The camera looks at the middle of the play area, which has
+/// the game's size. Subclasses pick what loads and draws the SVGs: see
 /// [ExampleSvgs].
 ///
-/// Given the snapshot of a game with another renderer, it goes on from there:
-/// see [SvgShooterSnapshots].
+/// Given the snapshot of a game with another renderer, the game resumes from
+/// it: see [SvgShooterSnapshots].
 abstract class SvgShooterExample({
   required super.status,
   math.Random? random,
   SvgShooterSnapshot? from,
 }) extends ExampleGame
     with ExampleSvgs, HasCollisionDetection, DragCallbacks, KeyboardEvents {
-  /// Creates the game for [renderer], with flame_svg's [cache] for Flame SVG,
-  /// which goes on from [from], if any.
+  /// Creates the game for [renderer], resuming from [from] if given.
+  ///
+  /// Flame SVG uses flame_svg's [cache] settings.
   factory SvgShooterExample.of(
     SvgRenderer renderer,
     ValueNotifier<String> status, {
@@ -86,7 +87,7 @@ abstract class SvgShooterExample({
 
   final math.Random random = random ?? math.Random();
 
-  /// The snapshot that it goes on from, if any.
+  /// The snapshot that the game resumes from, if any.
   final SvgShooterSnapshot? _from = from;
 
   /// The player's SVG.
@@ -105,8 +106,10 @@ abstract class SvgShooterExample({
   );
 
   /// The groups of stars, missiles, enemies and explosions, as in Rogue
-  /// Shooter, but without its batching. The explosions draw above the player
-  /// too, so that their particles don't split the SVGs' run.
+  /// Shooter, except without its batching.
+  ///
+  /// The explosions draw above the player too, so that their particles don't
+  /// split the run that draws the SVGs.
   final starGroup = Component(priority: -1);
   final missileGroup = Component();
   final enemyGroup = Component();
@@ -131,12 +134,15 @@ abstract class SvgShooterExample({
   bool get isGameOver => _isGameOver;
   bool _isGameOver = false;
 
-  /// The pointers that went down after the game was over. Each starts a new
-  /// game as it goes up, like a tap. Pointers that went down before don't.
+  /// The pointers that went down after the game was over.
+  ///
+  /// Each one starts a new game when it goes up, like a tap. Pointers that went
+  /// down before the game was over don't.
   final _newGamePointers = <int>{};
 
-  /// The pointers that went down before the game was over, and drag. The
-  /// player fires while any of them is down, or while [_fireKey] is held.
+  /// The dragging pointers that went down before the game was over.
+  ///
+  /// The player fires while any of them is down, or while [_fireKey] is held.
   final _firePointers = <int>{};
 
   /// The keys that move the player, each with its direction, and the key that
@@ -154,12 +160,13 @@ abstract class SvgShooterExample({
   };
   static const _fireKey = PhysicalKeyboardKey.space;
 
-  /// The keys above that are held, and went down while the game had the
+  /// The move and fire keys that are held and went down while the game had the
   /// focus.
   final _heldKeys = <PhysicalKeyboardKey>{};
 
-  /// Whether a key or a drag came before the player loaded. [_updateFire]
-  /// applies it once the player has.
+  /// Whether a key or a drag came before the player loaded.
+  ///
+  /// [_updateFire] applies it after the player has loaded.
   bool _fireDeferred = false;
 
   /// The direction that the held keys move the player in: a unit vector, or
@@ -235,8 +242,10 @@ abstract class SvgShooterExample({
     startStatus();
   }
 
-  /// Frees the stars' image. Removing a game doesn't remove its components,
-  /// so their own `onRemove` doesn't run.
+  /// Frees the stars' image.
+  ///
+  /// Removing a game doesn't remove its components, so their own `onRemove`
+  /// doesn't run.
   @override
   void onRemove() {
     super.onRemove();
@@ -266,8 +275,10 @@ abstract class SvgShooterExample({
     camera.viewfinder.position = size / 2;
   }
 
-  /// Makes the player fire, or, once the game is over, starts a new game as
-  /// the pointer goes up. A tap starts a drag too, so this handles taps.
+  /// Makes the player fire or, after the game is over, starts a new game when
+  /// the pointer goes up.
+  ///
+  /// A tap starts a drag too, so this also handles taps.
   @override
   void onDragStart(DragStartEvent event) {
     if (_isGameOver) {
@@ -307,8 +318,10 @@ abstract class SvgShooterExample({
     super.onDragUpdate(event);
   }
 
-  /// Tracks the keys that move the player or fire, and handles them, so that
-  /// they don't also move the focus. It ignores other keys.
+  /// Tracks the move and fire keys, and marks them handled so that they don't
+  /// also move the focus.
+  ///
+  /// It ignores other keys.
   @override
   KeyEventResult onKeyEvent(
     KeyEvent event,
@@ -329,8 +342,8 @@ abstract class SvgShooterExample({
 
   /// Makes the player fire while a pointer drags or the fire key is held.
   ///
-  /// Until the game and the player load, [update] calls it again each frame,
-  /// so that a key held from the start fires once they have.
+  /// Until the game and the player have loaded, [update] calls it again each
+  /// frame, so that a key held from the start fires as soon as they have.
   void _updateFire() {
     _fireDeferred = !isLoaded || !player.isLoaded;
     if (_fireDeferred) {
@@ -347,10 +360,10 @@ abstract class SvgShooterExample({
     score++;
   }
 
-  /// Stops the world, whatever [speed] is, and the player's fire, and shows
+  /// Stops the world whatever [speed] is, stops the player's fire, and shows
   /// Game Over until a tap starts a new game.
   ///
-  /// The player calls it once it has faded out.
+  /// The player calls it after it has faded out.
   void gameOver() {
     if (_isGameOver) {
       return;
@@ -363,10 +376,10 @@ abstract class SvgShooterExample({
 
   /// Starts a new game.
   ///
-  /// It removes all the missiles, enemies and explosions, adds a first wave
-  /// of enemies, and resets the score and the player. The player fires at
-  /// once if a drag or the fire key lasted through Game Over. The world runs
-  /// at [speed] again.
+  /// It removes all the missiles, enemies and explosions, adds a first wave of
+  /// enemies, and resets the score and the player. The player fires right away
+  /// if a drag or the fire key lasted through Game Over. The world runs at
+  /// [speed] again.
   void _newGame() {
     for (final group in [missileGroup, enemyGroup, explosionGroup]) {
       group.removeAll(group.children.toList());

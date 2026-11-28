@@ -8,13 +8,14 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// A star: a white dot that streaks as it moves.
 ///
 /// It lies [point] away from the axis through the viewport's centre, and
-/// [eyeDistance] from the eye along it, in tube units. That axis is the
-/// tube's, but for an open tube, whose drawing the camera centres instead.
+/// [eyeDistance] from the eye along that axis, both in tube units. That axis
+/// is the tube's, except for an open tube: the camera centres the open tube's
+/// drawing instead.
 class StarComponent(Offset point, double eyeDistance) extends DotComponent {
   this : super(TubeColors.star);
 
-  /// How many times as wide as the tube's lines at the same distance stars
-  /// are.
+  /// How many times as wide as the tube's lines a star is, at the same
+  /// distance.
   static const widthScale = 2.0;
 
   /// How many logical pixels longer a star is while [isSlow], so that drifting
@@ -27,7 +28,7 @@ class StarComponent(Offset point, double eyeDistance) extends DotComponent {
   /// Its distance from the eye the frame before, at least [eyeDistance].
   double cameFrom = eyeDistance;
 
-  /// How bright it is, from 0, unseen, to 1: its opacity.
+  /// How bright it is, as its opacity, from 0 (unseen) to 1.
   double brightness = 0;
 
   /// Whether the star field moves slowly, which keeps the streaks short.
@@ -37,8 +38,8 @@ class StarComponent(Offset point, double eyeDistance) extends DotComponent {
   ///
   /// It's [widthScale] times as wide as the tube's lines at its distance, and
   /// at most [widthScale] times [TubeView.rimPixels]. While [isSlow], its
-  /// streak is at most as long as it's wide, and [slowLength] longer. Its
-  /// opacity is its [brightness], which doesn't import its path again.
+  /// streak is at most as long as its width, plus [slowLength]. Its opacity is
+  /// its [brightness], and setting it doesn't import its path again.
   @override
   void place() {
     final view = gameRef.view;

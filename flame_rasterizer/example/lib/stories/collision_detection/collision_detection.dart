@@ -48,11 +48,11 @@ WidgetbookComponent collisionDetectionStories() {
   );
 }
 
-/// The Multiple Shapes game for [settings], over a status bar.
+/// The Multiple Shapes game for [settings], above a status bar.
 ///
-/// A new renderer or flame_svg [cache] makes a new game, which goes on with
-/// the same shapes, from where they were. New shapes make a new game, with
-/// new shapes. The other knobs change the same game.
+/// A new renderer or flame_svg [cache] makes a new game, which resumes with the
+/// same shapes where they were. A new Shapes choice makes a new game with new
+/// shapes. The other knobs change the running game.
 // The lint misses that its key isn't constant.
 // ignore: prefer_const_constructors_in_immutables
 class MultipleShapesStory({
@@ -61,10 +61,10 @@ class MultipleShapesStory({
   /// The camera's zoom.
   final double zoom = 1,
 
-  /// The components' speed, from 0, which stands still, to 2.
+  /// The components' speed, from 0 (standing still) to 2.
   final double speed = 1,
 
-  /// flame_svg's cache settings, for Flame SVG with SVGs.
+  /// flame_svg's cache settings, for Flame SVG when the shapes are SVGs.
   final SvgCache cache = defaultSvgCache,
 }) extends StatelessWidget {
   this : super(key: ValueKey(settings.shapes));

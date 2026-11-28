@@ -6,15 +6,18 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/tube_runner_e
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// Tube Runner on its own, outside the Widgetbook: run it with
-/// `flutter run -t lib/main_tube_runner.dart`.
+/// Runs Tube Runner on its own, outside the Widgetbook.
+///
+/// Start it with `flutter run -t lib/main_tube_runner.dart`.
 void main() {
   runApp(const TubeRunnerApp());
 }
 
-/// Tube Runner's story, without a status bar, with a settings dialog for its
-/// knobs in the Widgetbook but zoom and speed, which stay at 1: it flies down
-/// the hexagon at the default flight speed, with 400 stars.
+/// Tube Runner's story without a status bar.
+///
+/// A settings dialog holds the story's Widgetbook knobs, except zoom and
+/// speed, which stay at 1. The ship starts flying down the hexagon at the
+/// default flight speed, with 400 stars.
 class const TubeRunnerApp({
   /// Whether the game plays its sounds at the start.
   final bool sound = true,
@@ -24,7 +27,7 @@ class const TubeRunnerApp({
   Widget build(BuildContext context) {
     return StandaloneGame<TubeRunnerSettings>(
       title: 'Tube Runner',
-      // Its paths are drawn by Flame's own components with Flame SVG.
+      // With Flame SVG, Flame's own components draw its paths.
       svgs: false,
       settings: TubeRunnerSettings(sound: sound),
       builder: (renderer, settings, _) => TubeRunnerStory(
@@ -59,11 +62,11 @@ class const TubeRunnerApp({
   }
 }
 
-/// Tube Runner's settings, which stand for its knobs in the Widgetbook but
+/// Tube Runner's settings, which stand in for its Widgetbook knobs except
 /// zoom and speed.
 class TubeRunnerSettings({
-  /// The tube it flies down, one of [TubeRunnerExample.tubes], or the
-  /// hexagon.
+  /// The tube that the ship flies down: one of [TubeRunnerExample.tubes], or
+  /// the hexagon by default.
   Tube? tube,
 
   /// Whether the game plays its sounds.
@@ -72,10 +75,10 @@ class TubeRunnerSettings({
   /// How fast the ship flies at first: see [TubeHost.flightSpeed].
   final double flightSpeed = TubeHost.defaultFlightSpeed,
 }) {
-  /// The tube it flies down.
+  /// The tube that the ship flies down.
   final Tube tube = tube ?? Tubes.hexagon;
 
-  /// Returns these settings, with those given changed.
+  /// Returns a copy of these settings with the given ones changed.
   TubeRunnerSettings copyWith({
     Tube? tube,
     bool? sound,

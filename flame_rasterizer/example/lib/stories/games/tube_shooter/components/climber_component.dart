@@ -3,10 +3,10 @@ import 'dart:math' as math;
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
-/// A climber, which climbs its lane and fires up it.
+/// A climber, which climbs its lane and fires up along it.
 ///
 /// Now and then, it flips onto a neighbouring lane. At the rim, it flips
-/// toward the ship, and destroys it once in the ship's lane.
+/// toward the ship, and destroys the ship when it's in the ship's lane.
 class ClimberComponent({
   required super.lane,
   required super.depth,
@@ -14,10 +14,10 @@ class ClimberComponent({
 }) extends EnemyComponent {
   this : super(EnemyKind.climber);
 
-  /// Seconds until it flips, at the first round's pace.
+  /// Seconds until it flips, counted at the first round's pace.
   double _untilFlip = 0;
 
-  /// Seconds until it fires, at the first round's pace.
+  /// Seconds until it fires, counted at the first round's pace.
   double _untilFire = 0;
 
   @override

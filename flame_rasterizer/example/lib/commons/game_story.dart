@@ -4,30 +4,32 @@ import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flutter/foundation.dart';
 
-/// Shows the game that [create] makes, over a status bar, zoomed to [zoom]
+/// Shows the game that [create] makes above a status bar, zoomed to [zoom]
 /// and running at [speed].
 ///
-/// A new [renderer] or [cache] makes a new game, from a snapshot of the old
-/// one that [snapshot] takes, so that it looks the same. A new [zoom] or
-/// [speed] changes the same game, as do the knobs that [update] passes to
-/// it. Give this widget a key made of whatever else needs a new game, which
-/// starts afresh. The game has the keyboard focus at the start, and a
-/// pointer down on it takes the focus back from the knobs. A spinner shows
-/// until the game has loaded. The game is paused while a [TickerMode] above
-/// is off, as the standalone games' settings dialog sets it.
+/// A new [renderer] or [cache] creates a new game that continues from a
+/// [snapshot] of the old one, so that it looks the same. A new [zoom] or
+/// [speed] changes the running game, and so do the knobs that [update]
+/// passes to it. For any other change that needs a new game, which starts
+/// afresh, give this widget a key made of those values.
+///
+/// The game has the keyboard focus at the start, and pressing a pointer on
+/// it takes the focus back from the knobs. A spinner shows until the game
+/// has loaded. The game is paused while a [TickerMode] above it is off, as
+/// the standalone games' settings dialog does.
 class const GameStory<G extends StoryGame, S extends Object>({
   /// The renderer that the game draws with.
   required final SvgRenderer renderer,
 
-  /// Creates the game, which shows its status in the notifier it gets, and
-  /// goes on from the snapshot it gets, if any.
+  /// Creates the game, which shows its status in the given notifier and
+  /// continues from the given snapshot, if any.
   required final G Function(ValueNotifier<String> status, S? from) create,
 
   /// flame_svg's cache settings, for Flame SVG.
   final SvgCache cache = defaultSvgCache,
 
-  /// Takes a snapshot of the game, for a new game with another renderer or
-  /// cache to go on from. Without it, the new game starts afresh.
+  /// Takes a snapshot of the game, so that a new game with another renderer
+  /// or cache can continue from it. Without it, the new game starts afresh.
   final S Function(G game)? snapshot,
 
   /// Passes the story's other knobs to the running game, each time the story
@@ -37,7 +39,7 @@ class const GameStory<G extends StoryGame, S extends Object>({
   /// The camera's zoom.
   final double zoom = 1,
 
-  /// The world's speed, from 0, which stands still, to 2.
+  /// The world's speed, from 0 (standing still) to 2.
   final double speed = 1,
 
   /// How many lines tall the status bar is: 0 for none.
@@ -53,7 +55,7 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
   final _status = ValueNotifier('');
   final _focusNode = FocusNode();
 
-  /// The snapshot that [_game] went on from, if any.
+  /// The snapshot that [_game] continued from, if any.
   S? _from;
   late G _game = _create();
 
@@ -76,9 +78,9 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
     super.didUpdateWidget(oldWidget);
     if (widget.renderer != oldWidget.renderer ||
         widget.cache != oldWidget.cache) {
-      // The snapshot is taken here, as the old game is removed only after the
-      // new one is built. A game that hasn't loaded yet hasn't gone on from
-      // its snapshot either, so it hands that one on.
+      // Take the snapshot here, because the old game is removed only after
+      // the new one is built. A game that hasn't loaded yet hasn't continued
+      // from its snapshot either, so the new game gets that same snapshot.
       if (_game.isLoaded) {
         _from = widget.snapshot?.call(_game);
       }
@@ -114,8 +116,9 @@ class _GameStoryState<G extends StoryGame, S extends Object>()
                 key: ObjectKey(_game),
                 game: _game,
                 focusNode: _focusNode,
-                // Until the game has loaded, which for flame_rasterizer's
-                // games includes their renderer (ExampleRasterizer.onLoad).
+                // Shows until the game has loaded, which for
+                // flame_rasterizer's games includes loading their renderer
+                // (ExampleRasterizer.onLoad).
                 loadingBuilder: (_) =>
                     const Center(child: CircularProgressIndicator()),
               ),

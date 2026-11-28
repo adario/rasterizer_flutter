@@ -21,16 +21,16 @@ abstract class ExampleGame({
   set speed(double value) => world.timeScale = value;
 }
 
-/// A game that a story shows, with a world of any type, which runs at
+/// A game that a story shows, whose world can be of any type and runs at
 /// [speed].
 ///
-/// Once the game calls [startStatus], it shows the FPS at its top left
-/// corner. Then, every quarter of a second, [status] gets [rendererText],
-/// the frame times, [rendererStats] and [exampleStats].
+/// After the game calls [startStatus], it shows the FPS in its top-left
+/// corner. From then on, every quarter of a second, it sets [status] to
+/// [rendererText], the frame times, [rendererStats] and [exampleStats].
 ///
 /// The frame times are the mean and the 90th percentile of the last 60
 /// frames, in milliseconds. "render" times the game's own [render], "build"
-/// Flutter's build phase, and "raster" Flutter's raster phase.
+/// times Flutter's build phase, and "raster" times Flutter's raster phase.
 mixin StoryGame<W extends World> on FlameGame<W> {
   /// How many of the last frames the frame times cover.
   static const _window = 60;
@@ -59,8 +59,8 @@ mixin StoryGame<W extends World> on FlameGame<W> {
   /// The status that the bar under the game shows.
   ValueNotifier<String> get status;
 
-  /// The world's speed, from 0, which stands still, to 2: its `HasTimeScale`
-  /// scale.
+  /// The world's speed: its `HasTimeScale` scale, from 0 (standing still)
+  /// to 2.
   double get speed;
   set speed(double value);
 
@@ -75,15 +75,15 @@ mixin StoryGame<W extends World> on FlameGame<W> {
 
   /// Shows the FPS and starts timing frames for the status.
   ///
-  /// Call it once the game has something to show. It does nothing once the
-  /// game is removed, as a game can be while it loads.
+  /// Call it when the game has something to show. It does nothing after the
+  /// game is removed, which can happen while the game loads.
   @protected
   void startStatus() {
     if (_timed || isRemoved) {
       return;
     }
-    // The viewport draws the FPS above the world and doesn't zoom it, as the
-    // camera draws after the game's other children.
+    // The viewport draws the FPS over the world without zooming it, because
+    // the camera draws after the game's other children.
     camera.viewport.add(
       _fps = FpsTextComponent(
         decimalPlaces: 1,
@@ -98,8 +98,8 @@ mixin StoryGame<W extends World> on FlameGame<W> {
 
   /// Hides the FPS and stops updating the status.
   ///
-  /// The status then keeps what it's set to, such as an error, while the
-  /// game has nothing to show.
+  /// The status then keeps its last value, such as an error, while the game
+  /// has nothing to show.
   @protected
   void stopStatus() {
     if (!_timed) {
@@ -133,9 +133,9 @@ mixin StoryGame<W extends World> on FlameGame<W> {
 
   /// Times the components' render for the status.
   ///
-  /// With flame_rasterizer, the time leaves out its frame, which
-  /// `HasRasterizer` renders afterwards. The frame's cpu, upload and encode
-  /// times show among the renderer's own numbers instead.
+  /// With flame_rasterizer, the time leaves out the rasterizer's frame, which
+  /// `HasRasterizer` renders afterwards. That frame's CPU, upload and encode
+  /// times appear in the renderer's own numbers instead.
   @override
   void render(ui.Canvas canvas) {
     _renderWatch
@@ -163,7 +163,7 @@ mixin StoryGame<W extends World> on FlameGame<W> {
   }
 
   /// Returns the mean and the 90th percentile of [micros], in milliseconds, or
-  /// blank before the first frame.
+  /// an empty string before the first frame.
   static String _stats(List<int> micros) {
     if (micros.isEmpty) {
       return '';

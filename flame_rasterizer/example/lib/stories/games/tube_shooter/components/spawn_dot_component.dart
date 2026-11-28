@@ -7,9 +7,11 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/e
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
-/// What an enemy still to come in a game for another renderer goes on from:
-/// its kind, where it is round the far end, its wandering, once it has
-/// loaded, and its arrival.
+/// The state that an enemy still to come resumes from in a game with another
+/// renderer.
+///
+/// It holds the enemy's kind, where it is round the far end, its wandering
+/// after it has loaded, and its arrival.
 typedef SpawnSnapshot = ({
   EnemyKind kind,
   double at,
@@ -22,17 +24,18 @@ typedef SpawnSnapshot = ({
 /// An enemy of [kind] still to come: a dot in its colour on the tube's far
 /// end.
 ///
-/// It wanders round the far end, turning back at random, faster each round.
-/// Once it [arrive]s, it moves to its lane's middle, flashing white, until it
-/// [hasArrived]. The game then replaces it with the enemy, in that lane.
+/// It wanders round the far end and turns back at random times, faster each
+/// round. After [arrive], it moves to its lane's middle and flashes white
+/// until [hasArrived] is true. The game then replaces it with the enemy in
+/// that lane.
 ///
-/// Given [from], it goes on from there.
+/// Given [from], it resumes from that snapshot.
 class SpawnDotComponent(
   final EnemyKind kind, {
   required double at,
   final SpawnSnapshot? from,
 
-  /// Whether its enemy came out before, and went back on a lost ship.
+  /// Whether its enemy came out before and went back when the ship was lost.
   final bool again = false,
 }) extends DotComponent with InShooterMode {
   this : super(kind.color);
@@ -75,7 +78,7 @@ class SpawnDotComponent(
 
   bool get hasArrived => (_arriving ?? 0) >= arriveTime;
 
-  /// What a game with another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   SpawnSnapshot get snapshot => (
     kind: kind,
     at: at,

@@ -5,12 +5,14 @@ import 'package:flame/extensions.dart';
 import 'package:flame/post_process.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 
-/// The Glow knob's glow with the renderers other than the mesh renderer,
-/// which draws its own: a halo round the lines, in their colours, with a
-/// white core down the middle of the wider ones.
+/// The Glow knob's glow for every renderer except the mesh renderer, which
+/// draws its own.
+///
+/// The glow is a halo round the lines in their colours, with a white core
+/// down the middle of the wider ones.
 ///
 /// As [game]'s camera's post process, it rasterizes the world each frame at
-/// half the device's pixel ratio, which the halo's blur hides, and draws
+/// half the device's pixel ratio, which the halo's blur hides. It then draws
 /// `shaders/glow.frag` over the world, which the renderer draws as usual.
 /// The halo reaches [radius] logical pixels round the rim, and less towards
 /// the tube's middle, as the lines thin with depth. The stars, in the
@@ -43,7 +45,7 @@ class TubeGlow(final TubeHost game) extends ShaderPostProcess {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    // The shader keeps these.
+    // The shader keeps these values, so they're set only once.
     shader.getUniformFloat('uRadius').set(radius);
     shader.getUniformFloat('uGain').set(gain);
     shader.getUniformFloat('uCore').set(core);

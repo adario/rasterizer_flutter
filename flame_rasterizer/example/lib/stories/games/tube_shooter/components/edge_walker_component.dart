@@ -7,11 +7,12 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 /// An edge-walker, which spins along the edges between lanes, where the
 /// tube's spokes are.
 ///
-/// It comes at its lane's middle, and goes to one of the lane's edges. On an
-/// edge, it climbs the tube, and now and then crosses a neighbouring lane to
-/// that lane's other edge. Only while it crosses can a shot down the lane's
-/// middle destroy it. At the rim, it crosses toward the ship, and destroys it
-/// while crossing the ship's lane or standing on one of its edges.
+/// It appears in the middle of its lane and moves to one of the lane's edges.
+/// On an edge, it climbs the tube, and now and then it crosses a neighbouring
+/// lane to that lane's other edge. A shot down the lane's middle can destroy
+/// it only while it crosses. At the rim, it crosses toward the ship. It
+/// destroys the ship while it crosses the ship's lane or stands on one of that
+/// lane's edges.
 ///
 /// Its [lane] is the one it crosses, or the one that starts at its [edge].
 class EdgeWalkerComponent({
@@ -24,8 +25,8 @@ class EdgeWalkerComponent({
   /// How fast it spins, in turns a second.
   static const spin = 1.5;
 
-  /// The edge it's on, or crosses from, as the index of the tube's point
-  /// there.
+  /// The edge it's on or crosses from, as the index of the tube's point at
+  /// that edge.
   int get edge => _edge;
   int _edge = 0;
 
@@ -33,7 +34,7 @@ class EdgeWalkerComponent({
   int? _crossTo;
   double _crossProgress = 0;
 
-  /// Seconds until it crosses, at the first round's pace.
+  /// Seconds until it crosses, counted at the first round's pace.
   double _untilCross = 0;
 
   /// How far round its spin is, from 0 to 1.

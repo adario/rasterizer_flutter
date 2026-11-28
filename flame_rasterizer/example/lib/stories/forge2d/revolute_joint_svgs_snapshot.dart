@@ -1,7 +1,9 @@
 part of 'revolute_joint_svgs_example.dart';
 
-/// What a game for another renderer goes on from: the wheel and the bodies
-/// dropped, where they are and how they move, and the next body's color.
+/// The state that a game with another renderer resumes from.
+///
+/// It holds the wheel and the dropped bodies, with their positions and motion,
+/// and the next body's color.
 typedef RevoluteJointSvgsSnapshot = ({
   WheelSnapshot? wheel,
   List<BallSnapshot> balls,
@@ -9,14 +11,14 @@ typedef RevoluteJointSvgsSnapshot = ({
   int tint,
 });
 
-/// Takes a [RevoluteJointSvgsExample]'s snapshot, and goes on from one.
+/// Takes a snapshot of a [RevoluteJointSvgsExample] and resumes from one.
 ///
-/// Box2D's contacts between the bodies start again in the new game, so a
-/// pile can settle a little at its first steps.
+/// Box2D rebuilds the contacts between the bodies in the new game, so a pile
+/// can settle a little during the first steps.
 extension RevoluteJointSvgsSnapshots on RevoluteJointSvgsExample {
-  /// What a game for another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   ///
-  /// It leaves out the bodies that a tap dropped at this frame, which have no
+  /// It leaves out the bodies that a tap dropped in this frame, which have no
   /// Box2D body yet.
   RevoluteJointSvgsSnapshot get snapshot => (
     wheel: switch (_wheel) {
@@ -34,8 +36,8 @@ extension RevoluteJointSvgsSnapshots on RevoluteJointSvgsExample {
     tint: tint,
   );
 
-  /// Drops the snapshot's bodies again, where they were and moving as they
-  /// were.
+  /// Drops the snapshot's bodies again, at the positions and with the motion
+  /// they had, and restores the next body's color.
   void _restoreBodies() {
     if (_from case final from?) {
       balls.addAll(from.balls.map(Ball.from));

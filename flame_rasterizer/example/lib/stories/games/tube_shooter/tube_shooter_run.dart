@@ -1,29 +1,35 @@
 part of 'shooter_mode.dart';
 
-/// A run between two rounds, with [ShooterMode.runs] on: after the round's
-/// drop, the ship flies on down an endless tube, by Tube Runner's rules,
-/// then out of it, onto the next round's rim. The camera keeps looking where
-/// the round's does, then turns, on the arrival, to look where the next
-/// round's does.
+/// A run between two rounds, with [ShooterMode.runs] on.
 ///
-/// Its distances are along the run's axis, in tube units, from the rim of
-/// the round's tube, which leads straight into the run's: the drop is the
-/// first [Tube.depth] of the run. The drop speeds up to Tube Runner's
-/// [flightSpeed] by its end, as [dropDepth] says. There, [runner] takes over
-/// the ship, where it is, and the run's tube: the ship flies on, as far as
-/// it would in [ShooterMode.runTime] of play at [flightSpeed], as enemies
-/// come, and faster for each it destroys. Its tube eases into Tube Runner's
-/// bends past the drop, and out of them by the end of the run's play, then
-/// goes straight on to its [exit]. The round's rules take over again there,
-/// and the ship slows down evenly to a stop on the next round's rim, [rim]
-/// along the axis, as far as it would in [ShooterMode.arriveTime] from
-/// [flightSpeed].
+/// After the round's drop, the ship flies on down an endless tube by Tube
+/// Runner's rules, then out of it onto the next round's rim. The camera keeps
+/// looking where the round's camera looks, and during the arrival it turns to
+/// look where the next round's camera looks.
 ///
-/// [EndlessTube] draws the run's tube past the round's far end, which grows
-/// from there to the full length ahead on the drop, and the next round's
-/// tube, as its walls hide it. The round's tube draws itself on, as the eye
-/// leaves it behind. Once the ship is out of the run's tube, it glides onto
-/// the next round's tube, at the step nearest its angle round the axis.
+/// Its distances are in tube units along the run's axis, from the rim of the
+/// round's tube. That tube leads straight into the run's, so the drop is the
+/// first [Tube.depth] of the run. By the drop's end, the ship speeds up to
+/// Tube Runner's [flightSpeed], as [dropDepth] describes.
+///
+/// At the drop's end, [runner] takes over the ship where it is, along with
+/// the run's tube. While enemies come, the ship flies on as far as it would
+/// in [ShooterMode.runTime] of play at [flightSpeed], and it flies faster for
+/// each enemy it destroys. Past the drop, the run's tube eases into Tube
+/// Runner's bends. It eases out of them by the end of the run's play, then
+/// goes straight on to its [exit].
+///
+/// When the run's play ends, the round's rules take over again. The ship
+/// slows down evenly to a stop on the next round's rim, [rim] along the axis.
+/// That's as far as it would fly while slowing from [flightSpeed] to a stop
+/// over [ShooterMode.arriveTime].
+///
+/// [EndlessTube] draws the run's tube past the round's far end. During the
+/// drop, that tube grows from the far end to its full length ahead.
+/// [EndlessTube] also draws the next round's tube, except where the run's
+/// walls hide it. The round's tube keeps drawing itself as the eye leaves it
+/// behind. After the ship leaves the run's tube, it glides onto the next
+/// round's tube, at the step nearest its angle round the axis.
 class _Run(
   /// The round's tube, and its colour.
   final Tube tube,
@@ -35,24 +41,28 @@ class _Run(
   /// How fast the runner's ship flies at first, in tube units a second.
   required final double flightSpeed,
 
-  /// The enemies that come on the run, in order: the round's, as they came.
+  /// The enemies that come on the run, in order: the round's enemies, in the
+  /// order they came.
   required final List<EnemyKind> sequence,
 
-  /// The snapshot of the runner of a game with another renderer that the
-  /// run goes on from, if any.
+  /// The snapshot of a runner in a game with another renderer, if the run
+  /// resumes from one.
   final RunnerSnapshot? from,
 }) {
-  /// Where the run's bends end, where the next round's rim is, and where
-  /// the run's tube ends: endless, until the runner sets them with [endAt].
+  /// Where the run's bends end, where the next round's rim is, and where the
+  /// run's tube ends. They're infinite until the runner sets them with
+  /// [endAt].
   double playEnd = double.infinity;
   double rim = double.infinity;
   double exit = double.infinity;
 
-  /// Sets [playEnd], and from it [rim], as far past as the ship flies while
-  /// it slows down evenly from [flightSpeed] to a stop over
-  /// [ShooterMode.arriveTime], and [exit], on a ring, far enough before
-  /// [rim] to be behind the eye once the ship is there. Returns [exit] and
+  /// Sets [playEnd], and from it [rim] and [exit], and returns [exit] and
   /// [rim].
+  ///
+  /// [rim] lies past [playEnd] by as far as the ship flies while it slows
+  /// down evenly from [flightSpeed] to a stop over [ShooterMode.arriveTime].
+  /// [exit] lies on a ring far enough before [rim] to be behind the eye when
+  /// the ship reaches [rim].
   ({double exit, double rim}) endAt(double playEnd) {
     this.playEnd = playEnd;
     rim = playEnd + flightSpeed * ShooterMode.arriveTime / 2;
@@ -68,10 +78,12 @@ class _Run(
     return (exit: exit, rim: rim);
   }
 
-  /// How far the ship has dropped at [progress] of the drop: from a stop,
-  /// speeding up, and flying at [flightSpeed] at its end. If that's too slow
-  /// to drop [Tube.depth] in [ShooterMode.dropTime], it flies faster on the
-  /// way, then slows down to it.
+  /// How far the ship has dropped at [progress] through the drop.
+  ///
+  /// The ship starts from a stop and speeds up to [flightSpeed] by the drop's
+  /// end. If [flightSpeed] is too slow to drop [Tube.depth] in
+  /// [ShooterMode.dropTime], the ship flies faster on the way, then slows
+  /// down to [flightSpeed].
   double dropDepth(double progress) {
     final p = progress;
     final end = flightSpeed * ShooterMode.dropTime;
@@ -90,13 +102,16 @@ class _Run(
     ),
   );
 
-  /// The view that [endless] draws the run's tube for on the drop and the
-  /// arrival: the game's, but for its tube, which is the next round's once
-  /// the ship arrives.
+  /// The view for which [endless] draws the run's tube during the drop and
+  /// the arrival.
+  ///
+  /// It matches the game's view, except for its tube, which is the next
+  /// round's after the ship arrives.
   late final view = TubeView()..tube = tube;
 
-  /// Plays the run, from the drop's end to where its play ends. It loads on
-  /// the drop, so that it's ready by then.
+  /// Plays the run, from the drop's end to where its play ends.
+  ///
+  /// It loads during the drop, so that it's ready by the drop's end.
   late final runner = RunnerMode(
     run: RunnerRun(
       tube: endless,
@@ -123,11 +138,13 @@ class _Run(
   PositionComponent? tubeDrawing;
   PositionComponent? nextDrawing;
 
-  /// The explosions that [runner] left as the run's play ended, which go on
-  /// where they are along the run, on the arrival, until they're done.
+  /// The explosions that [runner] left when the run's play ended.
+  ///
+  /// During the arrival, they go on where they are along the run until
+  /// they're done.
   final blasts = <PlacedExplosionComponent>[];
 
-  /// Where the ship was in the world, its angle and its scale, as it began
+  /// The ship's position in the world, its angle and its scale when it began
   /// to arrive.
   Vector2? shipFrom;
   double angleFrom = 0;
@@ -152,8 +169,9 @@ class _Run(
     runner.removeFromParent();
   }
 
-  /// Returns the step round [to] nearest the angle round the axis of [step]
-  /// round [from], as Tube Runner's ship moves onto a new tube.
+  /// Returns the step round [to] whose angle round the axis is nearest to
+  /// that of [step] round [from], as when Tube Runner's ship moves onto a new
+  /// tube.
   static int nearestStep(Tube from, int step, Tube to) {
     final angle = _pointAt(from, step).direction;
     var nearest = 0;
@@ -184,8 +202,9 @@ class _Run(
 
 /// The runs, with [ShooterMode.runs] on: see [_Run].
 extension on ShooterMode {
-  /// Makes the run that the round's drop flies on down, with its runner,
-  /// which loads on the drop, or goes on [from] a runner's snapshot.
+  /// Makes the run that the round's drop flies on into, with its runner.
+  ///
+  /// The runner loads during the drop, or resumes [from] a runner's snapshot.
   void _makeRun({RunnerSnapshot? from}) {
     final run = _run = _Run(
       view.tube,
@@ -198,8 +217,10 @@ extension on ShooterMode {
     add(run.runner..spawning = spawning);
   }
 
-  /// Starts the run, the drop's overshoot into it: its runner takes over the
-  /// ship, where it is, and the drawing of the run's tube.
+  /// Starts the run, carrying over the time by which the drop overran.
+  ///
+  /// The runner takes over the ship where it is, and the drawing of the
+  /// run's tube.
   void _beginRun() {
     final run = _run!;
     final over = _stateTime - ShooterMode.dropTime;
@@ -213,7 +234,7 @@ extension on ShooterMode {
   /// Plays the run over [dt] seconds of the world's time.
   void _stepRun(double dt) {
     final runner = _run!.runner;
-    // A run that goes on from a snapshot waits for its runner to load.
+    // A run that resumes from a snapshot waits for its runner to load.
     if (!runner.isLoaded) {
       return;
     }
@@ -221,14 +242,16 @@ extension on ShooterMode {
     _followRunner();
   }
 
-  /// Keeps the eye, and the hidden ship, where the runner's ship is, and
-  /// once the run's play is over, starts the next round as it arrives.
+  /// Keeps the eye and the hidden ship where the runner's ship is.
+  ///
+  /// When the run's play is over, it starts the next round with the ship's
+  /// arrival.
   void _followRunner() {
     final run = _run!;
     final runner = run.runner;
     run.flown = runner.flown;
-    // The round's tube goes on behind the eye, and the stars turn as the
-    // runner's ship moves round.
+    // This keeps the round's tube going on behind the eye, and turns the
+    // stars as the runner's ship moves round.
     player
       ..depth = run.flown
       ..step = runner.ship.step;
@@ -238,9 +261,11 @@ extension on ShooterMode {
     }
   }
 
-  /// Starts the next round as the ship arrives on its rim, the run's
-  /// overshoot into the arrival: the round's ship takes over from the
-  /// runner's, where it is, and the round its explosions, where they are.
+  /// Starts the next round as the ship arrives on its rim, carrying over the
+  /// time by which the run overran.
+  ///
+  /// The round's ship takes over from the runner's ship where it is, and the
+  /// round takes over the runner's explosions where they are.
   void _beginArrive() {
     final run = _run!;
     final ship = run.runner.ship;
@@ -250,7 +275,8 @@ extension on ShooterMode {
       ..shipFrom = ship.position.clone()
       ..angleFrom = ship.angle
       ..scaleFrom = ship.scale.clone();
-    // Moved before the runner goes, so that they don't go with it.
+    // Move them before the runner is removed, so that they aren't removed
+    // with it.
     for (final blast in run.runner.blasts) {
       run.blasts.add(blast);
       blast.parent = explosionGroup;
@@ -262,9 +288,11 @@ extension on ShooterMode {
     _stepArrive();
   }
 
-  /// Slows the ship down evenly, from as fast as it flew, to a stop on the
-  /// next round's rim, as the camera turns to look where the round's does,
-  /// and then waits for the player, as at the end of a zoom.
+  /// Slows the ship down evenly from its last speed to a stop on the next
+  /// round's rim, while the camera turns to look where the round's camera
+  /// looks.
+  ///
+  /// Then it waits for the player, as at the end of a zoom.
   void _stepArrive() {
     final run = _run!;
     final way = run.rim - run.playEnd;
@@ -291,10 +319,11 @@ extension on ShooterMode {
     _run = null;
   }
 
-  /// Draws the run's tube on the drop and the arrival, if there's a run, and
-  /// the next round's tube, once it's no farther ahead than the run's tube
-  /// goes, and places the run's [_Run.blasts] where they show. On the run,
-  /// its runner draws and places them.
+  /// Draws the run's tube during the drop and the arrival, if there's a run.
+  ///
+  /// It also draws the next round's tube when that's no farther ahead than
+  /// the run's tube reaches, and places the run's [_Run.blasts] where they
+  /// show. During the run itself, the runner draws and places them.
   void _drawRun() {
     final run = _run;
     if (run == null || !isLoaded || _state == TubeState.run) {
@@ -347,9 +376,10 @@ extension on ShooterMode {
     }
   }
 
-  /// Places the ship as it arrives: where it was as the run ended, until it
-  /// leaves the run's tube, then gliding onto the rim, to where it's placed
-  /// there.
+  /// Places the ship as it arrives.
+  ///
+  /// It stays where it was when the run's play ended until it leaves the
+  /// run's tube. Then it glides onto the rim, to where the round places it.
   void _placeArriving() {
     final run = _run;
     final from = run?.shipFrom;

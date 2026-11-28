@@ -20,26 +20,26 @@ typedef SvgRenderersSettings = ({
   SvgCacheSize cacheSize,
 });
 
-/// What a game for another renderer goes on from: the world's time, which
-/// the rotations follow.
+/// The state that a game with another renderer resumes from: the world's time,
+/// which the rotations follow.
 typedef SvgRenderersSnapshot = ({double time});
 
 /// The same SVG drawn many times: see [description].
 ///
-/// A master SVG rotates at the world's origin, which the camera looks at,
-/// and a ring of more SVGs rotates around it, as many as [settings] say.
-/// Each SVG in the ring is smaller and starts later than the one before.
-/// Subclasses pick what loads and draws the SVG: see [ExampleSvgs].
+/// A master SVG rotates at the world's origin, which the camera looks at, and a
+/// ring of more SVGs rotates around it, as many as [settings] say. Each SVG in
+/// the ring is smaller and starts later than the one before. Subclasses pick
+/// what loads and draws the SVG: see [ExampleSvgs].
 ///
-/// Given the [snapshot] of a game with another renderer, it goes on from
-/// there, so that it turns on from the same angles.
+/// Given the [snapshot] of a game with another renderer, the game resumes from
+/// it, so the SVGs keep turning from the same angles.
 abstract class SvgRenderersExample(
   var SvgRenderersSettings _settings, {
   required super.status,
   SvgRenderersSnapshot? from,
 }) extends ExampleGame with ExampleSvgs {
-  /// Creates the game for [settings]' renderer, which goes on from [from], if
-  /// any.
+  /// Creates the game for the renderer in [settings], resuming from [from] if
+  /// given.
   factory SvgRenderersExample.of(
     SvgRenderersSettings settings,
     ValueNotifier<String> status, {
@@ -77,17 +77,17 @@ abstract class SvgRenderersExample(
   /// Seconds per turn.
   static const _turnTime = 2.0;
 
-  /// The settings it built its components for, or null before the first
+  /// The settings that the components were built for, or null before the first
   /// build.
   SvgRenderersSettings? _built;
 
-  /// The SVG that its components draw, or null if it couldn't load.
+  /// The SVG that the components draw, or null if it failed to load.
   ExampleSvg? _svg;
 
   /// What [_svg] was loaded for: its name and flame_svg's cache settings.
   ({String svg, SvgCacheMode cacheMode, SvgCacheSize cacheSize})? _svgKey;
 
-  /// Old SVGs to free once the components that drew them are removed.
+  /// Old SVGs to free after the components that drew them are removed.
   final _retired = <ExampleSvg>[];
 
   /// The SVG in the centre.
@@ -95,21 +95,26 @@ abstract class SvgRenderersExample(
   final _ring = <PositionComponent>[];
 
   /// Seconds of the world's time, scaled by [speed], since the story's first
-  /// game started. The rotations follow it, so that new components turn as
-  /// far as those they replace.
+  /// game started.
+  ///
+  /// The rotations follow it, so that new components start at the same angles
+  /// as the ones they replace.
   double _time = from?.time ?? 0;
 
   /// Whether [onLoad] has run.
   bool _started = false;
 
-  /// Whether [_apply] is running, so that another call leaves the work to it.
+  /// Whether [_apply] is running. A second call then returns at once and leaves
+  /// the work to the running one.
   bool _applying = false;
 
-  /// The knobs' values. New values change the running game, except for the
-  /// renderer, which is the one that the game was made for.
+  /// The values of the knobs.
   ///
-  /// Any change replaces the components with new ones, turned as far. A new
-  /// SVG or flame_svg cache loads the SVG again first.
+  /// New values change the running game, except for the renderer: a game always
+  /// draws with the renderer it was made for.
+  ///
+  /// Any change replaces the components with new ones at the same angles. A new
+  /// SVG or flame_svg cache setting reloads the SVG first.
   SvgRenderersSettings get settings => _settings;
   set settings(SvgRenderersSettings value) {
     assert(value.renderer == _settings.renderer, 'A game has one renderer');
@@ -122,11 +127,11 @@ abstract class SvgRenderersExample(
     }
   }
 
-  /// What a game for another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   SvgRenderersSnapshot get snapshot => (time: _time);
 
-  /// Whether its components match its settings. They don't while it loads a
-  /// new SVG.
+  /// Whether the components match the settings. They don't while a new SVG
+  /// loads.
   @visibleForTesting
   bool get settled => _built == _settings;
 
@@ -136,11 +141,11 @@ abstract class SvgRenderersExample(
     await _apply();
   }
 
-  /// Builds its components for its settings, loading the SVG first if it
+  /// Builds the components for the settings, loading the SVG first if it
   /// changed.
   ///
-  /// It goes on until they match, as the settings can change while an SVG
-  /// loads.
+  /// It loops until the components match the settings, as the settings can
+  /// change while an SVG loads.
   Future<void> _apply() async {
     if (_applying) {
       return;
@@ -195,10 +200,11 @@ abstract class SvgRenderersExample(
     }
   }
 
-  /// Replaces its components with new ones for its settings, turned as far
-  /// as those they replace.
+  /// Replaces the components with new ones for the settings, at the same angles
+  /// as the ones they replace.
   ///
-  /// Without an SVG, it adds none, and the status keeps showing the error.
+  /// Without an SVG, it adds no components, and the status keeps showing the
+  /// error.
   void _build() {
     final settings = _settings;
     world.removeAll([?_master, ..._ring]);
@@ -217,8 +223,9 @@ abstract class SvgRenderersExample(
       ..add(rotation);
     _master = master;
     world.add(master);
-    // As in flame_extended_svg, each one is smaller and starts later than the
-    // one before, and with Fade SVGs, it's fainter. All draw above the master.
+    // As in flame_extended_svg, each ring SVG is smaller and starts later than
+    // the one before. With Fade SVGs on, it's also fainter. All draw above the
+    // master.
     final count = settings.count;
     for (var i = 0; i < count; i++) {
       final f = i / count;
@@ -239,9 +246,11 @@ abstract class SvgRenderersExample(
     startStatus();
   }
 
-  /// Returns how far a turn every [_turnTime], starting [delay] after the game
-  /// did, has turned at the world's [_time], and the effect that goes on
-  /// turning from there.
+  /// Returns the angle and the rotation effect of an SVG that turns once every
+  /// [_turnTime], starting [delay] after the game did.
+  ///
+  /// The angle is how far it has turned at the world's [_time]. The effect
+  /// keeps it turning from there.
   ({double angle, Effect rotation}) _rotation({double delay = 0}) => (
     angle: _turn * (math.max(0.0, _time - delay) / _turnTime % 1),
     rotation: RotateEffect.by(
@@ -256,7 +265,7 @@ abstract class SvgRenderersExample(
 
   @override
   void update(double dt) {
-    // The world removes the old components, and adds the new ones, before
+    // The world removes the old components and adds the new ones here, before
     // the old SVGs are freed below.
     super.update(dt);
     _time += dt * speed;

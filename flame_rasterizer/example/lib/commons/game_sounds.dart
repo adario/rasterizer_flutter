@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 
 /// A game's sounds, loaded in the background by [load].
 ///
-/// Until they're loaded, and where they fail to load, such as in tests with
-/// no audio plugin, nothing plays. At most [size] of each sound play at once,
-/// or as many as [sizes] says for that sound.
+/// Nothing plays until the sounds are loaded, or if they fail to load, such
+/// as in tests without an audio plugin. Each sound can play at most [size]
+/// times at once, or as many times as [sizes] gives for it.
 class GameSounds(
   /// The sounds' asset paths.
   final List<String> paths, {
@@ -40,15 +40,17 @@ class GameSounds(
     }
   }
 
-  /// Plays the sound at [path] once, unless it already started this frame:
-  /// for example, the enemies that a purge destroys at once sound as one.
+  /// Plays the sound at [path] once, unless it already started this frame.
+  ///
+  /// For example, the enemies that a purge destroys together make a single
+  /// sound.
   void play(String path) {
     if (_played.add(path)) {
       _bank?.play(path);
     }
   }
 
-  /// Lets each sound play again.
+  /// Starts a new frame, so that each sound can play again.
   void nextFrame() => _played.clear();
 
   /// Releases the sounds.

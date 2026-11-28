@@ -5,8 +5,10 @@ import 'dart:ui';
 import 'package:flame_rasterizer/flame_rasterizer.dart' show RasterizerPolygons;
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 
-/// A point or a direction in 3D, in tube units: x to the right, y down and z
-/// forward, as the eye looks at the start.
+/// A point or a direction in 3D, in tube units.
+///
+/// The axes are as the eye sees them at the start: x to the right, y down
+/// and z forward.
 class const Point3(final double x, final double y, final double z) {
   Point3 operator +(Point3 other) =>
       Point3(x + other.x, y + other.y, z + other.z);
@@ -29,8 +31,10 @@ class const Point3(final double x, final double y, final double z) {
   Point3 get normalized => this * (1 / math.sqrt(dot(this)));
 }
 
-/// A cross-section of the tube, [index] steps along its axis: where the axis
-/// is, and which ways the axis, the outline's x and the outline's y go.
+/// A cross-section of the tube, [index] steps along its axis.
+///
+/// It holds where the axis is, and the directions of the axis, of the
+/// outline's x and of the outline's y.
 class const Ring(
   final int index,
   final Point3 center,
@@ -43,36 +47,48 @@ class const Ring(
 }
 
 /// A spike down the middle of a [lane], from [near] to [far] along the
-/// axis, in tube units: [far] where its seeder came, and [near] where the
-/// seeder has laid it to, or where shots have cut it back to.
+/// axis, in tube units.
+///
+/// [far] is where its seeder came. [near] is how far the seeder has laid
+/// the spike, or where shots have cut it back to.
 class Spike(final int lane, final double far) {
   double near = far;
 }
 
-/// A point down the middle of a `lane`, `at` along the axis, in tube units,
-/// where a shape is: an enemy, a shot or an explosion. If it flips onto a
-/// neighbouring lane, `flip` says how far.
+/// Where a shape is in the tube: an enemy, a shot or an explosion.
+///
+/// The shape is down the middle of `lane`, `at` along the axis, in tube
+/// units. If it is flipping onto a neighbouring lane, `flip` says how far.
 ///
 /// Its `across`, if given, is where it is across its lane, from 0 at the
 /// lane's first point to 1 at the next, instead of the lane's middle.
 typedef TubeMark = ({int lane, double at, TubeFlip? flip, double? across});
 
 /// How far a shape has flipped from its lane onto the neighbouring lane `to`,
-/// as in Tube Shooter: the angle it has turned by, about the corner the two
-/// lanes share, as `Tube.flipAngle` says, from 0.
+/// as in Tube Shooter.
+///
+/// The `turn` is the angle it has turned by about the corner the two lanes
+/// share: from 0 up to the angle that `Tube.flipAngle` returns.
 typedef TubeFlip = ({int to, double turn});
 
-/// Where a shape at a [TubeMark] shows in the world: its position, its angle,
-/// with its tail away along the lane, and its scale, the lane's width there.
+/// Where a shape at a [TubeMark] shows in the world.
+///
+/// The `angle` points the shape's tail away along the lane, and the `scale`
+/// is the lane's width there.
 typedef ShapePlace = ({Offset position, double angle, double scale});
 
-/// A zapper's bolt, down the middle of a `lane` from the ship's ring to `far`
-/// along the axis, in tube units, where the zapper is.
+/// A zapper's bolt down the middle of a `lane`, from the ship's ring to the
+/// zapper, `far` along the axis in tube units.
 typedef TubeBolt = ({int lane, double far});
 
-/// What [EndlessTube.quadsAt] makes: the quads of the tube, of the ship's
-/// lane, of the spikes, of the flash's lane and spike, and of their halo, of
-/// the bolts and of theirs, and where a shape at each mark shows, if it does.
+/// What [EndlessTube.quadsAt] makes.
+///
+/// It holds:
+/// - the quads of the tube, the ship's lane and the spikes;
+/// - the quads of the flash's lane and spike, and of their halo;
+/// - the quads of the bolts, and of their halo;
+/// - the quads of the next tube;
+/// - where a shape at each mark shows, or null where it doesn't.
 typedef TubeQuads = ({
   RasterizerPolygons tube,
   RasterizerPolygons lane,
@@ -87,31 +103,36 @@ typedef TubeQuads = ({
 });
 
 /// Where an [EndlessTube]'s axis bends: from `bendFrom` to `bendTo` along
-/// it, in tube units, easing into its bends over the first `ease` units, and
-/// out of them over the last. Before and after, it goes straight.
+/// it, in tube units.
+///
+/// The axis eases into its bends over the first `ease` units, and out of
+/// them over the last `ease` units. Before and after, it goes straight.
 typedef TubeCourse = ({double bendFrom, double bendTo, double ease});
 
-/// A tube of Tube Shooter's, straight on along an [EndlessTube]'s axis, with
-/// its rim `rim` along the axis, in tube units: see [EndlessTube.quadsAt].
+/// A Tube Shooter tube that continues straight on along an [EndlessTube]'s
+/// axis, with its rim `rim` along the axis, in tube units.
+///
+/// See [EndlessTube.quadsAt].
 typedef NextTube = ({Tube tube, double rim});
 
-/// An endless tube, made as the ship flies along it.
+/// An endless tube, built as the ship flies along it.
 ///
-/// Its outline is the view's tube, which [quadsAt] takes, so it can change
-/// from one frame to the next. Its axis bends as [axisAt] says. It's cut into
-/// rings [step] apart along the axis, from [behind] behind the ship to [ahead]
-/// in front of it. Each [advanceTo] makes the rings that come into that span,
-/// and drops those that leave it. Each ring turns from the one before as
-/// little as the axis lets it, so that the outline doesn't spin about the
-/// axis.
+/// Its outline is the tube of the view that [quadsAt] takes, so the outline
+/// can change from one frame to the next. Its axis bends as [axisAt] says.
 ///
-/// The eye looks along the axis at the ship's ring, from [Tube.eye] behind
-/// it, so that ring is always where Tube Shooter's rim is on screen, and the
-/// tube ahead bends away from it.
+/// The tube is cut into rings [step] apart along the axis, from [behind]
+/// the ship to [ahead] of it. Each [advanceTo] makes the rings that come
+/// into that span and drops those that leave it. Each ring turns from the
+/// one before as little as the axis allows, so the outline doesn't spin
+/// about the axis.
 ///
-/// Given a [course], the axis bends only along it, and goes straight before
-/// and after, so that Tube Shooter's tube can lead into it, and another
-/// follow it: see [quadsAt].
+/// The eye looks along the axis at the ship's ring from [Tube.eye] behind
+/// it. That ring is therefore always where Tube Shooter's rim is on screen,
+/// and the tube ahead bends away from it.
+///
+/// Given a [course], the axis bends only along it and goes straight before
+/// and after it. This lets a Tube Shooter tube lead into the endless tube,
+/// and another follow it: see [quadsAt].
 class EndlessTube({var TubeCourse? course}) {
   /// The distance between two rings along the axis, in tube units.
   static const step = 0.5;
@@ -119,8 +140,8 @@ class EndlessTube({var TubeCourse? course}) {
   /// How far in front of the ship the tube goes, in tube units.
   static const ahead = 16.0;
 
-  /// How far behind the ship the tube goes, in tube units: to the eye, as
-  /// anything closer than [TubeView.near] is clipped anyway.
+  /// How far behind the ship the tube goes, in tube units: back to the eye,
+  /// as anything closer than [TubeView.near] is clipped anyway.
   static const behind = Tube.eye + step;
 
   /// The distance between two rings drawn across the tube, in tube units: a
@@ -130,8 +151,8 @@ class EndlessTube({var TubeCourse? course}) {
   /// How many times as wide as the tube's lines the spikes are.
   static const spikeWidths = 2.0;
 
-  /// How far the axis bends across and down, in tube units, and over how
-  /// long a stretch it bends back and forth once.
+  /// How far the axis bends across and down, in tube units, and how long a
+  /// stretch one full bend back and forth takes.
   static const bends = (
     across: (amplitude: 4.0, period: 40.0),
     down: (amplitude: 3.0, period: 56.0),
@@ -146,8 +167,8 @@ class EndlessTube({var TubeCourse? course}) {
   /// Returns the way the axis goes, [distance] along it, with no [course].
   static Point3 forwardAt(double distance) => _forwardOf(distance, 1);
 
-  /// Returns where the axis is, [distance] along it, as far into its [bends]
-  /// as [bent] says.
+  /// Returns where the axis is, [distance] along it, when it is [bent] far
+  /// into its [bends].
   static Point3 _axisOf(double distance, double bent) {
     final (:across, :down) = bends;
     return Point3(
@@ -157,8 +178,8 @@ class EndlessTube({var TubeCourse? course}) {
     );
   }
 
-  /// Returns the way the axis goes, [bent] into its [bends], which it goes
-  /// into at [rate] times the distance along it.
+  /// Returns the way the axis goes when it is [bent] far into its [bends],
+  /// and goes into them at [rate] times the distance along it.
   static Point3 _forwardOf(double bent, double rate) {
     final (:across, :down) = bends;
     final acrossRate = 2 * math.pi / across.period;
@@ -177,9 +198,10 @@ class EndlessTube({var TubeCourse? course}) {
   Point3 _forwardAt(double distance) =>
       _forwardOf(_bentAt(distance), _rateAt(distance));
 
-  /// Returns how far into its [bends] the axis is, [distance] along it: the
-  /// distance itself, with no [course]. Along one, it's the distance that
-  /// the bends went at [_rateAt], from 0 at its start.
+  /// Returns how far into its [bends] the axis is, [distance] along it.
+  ///
+  /// With no [course], that is the distance itself. With a course, it is
+  /// how far the bends have gone at [_rateAt], from 0 at the course's start.
   double _bentAt(double distance) {
     final course = this.course;
     if (course == null) {
@@ -199,9 +221,11 @@ class EndlessTube({var TubeCourse? course}) {
   }
 
   /// Returns how fast the axis goes into its [bends], [distance] along it,
-  /// for each unit along it: 1 with no [course], and along one, from 0 to 1
-  /// as [_eased] says over its first `ease` units, and back to 0 over its
-  /// last, and 0 before and after it.
+  /// for each unit along it.
+  ///
+  /// With no [course], the rate is 1. With a course, it rises from 0 to 1
+  /// over the course's first `ease` units, as [_eased] says, and falls back
+  /// to 0 over its last `ease` units. Before and after the course, it is 0.
   double _rateAt(double distance) {
     final course = this.course;
     if (course == null) {
@@ -216,15 +240,15 @@ class EndlessTube({var TubeCourse? course}) {
     );
   }
 
-  /// Returns [t], from 0 to 1, eased in and out with no jump in the way it
-  /// changes, nor in how fast that changes: Ken Perlin's smootherstep.
+  /// Returns [t], from 0 to 1, eased in and out with no jump in its slope or
+  /// in its curvature: Ken Perlin's smootherstep.
   static double _eased(double t) => t * t * t * (t * (6 * t - 15) + 10);
 
   /// Returns the area under [_eased] from 0 to [t].
   static double _easedArea(double t) => t * t * t * t * (t * (t - 3) + 2.5);
 
   /// Makes the rings from [behind] the ship to [ahead] of it, with the ship
-  /// [distance] along the axis, and drops the others.
+  /// [distance] along the axis, and drops the rest.
   void advanceTo(double distance) {
     final first = ((distance - behind) / step).floor();
     final last = ((distance + ahead) / step).ceil();
@@ -243,58 +267,63 @@ class EndlessTube({var TubeCourse? course}) {
     }
   }
 
-  /// Returns the ring at the ship, [distance] along the axis, which
-  /// [advanceTo] made the rings for.
+  /// Returns the ring at the ship, [distance] along the axis.
+  ///
+  /// The last [advanceTo] must have made the rings for that distance.
   Ring ringAt(double distance) {
     final index = (distance / step).floor();
     return _turnTo(_rings[index - _rings.first.index], distance, index);
   }
 
-  /// Returns how far the axis's way [ahead] past [distance] along it points
-  /// to the right of the ring at [distance], which [advanceTo] made the rings
-  /// for: from -1, wholly to its left, to 1, wholly to its right, through 0
-  /// where the axis goes straight on, or bends only up or down.
+  /// Returns how far to the right of the ring at [distance] the axis points,
+  /// [ahead] farther along.
+  ///
+  /// The result goes from -1, wholly to the ring's left, to 1, wholly to its
+  /// right. It is 0 where the axis goes straight on or bends only up or
+  /// down. The last [advanceTo] must have made the rings for [distance].
   double bendAt(double distance, double ahead) =>
       _forwardAt(distance + ahead).dot(ringAt(distance).right);
 
-  /// Returns the tube's lines, as quads to fill, as the eye sees them with the
-  /// ship [distance] along the axis, round the outline of [view]'s tube.
+  /// Returns the tube's lines as quads to fill, as the eye sees them round
+  /// the outline of [view]'s tube, with the ship [distance] along the axis.
   ///
-  /// Each point of the outline draws a line along the tube, and every
-  /// [ringSpacing] a ring goes across it. Lines get thinner with distance, as
+  /// Each point of the outline draws a line along the tube, and a ring goes
+  /// across it every [ringSpacing]. Lines get thinner with distance, as
   /// [TubeView.lineWidthOf] says, and the view clips them closer than
   /// [TubeView.near].
   ///
-  /// A closed tube leaves out the lines between faces that the eye sees from
-  /// outside: from inside the tube, other faces always hide those. It also
-  /// cuts out what the rings before each line hide of it, as [_Hiders] says,
-  /// so that where the tube bends, its nearer walls and ridges hide what's
-  /// beyond. An open tube that goes more than half round the axis does the
-  /// same, with a lid across its gap, as [_lidOf] says. Another open tube
-  /// cuts out what its nearer faces hide, as [_Faces] says, as the eye sees
-  /// past its ends and under its faces.
+  /// A closed tube leaves out the lines between faces that the eye sees
+  /// from outside, as other faces always hide those from inside the tube.
+  /// It also cuts out the parts of each line that the rings before it hide,
+  /// as [_Hiders] says. This way, where the tube bends, its nearer walls and
+  /// ridges hide what lies beyond. An open tube that goes more than half
+  /// round the axis does the same, with a lid across its gap, as [_lidOf]
+  /// says. Any other open tube cuts out what its nearer faces hide, as
+  /// [_Faces] says, since the eye sees past its ends and under its faces.
   ///
-  /// The lines of [lane], if any, go to `lane` instead of `tube`: its two
+  /// The lines of [lane], if given, go to `lane` instead of `tube`: its two
   /// edges, and its stretch of each ring across it. The [spikes] go to
-  /// `spikes`, [spikeWidths] as wide as the tube's lines, walls hiding them
-  /// as they do the tube's lines, and `places` says where a shape at each of
-  /// [marks] shows, or null where the tube hides it.
+  /// `spikes`, [spikeWidths] times as wide as the tube's lines, and walls
+  /// hide them as they hide the tube's lines. The `places` say where a shape
+  /// at each of [marks] shows, or are null where the tube hides it.
   ///
   /// If [flashLane] is given, its lines go to `flashLane` instead, even if
-  /// it's [lane], and [flashSpike], one of [spikes], if given, goes to
-  /// `flashSpike`. With [halo], `halo` gets them all again, [halo] times as
-  /// wide.
+  /// it is [lane]. If [flashSpike], one of [spikes], is given, it goes to
+  /// `flashSpike`. With [halo], `halo` gets all of these again, [halo] times
+  /// as wide.
   ///
-  /// The [bolts] go to `bolts`, zigzagging as [_boltCorners] says with
-  /// [random], and with [halo], to `boltHalo` too, [halo] times as wide.
+  /// The [bolts] go to `bolts`, zigzagging with [random] as [_boltCorners]
+  /// says. With [halo], they also go to `boltHalo`, [halo] times as wide.
   ///
-  /// The tube's lines start [from] along the axis, and end [until], with no
-  /// ring across at either: Tube Shooter draws its far end where the tube
-  /// starts. The rings past [until] hide nothing, as the tube ends there. A
-  /// [next] tube's lines go to `next`, as Tube Shooter draws them, the
-  /// rings before [until] hiding them: its rim, its far end and the lines
-  /// between. It must be past the [course]'s end, and so must the last ring
-  /// that [advanceTo] made.
+  /// The tube's lines start at [from] along the axis and end at [until],
+  /// with no ring across at either end, as Tube Shooter draws its far end
+  /// where this tube starts. The rings past [until] hide nothing, as the
+  /// tube ends there.
+  ///
+  /// The lines of a [next] tube go to `next`, drawn as Tube Shooter draws
+  /// them: its rim, its far end and the lines between. The rings before
+  /// [until] hide them. The [next] tube must be past the [course]'s end, and
+  /// so must the last ring that [advanceTo] made.
   TubeQuads quadsAt(
     double distance,
     TubeView view, {
@@ -319,8 +348,8 @@ class EndlessTube({var TubeCourse? course}) {
       _hiding = _hidingOf(tube, turn);
     }
     final hiders = _hiding!..reset();
-    // Each ring's outline, from the eye: across, down and along its line of
-    // sight. A lid's points come after the tube's.
+    // Each ring's outline as seen from the eye: across, down and along the
+    // line of sight. A lid's points come after the tube's.
     final seen = [
       for (final ring in _rings)
         [
@@ -328,7 +357,7 @@ class EndlessTube({var TubeCourse? course}) {
             _fromEye(ring.place(point), eye, ship),
         ],
     ];
-    // Whether the eye sees each lane's face, from a ring to the next, from
+    // Whether the eye sees each lane's face between a ring and the next from
     // inside the tube, by ring and lane.
     final facing = [
       for (var k = 0; k + 1 < _rings.length; k++)
@@ -361,8 +390,8 @@ class EndlessTube({var TubeCourse? course}) {
     final boltCorners = [
       for (final bolt in bolts) _boltCorners(bolt, distance, tube, random!),
     ];
-    // Adds a line of the flash's lane, or [widths] as wide, of its spike, and
-    // its halo.
+    // Adds a line of the flash's lane, or of its spike at [widths] times as
+    // wide, and the line's halo.
     void addFlash(
       _Lines to,
       Point3 from,
@@ -505,7 +534,8 @@ class EndlessTube({var TubeCourse? course}) {
     }
     final nextLines = _Lines(view);
     if (next != null) {
-      // Straight on from the last ring, as the axis is past its course.
+      // The next tube goes straight on from the last ring, as the axis is
+      // past its course there.
       final last = _rings.last;
       final lastAt = last.index * step;
       Point3 seenOn(double at, Offset point) => _fromEye(
@@ -544,9 +574,11 @@ class EndlessTube({var TubeCourse? course}) {
   }
 
   /// Returns how far along the axis the eye sees down the middle of [lane]
-  /// of [view]'s tube, with the ship [distance] along it: up to where the
-  /// tube first hides a shape there, as [quadsAt] places it, or else to the
-  /// last ring, or [until].
+  /// of [view]'s tube, with the ship [distance] along the axis.
+  ///
+  /// The sight ends where the tube first hides a shape in the lane, as
+  /// [quadsAt] places shapes. Otherwise it ends at the last ring, or at
+  /// [until].
   double sightAlong(
     int lane,
     double distance,
@@ -590,7 +622,8 @@ class EndlessTube({var TubeCourse? course}) {
           return seen;
         }
         for (var i = 0; i < _sightSamples; i++) {
-          // Off the rings, where an open tube's faces would hide it.
+          // Samples between the rings, as on a ring an open tube's faces
+          // would hide the point.
           final at = near + step * (i + 0.5) / _sightSamples;
           if (at < distance) {
             continue;
@@ -621,8 +654,8 @@ class EndlessTube({var TubeCourse? course}) {
     return seen;
   }
 
-  /// How many points between each ring and the next [sightAlong] looks at,
-  /// evenly spaced.
+  /// How many evenly spaced points [sightAlong] looks at between each ring
+  /// and the next.
   static const _sightSamples = 4;
 
   /// Returns twice the signed area of [tube]'s outline: its sign says which
@@ -640,15 +673,17 @@ class EndlessTube({var TubeCourse? course}) {
   /// Returns the point [t] of the way from [a] to [b].
   static Point3 _lerp(Point3 a, Point3 b, double t) => a + (b - a) * t;
 
-  /// The most a segment of a bolt spans along the axis, in tube units: half
-  /// a [step], so that each lies between two rings.
+  /// The longest stretch a bolt's segment spans along the axis, in tube
+  /// units: half a [step], so that each segment lies between two rings.
   static const boltStep = step / 2;
 
-  /// Returns the corners of [bolt], from the ship's ring, [near] along the
-  /// axis, to its far end, as Tube Shooter's bolts zigzag: down the middle of
-  /// its lane at both ends, and between, on every [boltStep] along the axis,
-  /// at a place picked with [random] across the middle third of the lane,
-  /// on either side in turn.
+  /// Returns the corners of [bolt], zigzagging as Tube Shooter's bolts do,
+  /// from the ship's ring, [near] along the axis, to its far end.
+  ///
+  /// The bolt is down the middle of its lane at both ends. In between, it
+  /// has a corner at every [boltStep] along the axis, on alternate sides of
+  /// the lane's middle. Each corner's place is picked with [random] within
+  /// the middle third of the lane.
   static List<({double at, Offset point})> _boltCorners(
     TubeBolt bolt,
     double near,
@@ -675,12 +710,15 @@ class EndlessTube({var TubeCourse? course}) {
   static const _look = 0.05;
 
   /// Returns where a shape at [mark] shows, or null where [hiders] hide its
-  /// middle, with [seenAt] saying where the eye sees a point of the outline
-  /// some distance along the axis, and [lines] where those land.
+  /// middle.
   ///
-  /// A shape that flips turns about the corner its two lanes share, as in
-  /// Tube Shooter: its middle goes round the corner, through the inside of
-  /// the tube, and it turns from its lane's way by as much.
+  /// [seenAt] says where the eye sees a point of the outline at some
+  /// distance along the axis, and [lines] says where such points land on
+  /// screen.
+  ///
+  /// A flipping shape turns about the corner its two lanes share, as in Tube
+  /// Shooter. Its middle goes round the corner through the inside of the
+  /// tube, and the shape turns from its lane's direction by the same angle.
   static ShapePlace? _placeOf(
     TubeMark mark,
     Point3 Function(double at, Offset point) seenAt,
@@ -695,7 +733,8 @@ class EndlessTube({var TubeCourse? course}) {
       final corner = tube.points[tube.cornerOf(lane, flip.to)];
       point = corner + Tube.rotate(laneMiddle - corner, flip.turn);
     } else if (across != null) {
-      // Just inside the lane, so that its walls don't hide it on an edge.
+      // Kept just inside the lane, so that its walls don't hide a shape on
+      // an edge.
       point = Offset.lerp(
         tube.points[lane],
         tube.points[tube.pointAfter(lane)],
@@ -730,8 +769,8 @@ class EndlessTube({var TubeCourse? course}) {
       // The shape's tail, along its y, points away along the lane, turned by
       // the flip.
       angle: laneWay.direction - math.pi / 2 + (flip?.turn ?? 0),
-      // As Tube Shooter's, the same in every lane: [Tube.laneWidth], as far
-      // away as the mark.
+      // The same in every lane, as in Tube Shooter: [Tube.laneWidth] at the
+      // mark's distance.
       scale:
           (lines._project(nextCorner) - lines._project(corner)).distance *
           tube.laneWidth /
@@ -743,8 +782,10 @@ class EndlessTube({var TubeCourse? course}) {
   Tube? _hidingTube;
   _Hiding? _hiding;
 
-  /// Returns what hides the lines of [tube], whose outline's signed area has
-  /// [turn]'s sign: its rings, with a lid if it has one, or else its faces.
+  /// Returns what hides the lines of [tube]: its rings, with a lid if it has
+  /// one, or else its faces.
+  ///
+  /// The signed area of the tube's outline has [turn]'s sign.
   static _Hiding _hidingOf(Tube tube, double turn) {
     if (!tube.isOpen) {
       return _Hiders(tube.points, turn);
@@ -756,17 +797,20 @@ class EndlessTube({var TubeCourse? course}) {
   /// How far from the axis a lid is, in tube units: see [_lidOf].
   static const _lidRadius = 4.0;
 
-  /// Returns the outline of open [tube] with a lid across its gap, if it
-  /// goes more than half round the axis, as the Horseshoe does: its points,
-  /// then points [_lidRadius] from the axis, at most an eighth of a turn
-  /// apart, round the rest of the way. Else, returns null.
+  /// Returns the outline of the open [tube] with a lid across its gap, or
+  /// null unless the tube goes more than half round the axis, as the
+  /// Horseshoe does.
   ///
-  /// Such a tube's rings hide what lies beyond its walls, as a closed tube's
-  /// do, but would hide what the eye sees through its gap too. With the lid,
-  /// they hide only what it sees through the gap farther out than the lid:
-  /// little, as the tube bends. That costs less than hiding with its faces,
-  /// as [_Faces] does, for about as few mistakes as a closed tube's rings
-  /// make. The lid's lines aren't drawn.
+  /// The outline is the tube's points, then points [_lidRadius] from the
+  /// axis, at most an eighth of a turn apart, round the rest of the way.
+  ///
+  /// The rings of such a tube hide what lies beyond its walls, as a closed
+  /// tube's rings do. Without the lid, they would also hide what the eye
+  /// sees through the gap. With the lid, they hide only what the eye sees
+  /// through the gap farther out than the lid, which is little as the tube
+  /// bends. That costs less than hiding with the faces, as [_Faces] does,
+  /// and makes about as few mistakes as a closed tube's rings. The lid's
+  /// lines aren't drawn.
   static List<Offset>? _lidOf(Tube tube) {
     final points = tube.points;
     var sweep = 0.0;
@@ -788,16 +832,17 @@ class EndlessTube({var TubeCourse? course}) {
     ];
   }
 
-  /// How much bigger than each ring the window lets the eye see through it,
-  /// so that the ring's own lines, on its edge, stay whole.
+  /// How much bigger than each ring the window that the eye sees through it
+  /// is, so that the ring's own lines on its edge stay whole.
   static const _windowSlack = 1.002;
 
-  /// The least turn at a point that [_hullOf] keeps it for, so that rounding
-  /// errors don't keep points where the outline goes straight on.
+  /// The smallest turn at a point for which [_hullOf] keeps the point, so
+  /// that rounding errors don't keep points where the outline goes straight
+  /// on.
   static const _leastTurn = 1e-9;
 
-  /// Returns where the eye, at the origin, sees [point], as seen from 1 away
-  /// from it: across and down.
+  /// Returns where the eye, at the origin, sees [point] on a plane 1 unit in
+  /// front of it: across and down.
   static Offset _sight(Point3 point) =>
       Offset(point.x / point.z, point.y / point.z);
 
@@ -805,9 +850,9 @@ class EndlessTube({var TubeCourse? course}) {
   /// whose signed area has [turn]'s sign, in an order whose signed area is
   /// positive.
   ///
-  /// It drops the points where the outline turns in or goes straight on,
-  /// until none is left, which holds for outlines that wind round their
-  /// middle, as the tubes' do.
+  /// It drops the points where the outline turns inward or goes straight
+  /// on, until none are left. That yields the hull for outlines that wind
+  /// round their middle, as the tubes' outlines do.
   static List<int> _hullOf(List<Offset> points, double turn) {
     final order = List.generate(points.length, (i) => i);
     final hull = turn < 0 ? order.reversed.toList() : order;
@@ -829,9 +874,11 @@ class EndlessTube({var TubeCourse? course}) {
   }
 
   /// Returns whether the eye, at the origin, sees from inside the tube the
-  /// face from [corner] to [along], the next point of its outline, and to
-  /// [ahead], the same point of the next ring, for an outline whose signed
-  /// area has [turn]'s sign.
+  /// face that spans [corner], [along] and [ahead].
+  ///
+  /// [along] is the outline's next point after [corner], and [ahead] is the
+  /// same point as [corner] on the next ring. The outline's signed area has
+  /// [turn]'s sign.
   static bool _facesEye(
     Point3 corner,
     Point3 along,
@@ -842,8 +889,8 @@ class EndlessTube({var TubeCourse? course}) {
     return outward.dot(corner) > 0;
   }
 
-  /// Returns [point] as the eye at [eye] sees it, looking as [ship] faces:
-  /// across, down and along its line of sight.
+  /// Returns [point] as the eye at [eye] sees it when looking the way [ship]
+  /// faces: across, down and along the line of sight.
   static Point3 _fromEye(Point3 point, Point3 eye, Ring ship) {
     final offset = point - eye;
     return Point3(
@@ -867,7 +914,7 @@ class EndlessTube({var TubeCourse? course}) {
   }
 
   /// Returns the ring [distance] along the axis, at [index], turned from
-  /// [from] as little as the axis lets it.
+  /// [from] as little as the axis allows.
   ///
   /// This is the double reflection method for rotation minimizing frames, by
   /// Wang, Jüttler, Zheng and Liu (2008).
@@ -894,8 +941,8 @@ class EndlessTube({var TubeCourse? course}) {
   }
 }
 
-/// Lines in 3D, from the eye, made into [quads] to fill, as Tube Shooter's
-/// `TubeView` makes its own.
+/// Lines in 3D as seen from the eye, made into [quads] to fill, as Tube
+/// Shooter's `TubeView` makes its lines.
 class _Lines(final TubeView view) {
   /// The quads' corners, x then y.
   final _corners = <double>[];
@@ -909,17 +956,20 @@ class _Lines(final TubeView view) {
     );
   }
 
-  /// How far it moves the lines right and down: a sixteenth of a device
-  /// pixel, as `TubeView` does, and for the same reason.
+  /// How far the lines move right and down: a sixteenth of a device pixel,
+  /// as in `TubeView` and for the same reason.
   late final _lineOffset = Offset(view.devicePixel / 16, view.devicePixel / 16);
 
   /// Adds a line from [from] to [to], as a quad.
   ///
-  /// Each end is [widths] times [TubeView.lineWidthOf] its distance wide, and
-  /// extends by half that width, so that lines meeting at a corner close it.
-  /// It clips the line closer than [TubeView.near], and leaves out what
-  /// [hiders] hide of it, if any: what the rings before it hide, or [nearer]
-  /// those before the last ring passed to them, for a line on that ring.
+  /// Each end is [widths] times as wide as the tube's line at its distance,
+  /// as [TubeView.tubeLineWidthOf] says. Each end also extends by half that
+  /// width, so that lines meeting at a corner close it.
+  ///
+  /// It clips the line closer than [TubeView.near], and leaves out the
+  /// parts that [hiders] hide, if given: the parts the rings before the line
+  /// hide. With [nearer], for a line on the last ring passed to [hiders],
+  /// it leaves out the parts that the rings before that ring hide.
   void add(
     Point3 from,
     Point3 to, {
@@ -993,16 +1043,16 @@ class _Lines(final TubeView view) {
   }
 }
 
-/// What hides the tube's lines beyond its nearer parts, as the eye sees them
-/// from 1 away.
+/// What hides the tube's lines behind its nearer parts, as the eye sees them
+/// on a plane 1 unit away.
 ///
 /// `EndlessTube.quadsAt` passes it the rings of its [points] from the eye
 /// out, and asks it which spans of each line the eye sees. It keeps its
 /// buffers from one frame to the next, so that it allocates nothing per
 /// line.
 abstract class _Hiding(final List<Offset> points) {
-  /// The spans of the line that [spansOf] last returned the count of: where
-  /// each starts and ends, from 0 to 1 along the line.
+  /// The spans of the line that [spansOf] last counted: where each starts
+  /// and ends, from 0 to 1 along the line.
   Float64List spans = Float64List(2);
   var _spareSpans = Float64List(2);
 
@@ -1014,16 +1064,17 @@ abstract class _Hiding(final List<Offset> points) {
   /// Starts a new frame, before the nearest ring.
   void reset();
 
-  /// Passes the next ring from the eye: where the eye sees each of [points]
-  /// round it, its [outline], and its [center].
+  /// Passes the next ring out from the eye: its [outline], where the eye
+  /// sees each of [points] round it, and its [center].
   void pass(List<Point3> outline, Point3 center);
 
   /// Returns how many [spans] of the line from [a] to [b] the eye sees past
-  /// the rings passed so far, or [nearer] those before the last one.
+  /// the rings passed so far, or with [nearer], past those before the last
+  /// one.
   int spansOf(Offset a, Offset b, {required bool nearer});
 
-  /// Makes room in [spans] for those that [count] hiders can cut a line
-  /// into: each cuts at most one span in two.
+  /// Makes room in [spans] for as many spans as [count] hiders can cut a
+  /// line into. Each hider cuts at most one span in two.
   void _roomForSpans(int count) {
     if (spans.length >= 2 * (count + 1)) {
       return;
@@ -1063,10 +1114,12 @@ abstract class _Hiding(final List<Offset> points) {
     return cut;
   }
 
-  /// Narrows the span from [_start] to [_end] of the line from [a], going
-  /// [line], to the part inside the convex polygon of [length] points at
-  /// [offset] in [points], whose signed area is positive. Returns false if
-  /// none is left: the Cyrus-Beck algorithm.
+  /// Narrows the span from [_start] to [_end] of the line from [a] along
+  /// [line] to its part inside a convex polygon, with the Cyrus-Beck
+  /// algorithm.
+  ///
+  /// The polygon has [length] points at [offset] in [points], and a positive
+  /// signed area. Returns false if nothing is left.
   bool _clip(
     Float64List points,
     int offset,
@@ -1110,18 +1163,21 @@ abstract class _Hiding(final List<Offset> points) {
     return true;
   }
 
-  /// The least squared length of an edge that [_clip] clips to: rounding
-  /// errors leave shorter ones, which point any way.
+  /// The smallest squared length of an edge that [_clip] clips to. Rounding
+  /// errors leave shorter edges, which can point any way.
   static const _leastEdgeSquared = 1e-14;
 }
 
 /// What the rings of a closed tube hide of the lines beyond them, as the eye
-/// sees them from 1 away: all but the window through which it sees past the
-/// rings so far, and the notches between each ring's outline and its convex
-/// hull, behind the tube's ridges.
+/// sees them on a plane 1 unit away.
 ///
-/// Its [points] are the closed outline of the tube, or of an open one and
-/// its lid, whose signed area has [turn]'s sign.
+/// The rings hide everything outside the window through which the eye sees
+/// past all the rings so far. They also hide what lies in the notches
+/// between each ring's outline and its convex hull, behind the tube's
+/// ridges.
+///
+/// Its [points] are the closed outline of the tube, or of an open tube and
+/// its lid. Their signed area has [turn]'s sign.
 class _Hiders(super.points, final double turn) extends _Hiding {
   /// The outline's convex hull, as indices in an order whose signed area is
   /// positive.
@@ -1134,8 +1190,8 @@ class _Hiders(super.points, final double turn) extends _Hiding {
   /// ring's middle by `EndlessTube._windowSlack`: x then y.
   late final _ring = Float64List(2 * points.length);
 
-  /// The window, as the points of a convex polygon with a positive signed
-  /// area, x then y, and how many: -1 while no ring hides anything.
+  /// The window as a convex polygon with a positive signed area: its points,
+  /// x then y, and how many there are, or -1 while no ring hides anything.
   var _window = Float64List(64);
   var _windowLength = -1;
 
@@ -1147,8 +1203,8 @@ class _Hiders(super.points, final double turn) extends _Hiding {
   var _spare = Float64List(64);
   var _sides = Float64List(32);
 
-  /// The window, how many points it has and how many notches were live
-  /// before the ring last passed, for the lines across that ring.
+  /// The window, its number of points and the number of live notches from
+  /// before the last ring was passed, for the lines across that ring.
   var _nearerWindow = Float64List(64);
   var _nearerLength = -1;
   var _nearerCount = 0;
@@ -1158,9 +1214,10 @@ class _Hiders(super.points, final double turn) extends _Hiding {
   late final _stride =
       2 * _notches.fold<int>(3, (most, notch) => math.max(most, notch.length));
 
-  /// The notches made so far this frame, by slot: their points, x then y,
-  /// [_stride] apart, how many points each has, and their bounds (left, top,
-  /// right and bottom).
+  /// The notches made so far this frame, by slot:
+  /// - their points, x then y, [_stride] apart;
+  /// - how many points each notch has;
+  /// - their bounds: left, top, right and bottom.
   var _notchPoints = Float64List(0);
   var _notchLengths = Int32List(0);
   var _notchBounds = Float64List(0);
@@ -1181,8 +1238,8 @@ class _Hiders(super.points, final double turn) extends _Hiding {
   }
 
   /// A ring hides something only when all of its outline is at least
-  /// [TubeView.near] away. Only the rings nearest the eye aren't, and before
-  /// them nothing hides anything anyway.
+  /// [TubeView.near] away. Only the rings nearest the eye fall short of that,
+  /// and nothing nearer than them hides anything anyway.
   @override
   void pass(List<Point3> outline, Point3 center) {
     _prune();
@@ -1253,8 +1310,9 @@ class _Hiders(super.points, final double turn) extends _Hiding {
     return length;
   }
 
-  /// Drops the notches whose bounds no longer overlap the window's: as the
-  /// window only shrinks, they hide nothing that it doesn't.
+  /// Drops the notches whose bounds no longer overlap the window's. As the
+  /// window only shrinks, such notches hide nothing that the window doesn't
+  /// already hide.
   void _prune() {
     if (_windowLength < 0) {
       return;
@@ -1273,7 +1331,7 @@ class _Hiders(super.points, final double turn) extends _Hiding {
     _liveCount = kept;
   }
 
-  /// Narrows the window to the hull of the ring last passed: the
+  /// Narrows the window to the hull of the ring last passed, with the
   /// Sutherland-Hodgman algorithm.
   void _intersectRing() {
     final hull = _hull;
@@ -1368,21 +1426,23 @@ class _Hiders(super.points, final double turn) extends _Hiding {
       bounds[offset + 2] >= _windowBounds[0] &&
       bounds[offset + 3] >= _windowBounds[1];
 
-  /// Returns [list] if it holds at least [length] numbers, else a longer
-  /// one, whose numbers are all 0.
+  /// Returns [list] if it holds at least [length] numbers, or else a new,
+  /// longer list of zeros.
   static Float64List _fit(Float64List list, int length) => list.length >= length
       ? list
       : Float64List(math.max(length, 2 * list.length));
 
-  /// Returns the notches between [points], a closed outline whose signed
-  /// area has [turn]'s sign, and its convex [hull]: each as the indices of a
-  /// convex polygon whose signed area is positive.
+  /// Returns the notches between [points] and its convex [hull], each as the
+  /// indices of a convex polygon with a positive signed area.
   ///
+  /// The [points] are a closed outline whose signed area has [turn]'s sign.
   /// Each notch runs along the outline from one point of the hull to the
-  /// next, and back along the hull. It leaves out the points where a notch
-  /// goes straight on. A notch that isn't convex, as a lid's are beside the
-  /// tube's walls, it splits as [_convexPiecesOf] says: no closed tube's
-  /// notch is.
+  /// next, and back along the hull. The points where a notch goes straight
+  /// on are left out.
+  ///
+  /// A notch that isn't convex is split as [_convexPiecesOf] says. No closed
+  /// tube has such a notch, but a lid's notches beside the tube's walls are
+  /// not convex.
   static List<List<int>> _notchesOf(
     List<Offset> points,
     List<int> hull,
@@ -1429,14 +1489,18 @@ class _Hiders(super.points, final double turn) extends _Hiding {
     return notches;
   }
 
-  /// Returns [polygon], the indices of a simple polygon of [points] whose
-  /// signed area is positive, as convex polygons that cover it, each with a
-  /// positive signed area: itself, if it's convex.
+  /// Returns convex polygons that cover [polygon], each with a positive
+  /// signed area.
   ///
-  /// Else, it fans the polygon out from a corner that sees all the others,
-  /// as the corners of a lid's notch see each other from the lid, and joins
-  /// neighbouring triangles of the fan while they stay convex. If no corner
-  /// sees all the others, it returns none, which then hide nothing.
+  /// The [polygon] holds the indices of a simple polygon of [points] with a
+  /// positive signed area. If it is convex, the result is the polygon
+  /// itself.
+  ///
+  /// Otherwise, it fans the polygon out from a corner that sees all the
+  /// others, as the corners of a lid's notch see each other from the lid.
+  /// It then joins neighbouring triangles of the fan as long as they stay
+  /// convex. If no corner sees all the others, it returns no polygons, so
+  /// the notch hides nothing.
   static List<List<int>> _convexPiecesOf(
     List<Offset> points,
     List<int> polygon,
@@ -1494,25 +1558,29 @@ class _Hiders(super.points, final double turn) extends _Hiding {
 }
 
 /// What the faces of an open tube hide of the lines beyond them, as the eye
-/// sees them from 1 away: each lane's face between two rings, as the eye
-/// sees its corners, clipped closer than [TubeView.near].
+/// sees them on a plane 1 unit away.
 ///
-/// The eye sees past an open tube's ends, and so under its faces, where they
-/// don't hide what's beyond them as a closed tube's rings do. A line between
-/// two rings is hidden by the faces between the rings before it, nearest
-/// first: as the axis bends, never by those beyond. Within its own two
-/// rings, it isn't, so a ridge's faces don't hide each other there.
+/// Each face is a lane's face between two rings, as the eye sees its
+/// corners, clipped closer than [TubeView.near].
+///
+/// The eye sees past an open tube's ends, and so under its faces. There,
+/// the rings can't hide what lies beyond them as a closed tube's rings do.
+/// A line between two rings is hidden by the faces between the rings before
+/// it, nearest first. Given how the axis bends, the faces beyond the line
+/// never hide it. The faces between the line's own two rings don't hide it
+/// either, so a ridge's faces don't hide each other there.
 class _Faces(final Tube tube) extends _Hiding {
   this : super(tube.points);
 
   /// How many numbers a face takes in [_facePoints]: 2 for each of at most 5
-  /// points, a quad clipped closer than [TubeView.near].
+  /// points, the most that a quad clipped closer than [TubeView.near] has.
   static const _stride = 10;
 
-  /// The faces between the rings passed so far, nearest first: their points,
-  /// x then y, [_stride] apart, in an order whose signed area is positive,
-  /// how many points each has, and their bounds (left, top, right and
-  /// bottom).
+  /// The faces between the rings passed so far, nearest first:
+  /// - their points, x then y, [_stride] apart, in an order whose signed
+  ///   area is positive;
+  /// - how many points each face has;
+  /// - their bounds: left, top, right and bottom.
   var _facePoints = Float64List(0);
   var _faceLengths = Int32List(0);
   var _faceBounds = Float64List(0);
@@ -1525,8 +1593,8 @@ class _Faces(final Tube tube) extends _Hiding {
   /// The outline of the ring last passed, if any this frame.
   List<Point3>? _last;
 
-  /// A face's corners, from the eye, x, y and z, and the at most 5 left of
-  /// them closer than [TubeView.near].
+  /// A face's corners as seen from the eye, x, y and z, and the at most 5
+  /// corners left after clipping the face closer than [TubeView.near].
   final _corners = Float64List(12);
   final _clipped = Float64List(15);
 
@@ -1581,8 +1649,8 @@ class _Faces(final Tube tube) extends _Hiding {
     return length;
   }
 
-  /// Adds the face from [a] to [b], [c] and [d], from the eye, clipped closer
-  /// than [TubeView.near], unless none of it is left.
+  /// Adds the face with the corners [a], [b], [c] and [d], as seen from the
+  /// eye, clipped closer than [TubeView.near], unless nothing of it is left.
   void _add(Point3 a, Point3 b, Point3 c, Point3 d) {
     final corners = _corners;
     _put(0, a);
@@ -1651,8 +1719,8 @@ class _Faces(final Tube tube) extends _Hiding {
     _corners[3 * index + 2] = corner.z;
   }
 
-  /// The least area of a face, as the eye sees it, that hides anything: a
-  /// face seen edge on hides nothing.
+  /// The smallest area, as the eye sees it, of a face that hides anything.
+  /// A face seen edge on hides nothing.
   static const _leastArea = 1e-12;
 
   /// Makes room for [count] faces, and for the spans they can cut a line

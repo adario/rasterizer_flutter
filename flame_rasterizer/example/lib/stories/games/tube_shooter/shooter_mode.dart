@@ -43,28 +43,29 @@ enum TubeState() {
   /// The round is on.
   play,
 
-  /// The ship was destroyed. Next, it comes back, or the game ends.
+  /// The ship was destroyed. Next, either it comes back or the game ends.
   dying,
 
   /// The round's enemies are gone, and the ship drops down its lane.
   drop,
 
-  /// With [ShooterMode.runs] on, the ship flies on from the drop, down
-  /// an endless tube, by Tube Runner's rules: see [RunnerMode].
+  /// With [ShooterMode.runs] on, the ship flies on from the drop down an
+  /// endless tube, by Tube Runner's rules (see [RunnerMode]).
   run,
 
-  /// The run is over: the ship flies out of its tube, onto the next round's
-  /// rim.
+  /// The run is over, and the ship flies out of its tube onto the next
+  /// round's rim.
   arrive,
 
-  /// The game is over, and stands still until a tap, or Enter, starts a new
-  /// one.
+  /// The game is over, and the world stands still until a tap or Enter
+  /// starts a new game.
   over,
 }
 
-/// Tube Shooter's rules, and the components that play by them, under it in
-/// the world, but for the stars, in the camera's backdrop, and the texts, in
-/// its viewport.
+/// Tube Shooter's rules, and the components that play by them.
+///
+/// The components sit under it in the world, except for the stars, which are
+/// in the camera's backdrop, and the texts, which are in its viewport.
 ///
 /// In the world, the tube's axis is at the origin. The camera looks at it, or
 /// at the middle of an open tube's drawing. Each round plays on the next
@@ -72,9 +73,9 @@ enum TubeState() {
 /// starts at the round reached.
 ///
 /// Its game, a [TubeHost] such as `TubeShooterExample`, hands it the
-/// player's input, and has the score, the lives and the texts at the
-/// bottom. Given the snapshot of a game with another renderer, it goes on
-/// from there: see [TubeShooterSnapshots].
+/// player's input, and holds the score, the lives and the texts at the
+/// bottom. Given the snapshot of a game with another renderer, it resumes
+/// from there (see [TubeShooterSnapshots]).
 class ShooterMode({
   /// Which of the [levels] the first round plays.
   final int firstLevel = 0,
@@ -89,10 +90,11 @@ class ShooterMode({
   /// How long the drop takes, in seconds.
   static const dropTime = 2.0;
 
-  /// How long the run after [round] plays, with [runs] on, once the drop is
-  /// over, in seconds of the game at Tube Runner's first speed: a minute
-  /// after the first round, and [runTimeStep] more after each other. See
-  /// [TubeState.run].
+  /// How long the run after [round] plays once the drop is over, with [runs]
+  /// on, in seconds of the game at Tube Runner's first speed.
+  ///
+  /// It's a minute after the first round, and [runTimeStep] more after each
+  /// later round. See [TubeState.run].
   static double runTime(int round) => firstRunTime + runTimeStep * (round - 1);
   static const firstRunTime = 60.0;
   static const runTimeStep = 30.0;
@@ -108,7 +110,7 @@ class ShooterMode({
   /// How long the ship's lane takes to fade in on a run, in seconds.
   static const laneFadeTime = 0.3;
 
-  /// How long PURGE shows once the purge is used, in seconds.
+  /// How long PURGE shows after the purge is used, in seconds.
   static const purgeTime = 1.0;
 
   /// How close in depth a shot must be to what it hits.
@@ -120,7 +122,7 @@ class ShooterMode({
   /// What a shot that hits a spike scores.
   static const spikeScore = 2;
 
-  /// The snapshot that it goes on from, if any.
+  /// The snapshot that it resumes from, if any.
   final TubeShooterSnapshot? _from = from;
 
   /// The game's view of the tube.
@@ -149,12 +151,12 @@ class ShooterMode({
   /// The enemies' shots in the tube.
   final enemyShots = <EnemyShotComponent>{};
 
-  /// The enemies still to come this round, as dots at the far end, the next
-  /// one last. Those arriving are among them.
+  /// The enemies still to come this round, as dots at the far end, with the
+  /// next one last. It includes the dots that are arriving.
   final spawns = <SpawnDotComponent>[];
 
   /// The kinds of the round's enemies, in the order they first came out of
-  /// their dots, for its run.
+  /// their dots, for the run after the round.
   final _appeared = <EnemyKind>[];
 
   @visibleForTesting
@@ -175,15 +177,16 @@ class ShooterMode({
   /// What plays the run's rules, if there's a run.
   RunnerMode? get runner => _run?.runner;
 
-  /// Whether the ship was destroyed on its drop, so that the next round comes
-  /// rather than the same one again.
+  /// Whether the ship was destroyed during its drop, so that the next round
+  /// follows instead of the same one again.
   bool _dyingOnDrop = false;
 
   int round = 0;
   bool purgeReady = true;
 
-  /// How many enemies the ship destroyed since the round began, or the ship
-  /// was last lost: each speeds the stars up, as [StarFieldComponent] says.
+  /// How many enemies the ship has destroyed since the round began or since
+  /// the ship was last lost. Each one speeds up the stars, as
+  /// [StarFieldComponent] describes.
   int get kills => _kills;
   int _kills = 0;
 
@@ -214,14 +217,14 @@ class ShooterMode({
   /// round.
   double get pace => math.pow(roundSpeedUp, firstLevel + round - 1).toDouble();
 
-  /// Seconds since the last enemy came, at the first round's pace.
+  /// Seconds since the last enemy came, counted at the first round's pace.
   double _sinceSpawn = 0;
 
-  /// Seconds into the zappers' pulse period, at the first round's pace. The
-  /// pulse comes at the period's end.
+  /// Seconds into the zappers' pulse period, counted at the first round's
+  /// pace. The pulse comes at the period's end.
   double _pulseClock = 0;
 
-  /// Whether the zappers are pulsing, in play.
+  /// Whether the zappers are pulsing during play.
   bool get isPulsing =>
       _state == TubeState.play &&
       _pulseClock >= level.pulsePeriod - level.pulseTime;
@@ -234,33 +237,34 @@ class ShooterMode({
         _pulseClock >= pulse - level.pulseWarning;
   }
 
-  /// The round's number, at the middle, on the zoom.
+  /// The round's number, shown in the middle during the zoom.
   final _roundBanner = VectorTextComponent(capHeight: TubeHost.bannerCap);
 
-  /// PURGE READY, under the round's number on the zoom: each round recharges
-  /// the purge.
+  /// PURGE READY, shown under the round's number during the zoom, because
+  /// each round recharges the purge.
   final _purgeReadyText = VectorTextComponent(
     text: 'PURGE READY',
     capHeight: TubeHost.hudCap,
     below: 1.2 * TubeHost.bannerCap,
   );
 
-  /// PURGE, for [purgeTime] once the purge is used.
+  /// PURGE, shown for [purgeTime] after the purge is used.
   final _purgeText = VectorTextComponent(
     text: 'PURGE',
     capHeight: TubeHost.bannerCap,
   );
 
-  /// The seconds left before PURGE goes.
+  /// The seconds left before PURGE disappears.
   double _purgeLeft = 0;
 
-  /// Whether the ship moves at the player's will: in play, and in a run's.
+  /// Whether the player can move the ship: during play, and during a run's
+  /// play.
   bool get canMove =>
       _state == TubeState.play ||
       (_state == TubeState.run && _run!.runner.canMove);
 
-  /// Whether the ship fires at the player's will: in play, and on the drop.
-  /// On a run, its runner fires.
+  /// Whether the player can make the ship fire: during play and during the
+  /// drop. On a run, the runner does the firing.
   bool get canFire => _state == TubeState.play || _state == TubeState.drop;
 
   /// Whether the game waits for the player, at READY or Game Over.
@@ -277,15 +281,16 @@ class ShooterMode({
       _state == TubeState.over ||
       (_state == TubeState.run && _run!.runner.isOver);
 
-  /// The Runs knob's value: whether, after a round's drop, the ship flies on
-  /// down an endless tube, by Tube Runner's rules, for [runTime] of play,
-  /// before it flies onto the next round's rim: see [TubeState.run]. On by
-  /// default.
+  /// The Runs knob's value, on by default.
+  ///
+  /// When it's on, after a round's drop the ship flies on down an endless
+  /// tube by Tube Runner's rules for [runTime] of play, then flies onto the
+  /// next round's rim (see [TubeState.run]).
   bool runs = true;
 
-  /// Does what updates would do in a moving world: makes the tube's paths
-  /// again for the view, places everything on the tube, and gives the shapes
-  /// their stroke and glow.
+  /// Does what updates would do in a moving world: rebuilds the tube's paths
+  /// for the view, places everything on the tube, and gives the shapes their
+  /// stroke and glow.
   void updateStillLines() {
     tube.update(0);
     spikes.update(0);
@@ -300,7 +305,7 @@ class ShooterMode({
           ship.place();
       }
     }
-    // In the camera's backdrop, out of the world.
+    // The stars are in the camera's backdrop, outside the world.
     for (final star in starField.stars) {
       star.place();
     }
@@ -353,7 +358,7 @@ class ShooterMode({
       spikes,
       bolts,
     ]);
-    // Under the world, out of the glow's post process.
+    // Under the world, outside the glow's post process.
     gameRef.camera.backdrop.add(starField);
     if (_from case final from?) {
       _restoreRound(from);
@@ -362,33 +367,36 @@ class ShooterMode({
     }
   }
 
-  /// Applies the rules over [dt] seconds of the world's time: before the
-  /// world's components move, and before [TubeComponent] makes the tube's
-  /// paths for the view.
+  /// Applies the rules over [dt] seconds of the world's time.
+  ///
+  /// It runs before the world's components move, and before [TubeComponent]
+  /// rebuilds the tube's paths for the view.
   void advance(double dt) {
     _step(dt);
     _aimCamera();
     _drawRun();
     tube.lane = _state == TubeState.play ? player.lane : null;
-    // In a still world, where nothing updates, applies a change of the view,
-    // such as a resize or a zoom.
+    // While the world is paused and nothing updates, this applies a change
+    // of the view, such as a resize or a zoom.
     if (gameRef.world.timeScale == 0 && view.version != _lastVersion) {
       updateStillLines();
     }
     _lastVersion = view.version;
   }
 
-  /// Places the ship as it arrives from a run, and shows the round, once the
-  /// components updated, [dt] seconds after the last frame.
+  /// Places the ship as it arrives from a run, and shows the round, after the
+  /// components have updated, [dt] seconds after the last frame.
   void afterUpdate(double dt) {
     _placeArriving();
     if (_state == TubeState.run) {
-      // The run's time in play, as Tube Runner shows its time in the tube.
+      // Shows the run's time in play, as Tube Runner shows its time in the
+      // tube.
       _run!.runner.afterUpdate(dt);
     } else {
       gameRef.roundText.text = 'ROUND $round';
     }
-    // In real time, so that it goes in a still world too.
+    // This counts in real time, so that PURGE also goes while the world is
+    // paused.
     if (_purgeLeft > 0) {
       _purgeLeft -= dt;
       if (_purgeLeft <= 0) {
@@ -487,8 +495,8 @@ class ShooterMode({
   /// Replaces each dot that has arrived with its enemy, at the far end of its
   /// lane, and starts the next dot arriving.
   ///
-  /// A dot starts arriving every level's `spawnPeriod`, while fewer than the
-  /// level's `maxEnemies` are in the tube or arriving.
+  /// A dot starts arriving every `spawnPeriod` of the level, while fewer than
+  /// the level's `maxEnemies` enemies are in the tube or arriving.
   void _spawn(double dt) {
     for (final spawn in spawns.where((spawn) => spawn.hasArrived).toList()) {
       spawns.remove(spawn);
@@ -512,8 +520,10 @@ class ShooterMode({
   }
 
   /// Adds an enemy of [kind] to come next, as a dot [at] lanes round the far
-  /// end, which goes on [from] a dot in a game with another renderer, if
-  /// given.
+  /// end.
+  ///
+  /// Given [from], the dot resumes from a dot in a game with another
+  /// renderer.
   void _addSpawn(
     EnemyKind kind,
     double at, {
@@ -538,9 +548,10 @@ class ShooterMode({
 
   /// Resolves the hits between things in the same lane that [_meet].
   ///
-  /// The ship's shots shorten spikes, and destroy enemies' shots and the
-  /// enemies that can be shot. An enemy's shot at the rim, an enemy as its
-  /// kind does, and a spike on the drop destroy the ship in their lane.
+  /// The ship's shots shorten spikes and destroy enemies' shots and the
+  /// enemies that can be shot. Each of these destroys the ship in its lane:
+  /// an enemy's shot at the rim, an enemy in the way its kind does, and a
+  /// spike during the drop.
   void _collide() {
     for (final shot in [...shots]) {
       final tip = spikes.tipOf(shot.lane);
@@ -591,7 +602,7 @@ class ShooterMode({
   }
 
   /// Returns whether [a] and [b], in the same lane, meet: within [hitWindow] in
-  /// depth, or passing each other since their last update.
+  /// depth, or having passed each other since their last update.
   static bool _meet(LaneComponent a, LaneComponent b) {
     final now = a.depth - b.depth;
     final before = a.previousDepth - b.previousDepth;
@@ -638,9 +649,11 @@ class ShooterMode({
     return ahead % tube.laneCount <= tube.laneCount ~/ 2 ? 1 : -1;
   }
 
-  /// Replaces [splitter] with two climbers, which flip from its lane onto the
-  /// lanes on either side. A climber with no lane on its side, at an open
-  /// tube's end, stays in the splitter's lane.
+  /// Replaces [splitter] with two climbers that flip from its lane onto the
+  /// lanes on either side.
+  ///
+  /// At an open tube's end, the climber with no lane on its side stays in the
+  /// splitter's lane.
   void split(SplitterComponent splitter) {
     if (!enemies.contains(splitter)) {
       return;
@@ -695,8 +708,8 @@ class ShooterMode({
     }
   }
 
-  /// Adds an explosion where [component] is, [depth] deep in the tube, turned
-  /// and scaled as it is, with its flying rays in [rayColor].
+  /// Adds an explosion with [component]'s position, angle and scale, [depth]
+  /// deep in the tube, with its flying rays in [rayColor].
   void _explode(
     PositionComponent component,
     double depth, {
@@ -715,7 +728,7 @@ class ShooterMode({
     );
   }
 
-  /// Destroys every enemy in the tube, and their shots, once a round.
+  /// Destroys every enemy in the tube and their shots, once a round.
   void purge() {
     if (_state != TubeState.play || !purgeReady) {
       return;
@@ -736,8 +749,8 @@ class ShooterMode({
 
   /// Blows the ship up, fades it out, and takes a life.
   ///
-  /// The enemies in the tube go back to the far end of their lanes, to come
-  /// again, and all the shots go.
+  /// The enemies in the tube go back to the far end of their lanes to come
+  /// again, and all the shots disappear.
   void _destroyShip() {
     if (_state != TubeState.play && _state != TubeState.drop) {
       return;
@@ -763,7 +776,9 @@ class ShooterMode({
   }
 
   /// Starts the next round on the next level's tube, or the first round on
-  /// the round's level, [arriving] from a run if so.
+  /// the current level's tube.
+  ///
+  /// With [arriving], the ship arrives from a run.
   void _nextRound({bool arriving = false}) {
     if (round > 0) {
       _levelIndex = (_levelIndex + 1) % levels.length;
@@ -774,12 +789,12 @@ class ShooterMode({
 
   /// Starts the round on its level's tube.
   ///
-  /// The round starts with its enemies at random round the far end, no
+  /// The round starts with its enemies at random places round the far end, no
   /// spikes, the purge ready, and the ship on the tube's bottom lane. The tube
   /// zooms in through the stars, with the ship hidden until the zoom ends.
   ///
-  /// [arriving] from a run, the ship flies onto the rim instead, at the step
-  /// nearest its angle round the axis: see [_beginArrive].
+  /// When [arriving] from a run, the ship instead flies onto the rim, at the
+  /// step nearest its angle round the axis (see [_beginArrive]).
   void _startRound({bool arriving = false}) {
     final from = view.tube;
     view.tube = level.tube;
@@ -807,7 +822,7 @@ class ShooterMode({
     player.revive();
     if (arriving) {
       player.step = _Run.nearestStep(from, player.step, view.tube);
-      // The eye goes on as fast, with the rim ahead now.
+      // The eye keeps its speed, with the new round's rim ahead of it.
       starField.shiftEye(-_run!.rim);
       view.eyeShift = _run!.flown - _run!.rim;
     } else {
@@ -846,9 +861,11 @@ class ShooterMode({
     gameRef.camera.viewport.add(gameRef.gameOverText);
   }
 
-  /// Starts a new game in this one: no enemies, shots or explosions, a score
-  /// of 0, all lives, the round that the last game reached, at its pace, and
-  /// the world at the game's speed.
+  /// Starts a new game within this one.
+  ///
+  /// The new game has no enemies, shots or explosions, a score of 0 and all
+  /// its lives, and the world runs at the game's speed again. It starts at
+  /// the round that the last game reached, at that round's pace.
   void _newGame() {
     for (final enemy in [...enemies]) {
       discard(enemy);
@@ -862,7 +879,8 @@ class ShooterMode({
     _startRound();
   }
 
-  /// Moves the ship [lanes] round the tube: the runner's, on a run.
+  /// Moves the ship [lanes] round the tube, or the runner's ship during a
+  /// run.
   void moveShipBy(double lanes) {
     if (_state == TubeState.run) {
       _run!.runner.moveShipBy(lanes);
@@ -871,12 +889,15 @@ class ShooterMode({
     }
   }
 
-  /// The step round the tube that the ship is on: the runner's, on a run.
+  /// The step round the tube that the ship is on, or that the runner's ship
+  /// is on during a run.
   int get shipStep =>
       _state == TubeState.run ? _run!.runner.shipStep : player.step;
 
-  /// Ends a wait: starts a new game once it's over, on a run too, or else
-  /// the round, or the run's play.
+  /// Ends a wait.
+  ///
+  /// If the game is over, in a round or on a run, this starts a new game.
+  /// Otherwise, it starts or resumes the round, or the run's play.
   void endWait() {
     if (isOver) {
       _newGame();
@@ -899,11 +920,12 @@ class ShooterMode({
 
 /// A component under a [ShooterMode], which plays by its rules.
 mixin InShooterMode on Component {
-  /// The mode that it's under, or was under when it [findShooter].
+  /// The mode that it's under, or was under when it called [findShooter].
   ShooterMode get shooter => _shooter ??= findParent<ShooterMode>()!;
   ShooterMode? _shooter;
 
-  /// Finds the mode that it's under, so that [shooter] is still its mode
-  /// once it's gone from it, as when it finishes loading after a purge.
+  /// Finds the mode that it's under, so that [shooter] still returns that
+  /// mode after the component has left it, such as when it finishes loading
+  /// after a purge.
   void findShooter() => _shooter ??= findParent<ShooterMode>();
 }

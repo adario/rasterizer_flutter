@@ -2,13 +2,13 @@ import 'package:flame_rasterizer_example/stories/games/tube_runner/components/ru
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/components/enemy_component.dart';
 
-/// A splitter, which climbs its [lane] toward the ship from [at], as fast as
-/// a seeder, without flipping or firing, as Tube Shooter's
-/// `SplitterComponent` does.
+/// A splitter that climbs its [lane] toward the ship from [at] as fast as a
+/// seeder, without flipping or firing, as Tube Shooter's `SplitterComponent`
+/// does.
 ///
-/// When shot, or [splitAhead] of the ship, as Tube Shooter's at the rim, the
-/// game splits it into two climbers, which flip onto the lanes on either
-/// side.
+/// When it is shot, or gets within [splitAhead] of the ship, the game splits
+/// it into two climbers that flip onto the lanes on either side. Tube
+/// Shooter's splitter splits at the rim instead.
 class RunnerSplitterComponent(
   @override final int lane,
   @override var double at, {

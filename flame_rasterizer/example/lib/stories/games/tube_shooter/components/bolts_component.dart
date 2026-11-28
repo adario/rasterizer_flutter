@@ -7,19 +7,21 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
 
-/// Draws the zappers' bolts while they zap, each down its zapper's lane to the
-/// rim.
+/// Draws the zappers' bolts while they zap, each along its zapper's lane from
+/// the zapper to the rim.
 ///
-/// All the bolts make one path. On every frame of a pulse, this makes the path
-/// again, with a new component in the game's tube group, unless the world is
-/// still and the view hasn't changed.
+/// All the bolts share one path. On every frame of a pulse, this rebuilds the
+/// path as a new component in the game's tube group. It skips the rebuild
+/// while the world is paused and the view hasn't changed.
 class BoltsComponent()
     extends Component
     with HasGameRef<TubeHost>, InShooterMode {
   this : super(priority: 10);
 
-  /// For the bolts' zigzags, apart from [TubeShooterExample.random], so that
-  /// drawing doesn't change the game's random sequence.
+  /// The random source for the bolts' zigzags.
+  ///
+  /// It's separate from [TubeShooterExample.random] so that drawing doesn't
+  /// change the game's random sequence.
   final _random = math.Random(0);
 
   PathComponent? _bolts;

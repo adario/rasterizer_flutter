@@ -3,15 +3,18 @@ import 'package:flame_rasterizer_example/commons/standalone_game.dart';
 import 'package:flame_rasterizer_example/stories/games/games.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/level.dart';
 
-/// Tube Shooter on its own, outside the Widgetbook: run it with
-/// `flutter run -t lib/main_tube_shooter.dart`.
+/// Runs Tube Shooter on its own, outside the Widgetbook.
+///
+/// Start it with `flutter run -t lib/main_tube_shooter.dart`.
 void main() {
   runApp(const TubeShooterApp());
 }
 
-/// Tube Shooter's story, without a status bar, with a settings dialog for
-/// its knobs in the Widgetbook but zoom and speed, which stay at 1: it starts
-/// at the first level, with 400 stars, without glow.
+/// Tube Shooter's story without a status bar.
+///
+/// A settings dialog holds the story's Widgetbook knobs, except zoom and
+/// speed, which stay at 1. The game starts at the first level, with 400
+/// stars and without glow.
 class const TubeShooterApp({
   /// Whether the game plays its sounds at the start.
   final bool sound = true,
@@ -21,13 +24,14 @@ class const TubeShooterApp({
   Widget build(BuildContext context) {
     return StandaloneGame<TubeShooterSettings>(
       title: 'Tube Shooter',
-      // Its paths are drawn by Flame's own components with Flame SVG.
+      // With Flame SVG, Flame's own components draw its paths.
       svgs: false,
       settings: TubeShooterSettings(sound: sound),
       builder: (renderer, settings, onChanged) => TubeShooterStory(
         renderer: renderer,
         firstLevel: settings.level,
-        // The Level setting shows the round's level, as the knob does.
+        // The Level setting follows the round's current level, as the knob
+        // does.
         onLevel: (level) => onChanged(settings.copyWith(level: level)),
         glow: settings.glow,
         sound: settings.sound,
@@ -56,10 +60,11 @@ class const TubeShooterApp({
   }
 }
 
-/// Tube Shooter's settings, which stand for its knobs in the Widgetbook but
+/// Tube Shooter's settings, which stand in for its Widgetbook knobs except
 /// zoom and speed.
 class const TubeShooterSettings({
-  /// The level that a new game starts at, and then the round's level.
+  /// The level that a new game starts at, which then follows the round's
+  /// current level.
   final int level = 0,
 
   /// Whether the lines glow.
@@ -68,7 +73,7 @@ class const TubeShooterSettings({
   /// Whether the game plays its sounds.
   final bool sound = true,
 }) {
-  /// Returns these settings, with those given changed.
+  /// Returns a copy of these settings with the given ones changed.
   TubeShooterSettings copyWith({
     int? level,
     bool? glow,

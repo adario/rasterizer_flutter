@@ -15,17 +15,17 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.da
 /// They lie round the eye's line of sight, not round the tube's axis, so they
 /// don't bend with the tube. Each frame, they come closer by as far as
 /// the ship flew, so they stream outward as streaks. A star that passes the
-/// near plane goes back to the farthest distance, as a dot somewhere else. As
+/// near plane goes back to the farthest distance, at a new random place. As
 /// the ship flies, they turn toward the tube's bends ahead, as Tube Shooter's
-/// do on a run: see [StarFieldComponent.bendTurnOver]. Nearer stars turn
-/// more, as with parallax.
+/// stars do on a run: see [StarFieldComponent.bendTurnOver]. Nearer stars
+/// turn more, as with parallax.
 ///
-/// There are [TubeHost.starCount] of them. As it changes, stars go, or come
-/// at random distances, as at first.
+/// There are [TubeHost.starCount] of them. When that count changes, stars
+/// go, or new ones come at random distances, as at the start.
 ///
-/// It's in the camera's backdrop, as Tube Shooter's stars are, and draws
-/// through the viewfinder's transform and updates at the world's time scale,
-/// as if it were in the world.
+/// It sits in the camera's backdrop, as Tube Shooter's stars do. It still
+/// draws through the viewfinder's transform and updates at the world's time
+/// scale, as if it were in the world.
 class FlightStarsComponent(
   /// The mode whose ship the stars fly by.
   final RunnerMode runner,
@@ -82,9 +82,9 @@ class FlightStarsComponent(
     return Offset.fromDirection(2 * math.pi * random.nextDouble(), radius);
   }
 
-  /// Updates it and the stars as the world's time scale does its components:
-  /// not at all in a still world. Even there, it adds or removes stars as
-  /// [TubeHost.starCount] changes.
+  /// Updates it and the stars at the world's time scale, as the world
+  /// updates its components, so not at all in a still world. Even then, it
+  /// adds or removes stars as [TubeHost.starCount] changes.
   @override
   void updateSubtree(double dt) {
     if (isLoaded) {
@@ -125,7 +125,8 @@ class FlightStarsComponent(
           ..cameFrom = star.eyeDistance
           ..point = _point();
       }
-      // Past the near plane, so never too close to the eye.
+      // The star is past the near plane, so it's never too close to the eye
+      // for the ratio below.
       if (turn != 0) {
         final ratio =
             StarFieldComponent.turnRatio *

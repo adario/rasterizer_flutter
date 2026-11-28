@@ -1,7 +1,9 @@
 part of 'collidable_svgs_example.dart';
 
-/// What a game for another renderer goes on from: the SVGs' names and
-/// widths, where the SVGs are and how they move, and the collisions so far.
+/// The state that a game with another renderer resumes from.
+///
+/// It holds the SVGs' names and widths, their positions, velocities and angles,
+/// and the number of collisions so far.
 typedef CollidableSvgsSnapshot = ({
   List<String> names,
   List<double> widths,
@@ -9,9 +11,9 @@ typedef CollidableSvgsSnapshot = ({
   int collisions,
 });
 
-/// Takes a [CollidableSvgsExample]'s snapshot, and goes on from one.
+/// Takes a snapshot of a [CollidableSvgsExample] and resumes from one.
 extension CollidableSvgsSnapshots on CollidableSvgsExample {
-  /// What a game for another renderer goes on from.
+  /// The state that a game with another renderer resumes from.
   CollidableSvgsSnapshot get snapshot => (
     names: [..._names],
     widths: [..._widthsPicked],
@@ -26,7 +28,7 @@ extension CollidableSvgsSnapshots on CollidableSvgsExample {
     collisions: collisions,
   );
 
-  /// Picks the snapshot's SVGs, at its widths, before they load.
+  /// Picks the snapshot's SVGs and widths before the SVGs load.
   void _restorePicks() {
     if (_from case final from?) {
       _names.addAll(from.names);
@@ -34,8 +36,8 @@ extension CollidableSvgsSnapshots on CollidableSvgsExample {
     }
   }
 
-  /// Places the SVGs where the snapshot's were, moving and turned as they
-  /// were, and counts its collisions.
+  /// Gives the SVGs the snapshot's positions, velocities and angles, and
+  /// restores its collision count.
   void _restoreSvgs() {
     if (_from case final from?) {
       for (final (i, was) in from.svgs.take(svgs.length).indexed) {
