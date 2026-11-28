@@ -305,7 +305,7 @@ Inspired by Atari's Tempest (1981): a tube shooter with a tube, enemies, colours
   the lanes' edges rather than their middles, spinning.
 - **Controls.** The ship moves round the rim, up to an open tube's ends, 16 steps a lane. The arrow keys, or A and D,
   move it from 3 lanes a second up to 10, and a drag moves it a lane every 40 logical pixels. The ship fires down its
-  lane with the space bar, or while dragging: a shot every 0.1 s, 8 at most, each crossing the tube in 0.5 s. Enter, or
+  lane with the space bar, or while dragging: a shot every 0.15 s, 8 at most, each crossing the tube in 0.5 s. Enter, or
   a double tap, purges the tube of its enemies and their shots, once a round.
 - **Enemies.** A round's enemies, 12 on the first level, wait at the far end, as dots of their colours wandering round
   it. One comes every 2.5 s, with 4 at most in the tube or coming. The next one goes to its lane's middle, flashes white

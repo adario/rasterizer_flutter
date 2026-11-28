@@ -7,9 +7,9 @@ enum Sound(
   /// How many times the sound can play at once.
   final int size = 3,
 }) {
-  /// The ship fires: as often as every `RunnerRun.firePeriod`, so as many
-  /// times at once as fit in the sound, and one more.
-  fire('fire', size: 10),
+  /// The ship fires: as often as every `PlayerComponent.firePeriod`, so as
+  /// many times at once as fit in the sound, and one more.
+  fire('fire', size: 7),
 
   /// An enemy fires.
   enemyFire('enemy_fire'),

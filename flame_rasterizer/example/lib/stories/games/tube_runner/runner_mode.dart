@@ -141,10 +141,6 @@ class RunnerMode({
   /// When the first enemy comes, in seconds of the game.
   static const firstEnemy = 3.0;
 
-  /// How long between the ship's shots, in seconds: shorter than Tube
-  /// Shooter's, as the enemies come one at a time.
-  static const firePeriod = 0.1;
-
   /// The kinds of enemy that come, but on a [run].
   static const enemyKinds = [
     EnemyKind.seeder,
@@ -216,7 +212,7 @@ class RunnerMode({
   bool get isOver => _state == RunnerState.over;
 
   /// How long since the ship last fired, in seconds of the game.
-  double _sinceShot = firePeriod;
+  double _sinceShot = PlayerComponent.firePeriod;
 
   late final stars = FlightStarsComponent(this);
 
@@ -583,8 +579,9 @@ class RunnerMode({
   }
 
   /// Over [dt] seconds of the game: fires a shot down the ship's lane every
-  /// [firePeriod] while it fires, with at most `PlayerComponent.maxShots`
-  /// in the tube, as in Tube Shooter, flies the shots, and drops those
+  /// `PlayerComponent.firePeriod` while it fires, with at most
+  /// `PlayerComponent.maxShots` in the tube, as in Tube Shooter, flies the
+  /// shots, and drops those
   /// [RunnerShotComponent.range] ahead of the ship.
   void _updateShots(double dt) {
     for (final shot in _shots) {
@@ -599,7 +596,7 @@ class RunnerMode({
     });
     _sinceShot += dt;
     if (gameRef.isFiring &&
-        _sinceShot >= firePeriod &&
+        _sinceShot >= PlayerComponent.firePeriod &&
         _shots.length < PlayerComponent.maxShots) {
       _sinceShot = 0;
       final shot = RunnerShotComponent(ship.lane, _flown);
