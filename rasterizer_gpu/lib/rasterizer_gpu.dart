@@ -69,6 +69,8 @@ enum RasterizerSupport() {
   ///   manifest. This package's manifest sets it.
   /// - on Linux, `fl_dart_project_set_enable_flutter_gpu(project, TRUE)` in
   ///   the runner's `linux/runner/my_application.cc`.
+  /// - on Windows, `project.set_enable_flutter_gpu(true)` in the runner's
+  ///   `windows/runner/main.cpp`.
   noFlutterGpu,
 
   /// Impeller renders with OpenGL ES, and [RasterizerGpu.allowOpenGles] is
@@ -76,7 +78,7 @@ enum RasterizerSupport() {
   ///
   /// Android falls back to OpenGL ES on devices without Vulkan, and on
   /// devices whose Vulkan driver Flutter blocks, such as the emulator's.
-  /// Linux always uses OpenGL ES.
+  /// Linux and Windows always use OpenGL ES, Windows through ANGLE.
   ///
   /// Setting `io.flutter.embedding.android.ImpellerBackend` to `vulkan` in
   /// the app's Android manifest asks for Vulkan anyway. Only debug and
@@ -1215,10 +1217,12 @@ abstract class RasterizerRun() {
 
   /// Its parts, for GPU runs, after [place] or [RasterizerFrame.render].
   ///
-  /// The parts don't overlap in the viewport. So a run of entries scattered
-  /// over the viewport takes up only their area of the atlas, not the whole
-  /// viewport's. A mesh run has one part, its target. A run that has nothing
-  /// to draw has no parts, and neither do canvas runs.
+  /// Entries in different parts don't overlap in the viewport, though the
+  /// parts' rectangles can: each part's rectangle in the atlas holds only its
+  /// own entries. So a run of entries scattered over the viewport takes up
+  /// only their area of the atlas, not the whole viewport's. A mesh run has
+  /// one part, its target. A run that has nothing to draw has no parts, and
+  /// neither do canvas runs.
   List<RasterizerRunPart> get parts;
 
   /// Whether it has nothing to draw.

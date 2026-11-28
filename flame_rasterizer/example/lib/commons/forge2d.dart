@@ -373,7 +373,8 @@ const minPieceSide = 5 * 4 * linearSlop;
 /// It splits the polygons of the outline's [SvgHitbox], sampled every 0.1
 /// meters, which matches a hitbox at 10 pixels a meter that samples every
 /// pixel. It leaves out the pieces less than [minPieceSide] across, which is
-/// about a pixel at that scale.
+/// about a pixel at that scale. Each piece has at most 8 vertices, Box2D's
+/// limit and `convexPieces`' default.
 List<List<Vector2>> convexPiecesOf(SvgOutline outline, Vector2 size) {
   final hitbox = SvgHitbox(outline, size: size, sampling: 0.1)..place(size);
   final half = size / 2;
@@ -870,6 +871,8 @@ class SvgBody(
   final double density = 1,
   final BodySnapshot? from,
 }) extends BodyComponent {
+  // Above the other bodies, which draw on the canvas, so that the SVG bodies
+  // share one run.
   this : super(renderBody: false, priority: 1);
 
   /// The component that draws its pieces, while the game shows them.

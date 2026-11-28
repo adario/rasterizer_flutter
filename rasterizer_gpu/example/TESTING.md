@@ -155,7 +155,8 @@ pixels once the frame comes.
 Vulkan and OpenGL ES and on macOS, and the golden, opacity and edge tests on web. On the emulator, the golden tests
 run with the GPU renderer only, and the Vulkan atlas test runs only when named, as `vk_atlas`. Run it in the
 background, as `python3 -I tool/matrix.py > matrix.txt`, and follow it with
-`python3 -I tool/follow.py matrix.txt 'STALL|FAIL|passed|failed|FINISHED' FINISHED`. Each `flutter test` runs under a
+`python3 -I tool/follow.py matrix.txt 'STALL|FAIL|passed|failed|FINISHED' FINISHED`. That stops after 590 s, before
+the matrix ends, so run it again, or pass a longer limit in seconds after `FINISHED`. Each `flutter test` runs under a
 watchdog (`tool/device_tests.py`), which kills a run that's silent for 2 minutes once its tests have started, as a GPU
 app hung on the emulator would be. It keeps each run's output in the repository's `build/test_logs/`.
 

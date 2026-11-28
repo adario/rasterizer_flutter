@@ -403,8 +403,9 @@ class FrameRenders(
 /// there each frame's atlas pages, the core's frames and the lists of entries
 /// they were rendered from. Those are the `.rgba`, `_frame.bin`, `_frame.txt`
 /// and `.entries` files. The `.entries` files name each entry's SVG, which
-/// [load] writes there too. The last comparison with Rasterizer's original
-/// renderer read those files.
+/// [load] writes there too. The paths case has no SVG, so its entries name
+/// `paths` instead. The last comparison with Rasterizer's original renderer
+/// read those files.
 class GoldenRenders._(
   final RasterizerRenderer renderer,
   final RasterizerScene tigerScene,

@@ -385,7 +385,7 @@ abstract class TubeHost({
   /// [color] about its origin, [widths] times as wide as the view's shapes.
   ///
   /// All the components of a shape share one import of it until the view
-  /// changes.
+  /// changes. Fading and tinting a component don't import it again.
   PathComponent shapeComponent(Path shape, Color color, {double widths = 1}) {
     final bounds = shape.getBounds();
     return pathComponent(

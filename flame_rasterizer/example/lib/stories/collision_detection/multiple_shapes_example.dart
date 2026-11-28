@@ -237,6 +237,7 @@ abstract class MultipleShapesExample({
     while (_picks.length < target) {
       _picks.add((
         sizeIndex: random.nextInt(_sizes.length),
+        // 50 to 150 wide at a scale of 1.
         width: 50 + random.nextDouble() * 100,
       ));
     }

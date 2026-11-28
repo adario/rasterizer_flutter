@@ -5,9 +5,11 @@ import 'dart:ui';
 ///
 /// The outline's [points] lie round the tube's axis, at most 1 from it
 /// horizontally and vertically, and run from left to right along the bottom.
-/// Each point starts a lane, and all the lanes have the same width. A closed
-/// tube's last lane goes back to its first point. An open tube's last point
-/// only ends its last lane, and the ship stops there.
+/// Each point starts a lane, and all the lanes have the same width. So one
+/// scale, [laneWidth], fits a shape to any lane, and a shape that turns about
+/// the corner of two lanes lands on the other lane's middle. A closed tube's
+/// last lane goes back to its first point. An open tube's last point only
+/// ends its last lane, and the ship stops there.
 ///
 /// Every tube is [depth] deep, from its rim at depth 0 to its far end. The eye
 /// is on the axis, [eye] in front of the rim, so the far end looks
@@ -485,6 +487,9 @@ class TubeView() {
 
   /// Returns the width of a line [distance] from the eye: [rimPixels] device
   /// pixels at the rim during play, and never thinner than one device pixel.
+  ///
+  /// In play, that's 4 device pixels at the rim and 4 / 3.8, about 1.05, at
+  /// the far end.
   double lineWidthOf(double distance) =>
       math.max(_devicePixel, rimPixels * _devicePixel * Tube.eye / distance);
 
@@ -497,6 +502,11 @@ class TubeView() {
   /// pixels at the rim during play, times [lineWidths]. A shape's scale
   /// is its lane's width, so its strokes get thinner with depth, as the
   /// tube's lines do.
+  ///
+  /// Unlike the tube's lines, they have no one-pixel floor, as every
+  /// component of a shape shares one stroke and one import, whatever its
+  /// depth. So during the zoom, with the eye further back, they can get
+  /// thinner than a device pixel.
   double get shapeStroke =>
       _lineWidths * rimPixels * _devicePixel / (tube.laneWidth * _rimScale);
 
