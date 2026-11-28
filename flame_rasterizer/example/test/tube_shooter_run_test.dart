@@ -20,10 +20,13 @@ import 'package:flame_rasterizer_example/stories/games/tube_shooter/shooter_mode
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_host.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_shooter/tube_shooter_example.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter/widgets.dart' show SizedBox, Widget;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'circle_drag.dart';
 import 'pump_while_loading.dart';
 import 'tube_shooter_test.dart'
     show beginLevel, pumpFrames, pumpGame, pumpUntil, story;
@@ -680,4 +683,32 @@ void main() {
     await pumpFrames(tester, 2);
     await tester.pumpWidget(const SizedBox());
   });
+
+  for (final tube in [Tubes.hexagon, Tubes.horseshoe]) {
+    testWidgets("on a phone, on the ${tube.name}'s run, Tube Runner's ship "
+        "follows a finger round the tube's near end", (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final game = await pumpGame(
+        tester,
+        SvgRenderer.rasterizerCanvas,
+        firstLevel: levels.indexWhere((level) => level.tube == tube),
+        runs: true,
+      );
+      final runner = await pumpToRun(tester, game, sequence: const []);
+      await pumpUntil(tester, () => runner.canMove);
+      final ship = runner.ship;
+      double shipAngle() => math.atan2(ship.position.y, ship.position.x);
+      final from = shipAngle();
+      await drawCircle(
+        tester,
+        nearEndCentreOf(tester, game),
+        from: from,
+        turns: 0.25,
+      );
+      expect(game.shooter.state, TubeState.run);
+      expect(turnOf(shipAngle() - from - math.pi / 2), closeTo(0, 0.05));
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
 }
