@@ -344,9 +344,10 @@ abstract class TubeHost({
   /// Loads the sounds, unless they're loaded or loading.
   Future<void> _loadSounds() async {
     if (_sounds == null) {
-      await (_sounds = GameSounds([
-        for (final sound in Sound.values) sound.path,
-      ])).load();
+      await (_sounds = GameSounds(
+        [for (final sound in Sound.values) sound.path],
+        sizes: {for (final sound in Sound.values) sound.path: sound.size},
+      )).load();
     }
   }
 

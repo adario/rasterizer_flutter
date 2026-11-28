@@ -10,7 +10,7 @@ import 'package:web/web.dart' as web;
 /// Safari starting one can block the page for hundreds of milliseconds.
 class SoundBank._(
   final Map<String, web.AudioBuffer> _buffers,
-  final int _size,
+  final Map<String, int> _sizes,
 ) {
   /// The page's audio context, which every game shares: once the user's input
   /// starts it, it stays started for the games that come later.
@@ -26,20 +26,17 @@ class SoundBank._(
   /// How many times each sound is playing.
   final _playing = <String, int>{};
 
-  /// Loads the sounds at [paths], each of which can play [size] times at
-  /// once.
-  static Future<SoundBank> load(
-    List<String> paths, {
-    required int size,
-  }) async {
+  /// Loads the sound at each of [sizes]' paths, which can play as many times
+  /// at once as it says.
+  static Future<SoundBank> load(Map<String, int> sizes) async {
     final context = _context ??= _createContext();
     final buffers = {
-      for (final path in paths)
+      for (final path in sizes.keys)
         path: await (_decoded[path] ??= _decode(context, path)),
     };
     _banks++;
     context.resume().toDart.ignore();
-    return SoundBank._(buffers, size);
+    return SoundBank._(buffers, sizes);
   }
 
   static web.AudioContext _createContext() {
@@ -81,7 +78,7 @@ class SoundBank._(
     final playing = _playing[path] ?? 0;
     // A source started while the context is suspended would play when it
     // resumes, together with every other sound started meanwhile.
-    if (playing >= _size || context.state != 'running') {
+    if (playing >= _sizes[path]! || context.state != 'running') {
       return;
     }
     final source = context.createBufferSource()..buffer = _buffers[path];

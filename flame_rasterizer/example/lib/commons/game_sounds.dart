@@ -4,13 +4,18 @@ import 'package:flutter/foundation.dart';
 /// A game's sounds, loaded in the background by [load].
 ///
 /// Until they're loaded, and where they fail to load, such as in tests with
-/// no audio plugin, nothing plays. At most [size] of each sound play at once.
+/// no audio plugin, nothing plays. At most [size] of each sound play at once,
+/// or as many as [sizes] says for that sound.
 class GameSounds(
   /// The sounds' asset paths.
   final List<String> paths, {
 
   /// How many times each sound can play at once.
   final int size = 3,
+
+  /// How many times the sounds at these paths can play at once, instead of
+  /// [size]: more for a long sound that starts often.
+  final Map<String, int> sizes = const {},
 }) {
   SoundBank? _bank;
 
@@ -22,7 +27,9 @@ class GameSounds(
   /// Loads every sound.
   Future<void> load() async {
     try {
-      final bank = await SoundBank.load(paths, size: size);
+      final bank = await SoundBank.load({
+        for (final path in paths) path: sizes[path] ?? size,
+      });
       if (_disposed) {
         await bank.dispose();
         return;

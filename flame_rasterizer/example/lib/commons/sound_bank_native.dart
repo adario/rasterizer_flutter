@@ -3,14 +3,13 @@ import 'package:flame_audio/flame_audio.dart';
 /// A game's sounds on native platforms, which audioplayers plays: a
 /// [SoundPool] for each sound.
 class SoundBank._(final Map<String, SoundPool> _pools) {
-  /// Loads the sounds at [paths], each into [size] players.
-  static Future<SoundBank> load(
-    List<String> paths, {
-    required int size,
-  }) async {
-    await FlameAudio.audioCache.loadAll(paths);
+  /// Loads the sound at each of [sizes]' paths into as many players as it
+  /// says.
+  static Future<SoundBank> load(Map<String, int> sizes) async {
+    await FlameAudio.audioCache.loadAll([...sizes.keys]);
     return SoundBank._({
-      for (final path in paths) path: await SoundPool.load(path, size: size),
+      for (final MapEntry(key: path, value: size) in sizes.entries)
+        path: await SoundPool.load(path, size: size),
     });
   }
 
