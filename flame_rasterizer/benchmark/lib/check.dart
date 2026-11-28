@@ -78,8 +78,8 @@ class _CheckPageState() extends State<CheckPage> {
   /// saves them.
   Future<void> _run() async {
     try {
-      // The reference's mesh scenes flatten their curves for the same size
-      // as the game's.
+      // The reference's scenes take the game's maximum size, so that mesh
+      // scenes flatten their curves the same way.
       final renderer = await RasterizerRenderer.create(gpu: demoGpu);
       final scenes = [
         for (final s in layout.svgs)
@@ -170,20 +170,15 @@ class _CheckPageState() extends State<CheckPage> {
   }
 
   /// At most 1 pixel in this many may differ by over 8/255: 1 in 10,000 with
-  /// Impeller, 1 in 800 with Skia.
+  /// Impeller, and 1 in 800 with Skia, on the web or without Impeller
+  /// (`--no-enable-impeller`).
   ///
-  /// On the web, Skia antialiases edges analytically, rather than with
-  /// Impeller's MSAA. The game and the reference compose their transforms in
-  /// different orders, rounded to floats, so edges move by fractions of a
-  /// pixel. At the 4 times that check_test.dart uses, 21 to 106 of 120,000
-  /// pixels differed by over 8/255, all scattered edge pixels, by at most
-  /// 36/255. The painted items, each with its own opacity, show more edges
-  /// through the translucent ones: 41 to 120 pixels at those times, at a
-  /// pixel ratio of 1.
-  ///
-  /// Skia does the same without Impeller (`--no-enable-impeller`). On macOS,
-  /// 130 to 207 of 480,000 pixels differed, all on edges, by at most 31/255.
-  /// On the Android emulator, 126 to 317 of 827,400 did, by at most 22/255.
+  /// Skia antialiases edges analytically, rather than with Impeller's MSAA.
+  /// The game and the reference compose their transforms in different
+  /// orders, rounded to floats, so edges move by fractions of a pixel. With
+  /// Skia, scattered edge pixels then differ by more than 8/255. The
+  /// translucent painted items add more such pixels, as the edges under them
+  /// show through.
   static final _over8Ratio =
       kIsWeb || RasterizerGpu.support == RasterizerSupport.noImpeller
       ? 800
@@ -291,9 +286,9 @@ class _CheckPageState() extends State<CheckPage> {
 /// per path. It then draws the run plainly, in a layer with the rest of the
 /// paint, rather than with [RasterizerRun.draw]'s paint as the game does.
 /// The faded, tinted and hued items share a run, with their tint and hue
-/// folded in as [RasterizerRun.add]'s color transform. The core clamps those
-/// matrices per path, so a hue differs from a layer's along the edges
-/// between paths, by up to 40/255 here.
+/// folded in as [RasterizerRun.add]'s color transform. The renderer clamps
+/// those color matrices per path, so a hue differs from a layer's along the
+/// edges between paths.
 class _ReferencePainter(
   final RasterizerRenderer renderer,
   final List<RasterizerScene> scenes,

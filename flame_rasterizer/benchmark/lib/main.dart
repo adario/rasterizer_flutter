@@ -110,7 +110,7 @@ Future<void> main() async {
     svgName: svg,
   );
   const kind = mode == 'demo' ? Separators.spritesAndText : Separators.sprites;
-  // The demo logs its timings once, after 120 frames.
+  // The demo logs its timings once, over 120 frames after the warm-up.
   const benchFrames = mode == 'bench' ? frames : 120;
   final game = engine == 'flame_svg'
       ? FlameSvgDemoGame(

@@ -69,8 +69,9 @@ mixin DemoContent on FlameGame {
   /// The world's time, in seconds, which moves the vector components.
   double time = 0;
 
-  /// Creates the vector component that draws [item], at [priority]. Its
-  /// update sets its position and angle.
+  /// Creates the vector component that draws [item], at [priority].
+  ///
+  /// Its update sets its position and angle.
   HasPaint vectorComponent(VectorItem item, int priority);
 
   /// Loads the layout's SVGs for the engine.
@@ -83,8 +84,10 @@ mixin DemoContent on FlameGame {
   int? _lastVsync;
   int _frames = 0;
 
-  /// The frames whose timings came, warm-up included. They're the same frames
-  /// as the renders, as the game counts both from its load on.
+  /// The number of frames whose timings have come, warm-up included.
+  ///
+  /// They're the same frames as the renders, as the game counts both from its
+  /// load on.
   int _timedFrames = 0;
   bool _reported = false;
 
@@ -183,9 +186,10 @@ mixin DemoContent on FlameGame {
         ),
       );
     }
-    // Painted items, set up with HasPaint's API, except the one with the
-    // shared paint. Unless the time is fixed, the faded one fades in and out
-    // and the hued one's hue turns.
+    // Adds the painted items. Each sets its paint with HasPaint's API, except
+    // the shared ones, which take the layout's shared paint as it is. Unless
+    // the time is fixed, the faded item fades in and out and the hued item's
+    // hue turns.
     final shared = DemoLayout.paintOf(PaintKind.shared);
     for (final (:item, :kind) in layout.paintedItems) {
       final component = vectorComponent(item, 2 * groups + 1);
@@ -249,7 +253,8 @@ mixin DemoContent on FlameGame {
       canvasSize.x,
       canvasSize.y,
     );
-    // The zoom is zero before the game's first layout, as happens on Android.
+    // The zoom is zero until the game's first layout, as the canvas size is.
+    // This shows on Android, where updates start before that layout.
     if (zoom > 0) {
       camera.viewfinder
         ..position = Vector2(x, y)
@@ -506,7 +511,9 @@ class RasterizerDemoGame({
   }
 }
 
-/// The benchmark with flame_svg, the baseline. Its time always moves.
+/// The benchmark with flame_svg, the baseline.
+///
+/// Its time always moves.
 class FlameSvgDemoGame({
   @override required final DemoLayout layout,
   @override required final Separators separatorKind,

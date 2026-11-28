@@ -88,8 +88,9 @@ class DemoLayout({
     ];
   }
 
-  /// The painted items' kinds of paint, in paint order. They make
-  /// [paintedRuns] runs.
+  /// The painted items' kinds of paint, in paint order.
+  ///
+  /// They make [paintedRuns] runs.
   static const paintedKinds = [
     PaintKind.faded,
     PaintKind.tinted,
@@ -178,8 +179,9 @@ class DemoLayout({
   /// The height of the area items start in.
   static const worldHeight = 700.0;
 
-  /// The clipped group's clip rectangle, in world coordinates. Its items'
-  /// positions are relative to the rectangle's top left corner.
+  /// The clipped group's clip rectangle, in world coordinates.
+  ///
+  /// Its items' positions are relative to the rectangle's top left corner.
   static const clipRect = Rect.fromLTWH(-150, -100, 300, 200);
 
   /// The SVGs' sources, which the items pick by index.
@@ -254,8 +256,8 @@ class VectorItem({
 
 /// A separator between two groups, drawn after [group]'s items.
 ///
-/// The game draws it as a rectangle, a sprite or a text, as its
-/// `Separators` say, centred on [x] and [y] and turned by [angle].
+/// The game draws it as a rectangle, a sprite or a text, as the game's
+/// `Separators` value picks, centred on [x] and [y] and turned by [angle].
 class SeparatorItem({
   /// The group that it's drawn after.
   required final int group,
