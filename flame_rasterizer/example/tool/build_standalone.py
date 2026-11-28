@@ -21,6 +21,12 @@ on macOS, which flutter doesn't archive, `xcodebuild archive` does, once
 `flutter build macos --config-only` has set the project up, with the Hardened
 Runtime that notarization needs.
 
+With --install, an Android or iOS build is installed on a device, given by
+its id or name as `flutter devices` lists them, before its folder opens:
+
+  python3 -I tool/build_standalone.py tube_runner android release \
+      --install emulator-5554
+
 Arguments after `--` go to `flutter build` as they are, such as
 `-- --no-codesign` for iOS, or `-- -o build/web_pinball` for the web.
 """
@@ -29,6 +35,8 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
+import zipfile
 
 # Each game's name, as its app shows it. Android's labels are in
 # android/app/build.gradle.kts.
@@ -97,6 +105,36 @@ def output(platform, mode, archive, flutter_args):
     return folder
 
 
+def install(folder, game, platform, mode, device):
+    """Installs game's app, built for platform in mode in folder, on device,
+    given by its id or name, and returns flutter's exit code. Flutter
+    uninstalls the app first if it's there, with its data."""
+    with tempfile.TemporaryDirectory() as temp:
+        if platform == 'android':
+            binary = os.path.join(folder,
+                                  '%s-%s.apk' % (file_name(game), mode))
+        else:
+            # flutter install takes an IPA, not an .app, on iOS.
+            binary = os.path.join(temp, file_name(game) + '.ipa')
+            ipa(os.path.join(folder, file_name(game) + '.app'), binary)
+        return run([
+            'flutter', 'install', '--' + mode, '-d', device,
+            '--use-application-binary', binary,
+        ], dict(os.environ))
+
+
+def ipa(app, path):
+    """Zips the .app at app into an IPA at path, in its Payload folder."""
+    parent = os.path.dirname(app)
+    with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for root, folders, files in os.walk(app):
+            for name in folders + files:
+                full = os.path.join(root, name)
+                # With their modes, so that the executables stay executable.
+                archive.write(full, os.path.join(
+                    'Payload', os.path.relpath(full, parent)))
+
+
 def reveal(folder):
     """Opens folder in the platform's file manager."""
     if sys.platform == 'darwin':
@@ -133,6 +171,9 @@ def main():
     parser.add_argument('--archive', action='store_true',
                         help='make an Xcode archive, for iOS and macOS, in '
                         'profile or release mode')
+    parser.add_argument('--install', metavar='DEVICE',
+                        help='install the app on this device, by its id or '
+                        'name, for Android and iOS')
     args = parser.parse_args()
 
     apple = args.platform in ('ios', 'macos')
@@ -143,6 +184,10 @@ def main():
                      'macOS only')
     if args.archive and args.mode == 'debug':
         parser.error('--archive is for profile or release mode')
+    if args.install and (args.platform not in ('android', 'ios') or
+                         args.archive):
+        parser.error('--install is for Android and iOS builds, without '
+                     '--archive')
     if args.bundle_id and not re.fullmatch(r'[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+',
                                            args.bundle_id):
         parser.error('a bundle id has letters, digits and hyphens, in two or '
@@ -210,6 +255,9 @@ def main():
         if os.path.isdir(folder):
             if args.platform == 'android':
                 rename_apks(folder, args.game, args.mode)
+            if args.install:
+                code = install(folder, args.game, args.platform, args.mode,
+                               args.install)
             reveal(folder)
         else:
             print('No folder at %s to open' % folder)
