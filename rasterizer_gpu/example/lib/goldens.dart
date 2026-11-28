@@ -22,13 +22,12 @@ import 'scenes.dart';
 /// pixels are the raw, premultiplied RGBA read back from the GPU, over
 /// transparent.
 ///
-/// The GPU renderer's goldens were checked against the original Metal
-/// renderer before it was dropped, and the ios set against the macos set
-/// once it was gone. So a render that matches its golden still matches the
-/// original. Gradients are the exception: since the core's gradient patches,
-/// the goldens of the atlas frame and the gradient cases stand for Chrome's
-/// renders instead. The core is Rasterizer's C++ library, which the GPU
-/// renderer draws with.
+/// The GPU renderer draws with the core, Rasterizer's C++ library. Its
+/// goldens were checked against Rasterizer's original Metal renderer, and the
+/// ios set against the macos set. So a render that matches its golden also
+/// matches the original. Gradients are the exception: the core's gradients
+/// have since been patched, and the goldens of the atlas frame and the
+/// gradient cases stand for Chrome's renders instead.
 ///
 /// The golden tests check the canvas renderer against the same goldens, with
 /// the looser tolerance of [GoldenDiff.passesCanvas], as it antialiases
@@ -43,15 +42,15 @@ const goldenWidth = 1024, goldenHeight = 768;
 ///
 /// - macos: the Mac, and the iOS Simulator, which renders with the Mac's GPU
 ///   and matches it.
-/// - ios: iOS devices, whose GPUs round differently from the Mac's, by 1/255
-///   on a few pixels.
+/// - ios: iOS devices, whose GPUs round slightly differently from the Mac's.
 /// - android_emulator: the Android emulator, whose Vulkan runs on the host's
 ///   GPU. android_emulator_gles: the emulator with Impeller's OpenGL ES
 ///   backend, which runs on the CPU (SwiftShader, through ANGLE).
 /// - android: Android devices. It has no goldens yet, so a first run records
 ///   them.
 /// - linux_llvmpipe: Linux, whose Impeller renders with OpenGL ES, on Mesa's
-///   CPU renderer, which tool/linux's image picks with GALLIUM_DRIVER.
+///   CPU renderer, which the repository's tool/linux Docker image picks with
+///   GALLIUM_DRIVER.
 ///   linux: Linux on a GPU, which has no goldens yet either.
 /// - macos on the web too: only the canvas renderer draws there, and it
 ///   never writes goldens, so the tests check its renders against the macos
@@ -184,10 +183,10 @@ class GoldenDiff(GoldenImage a, GoldenImage b) {
   /// Whether the images match within the tolerance.
   ///
   /// At most 1 pixel in 10,000 may differ by over 2/255, at most 1% by any,
-  /// and none by over 16/255. The core can write a frame's edges in another
-  /// order from one render to the next, so it sums their coverage in another
-  /// order too. In the tiger's sweep, that changed a few pixels by up to
-  /// 6/255. On the emulator, one frame varied by 1/255 on 361 pixels.
+  /// and none by over 16/255. The core can write a frame's edges in a
+  /// different order from one render to the next. It then sums their
+  /// coverage in a different order too, and float rounding changes a few
+  /// pixels slightly.
   bool get passes =>
       over2 <= pixels ~/ 10000 && differing <= pixels ~/ 100 && largest <= 16;
 
@@ -197,21 +196,19 @@ class GoldenDiff(GoldenImage a, GoldenImage b) {
   /// vector_graphics_compiler parses the canvas renderer's SVGs, rather than
   /// NanoSVG, and Impeller antialiases its paths, rather than the core's
   /// exact coverage. On macOS, Impeller's 4x MSAA covers an edge pixel by a
-  /// quarter, a half or three quarters, so edges differ by up to 100/255 or
-  /// so. Shapes and colours mustn't differ, so this compares 4 x 4 pixel
-  /// blocks, which average edges out. In its first tests, antialiasing alone
-  /// made blocks differ by at most 53/255, and at most 0.2% by over 32/255.
-  /// Drawing curves as line segments made them differ by up to 155/255, and
-  /// 1.9% by over 32/255.
+  /// quarter, a half or three quarters, so edge pixels can differ a lot.
+  /// Shapes and colours mustn't differ, so this compares 4 x 4 pixel blocks,
+  /// which average edges out. At most 1 block in 200 may differ by over
+  /// 32/255, and at most 1 in 2,000 by over 64/255.
   bool get passesCanvas =>
       blocksOver32 <= blockCount ~/ 200 && blocksOver64 <= blockCount ~/ 2000;
 
   /// The side of the blocks that [passesCanvas] compares, in pixels.
   ///
-  /// A block's difference is the largest among its channels' mean
-  /// differences. [blockLargest] is the largest of them, and [blocksOver32]
-  /// and [blocksOver64] count the blocks that differ by over 32/255 and over
-  /// 64/255.
+  /// A block's difference is the largest, among its channels, of how far the
+  /// two images' mean values differ. [blockLargest] is the largest of them,
+  /// and [blocksOver32] and [blocksOver64] count the blocks that differ by
+  /// over 32/255 and over 64/255.
   static const blockSize = 4;
   late final int blockCount =
       (_a.width ~/ blockSize) * (_a.height ~/ blockSize);
@@ -265,7 +262,7 @@ class GoldenDiff(GoldenImage a, GoldenImage b) {
       '$this; blocks: largest $blockLargest/255, $blocksOver32 of $blockCount over 32/255, $blocksOver64 over 64/255';
 
   /// Creates an image of where [actual] differs from [golden]: [actual]
-  /// dimmed to grey, with the differing pixels in red, brighter for bigger
+  /// faded to light grey, with the differing pixels in red, deeper for bigger
   /// differences.
   static GoldenImage image(GoldenImage golden, GoldenImage actual) {
     final out = Uint8List(actual.rgba.length), a = actual.rgba, g = golden.rgba;
@@ -301,11 +298,14 @@ class const GoldenCase(
   ///
   /// It isn't where the canvas renderer can't draw the same: with curves
   /// drawn as line segments, which it never does, and with the gradients
-  /// that vector_graphics_compiler doesn't draw as SVG says.
+  /// that vector_graphics_compiler doesn't draw as SVG says. Nor is it
+  /// checked where only the mesh renderer has a golden.
   final bool canvas = true,
 
-  /// Whether the mesh renderer has a golden of it. It doesn't for curves
-  /// drawn as line segments, as it draws those frames the same either way.
+  /// Whether the mesh renderer has a golden of it.
+  ///
+  /// It doesn't for curves drawn as line segments, as it draws those frames
+  /// the same either way.
   final bool mesh = true,
 
   /// Whether the mesh renderer's render is also checked against the GPU
@@ -313,18 +313,18 @@ class const GoldenCase(
   ///
   /// It isn't where strokes thinner than a pixel make the two differ by more
   /// than the canvas renderer's tolerance. The mesh renderer widens those
-  /// strokes to its least width, so that 4x MSAA doesn't break them into
+  /// strokes to its minimum width, so that 4x MSAA doesn't break them into
   /// dots, while the GPU renderer draws them as faint lines.
   final bool meshAsGpu = true,
 });
 
 /// The golden cases.
 ///
-/// They are the tiger's first frame and its sweep's checkpoints, with and
-/// without curves, the sweep of a 4 x 4 grid of tigers, the atlas frame of
-/// generated SVGs in 4 runs, the gradients and the plain paths. For the mesh
-/// renderer only, they also include the strokes, strokes thinner than a
-/// pixel on screen, and glows.
+/// They are the tiger fitted to the viewport and at the sweep's checkpoints,
+/// with and without curves, and a 4 x 4 grid of tigers at the same
+/// checkpoints. Then come the atlas frame of generated SVGs in 4 runs, the
+/// gradients and the plain paths. For the mesh renderer only, they also
+/// include the strokes, strokes thinner than a pixel on screen, and glows.
 final goldenCases = [
   for (final curves in [false, true])
     GoldenCase(
@@ -332,7 +332,7 @@ final goldenCases = [
       (r) => r.tiger(curves: curves),
       canvas: curves,
       mesh: curves,
-      // As the sweep's frames below.
+      // For the same reason as the sweep's frames below.
       meshAsGpu: false,
     ),
   for (final curves in [false, true])
@@ -342,16 +342,18 @@ final goldenCases = [
         (r) => r.tiger(curves: curves, sweep: i),
         canvas: curves,
         mesh: curves,
-        // The tiger's outlines are about 0.14 of a pixel wide at its fit, and
-        // 1/4 at 1.5 times. Frames 90 and 150 show enough of them, widened to
-        // the least width, to differ by more than the tolerance.
+        // The tiger's outlines are thinner than a pixel at its fit and at 1.5
+        // times, so the mesh renderer widens them to its minimum width.
+        // Frames 90 and 150 show enough of them to differ from the GPU
+        // golden by more than the tolerance.
         meshAsGpu: i != 90 && i != 150,
       ),
   for (final i in sweepCheckpoints)
     GoldenCase(
       'tiger4x4_curves_sweep${'$i'.padLeft(3, '0')}',
       (r) => r.tiger(curves: true, grid: 4, sweep: i),
-      // As above, and the grid draws the outlines 4 times thinner.
+      // As above, and the grid draws the outlines 4 times thinner, so only
+      // frame 59, zoomed in the most, is checked against the GPU golden.
       meshAsGpu: i == 59,
     ),
   GoldenCase('atlas', (r) async => (await r.atlas()).runs),
@@ -382,8 +384,8 @@ class FrameRenders(
   ///
   /// The core's clip to a rectangle is also a soft clip of its paths: a ramp
   /// 1 pixel wide, centred on the rectangle's edge. So a pixel just outside
-  /// gets a coverage of about 0, which float rounding can make 1/255. The
-  /// original renderer draws the same from the same frame.
+  /// gets a coverage of about 0, which float rounding can make 1/255.
+  /// Rasterizer's original renderer draws the same from the same frame.
   final int faint,
 
   /// The largest alpha outside the runs' rectangles.
@@ -398,10 +400,11 @@ class FrameRenders(
 ///
 /// For the mesh renderer, it flattens each SVG's curves for the largest size
 /// that a case draws it at. With a `recordDir`, the GPU renderer also writes
-/// there each frame's atlas pages, the core's frames and the lists they were
-/// rendered from: the `.rgba`, `_frame.bin`, `_frame.txt` and `.entries`
-/// files, the last naming the SVGs written there too. The last comparison
-/// with the original renderer read those files.
+/// there each frame's atlas pages, the core's frames and the lists of entries
+/// they were rendered from. Those are the `.rgba`, `_frame.bin`, `_frame.txt`
+/// and `.entries` files. The `.entries` files name each entry's SVG, which
+/// [load] writes there too. The last comparison with Rasterizer's original
+/// renderer read those files.
 class GoldenRenders._(
   final RasterizerRenderer renderer,
   final RasterizerScene tigerScene,
@@ -426,7 +429,8 @@ class GoldenRenders._(
 ) {
   /// Loads the scenes for [backend]'s renderer, the tiger from [tigerSvg].
   ///
-  /// It ignores [recordDir] for other renderers than the GPU renderer.
+  /// With [recordDir], it writes the SVGs there. It ignores [recordDir] for
+  /// renderers other than the GPU renderer.
   static Future<GoldenRenders> load(
     Uint8List tigerSvg, {
     RasterizerBackend backend = RasterizerBackend.gpu,
@@ -448,11 +452,12 @@ class GoldenRenders._(
     }
     RasterizerScene scene(Uint8List svg, double maxSize) =>
         RasterizerScene.fromSvg(svg, backend: backend, maxSize: maxSize);
-    // Fit the mesh renderer's tiger by its GPU renderer scene's bounds, the
-    // core's, so that both renderers draw the same frames. Those bounds are
-    // looser than the mesh's triangles'. The sweep then zooms in up to 20
-    // times. The atlas frame draws the generated SVGs' view boxes at up to
-    // 1.6 / 12 of the viewport's height.
+    // Fit the mesh renderer's tiger by the bounds of its GPU renderer scene,
+    // which the core computes, so that both renderers draw the same frames.
+    // Those bounds are looser than the mesh's triangles'. Each scene's
+    // maxSize is the largest size that a case draws it at. The sweep zooms
+    // the tiger in up to 20 times, and the atlas frame draws the generated
+    // SVGs' view boxes at up to 1.6 / 12 of the viewport's height.
     final gpuTiger = backend == RasterizerBackend.mesh
         ? RasterizerScene.fromSvg(tigerSvg, backend: RasterizerBackend.gpu)
         : null;
@@ -492,19 +497,19 @@ class GoldenRenders._(
     );
   }
 
-  /// The pixels a unit that [paths] draws [goldenSmallPaths] at.
+  /// The pixels per unit at which [paths] draws [goldenSmallPaths].
   static const smallPathsScale = 40.0;
 
-  /// The pixels a unit that [glow] draws the ship and the zapper at.
+  /// The pixels per unit at which [glow] draws the ship and the zapper.
   static const _glowUnit = 85.0;
 
-  /// Creates the scenes of the mesh renderer's glow golden, shapes from the
-  /// Tube Shooter example.
+  /// Creates the scenes of the mesh renderer's glow golden: a ship, a zapper
+  /// and the tube they fly in, as a tube shooter game draws them.
   ///
   /// The ship is a closed stroke, and the zapper an open one. Both are a unit
-  /// wide, with a stroke of 4 pixels and a glow of 12 at [_glowUnit] pixels a
-  /// unit. The tube has 12 lanes, drawn as filled quads 3 pixels wide, with a
-  /// glow of 12 pixels.
+  /// wide, with a stroke of 4 pixels and a glow of 12 at [_glowUnit] pixels
+  /// per unit. The tube has 12 lanes, drawn as filled quads 3 pixels wide,
+  /// with a glow that reaches 2 line widths.
   static List<RasterizerScene> _glowScenes() {
     const unit = _glowUnit;
     RasterizerScene shape(
@@ -664,8 +669,8 @@ class GoldenRenders._(
   /// its strokes are 0.6 pixels wide, at a quarter, turned and shrunk, and
   /// under a perspective.
   ///
-  /// The strokes must stay whole, widened to the least width where they'd be
-  /// thinner, never broken into dots.
+  /// The strokes must stay whole, widened to the minimum width where they'd
+  /// be thinner, never broken into dots.
   Future<List<GoldenImage>> thinStrokes() async {
     final frame = renderer.beginFrame(goldenWidth, goldenHeight);
     frame.addRun()
@@ -719,8 +724,8 @@ class GoldenRenders._(
       renderAtlasFrame(name, frame, renderer, curves, svgOf, recordDir) ??
       _renderCanvas(name, frame);
 
-  /// Renders a canvas renderer's frame, drawing each run on its own into a
-  /// picture of the viewport's size, and reads the pictures back.
+  /// Renders a canvas or mesh renderer's frame, drawing each run on its own
+  /// into a picture of the viewport's size, and reads the pictures back.
   Future<FrameRenders> _renderCanvas(String name, RasterizerFrame frame) async {
     frame.render();
     final runs = <GoldenImage>[];

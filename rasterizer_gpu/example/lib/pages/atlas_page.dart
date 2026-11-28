@@ -8,22 +8,26 @@ import '../layout_size.dart';
 import '../scenes.dart';
 import '../startup_log.dart';
 
-/// The atlas benchmark: [entries] entries of [count] generated SVGs, each
+/// A benchmark that draws [entries] entries of [count] generated SVGs, each
 /// moving and spinning.
 ///
 /// It splits the entries into [runs] runs in paint order, and paints grey
 /// bars between the runs, as stand-ins for sprites. After [frames] frames, it
 /// logs `RASTERIZER_ATLAS` timing statistics, and keeps animating. The golden
-/// tests render one of its frames.
+/// tests render a frame of the same motion: see [AtlasMotion].
 class const AtlasPage({
   super.key,
 
   /// How many different SVGs it generates.
   final int count = 50,
 
-  /// How many SVGs it draws.
+  /// How many entries it draws, each one of the generated SVGs.
   final int entries = 1000,
+
+  /// How many runs it splits the entries into.
   final int runs = 4,
+
+  /// How many frames it times before it logs the statistics.
   final int frames = 300,
 
   /// The GPU renderer to use where it's supported, as
@@ -40,7 +44,7 @@ class _AtlasPageState()
   RasterizerRenderer? _renderer;
   final List<RasterizerScene> _scenes = [];
 
-  /// The runs that the last render drew, but the empty ones.
+  /// The runs that the last render drew, except the empty ones.
   List<RasterizerRun> _drawn = const [];
   Size? _size;
   double _ratio = 1;
@@ -77,8 +81,8 @@ class _AtlasPageState()
         return;
       }
       // The largest size that an SVG is drawn at, for the mesh renderer's
-      // curves: its view box at 1.6 / 12 of the viewport's shorter side, and
-      // the viewport at most the window.
+      // curves. Its view box is drawn at up to 1.6 / 12 of the viewport's
+      // shorter side, and the viewport is at most the window.
       final maxSize = 1.6 * View.of(context).physicalSize.shortestSide / 12;
       _scenes.addAll([
         for (final svg in generatedSvgs(widget.count))
@@ -153,7 +157,7 @@ class _AtlasPageState()
     if (++_frame != widget.frames) {
       return;
     }
-    // The first 5 frames warm up, unless they're all there is.
+    // Leave out the first 5 frames, which warm up, unless there are no others.
     final warmUp = _timings.length > 5 ? 5 : 0;
     String stats(String name, int k) {
       final values = [for (final row in _timings.skip(warmUp)) row[k]]..sort();
@@ -224,7 +228,8 @@ class _AtlasPageState()
 /// Draws each run, and a grey bar after each but the last, standing in for a
 /// sprite between runs.
 ///
-/// A GPU run draws as images of its parts, and a canvas run as its paths.
+/// A GPU or mesh run draws as images of its parts, and a canvas run as its
+/// paths.
 /// [render] counts renders, so that a new render repaints: the renderer
 /// reuses its run objects.
 class _RunsPainter(

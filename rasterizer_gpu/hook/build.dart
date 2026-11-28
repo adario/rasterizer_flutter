@@ -8,17 +8,17 @@ import 'package:native_toolchain_c/native_toolchain_c.dart';
 
 /// Builds the GPU renderers' shader bundle and the package's native library.
 ///
-/// The library holds the Rasterizer core, NanoSVG, libtess2 and the C API, for
-/// macOS, iOS, 64-bit Android, Linux and Windows. The core's sources are in
-/// src/core, and libtess2's in src/libtess2: see each one's README.md.
+/// The library holds the C++ core, NanoSVG, libtess2 and the C API, for macOS,
+/// iOS, 64-bit Android, Linux and Windows. The core's sources are in src/core,
+/// and libtess2's are in src/libtess2. Each folder has a README.md.
 ///
 /// flutter_gpu_shaders always writes the bundle into this package's
 /// build/shaderbundles/, and pubspec.yaml lists it as an asset. When the
-/// package is hosted, that's its folder in the pub cache. flutter_gpu_shaders
-/// allows for that: its engine stamp reruns the hook when another project's
-/// SDK rewrote the bundle. Dart data assets would avoid writing there, but
-/// stable Flutter doesn't have them yet. A prebuilt bundle wouldn't work
-/// either, as bundles are tied to the engine's impellerc.
+/// package is installed from a pub server, that folder is in the pub cache.
+/// flutter_gpu_shaders allows for that: its engine stamp reruns the hook when
+/// another project's SDK rewrote the bundle. Dart data assets would avoid
+/// writing there, but stable Flutter doesn't have them yet. A prebuilt bundle
+/// wouldn't work either, as each bundle is tied to the engine's impellerc.
 void main(List<String> args) async {
   await build(args, (input, output) async {
     await buildShaderBundleJson(
@@ -50,8 +50,8 @@ void main(List<String> args) async {
       );
       return;
     }
-    // Nor on 32-bit Android. `flutter build apk` builds it by default, and
-    // checkSupport reports it as unsupported.
+    // 32-bit Android has no GPU renderer either. `flutter build apk` builds
+    // for it by default, and checkSupport reports it as unsupported.
     if (os == OS.android &&
         code.targetArchitecture != Architecture.arm64 &&
         code.targetArchitecture != Architecture.x64) {
@@ -89,9 +89,9 @@ void main(List<String> args) async {
           // MSVC unwinds C++ exceptions, which the core throws, only with
           // /EHsc. It already exports only RA_EXPORT's dllexport functions.
           ? ['/EHsc']
-          // Export only the C API, RA_EXPORT: not NanoSVG's, libtess2's or
-          // xxHash's symbols, which another library loaded alongside may
-          // have too.
+          // Export only the C API's RA_EXPORT functions. NanoSVG, libtess2
+          // and xxHash stay hidden, as another library loaded alongside may
+          // export the same symbols.
           : ['-fvisibility=hidden', '-fvisibility-inlines-hidden'],
     );
     await cbuilder.run(

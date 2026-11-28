@@ -15,7 +15,7 @@ import 'goldens.dart';
 /// It copies each run's parts out of the atlas pages into an image of the
 /// golden viewport's size. It also counts the pixels that the pages have
 /// outside all the parts. With [recordDir], it writes the frame's atlas
-/// pages, core frames and lists there too: see [GoldenRenders].
+/// pages, core frames and entry lists there too: see [GoldenRenders].
 Future<FrameRenders>? renderAtlasFrame(
   String name,
   RasterizerFrame frame,
@@ -141,7 +141,7 @@ Future<FrameRenders> _render(
   }
 
   // Write each page's pixels, and a list of the entries drawn into it, each
-  // with its SVG's name.
+  // with its transform, its clip and its SVG's name.
   if (record != null) {
     for (final MapEntry(:key, :value) in pages.entries) {
       final (width: pw, height: ph) = frame.pageSizes[key];

@@ -23,7 +23,7 @@ import '../startup_log.dart';
 /// in further, the curves show their segments.
 ///
 /// With [sweep], it runs the fixed pan-and-zoom sweep of [sweepFrames]
-/// frames instead, one render per frame: see [sweepView]. It then logs
+/// frames, one render per frame: see [sweepView]. It then logs
 /// `RASTERIZER_SWEEP` timing statistics. The golden tests render the
 /// sweep's checkpoints.
 class const SvgPage({
@@ -37,13 +37,16 @@ class const SvgPage({
   /// Whether the GPU renderer draws curves as quadratics, rather than as line
   /// segments.
   final bool useCurves = false,
+
+  /// Whether it runs the sweep once the asset has loaded.
   final bool sweep = false,
 
   /// The renderer's frames in flight.
   final int slots = 2,
 
-  /// How many times it draws the asset across and down. The copies are
-  /// offset by whole multiples of the asset's bounds, rounded up.
+  /// How many times it draws the asset across and down.
+  ///
+  /// The copies are spaced by the asset's size, rounded up to whole units.
   final int grid = 1,
 }) extends StatefulWidget {
   @override
@@ -313,7 +316,7 @@ class _SvgPageState()
     }
   }
 
-  /// Logs the sweep's timing statistics, but for its first frame's, which
+  /// Logs the sweep's timing statistics, leaving out its first frame, which
   /// warms up.
   void _logSweep() {
     String stats(String name, int k) {
@@ -387,7 +390,8 @@ class _SvgPageState()
 
 /// Draws a run, rendered in device pixels, scaled by the page's pixel ratio.
 ///
-/// A GPU run draws as images of its parts, and a canvas run as its paths.
+/// A GPU or mesh run draws as images of its parts, and a canvas run as its
+/// paths.
 /// [render] counts renders, so that a new render repaints: the renderer
 /// reuses its run objects.
 class _RunPainter(final RasterizerRun run, final int render, final double ratio)

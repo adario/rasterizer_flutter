@@ -5,14 +5,15 @@ import 'package:rasterizer_gpu/rasterizer_gpu.dart' show RasterizerPaintedPath;
 
 import 'affine.dart';
 
-/// Returns a scale by [s] about the point [f], with y pointing down.
+/// Returns a scale by [s] about the point [f].
 Affine about(Offset f, double s) =>
     Affine(s, 0, 0, s, f.dx * (1 - s), f.dy * (1 - s));
 
 /// The number of frames in the sweep, a camera move over the tiger SVG.
 ///
-/// The sweep zooms into the tiger's left eye up to 20x, zooms out to 0.05x,
-/// then pans off the page's bottom left, 60 frames each.
+/// The sweep zooms into the tiger's left eye up to 20x, then zooms out to
+/// 0.05x. Last, at 1.5x, it moves the tiger up and to the left. Each of the
+/// three moves takes 60 frames.
 const sweepFrames = 180;
 
 /// The sweep's frames that the goldens check.
@@ -41,8 +42,8 @@ Affine sweepView(int i, Size size) {
 /// Returns the transforms that draw a scene of [bounds] [grid] x [grid]
 /// times.
 ///
-/// It offsets the copies by whole multiples of the scene's size, rounded up.
-/// It fits the whole grid to a page of [size] points, then applies [view],
+/// It spaces the copies by the scene's size, rounded up to whole units. It
+/// fits the whole grid to a page of [size] points, then applies [view],
 /// then scales by [ratio] device pixels a point.
 List<Affine> gridTransforms(
   Rect bounds,
@@ -80,10 +81,10 @@ List<Affine> gridTransforms(
 /// with fill, stroke and stop opacities.
 ///
 /// vector_graphics_compiler draws them all as SVG says, as Chrome does. The
-/// strokes' gradients are diagonal: on iOS devices and the iOS Simulator,
-/// Impeller draws only the inner half of a stroked rectangle whose horizontal
-/// or vertical linear gradient ends on its bounds, while macOS's draws the
-/// whole stroke from the same canvas calls.
+/// strokes' gradients are diagonal because of an Impeller bug. On iOS
+/// devices and the iOS Simulator, it draws only the inner half of a stroked
+/// rectangle whose horizontal or vertical linear gradient ends on its bounds.
+/// On macOS, it draws the whole stroke from the same canvas calls.
 const gradientsSvg = '''
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
 <defs>
@@ -115,14 +116,14 @@ const gradientsSvg = '''
 </svg>''';
 
 /// An SVG of gradients that vector_graphics_compiler doesn't draw as SVG
-/// says, while Chrome and the core do.
+/// says, while Chrome and the C++ core do.
 ///
-/// It has diagonal bounding box gradients on shapes that aren't square, and
-/// on a stretched square, whose colour bands follow the bounds' proportions.
-/// It also has rotated gradients on shapes that aren't square, and a line
-/// with no height, which a bounding box gradient doesn't paint. Last comes a
-/// skewed radial gradient, as vector_graphics_compiler reads skew angles as
-/// radians rather than degrees.
+/// It has diagonal bounding box gradients on shapes that aren't square, one
+/// of them in a stretched group. Their colour bands follow the bounds'
+/// proportions. It also has rotated gradients on shapes that aren't square,
+/// and a line with no height, which a bounding box gradient doesn't paint.
+/// Last comes a skewed radial gradient: vector_graphics_compiler reads skew
+/// angles as radians rather than degrees.
 const gradientsSkewedSvg = '''
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
 <defs>
@@ -191,7 +192,7 @@ const strokesSvg = '''
 </svg>''';
 
 /// An SVG of strokes thin enough that, drawn small, the mesh renderer widens
-/// them to its least width, so that 4x MSAA doesn't break them into dots.
+/// them to its minimum width, so that 4x MSAA doesn't break them into dots.
 ///
 /// It has a curve, miter, bevel and round joins, a circle, and opaque
 /// strokes that cross and turn back on themselves. Those last three lie over
@@ -265,9 +266,9 @@ List<RasterizerPaintedPath> goldenPaths() {
   final wave = Path()
     ..moveTo(770, 440)
     ..cubicTo(830, 260, 920, 520, 980, 320);
-  // Its lower miter stays within the scene's bounds, which the triangle sets.
-  // The GPU renderer clips runs to those bounds, which take in half a
-  // stroke's width but not its miters.
+  // Its lower miter stays within the scene's bounds, whose bottom the
+  // triangle sets. The GPU renderer clips runs to those bounds, which take in
+  // half a stroke's width but not its miters.
   final zigzag = Path()
     ..addPolygon(const [
       Offset(40, 700),
@@ -322,10 +323,11 @@ List<RasterizerPaintedPath> goldenPaths() {
   ];
 }
 
-/// Returns a shape 3 units wide, the size of a Forge2D body, with a stroke
-/// 0.05 units wide: a body and two wheels.
+/// Returns a car 3 units wide: a body with a stroke 0.05 units wide, and two
+/// wheels.
 ///
-/// The paths golden draws it on [goldenPaths]' page at 40 pixels a unit.
+/// It's sized like a physics engine's body, in meters. The paths golden
+/// draws it on [goldenPaths]' page at 40 pixels per unit.
 List<RasterizerPaintedPath> goldenSmallPaths() {
   final body = Path()
     ..addRRect(

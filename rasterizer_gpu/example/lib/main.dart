@@ -10,9 +10,9 @@ import 'startup_log.dart';
 const String kPage = String.fromEnvironment('PAGE', defaultValue: 'svg');
 
 // Settings for the svg page. SVG names the asset, and CURVES=false draws
-// curves as line segments. SWEEP=true runs the sweep and logs its timings.
-// GRID=n draws the SVG n x n times, and SLOTS sets the renderer's frames in
-// flight.
+// curves as line segments. SWEEP=true runs the sweep, a fixed camera move,
+// and logs its timings. GRID=n draws the SVG n x n times, and SLOTS sets the
+// renderer's frames in flight.
 const String kSvg = String.fromEnvironment(
   'SVG',
   defaultValue: 'assets/tiger/tiger.svg',

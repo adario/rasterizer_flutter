@@ -10,10 +10,11 @@ import 'package:flutter/widgets.dart'
 /// Logs the app's frames until its page has created its renderer, and for as
 /// long again after it, as a baseline.
 ///
-/// It logs a `RASTERIZER_EXAMPLE startup` line with each of the two windows'
-/// frames, the longest gap between frames, and how many gaps missed a vsync.
-/// On OpenGL ES, creating a GPU renderer compiles its pipelines on the UI
-/// thread, which shows as gaps.
+/// It logs a `RASTERIZER_EXAMPLE startup` line. For each of the two windows,
+/// it gives the frame count, the longest gap between frames, how many gaps
+/// missed a vsync, and the longest build and raster times. Then comes the
+/// longest UI thread stall. On OpenGL ES, creating a GPU renderer compiles
+/// its pipelines on the UI thread, which shows as gaps.
 ///
 /// Meanwhile, `RASTERIZER_EXAMPLE event` lines mark the first frame
 /// rasterized, lifecycle changes, and stalls of the UI thread over 250 ms,
