@@ -1,17 +1,20 @@
 //
-//  Meshes: an SVG imported once into triangles in its own coordinates, y down, which the mesh renderer uploads once &
-//  draws under each component's transform. NanoSVG parses it & RasterizerSVG.hpp writes each shape's Geometry, as for a
-//  scene. Its curves are flattened once, within a tolerance. Fills are tessellated by libtess2 with their winding rule, &
-//  strokes outlined, with their joins, caps & dashes, as strips of triangles, or where a strip overlaps itself, libtess2's
-//  non-zero union of it. So the triangles are each path's coverage, holes, overlaps & self-crossings included, & never
-//  overlap within a path. Plain paths come flattened already, as polylines (ra_paths.hpp), & import the same way, except for
-//  a separate fill, which fills each contour on its own, a convex one as a fan, so that its triangles can overlap.
-//  A stroke's strip also holds each vertex's offset from the polyline point it's built around, for the vertex shader to
-//  hold the stroke at a least width on screen. A union's crossings come from no point, so an opaque stroke that overlaps itself
-//  keeps its strip too, in a second list of indices, for the instances drawn without an opacity, whose overlaps can't show.
-//  A path can glow, as a neon tube: a halo, a ribbon around it of triangles with a per-vertex falloff, a path of the mesh
-//  painted before all the others, & a core, another over each draw, that turns near white down its middle, a path of the mesh
-//  right after it. Both are in both lists of indices, so the instanced draw that paints each instance's path paints them too.
+//  Meshes: an SVG imported once into triangles in its own coordinates, y down, which the mesh renderer uploads once and
+//  draws under each entry's transform. As for a scene, NanoSVG parses the SVG and RasterizerSVG.hpp writes each shape's
+//  Geometry. The curves are flattened once, within a tolerance. libtess2 tessellates fills with their winding rule. Strokes
+//  are outlined, with their joins, caps and dashes, as strips of triangles; where a strip overlaps itself, libtess2's
+//  non-zero union of the strip replaces it. So each path's triangles cover exactly its area, holes, overlaps and
+//  self-crossings included, and never overlap each other. Plain paths arrive already flattened, as polylines (ra_paths.hpp),
+//  and are imported the same way. The exception is a separate fill, which fills each contour on its own, a convex one as a
+//  fan, so that its triangles can overlap.
+//  A stroke's strip also stores each vertex's offset from the polyline point it's built around, so that the vertex shader can
+//  keep the stroke at a minimum width on screen. The crossings of a union aren't built around any polyline point, so an opaque
+//  stroke that overlaps itself also keeps its strip, in a second list of indices. Instances drawn without an opacity use that
+//  list, as their overlaps can't show.
+//  A path can glow like a neon tube. Its halo is a ribbon of triangles around it, with a falloff stored per vertex, and is a
+//  path of the mesh painted before all the others. Its core, over each draw, turns near white down the middle, and is a path
+//  of the mesh right after that draw. Both lists of indices include halos and cores, so the instanced draw that paints each
+//  instance's path paints them too.
 //
 
 #pragma once
@@ -32,12 +35,12 @@
 #include "tesselator.h"
 
 struct RaMesh {
-    std::vector<float> vertices;            // Per vertex x, y & its path's index, & in a mesh with strokes its offset, then a glow's
+    std::vector<float> vertices;            // Per vertex: x, y and its path's index, then its offset and glow, if any
     uint32_t vertexFloats = 3;              // Per vertex: 3, 5 in a mesh with strokes, or 6 in a mesh with a glow
-    std::vector<uint16_t> indices16;        // The triangles in paint order, in one of them: u16 when each index is below
-    std::vector<uint32_t> indices32;        // 0xFFFF, some APIs' primitive restart, else u32
-    std::vector<uint16_t> stripIndices16;   // The same with opaque overlapping strokes' strips for their unions, in one of
-    std::vector<uint32_t> stripIndices32;   // them, u16 as above, if hasStrips
+    std::vector<uint16_t> indices16;        // The triangles in paint order, in one of these: u16 if every index is below
+    std::vector<uint32_t> indices32;        // 0xFFFF, which some APIs reserve for primitive restart, else u32
+    std::vector<uint16_t> stripIndices16;   // The same, with opaque self-overlapping strokes' strips instead of their
+    std::vector<uint32_t> stripIndices32;   // unions, in one of these, u16 as above, if hasStrips
     bool hasStrips = false;
     std::vector<RaMeshPath> paths;
     std::vector<RaMeshStop> stops;
@@ -54,7 +57,7 @@ struct RasterizerMesh {
         float x, y;
     };
     struct StrokeVertex {
-        Point p, u;     // Its position, & its offset from the polyline point it's built around, in half widths
+        Point p, u;     // Its position, and its offset from the polyline point it's built around, in half widths
     };
     struct VertexKey {
         uint64_t p, u;
@@ -72,14 +75,14 @@ struct RasterizerMesh {
     struct Stroker;
     struct Ribbon;
 
-    // libtess2's sweep can run away on a path, adding crossings without end at gigabytes a second. So its tessellations draw on
-    // a budget of live bytes: past it its allocations fail, its sweep gives up & the path isn't drawn. A sweep that gives up
-    // leaves its dictionary & priority queue behind, so this owns every block, & frees what libtess2 didn't
+    // libtess2's sweep can run away on a path, adding crossings without end. So each tessellation gets a budget of live
+    // bytes: past it, allocations fail, the sweep gives up and the path isn't drawn. A sweep that gives up leaks its
+    // dictionary and priority queue, so this allocator owns every block and frees whatever libtess2 didn't.
     struct TessMemory {
         static constexpr size_t kLeastBudget = size_t(64) << 20;    // Some 190,000 crossings
         static constexpr size_t kBudgetPerPoint = 4096;             // Some 12 crossings
         struct Block {
-            Block *prev, *next;  size_t size, unused;               // 32 bytes, so what follows is aligned as malloc's
+            Block *prev, *next;  size_t size, unused;               // 32 bytes, so the data after it keeps malloc's alignment
         };
         Block blocks = { &blocks, &blocks, 0, 0 };
         size_t budget, used = 0;
@@ -131,8 +134,8 @@ struct RasterizerMesh {
             free(block);
         }
     };
-    // The first tessellation in a process to pass its budget is reported, & with RASTERIZER_TESS_BUDGET_FILE set to a path,
-    // its contours are written there, the coordinates as hex floats, so exactly, to reproduce it with
+    // Reports the first tessellation in the process that exceeds its budget. If RASTERIZER_TESS_BUDGET_FILE is set to a
+    // path, also writes the contours there, with the coordinates as exact hex floats, so that the failure can be reproduced.
     static void reportExceeded(const TessMemory& memory, int windingRule, const std::vector<Subpath>& contours) {
         static std::atomic_flag reported = ATOMIC_FLAG_INIT;
         if (!memory.exceeded || reported.test_and_set())
@@ -166,14 +169,14 @@ struct RasterizerMesh {
         reportExceeded(memory, windingRule, triangles);
     }
 
-    // Imports image's visible shapes, as RaSVG::addSvgImageToScene adds them to a scene: each shape's fill, then its stroke. The
-    // curves are flattened to within kTolerancePixels device pixels at maxSize, the device pixels that the SVG's longer side is
-    // drawn at, at most
+    // Imports image's visible shapes as RaSVG::addSvgImageToScene adds them to a scene: each shape's fill, then its stroke.
+    // The curves are flattened to within kTolerancePixels device pixels when the SVG's longer side is drawn maxSize device
+    // pixels long, the largest size it's drawn at.
     static RaMesh *createMesh(NSVGimage *image, RaBounds svgBounds, float maxSize) {
         RaMesh *mesh = new RaMesh();
         mesh->svgBounds = svgBounds;
         float side = fmaxf(svgBounds.ux - svgBounds.lx, svgBounds.uy - svgBounds.ly);
-        if (!(side > 0.f)) {     // No viewBox, width or height, so the shapes' own
+        if (!(side > 0.f)) {     // No viewBox, width or height, so use the shapes' bounds
             Ra::Bounds b;
             for (NSVGshape *shape = image->shapes; shape != NULL; shape = shape->next)
                 b.extend(shape->bounds[0], shape->bounds[1]), b.extend(shape->bounds[2], shape->bounds[3]);
@@ -216,18 +219,20 @@ struct RasterizerMesh {
         return finish(mesh);
     }
 
-    // Imports draws of contours' paths, as createMesh imports an SVG's shapes, in paint order: each a fill with its rule,
-    // which closes open contours, or a stroke, its round joins & caps within tolerance, in the paths' units, of their arcs. A glow
-    // that shows puts its halos before all of them, & each draw's core right after it, so that a later draw still paints over it
+    // Imports draws of contours' paths in paint order, as createMesh imports an SVG's shapes. Each draw is a fill with its
+    // rule, which closes open contours, or a stroke whose round joins and caps are within tolerance of their arcs, in the
+    // paths' units. A glow with a positive radius and strength puts its halos before all the draws, and each draw's core
+    // right after the draw, so that later draws still paint over the core.
     static RaMesh *createMeshFromPaths(const RaContours& contours, const RaPathDraw *draws, uint64_t count, RaBounds viewBox, float tolerance, const RaGlow *glow) {
         RaMesh *mesh = new RaMesh();
         mesh->svgBounds = viewBox;
         RasterizerPaths::Index index(contours);
         std::vector<Subpath> subpaths;
         const std::vector<RaMeshStop> stops;
-        // Dart's PathMetric leaves corners that met a float step or two apart, & on edges so nearly collinear libtess2's sweep can
-        // contradict itself: it gives up, spins or runs away, mostly on arm64, whose fused multiply-add keeps rounding errors that
-        // would have been 0. So points go on a grid of at most 1/32 of tolerance, a power of 2 so that they land on it exactly
+        // Dart's PathMetric can leave a corner's points a float step or two apart, on edges so nearly collinear that
+        // libtess2's sweep contradicts itself. It then gives up, spins or runs away, mostly on arm64, where fused
+        // multiply-add keeps rounding errors that would otherwise be 0. So points are snapped to a grid of at most 1/32 of
+        // tolerance, a power of 2 so that they land on it exactly.
         const float grid = ldexpf(1.f, ilogbf(tolerance / 32.f));
         const bool glows = glow != nullptr && glow->radius > 0.f && isfinite(glow->radius) && glow->strength > 0.f;
         const std::vector<Drawn> drawn = glows ? addGlow(*glow, index, contours, draws, count, grid, *mesh) : std::vector<Drawn>();
@@ -251,12 +256,12 @@ struct RasterizerMesh {
         }
         return finish(mesh);
     }
-    // Writes path's contours to subpaths, their points on the grid. False if one of their points isn't finite
+    // Writes path's contours to subpaths, with their points on the grid. Returns false if any of their points isn't finite.
     static bool readContours(const RasterizerPaths::Index& index, uint64_t path, float grid, std::vector<Subpath>& subpaths) {
         subpaths.clear();
         return index.forEachContour(path, [&](const float *p, uint32_t n, bool closed) {
             subpaths.emplace_back();
-            // Reserves the points once: growing them at each doubling took most of the time to import small contours
+            // Reserves room for all the points at once, so that the vector doesn't grow as they're added.
             subpaths.back().points.reserve(n);
             for (uint32_t k = 0; k < n; k++)
                 addPoint(subpaths.back(), roundf(p[2 * k] / grid) * grid, roundf(p[2 * k + 1] / grid) * grid);
@@ -264,10 +269,10 @@ struct RasterizerMesh {
             endSubpath(subpaths);
         });
     }
-    // Makes mesh's vertices hold a glow, & appends a halo for each path that a draw paints, as a path of the mesh, before the
-    // draws' own. Each is in the color of the path's last draw that paints, unless glow has its own. A path that any draw strokes
-    // has its halo on both sides of its polylines, reaching a glow of 1 at the widest stroke's edge, & the widest stroke measures
-    // a radius in line widths. Returns what's drawn of each path
+    // Makes mesh's vertices hold a glow, and appends a halo for each path that a draw paints, as a path of the mesh, before
+    // the draws' own paths. A halo has the color of the path's last draw that paints, unless glow has its own color. A path
+    // that any draw strokes has its halo on both sides of its polylines, with a glow of 1 at the widest stroke's edge, and that
+    // stroke's width is the line width for a radius in line widths. Returns what the draws do to each path.
     static std::vector<Drawn> addGlow(const RaGlow& glow, const RasterizerPaths::Index& index, const RaContours& contours, const RaPathDraw *draws, uint64_t count, float grid, RaMesh& mesh) {
         mesh.vertexFloats = 6;
         std::vector<Drawn> drawn(contours.pathCount);
@@ -302,10 +307,11 @@ struct RasterizerMesh {
         }
         return drawn;
     }
-    // Appends draw's core, which goes over it, to mesh as a path with paint & stops: along a stroke's polylines, as wide as it is,
-    // or if inWidths, as then a fill is a line, inward of each of a fill's contours that's neither inside another nor around one,
-    // as that may be a hole, which a core would paint. A hairline has no width for one, nor has a fill of a path that's stroked,
-    // as its halo follows the polylines
+    // Appends draw's core, which goes over the draw, to mesh as a path with paint and stops. A stroke's core runs along its
+    // polylines, as wide as the stroke. A fill gets a core only if inWidths, as then the fill is treated as a line. Its core
+    // goes inward of each contour that is neither inside another nor around one, as such a contour may be a hole, which a core
+    // would paint over. A hairline has no width for a core. A fill of a stroked path has none either, as its halo follows the
+    // polylines.
     static void addCore(const RaPathDraw& draw, bool pathStroked, bool inWidths, const std::vector<Subpath>& subpaths, RaMeshPath paint, const std::vector<RaMeshStop>& stops, Ribbon& core, RaMesh& mesh) {
         const bool stroke = draw.strokeWidth > 0.f;
         if (draw.hairline || (!stroke && (pathStroked || !inWidths)))
@@ -321,8 +327,8 @@ struct RasterizerMesh {
         if (mesh.indices32.size() > paint.indexBegin)
             endPath(paint, stops, mesh, true);
     }
-    // Which of contours are inside another of them, all of their points by the even-odd rule, or have another inside. Their
-    // bounds rule most pairs out
+    // Returns which contours are inside another one, with all of their points inside by the even-odd rule, or have another
+    // one inside. Comparing bounds first rules out most pairs.
     static std::vector<bool> nestedContours(const std::vector<Subpath>& contours) {
         std::vector<bool> nested(contours.size(), false);
         std::vector<Ra::Bounds> bounds(contours.size());
@@ -348,7 +354,7 @@ struct RasterizerMesh {
         }
         return true;
     }
-    // Appends subpaths' fill, with the even-odd rule or the non-zero one, to mesh as a path with paint & stops
+    // Appends subpaths' fill, with the even-odd rule or the non-zero one, to mesh as a path with paint and stops.
     static void addFill(const std::vector<Subpath>& subpaths, bool evenOdd, RaMeshPath paint, const std::vector<RaMeshStop>& stops, RaMesh& mesh) {
         size_t points = 0;
         for (const Subpath& subpath: subpaths)
@@ -362,7 +368,7 @@ struct RasterizerMesh {
         addPath(tess, windingRule, paint, stops, mesh);
         reportExceeded(memory, windingRule, subpaths);
     }
-    // Moves mesh's indices to u16 if they all fit
+    // Moves mesh's indices to u16 if they all fit.
     static RaMesh *finish(RaMesh *mesh) {
         if (mesh->vertices.size() / mesh->vertexFloats <= 0xFFFF) {
             mesh->indices16.assign(mesh->indices32.begin(), mesh->indices32.end());
@@ -373,7 +379,8 @@ struct RasterizerMesh {
         return mesh;
     }
 
-    // A paint as a path's: a premultiplied color, or a gradient's inverse transform & stops. False if it paints nothing
+    // Converts an SVG paint into a path's paint: a premultiplied color, or a gradient's inverse transform and stops. Returns
+    // false if it paints nothing.
     static bool paintFromPaint(const NSVGpaint& paint, float opacity, RaMeshPath& path, std::vector<RaMeshStop>& stops) {
         path = RaMeshPath();
         stops.clear();
@@ -382,7 +389,7 @@ struct RasterizerMesh {
         const NSVGgradient *gradient = paint.gradient;
         if (gradient == nullptr || gradient->nstops == 0)
             return false;
-        // NanoSVG's xform maps the gradient's space into the SVG's: its inverse is what a fragment shader needs
+        // NanoSVG's xform maps the gradient's space into the SVG's, and a fragment shader needs its inverse.
         const float *t = gradient->xform;
         float det = t[0] * t[3] - t[1] * t[2];
         if (gradient->nstops == 1 || !(fabsf(det) > 1e-12f) || !isfinite(det))     // As SVG says, the last stop's color
@@ -408,7 +415,8 @@ struct RasterizerMesh {
         return a > 0.f;
     }
 
-    // As Mesh.isOpaque in Dart: its color's alpha is 1, or each of its gradient's stops' is
+    // Whether a path's paint is opaque, as Mesh.isOpaque in Dart decides for each path: its color's alpha is 1, or the alpha
+    // of each of its gradient's stops is.
     static bool isOpaque(const RaMeshPath& paint, const std::vector<RaMeshStop>& stops) {
         if (paint.type == RA_PAINT_COLOR)
             return paint.a == 1.f;
@@ -417,9 +425,10 @@ struct RasterizerMesh {
                 return false;
         return !stops.empty();
     }
-    // Appends a stroke's strip to mesh as a path with paint & stops, unless it overlaps itself by more than float rounding: then
-    // its non-zero union, as an opacity applied when drawing would show its overlaps. The union's crossings have no offsets, so
-    // an opaque paint keeps the strip too, for instances drawn without one. A hairline's strip has no area to test, & stays
+    // Appends a stroke's strip to mesh as a path with paint and stops. If the strip overlaps itself by more than float
+    // rounding, appends its non-zero union instead, as an opacity applied when drawing would show the overlaps. The union's
+    // crossings have no offsets, so with an opaque paint the strip is kept too, for instances drawn without an opacity. A
+    // hairline's strip has no area to test, so it's always kept.
     static void addStroke(const Stroker& stroker, RaMeshPath paint, const std::vector<RaMeshStop>& stops, RaMesh& mesh) {
         static const TESSreal normal[3] = { 0.f, 0.f, 1.f };
         const std::vector<StrokeVertex>& strip = stroker.strip;
@@ -436,8 +445,8 @@ struct RasterizerMesh {
         TESStesselator *tess = tessNewTess(&memory.alloc);
         for (size_t i = 0; i < strip.size(); i += 3)
             tessAddContour(tess, 2, &strip[i], sizeof(StrokeVertex), 3);
-        // The strip's triangles are counter-clockwise, so where they overlap, the winding is 2 or more. An overlap counts once
-        // its region's width, 2 · area / perimeter, passes 16 ulps of the coordinates, float rounding's
+        // The strip's triangles are counter-clockwise, so where they overlap, the winding is 2 or more. An overlap counts only
+        // if its region's width, 2 · area / perimeter, exceeds 16 ulps of the coordinates, beyond float rounding.
         bool overlaps = false;
         if (tessTesselate(tess, TESS_WINDING_ABS_GEQ_TWO, TESS_BOUNDARY_CONTOURS, 0, 2, normal)) {
             const TESSreal *v = tessGetVertices(tess);
@@ -457,7 +466,7 @@ struct RasterizerMesh {
         reportExceeded(memory, TESS_WINDING_ABS_GEQ_TWO, strip);
         if (!overlaps)
             return addTriangles(strip, paint, stops, mesh);
-        // The union's boundary, then its triangles: tessellated at once, the triangles' crossings would stay as vertices
+        // First the union's boundary, then its triangles: a single tessellation would keep the triangles' crossings as vertices.
         tess = tessNewTess(&memory.alloc);
         for (size_t i = 0; i < strip.size(); i += 3)
             tessAddContour(tess, 2, &strip[i], sizeof(StrokeVertex), 3);
@@ -478,7 +487,8 @@ struct RasterizerMesh {
             weld(strip, float(path), mesh, mesh.stripIndices32);
         reportExceeded(memory, TESS_WINDING_NONZERO, strip);
     }
-    // Makes room for the offsets of mesh's vertices, 0 for those so far, as a mesh without strokes has none
+    // Makes room for an offset in each of mesh's vertices, as a mesh without strokes has none, and sets the offsets of the
+    // existing vertices to 0.
     static void addOffsets(RaMesh& mesh) {
         if (mesh.vertexFloats >= 5)
             return;
@@ -499,7 +509,8 @@ struct RasterizerMesh {
             mesh.vertices.push_back(glow);
         mesh.bounds.extend(p.x, p.y);
     }
-    // Appends triangles, 3 vertices each, to mesh with path's index, each distinct vertex once, & their indices to indices
+    // Appends triangles, 3 vertices each, to mesh with path's index, adding each distinct vertex once, and appends their
+    // indices to indices.
     static void weld(const std::vector<StrokeVertex>& triangles, float path, RaMesh& mesh, std::vector<uint32_t>& indices) {
         std::unordered_map<VertexKey, uint32_t, VertexKeyHash> welded;
         for (const StrokeVertex& v: triangles) {
@@ -511,7 +522,7 @@ struct RasterizerMesh {
             indices.push_back(found.first->second);
         }
     }
-    // Appends triangles, 3 vertices each, to mesh as a path with paint & stops
+    // Appends triangles, 3 vertices each, to mesh as a path with paint and stops.
     static void addTriangles(const std::vector<StrokeVertex>& triangles, RaMeshPath paint, const std::vector<RaMeshStop>& stops, RaMesh& mesh) {
         if (triangles.empty())
             return;
@@ -519,7 +530,8 @@ struct RasterizerMesh {
         weld(triangles, float(mesh.paths.size()), mesh, mesh.indices32);
         endPath(paint, stops, mesh, true);
     }
-    // Ends mesh's path with paint & stops, whose indices were appended from paint.indexBegin, in the strips' list too if shared
+    // Ends mesh's current path with paint and stops. Its indices start at paint.indexBegin. If shared, and the mesh has
+    // strips, they also go into the strips' list.
     static void endPath(RaMeshPath paint, const std::vector<RaMeshStop>& stops, RaMesh& mesh, bool shared) {
         paint.indexCount = uint32_t(mesh.indices32.size()) - paint.indexBegin;
         paint.stopBegin = uint32_t(mesh.stops.size());
@@ -528,16 +540,16 @@ struct RasterizerMesh {
         if (shared && mesh.hasStrips)
             mesh.stripIndices32.insert(mesh.stripIndices32.end(), mesh.indices32.begin() + paint.indexBegin, mesh.indices32.end());
     }
-    // Appends tess's contours, tessellated with windingRule, to mesh as a path with paint & stops, & deletes tess. Its vertices
-    // have no offsets. Its indices are in the strips' list too if shared
+    // Tessellates tess's contours with windingRule, appends the triangles to mesh as a path with paint and stops, and deletes
+    // tess. The vertices have no offsets. If shared, the indices also go into the strips' list.
     static void addPath(TESStesselator *tess, int windingRule, RaMeshPath paint, const std::vector<RaMeshStop>& stops, RaMesh& mesh, bool shared = true) {
         paint.indexBegin = uint32_t(mesh.indices32.size());
         if (addTessellation(tess, windingRule, float(mesh.paths.size()), mesh))
             endPath(paint, stops, mesh, shared);
         tessDeleteTess(tess);
     }
-    // Tessellates tess's contours with windingRule, & appends the triangles to mesh with path's index. Returns false if there
-    // are none
+    // Tessellates tess's contours with windingRule, and appends the triangles to mesh with path's index. Returns false if the
+    // tessellation fails or has no triangles.
     static bool addTessellation(TESStesselator *tess, int windingRule, float path, RaMesh& mesh) {
         static const TESSreal normal[3] = { 0.f, 0.f, 1.f };
         if (!tessTesselate(tess, windingRule, TESS_POLYGONS, 3, 2, normal) || tessGetElementCount(tess) == 0)
@@ -552,10 +564,10 @@ struct RasterizerMesh {
                 mesh.indices32.insert(mesh.indices32.end(), { base + uint32_t(elements[0]), base + uint32_t(elements[1]), base + uint32_t(elements[2]) });
         return true;
     }
-    // Appends subpaths' fill to mesh as a path with paint & stops. It closes each contour & fills it on its own, instead of
-    // filling their union: a convex contour as a fan from its first point, & any other with libtess2's non-zero tessellation of
-    // that contour alone. So the path's triangles overlap where its contours do. For many overlapping contours, libtess2's
-    // sweep costs far more than fans
+    // Appends subpaths' fill to mesh as a path with paint and stops. It closes each contour and fills it on its own instead of
+    // filling their union: a convex contour as a fan from its first point, and any other with libtess2's non-zero tessellation
+    // of that contour alone. So the path's triangles overlap where its contours do. With many overlapping contours, fans cost
+    // far less than libtess2's sweep.
     static void addSeparateFill(const std::vector<Subpath>& subpaths, RaMeshPath paint, const std::vector<RaMeshStop>& stops, RaMesh& mesh) {
         paint.indexBegin = uint32_t(mesh.indices32.size());
         const float path = float(mesh.paths.size());
@@ -583,8 +595,8 @@ struct RasterizerMesh {
         if (mesh.indices32.size() > paint.indexBegin)
             endPath(paint, stops, mesh, true);
     }
-    // Returns whether a closed contour is convex: it turns the same way at each vertex where it turns at all, & goes round once.
-    // A contour that never turns has no area, so it isn't convex
+    // Returns whether a closed contour is convex: it turns the same way at each vertex where it turns at all, and goes round
+    // once. A contour that never turns has no area, so it isn't convex.
     static bool isConvex(const std::vector<Point>& points) {
         const size_t n = points.size();
         int sign = 0;
@@ -604,14 +616,15 @@ struct RasterizerMesh {
         return sign != 0 && fabsf(turned) < 6.2932f;     // One full turn, 2π, plus a little for rounding
     }
 
-    // Flattens geometry's subpaths, with Wang's formula for each curve's segment count, so each is within tolerance
+    // Flattens geometry's subpaths, using Wang's formula for each curve's segment count, so that each curve stays within
+    // tolerance.
     static void flatten(Ra::Geometry& geometry, float tolerance, std::vector<Subpath>& subpaths) {
         subpaths.clear();
         const uint8_t *types = geometry.types.base;
         for (size_t i = 0; i < geometry.types.end; i += Ra::Geometry::TypeSizes[types[i]]) {
             const float *p = geometry.points.base + 2 * i;
             if (types[i] == Ra::Geometry::kMove || subpaths.empty() || subpaths.back().closed) {
-                // After a close, a subpath starts where the closed one did
+                // After a close, a subpath starts where the closed one did.
                 Point start = types[i] == Ra::Geometry::kMove || subpaths.empty() ? Point{ p[0], p[1] } : subpaths.back().points[0];
                 endSubpath(subpaths);
                 subpaths.emplace_back();
@@ -676,7 +689,8 @@ struct RasterizerMesh {
         return length;
     }
 
-    // The shape's dash pattern, repeated once if its count is odd, as SVG says, or 0 if it has none
+    // Writes the shape's dash pattern, repeated once if its count is odd, as SVG specifies, and returns its count. Returns 0
+    // if the shape has no dashes, or their total length isn't positive and finite.
     static int dashPattern(const NSVGshape *shape, float *pattern) {
         int count = shape->strokeDashCount;
         float length = 0.f;
@@ -684,8 +698,8 @@ struct RasterizerMesh {
             length += (pattern[i] = pattern[i + count] = fmaxf(0.f, shape->strokeDashArray[i]));
         return length > 0.f && isfinite(length) ? count * (count % 2 + 1) : 0;
     }
-    // Strokes subpath's dashes, from offset into the pattern. A closed subpath's first & last dashes are one when they meet at its
-    // start, & a dash of no length is a dot, drawn with its caps
+    // Strokes subpath's dashes, starting at offset into the pattern. When a closed subpath's first and last dashes meet at its
+    // start, they become one dash. A dash of no length is a dot, drawn with its caps.
     static void dash(const Subpath& subpath, const float *pattern, int count, float offset, Stroker& stroker) {
         struct Dash {
             std::vector<Point> points;  Point direction;
@@ -729,7 +743,7 @@ struct RasterizerMesh {
                 dash.points.push_back(b);
         }
         if (on && dash.points.size() > 1) {
-            if (subpath.closed && startsOn && !dashes.empty())     // The first dash goes on from the last
+            if (subpath.closed && startsOn && !dashes.empty())     // The last dash continues into the first
                 dash.points.insert(dash.points.end(), dashes[0].points.begin() + 1, dashes[0].points.end()), dashes[0] = dash;
             else
                 dashes.push_back(dash);
@@ -744,21 +758,23 @@ struct RasterizerMesh {
         return sqrtf((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
     }
 
-    // Outlines polylines as a strip of triangles, counter-clockwise: a quad per segment, its sides' ends moved to the joins'
-    // miters, the inner one's while within half of each segment, which round joins take while within tolerance of their
-    // arc, else a fan from the inner miter, or the point, over the outer side's arc or bevel, & caps at open ends. Each vertex
-    // records its offset from the polyline point it's built around. A hairline, of width 0, is outlined at a half width of 1 for
-    // those offsets, & its vertices are the points themselves: as the width it's drawn at isn't known, its inner corners don't
-    // move, & its arcs have as few segments as they can
+    // Outlines polylines as a strip of counter-clockwise triangles: a quad per segment, plus joins and caps. The ends of each
+    // quad's sides move to the joins' miters, the inner side's only while its miter lies within half of each segment. A round
+    // join also takes the outer miter while that's within tolerance of its arc. Otherwise a join is a fan from the inner
+    // miter, or from the point, over the outer side's arc or bevel. Open ends get caps. Each vertex records its offset from
+    // the polyline point it's built around. A hairline, of width 0, is outlined at a half width of 1 for those offsets, and its
+    // vertices are the points themselves. As the width it's drawn at isn't known, its inner corners don't move, and its arcs
+    // have as few segments as possible.
     struct Stroker {
-        // A stroke's width, 0 for a hairline, miter limit, & NanoSVG's join & cap
+        // A stroke's width (0 for a hairline), miter limit, and NanoSVG join and cap.
         Stroker(float width, float miterLimit, char join, char cap, float tolerance) : hairline(width == 0.f),
             hw(hairline ? 1.f : 0.5f * width), miterLimit(miterLimit), tolerance(hairline ? 1.f : tolerance), join(join), cap(cap) {}
         float halfWidth() const { return hairline ? 0.f : hw; }
         struct Ends {
-            Point l0, l1, r0, r1;   // A segment's left & right sides' start & end
+            Point l0, l1, r0, r1;   // The start and end of a segment's left and right sides
         };
-        // A polyline of n distinct consecutive points. An open one of one point is a dot, drawn with its caps along direction
+        // Adds a polyline of n points, no two consecutive ones equal. An open polyline of one point is a dot, drawn with its
+        // caps facing along direction.
         void addPolyline(const Point *p, size_t n, bool closed, Point direction) {
             if (n == 0 || (closed && n < 2))
                 return;
@@ -789,7 +805,7 @@ struct RasterizerMesh {
             if (!closed)
                 addCap(p[0], unit(p[1], p[0])), addCap(p[n - 1], unit(p[n - 2], p[n - 1]));
         }
-        // The join at b of the segments from a & to c, with ends e0 & e1
+        // The join at b of the segment from a and the segment to c, whose ends are e0 and e1.
         void addJoin(Point a, Point b, Point c, Ends& e0, Ends& e1) {
             center = b;
             Point d0 = unit(a, b), d1 = unit(b, c);
@@ -797,17 +813,17 @@ struct RasterizerMesh {
             Point o0 = { -d0.y * hw, d0.x * hw }, o1 = { -d1.y * hw, d1.x * hw }, m = { o0.x + o1.x, o0.y + o1.y };
             float ml = sqrtf(m.x * m.x + m.y * m.y);
             if ((fabsf(cross) < 1e-6f && dot < 0.f) || !(ml > 1e-6f * hw)) {
-                // A turn back has no miter, & its quads overlap. A round join is the half disc ahead
+                // A turn back has no miter, and its quads overlap. A round join there is the half disc ahead.
                 if (join == NSVG_JOIN_ROUND)
                     arc.clear(), addArc(b, atan2f(o0.y, o0.x), -float(M_PI)), arc.front() = e0.l1, arc.back() = e0.r1, addFan(b);
                 return;
             }
-            // SVG's miter ratio 1 / sin(θ / 2), for an angle θ between the segments, is 1 / cos(φ / 2) for their turn φ
+            // SVG's miter ratio 1 / sin(θ / 2), for an angle θ between the segments, is 1 / cos(φ / 2) for their turn φ.
             float ratio = 1.f / sqrtf(fmaxf(1e-12f, 0.5f * (1.f + dot))), k = hw * ratio / ml;
             Point mk = { m.x * k, m.y * k };
             bool left = cross > 0.f;    // A turn towards the left side, the inner one
-            // The inner miter is hw · tan(φ / 2) along each segment from b: past half of either, the quads keep their inner
-            // corners & overlap, as a turn back's, rather than turn inside out, into a spike at a sharp turn
+            // The inner miter lies hw · tan(φ / 2) along each segment from b. Past half of either segment, the quads keep their
+            // inner corners and overlap, as at a turn back, rather than turning inside out into a spike at a sharp turn.
             bool overlap = hairline || hw * sqrtf(fmaxf(0.f, ratio * ratio - 1.f)) > 0.5f * fminf(distance(a, b), distance(b, c));
             Point inner = overlap ? b : left ? Point{ b.x + mk.x, b.y + mk.y } : Point{ b.x - mk.x, b.y - mk.y };
             Point outer = left ? Point{ b.x - mk.x, b.y - mk.y } : Point{ b.x + mk.x, b.y + mk.y };
@@ -825,7 +841,7 @@ struct RasterizerMesh {
             } else
                 addTriangle(inner, out0, out1);
         }
-        // A cap at p, facing direction d, its corners the segment's
+        // A cap at p, facing direction d, whose corners are the segment's.
         void addCap(Point p, Point d) {
             center = p;
             Point o = { -d.y * hw, d.x * hw };
@@ -836,8 +852,8 @@ struct RasterizerMesh {
                 addQuad({ p.x + o.x, p.y + o.y }, { p.x + o.x + d.x * hw, p.y + o.y + d.y * hw },
                         { p.x - o.x + d.x * hw, p.y - o.y + d.y * hw }, { p.x - o.x, p.y - o.y });
         }
-        // Appends to arc an arc of radius hw around o, from angle a0 through sweep, within tolerance, & at least a segment
-        // per quarter turn
+        // Appends to arc the points of an arc of radius hw around o, from angle a0 through sweep, within tolerance and with at
+        // least one segment per quarter turn.
         void addArc(Point o, float a0, float sweep) {
             float step = 2.f * acosf(fmaxf(-1.f, 1.f - tolerance / hw));
             int n = std::max(int(ceilf(fabsf(sweep) / (0.5f * float(M_PI)) - 1e-3f)),
@@ -854,11 +870,11 @@ struct RasterizerMesh {
         void addQuad(Point a, Point b, Point c, Point d) {
             addTriangle(a, b, c), addTriangle(a, c, d);
         }
-        // A triangle built around center
+        // A triangle built around center.
         void addTriangle(Point a, Point b, Point c) {
             addTriangle(a, b, c, center, center, center);
         }
-        // Appends a triangle counter-clockwise, its points built around ca, cb & cc, unless it has no area
+        // Appends a triangle, counter-clockwise, whose points are built around ca, cb and cc, unless it has no area.
         void addTriangle(Point a, Point b, Point c, Point ca, Point cb, Point cc) {
             float area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
             if (area == 0.f || !isfinite(area))
@@ -882,27 +898,31 @@ struct RasterizerMesh {
         std::vector<Ends> ends;
     };
 
-    // Appends glows' ribbons' triangles to a mesh, indexed as they're built, each vertex once. A halo's glow is 0 on its outer
-    // edge & 1 at the path's edge: on a fill's contour, or for a stroke's over 1 on its polyline, so that it's 1 at the stroke's
-    // edge. A core's is 1 on its outer edge, the draw's own, & up to kCoreGlow in its middle. So a path's edge has no step in the
-    // glow, which ra_mesh_glow.frag turns into one profile. Offsets are 0, so that a stroke's least width leaves ribbons alone.
-    // Every case but a fill's core is a closed walk along points with the ribbon on its left: a fill's contour turned so that its
-    // outside is, a closed polyline in both directions, & an open one there & back, so that its caps are turns back. Where the
-    // walk turns left, its ribbon's on the inner side, & a miter as in the Stroker, while within half of each segment, else the
-    // segments' quads overlap. Where it turns right, a round join, or a miter if it's a turn of at most one of the arc's steps
+    // Appends the triangles of glows' ribbons to a mesh, indexed as they're built, with each vertex added once.
+    // A halo's glow is 0 on its outer edge and 1 at the path's edge. For a fill, that edge is the contour. For a stroke, the
+    // glow on the polyline is above 1, so that it's 1 at the stroke's edge. A core's glow is 1 on its outer edge, which is
+    // the draw's own edge, and rises to kCoreGlow in its middle. So the glow has no step at a path's edge, and
+    // ra_mesh_glow.frag turns it into one continuous profile. Offsets are 0, so that a stroke's minimum width leaves ribbons
+    // alone.
+    // Every case except a fill's core is a closed walk along points, with the ribbon on the walk's left. A fill's contour is
+    // turned so that its outside is on the left. A closed polyline is walked in both directions, and an open one there and
+    // back, so that its caps are turns back. Where the walk turns left, the ribbon is on the inner side: a miter as in the
+    // Stroker while the miter lies within half of each segment, otherwise the segments' quads overlap. Where the walk turns
+    // right, the ribbon has a round join, or a miter if the turn is at most one of the arc's steps.
     struct Ribbon {
         static constexpr float kArcStep = float(M_PI) / 6.f, kArcStepCosine = 0.8660254f;
         static constexpr float kCoreGlow = 2.f;
-        static constexpr float kLeastTaper = 0.05f;     // How much the ends of a quad can differ, relatively, for 2 triangles
-        static constexpr float kLeastMiterCosine = 0.05f;   // Of a fill's core's corners: 1 + cos, so that a spike's stays near
+        static constexpr float kLeastTaper = 0.05f;     // The most a quad's ends can differ, relatively, for it to stay 2 triangles
+        static constexpr float kLeastMiterCosine = 0.05f;   // Least 1 + cos at a fill core's corners, keeping a spike's miter near
 
         struct Stop {
-            Point p;  float radius;  uint32_t vertex, in, out;   // On the polyline, then the outer edge's ends there, in & out of it
+            Point p;  float radius;  uint32_t vertex, in, out;   // On the polyline, then the outer edge's ends there, in and out
         };
-        // A ribbon whose outer edges have a glow of edge
+        // A ribbon whose outer edges have a glow of edge.
         explicit Ribbon(RaMesh& mesh, float edge = 0.f) : mesh(mesh), edge(edge) {}
 
-        // A polyline's ribbon on both of its sides, with half discs around its ends if it's open, its glow on the polyline centre
+        // Adds a polyline's ribbon on both of its sides, with half discs around its ends if it's open, and a glow of centre on
+        // the polyline.
         void addStroke(const Subpath& subpath, float radius, float centre) {
             const std::vector<Point>& p = subpath.points;
             size_t n = p.size();
@@ -921,8 +941,8 @@ struct RasterizerMesh {
                 addWalk(n);
             }
         }
-        // A contour's ribbon outward, as its signed area tells, closed as a fill closes it. Its radius is at each point inWidths
-        // that many times the shorter of the edges there. A contour of no area has no outside
+        // Adds a contour's ribbon on its outside, which its signed area tells, closing the contour as a fill does. If inWidths,
+        // the radius at each point is radius times the shorter of the edges there. A contour of no area has no outside.
         void addFill(const Subpath& subpath, float radius, bool inWidths) {
             const std::vector<Point>& p = subpath.points;
             double area;
@@ -935,8 +955,8 @@ struct RasterizerMesh {
             if (n > 0)
                 addWalk(n);
         }
-        // A fill's core inward of a contour, as its signed area tells: a glow of 1 on it, up to kCoreGlow where the contour's sides
-        // meet in a thin shape, half of the shorter of the edges at each point in
+        // Adds a fill's core inward of a contour, on the side its signed area tells. The glow is 1 on the contour and rises to
+        // kCoreGlow at an inner vertex for each point, half the shorter of its edges inward, where a thin shape's sides meet.
         void addCore(const Subpath& subpath) {
             const std::vector<Point>& p = subpath.points;
             double area;
@@ -955,8 +975,8 @@ struct RasterizerMesh {
                 addQuad(base + 2 * k, base + 2 * k + 1, base + 2 * j + 1, base + 2 * j, tapers(ra, rb));
             }
         }
-        // How many of a contour's points to walk, without the repeat of its first at its end: 0 if it has under 3 or no area, as
-        // then it has no sides. area is twice its signed one
+        // Returns how many of a contour's points to walk, leaving out any repeats of its first point at its end: 0 if it has
+        // fewer than 3 or no area, as then it has no sides. Sets area to twice its signed area.
         static size_t closedPoints(const std::vector<Point>& p, double& area) {
             size_t n = p.size();
             while (n > 1 && p[n - 1].x == p[0].x && p[n - 1].y == p[0].y)
@@ -966,8 +986,8 @@ struct RasterizerMesh {
                 area += double(p[i].x) * p[(i + 1) % n].y - double(p[(i + 1) % n].x) * p[i].y;
             return n < 3 || area == 0.0 ? 0 : n;
         }
-        // The ribbon on the left of the closed walk along stops. Only the first rounded stops round a turn back, as a walk that
-        // passes it twice would paint its half disc twice
+        // Adds the ribbon on the left of the closed walk along stops. Only the first rounded stops round off a turn back, as a
+        // walk that passes a turn back twice would paint its half disc twice.
         void addWalk(size_t rounded) {
             size_t n = stops.size();
             for (size_t i = 0; i < n; i++) {
@@ -976,7 +996,7 @@ struct RasterizerMesh {
                 Point o0 = { -d0.y, d0.x }, o1 = { -d1.y, d1.x };
                 float r = s.radius, cross = d0.x * d1.y - d0.y * d1.x, dot = d0.x * d1.x + d0.y * d1.y;
                 bool back = fabsf(cross) < 1e-6f && dot < 0.f, inner = !back && cross > 0.f;
-                // tan(φ / 2) of the turn φ is cross / (1 + dot), which the inner miter is r times along each segment
+                // For a turn φ, tan(φ / 2) is cross / (1 + dot), and the inner miter lies r times that along each segment.
                 if (!back && (inner ? r * cross <= 0.5f * (1.f + dot) * fminf(distance(a, s.p), distance(s.p, b)) : dot >= kArcStepCosine)) {
                     float k = r / (1.f + dot);
                     s.in = s.out = addVertex(Point{ s.p.x + k * (o0.x + o1.x), s.p.y + k * (o0.y + o1.y) }, edge);
@@ -992,7 +1012,7 @@ struct RasterizerMesh {
                 addQuad(s.vertex, s.out, next.in, next.vertex, tapers(s.radius, next.radius));
             }
         }
-        // The fan around s, of its arc from its in vertex, at angle a0, through sweep to its out vertex
+        // Adds the fan around s over its arc, from its in vertex at angle a0 through sweep to its out vertex.
         void addFan(const Stop& s, float a0, float sweep) {
             int n = std::max(1, int(ceilf(fabsf(sweep) / kArcStep - 1e-3f)));
             uint32_t last = s.in;
@@ -1006,8 +1026,8 @@ struct RasterizerMesh {
         static bool tapers(float ra, float rb) {
             return fabsf(ra - rb) > kLeastTaper * fmaxf(ra, rb);
         }
-        // The quad from a's inner & outer vertices to b's outer & inner ones. One that tapers is a fan around its centre, as a
-        // diagonal would make its glow lopsided, differently on a line's two sides
+        // Adds the quad from a's inner and outer vertices to b's outer and inner ones. A tapered quad becomes a fan around its
+        // centre, as a diagonal would make its glow lopsided, differently on each side of a line.
         void addQuad(uint32_t ai, uint32_t ao, uint32_t bo, uint32_t bi, bool tapered) {
             if (!tapered) {
                 addTriangle(ai, ao, bo), addTriangle(ai, bo, bi);

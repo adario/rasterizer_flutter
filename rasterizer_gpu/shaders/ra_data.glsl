@@ -1,6 +1,6 @@
-// Readers of a frame's structs, for the GPU renderer's vertex shaders. The host uploads the frame into a data texture,
-// r32g32b32a32Float, 4 words a texel & 1 << kDataWidthLog2 texels a row. The FrameInfo uniform gives the first word of each
-// array of structs, where the Metal shaders had buffer offsets
+// Functions that read a frame's structs, for the GPU renderer's vertex shaders. The host uploads the frame into an
+// r32g32b32a32Float data texture, with 4 words per texel and 1 << kDataWidthLog2 texels per row. The FrameInfo uniform gives the
+// first word of each array of structs, where the Metal shaders used buffer offsets.
 
 #include "ra_defs.glsl"
 
@@ -23,7 +23,7 @@ float loadFloat(uint word) {
   return uintBitsToFloat(loadWord(word));
 }
 
-// The low 16 bits of w, as a signed short
+// The low 16 bits of w, as a signed short.
 int lowShort(uint w) {
   return int(w << 16u) >> 16;
 }
@@ -50,7 +50,7 @@ struct Cell {
   float lx, ly, ux, uy, ox, oy;
 };
 
-// A Cell, from its 6 uint16s in 3 words
+// Loads a Cell from its 6 uint16s, packed in 3 words.
 Cell loadCell(uint word) {
   uint w0 = loadWord(word), w1 = loadWord(word + 1u), w2 = loadWord(word + 2u);
   return Cell(float(w0 & 0xFFFFu), float(w0 >> 16u), float(w1 & 0xFFFFu), float(w1 >> 16u), float(w2 & 0xFFFFu),
@@ -66,7 +66,7 @@ Quadratic loadQuadratic(uint word) {
                    loadFloat(word + 5u));
 }
 
-// A 16-bit point, Point16 { uint16_t x, y; }, whose x's top bit is kPoint16IsCurve
+// A 16-bit point, Point16 { uint16_t x, y; }, whose x's top bit is kPoint16IsCurve.
 uint loadPoint16(uint index) {
   return loadWord(frame.counts.x + index);
 }

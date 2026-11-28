@@ -1,5 +1,5 @@
 //
-//  The C API over the Rasterizer core, src/core: see its README.md
+//  The C API over the Rasterizer core in src/core. See its README.md.
 //
 
 #include <memory>
@@ -34,8 +34,9 @@ static_assert(RA_CAP_ROUND == NSVG_CAP_ROUND && RA_CAP_SQUARE == NSVG_CAP_SQUARE
 
 static constexpr Ra::ColorMatrix kIdentityMatrix = {{ 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f }};
 
-// C++ exceptions mustn't cross into Dart, where one aborts the process: the core's are of running out of memory, and an
-// export that meets one fails as its result says, as a null handle or an empty frame, which Dart throws for
+// C++ exceptions mustn't cross into Dart, where one aborts the process. The core's exceptions all come from running out of
+// memory. An export that catches one fails instead: it returns a null handle or an empty frame, which Dart throws for, or it
+// empties the list or its color matrices.
 template<typename T, typename F>
 static inline T guarded(T failed, F&& f) {
     try {
@@ -60,20 +61,21 @@ RaLayout ra_layout(void) {
     };
 }
 
-// The core parses without units, so the paths stay in the viewBox's coordinates, unscaled to the width & height
+// The core parses without units, so the paths stay in the viewBox's coordinates and aren't scaled to the width and height.
 static RaBounds svgBounds(const NSVGimage *image) {
     const float *box = image->viewBox;
     return box[2] > 0.f && box[3] > 0.f ? RaBounds{ box[0], box[1], box[0] + box[2], box[1] + box[3] }
         : RaBounds{ 0.f, 0.f, image->width, image->height };
 }
-// nsvgParse needs a null-terminated string it can modify, & nsvgParseFromFile's arguments
+// Copies the data, as nsvgParse needs a null-terminated string it can modify, and parses it with the arguments that
+// ra_scene_from_svg passes to nsvgParseFromFile.
 static NSVGimage *parseSvgData(const char *data, uint64_t length) {
     std::vector<char> text(data, data + length);
     text.push_back('\0');
     return nsvgParse(text.data(), nullptr, 0);
 }
-// RaSVG::addSvgToScene, but failing when the SVG can't be parsed, & flipping its y onto its viewBox, as its paths are in
-// the viewBox's coordinates, not around its height
+// As RaSVG::addSvgToScene, except that it fails when the SVG can't be parsed, and its transform flips y around the viewBox
+// rather than the height, as the paths are in the viewBox's coordinates.
 static RaScene *sceneFromImage(NSVGimage *image, RaTransform *ctm) {
     if (image == nullptr)
         return nullptr;
@@ -118,7 +120,7 @@ RaList *ra_list_create(void) {
 void ra_list_release(RaList *list) {
     delete list;
 }
-// Empties the list, as one that couldn't be filled
+// Empties the list, for when it couldn't be filled.
 static void clearList(RaList *list) {
     Ra::SceneList& l = list->list;
     l.scenes.clear(), l.ctms.clear(), l.clips.clear(), l.deviceClips.clear(), l.opacities.clear(), l.colorMatrices.clear();
@@ -157,7 +159,7 @@ static void setEntries(RaList *list, const RaListEntry *entries, uint64_t count)
             l.addScene(e.scene->scene, transform(e.ctm));
             l.deviceClips.emplace_back(e.deviceClip.lx, e.deviceClip.ly, e.deviceClip.ux, e.deviceClip.uy);
             l.opacities.emplace_back(e.opacity);
-            if (transformed)     // Lists without matrices have none, so cost nothing
+            if (transformed)     // Stored only if an entry uses a matrix, so lists without one cost nothing
                 l.colorMatrices.emplace_back(e.colorMatrix && e.colorMatrix <= list->colorMatrices.size() ? list->colorMatrices[e.colorMatrix - 1] : kIdentityMatrix);
         }
     }
@@ -194,7 +196,7 @@ void ra_frame_buffer_release(RaFrameBuffer *buffer) {
     delete buffer;
 }
 
-// An empty frame, its base null, if it couldn't be written
+// Returns an empty frame, with a null base, if it can't be written.
 RaFrame ra_render(RaRenderer *renderer, const RaList *list, float w, float h, float scale, RaFrameBuffer *frameBuffer) {
     size_t size = guarded<size_t>(0, [&] { return renderer->renderer.renderList(list->list, scale, w, h, & frameBuffer->buffer); });
     if (size == 0)
@@ -210,7 +212,7 @@ RaFrame ra_render(RaRenderer *renderer, const RaList *list, float w, float h, fl
     return frame;
 }
 
-// Imports an image, which it deletes, into a new mesh
+// Imports an image into a new mesh, and deletes the image.
 static RaMesh *meshFromImage(NSVGimage *image, float maxSize) {
     if (image == nullptr)
         return nullptr;
@@ -242,7 +244,7 @@ void ra_mesh_release(RaMesh *mesh) {
 
 static RaScene *sceneFromPaths(const RaContours *contours, const RaPathDraw *draws, uint64_t drawCount, RaBounds viewBox) {
     RasterizerPaths::Index index(*contours);
-    // Each path's, written once, so a fill & a stroke of it share its geometry, as an SVG shape's do
+    // Each path is written once, so a fill and a stroke of it share its geometry, as an SVG shape's fill and stroke do.
     std::vector<Ra::Path> paths(contours->pathCount, Ra::Path(nullptr));
     std::vector<bool> written(contours->pathCount, false);
     std::unique_ptr<RaScene> scene(new RaScene());

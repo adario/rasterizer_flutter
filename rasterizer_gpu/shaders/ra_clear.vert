@@ -1,7 +1,7 @@
 #version 460 core
 
 // Covers the whole target at the far depth, so drawing it clears the target to a color. Flutter GPU crashes when it loads a bundle
-// with a vertex shader that has no inputs, so this one takes the renderer's unit quad corners
+// with a vertex shader that has no inputs, so this one takes the renderer's unit quad corners.
 in vec2 corner;
 
 uniform ClearInfo {

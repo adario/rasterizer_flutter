@@ -1,7 +1,7 @@
 //
-//  What the core & ra_frame.hpp need off Apple platforms: always_inline, alloca, sincos, the processor count, & a parallel
-//  for, which is GCD's dispatch_apply_f on Apple, as in the original core, & std::threads elsewhere. Also bzero, for
-//  MSVC, & raNonZero, for GNU's x ?: 1, which MSVC lacks
+//  What the core and ra_frame.hpp need on platforms other than Apple's: always_inline, alloca, sincos, the processor count,
+//  and a parallel for. The parallel for uses GCD's dispatch_apply_f on Apple platforms, as the original core does, and
+//  std::thread elsewhere. Also bzero for MSVC, and raNonZero in place of GNU's x ?: 1, which MSVC lacks.
 //
 
 #pragma once
@@ -51,8 +51,8 @@ static inline size_t raProcessorCount() {
     unsigned count = std::thread::hardware_concurrency();
     return count < 1 ? 1 : size_t(count);
 }
-// Threads are created per call, not pooled, which costs tens of µs a call: callers run a few a frame, over at most a
-// thread per processor. Those that can't be created run on the caller's
+// Threads are created for each call, not pooled, as callers make only a few calls a frame, each over at most one thread per
+// processor. The iterations whose threads can't be created run on the caller's thread.
 static inline void raDispatch(size_t count, void *context, void (*function)(void *, size_t)) {
     struct Threads {
         ~Threads() {
@@ -79,8 +79,8 @@ static inline void raSinCos(double x, double *sine, double *cosine) {
 }
 #endif
 
-// function(context, i) for each i below count, in parallel. An exception thrown by one is rethrown on the caller's thread,
-// once all have returned, as one escaping a worker thread would end the process
+// Calls function(context, i) for each i below count, in parallel. If a call throws, the first exception is rethrown on the
+// caller's thread once all calls have returned, as an exception escaping a worker thread would end the process.
 static inline void raParallelFor(size_t count, void *context, void (*function)(void *, size_t)) {
     struct Guarded {
         void *context;

@@ -1,9 +1,10 @@
 #pragma once
 //
-//  The OpenGL ES format probe's image: probeSvg in lib/src/format_probe.dart, built as NanoSVG parses it, without parsing it
+//  The OpenGL ES format probe's image: probeSvg in lib/src/format_probe.dart, built directly as NanoSVG would parse it.
 //
-//  So the probe checks the GPU renderer alone. Parsed, a parser's bug would fail it as if the GPU drew wrongly, as under a
-//  locale whose decimal point is a comma, where NanoSVG read fill-opacity="0.5" as 0, and the translucent paths vanished.
+//  This way the probe tests only the GPU renderer. If the image were parsed, a parser bug would fail the probe as if the GPU
+//  drew wrongly. That happened under a locale whose decimal point is a comma: NanoSVG read fill-opacity="0.5" as 0, and the
+//  translucent paths vanished.
 //  test/probe_scene_test.dart checks that this image covers the probe's pixels with the same paths as the SVG.
 //
 
@@ -15,24 +16,24 @@
 #include "core/nanosvg.h"
 
 namespace RaProbeScene {
-    // nanosvg.h's, which only its implementation defines
+    // nanosvg.h's value, which only its implementation section defines.
     static constexpr float kKappa90 = 0.5522847493f;
 
-    // NanoSVG's points: x0, y0, then each cubic's two control points & end point
+    // NanoSVG's points: x0, y0, then each cubic's two control points and end point.
     typedef std::vector<float> Points;
 
-    // As nsvg__lineTo: a line is a cubic with its control points at its thirds
+    // As in nsvg__lineTo, a line is a cubic with its control points at its thirds.
     static inline void lineTo(Points& p, float x, float y) {
         float px = p[p.size() - 2], py = p[p.size() - 1], dx = x - px, dy = y - py;
         p.insert(p.end(), { px + dx / 3.f, py + dy / 3.f, x - dx / 3.f, y - dy / 3.f, x, y });
     }
-    // As nsvg__parseRect, & nsvg__addPath's closing line
+    // A rectangle as nsvg__parseRect builds it, with nsvg__addPath's closing line.
     static inline Points rect(float x, float y, float w, float h) {
         Points p = { x, y };
         lineTo(p, x + w, y), lineTo(p, x + w, y + h), lineTo(p, x, y + h), lineTo(p, x, y);
         return p;
     }
-    // As nsvg__parseCircle, & nsvg__addPath's closing line, which has no length
+    // A circle as nsvg__parseCircle builds it, with nsvg__addPath's closing line, which has no length.
     static inline Points circle(float cx, float cy, float r) {
         const float k = r * kKappa90;
         Points p = { cx + r, cy };
@@ -44,8 +45,8 @@ namespace RaProbeScene {
         return p;
     }
 
-    // nsvgDelete frees the image with free(), so it's built with malloc. Each allocation throws if it fails, & the
-    // image's builder deletes what it built so far
+    // nsvgDelete frees the image with free(), so it's built with calloc. Each allocation throws if it fails, and image()
+    // then deletes what it has built so far.
     template<typename T>
     static inline T *alloc(size_t count = 1) {
         T *t = (T *)calloc(count, sizeof(T));
@@ -53,8 +54,8 @@ namespace RaProbeScene {
             throw std::bad_alloc();
         return t;
     }
-    // A closed path, & its bounds: its points', which hold its curves, as each curve's control points lie on the
-    // bounds of a rectangle or circle
+    // A closed path and its bounds. The bounds are its points' bounds, which contain its curves, as each curve's control
+    // points lie on the bounds of a rectangle or circle.
     static NSVGpath *path(const Points& p, NSVGpath *next) {
         float *pts = alloc<float>(p.size());
         NSVGpath *path = (NSVGpath *)calloc(1, sizeof(NSVGpath));
@@ -73,8 +74,8 @@ namespace RaProbeScene {
         }
         return path;
     }
-    // A filled shape, as nsvg__addShape makes one with NanoSVG's defaults: its fill-opacity in its color's alpha, as
-    // (unsigned int)(opacity * 255), & its paths in reverse order, as NanoSVG prepends each one
+    // A filled shape, as nsvg__addShape makes one with NanoSVG's defaults. Its fill-opacity goes into its color's alpha as
+    // (unsigned int)(opacity * 255), and its paths are in reverse order, as NanoSVG prepends each one.
     static NSVGshape *shape(NSVGimage *image, NSVGshape *last, std::initializer_list<Points> paths,
                             unsigned int rgb, float fillOpacity = 1.f, bool evenOdd = false) {
         NSVGshape *shape = alloc<NSVGshape>();
@@ -96,7 +97,7 @@ namespace RaProbeScene {
         return shape;
     }
 
-    // The image, 160 x 160, its shapes back to front as probeSvg's. NULL if it runs out of memory
+    // The image, 160 x 160, with its shapes back to front as in probeSvg. Returns NULL if memory runs out.
     static NSVGimage *image() {
         NSVGimage *image = (NSVGimage *)calloc(1, sizeof(NSVGimage));
         if (image == nullptr)

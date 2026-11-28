@@ -1,4 +1,4 @@
-// The core's constants & struct flags, from src/core's Rasterizer.h & Rasterizer.hpp, for the GPU renderer's shaders
+// The core's constants and struct flags, from Rasterizer.h and Rasterizer.hpp in src/core, for the GPU renderer's shaders.
 
 #ifndef RA_DEFS
 #define RA_DEFS
@@ -42,7 +42,7 @@
 #define kPoint16IsCurve 0x8000u
 #define kPoint16Mask 0x7FFFu
 
-// The data texture's row width in texels, as a power of 2, which gpu_renderer.dart's dataWidthLog2 matches
+// The base-2 log of the data texture's row width in texels. It matches dataWidthLog2 in gpu_renderer.dart.
 #define kDataWidthLog2 12u
 
 // Struct sizes in 32-bit words

@@ -1,7 +1,7 @@
 #version 460 core
 
 // Adds the winding of an edge's 2 quadratics, each monotonic in y, to the accumulation texture, blended additively. Ported from
-// quad_edges_fragment_main in Rasterizer's Shaders.metal
+// quad_edges_fragment_main in Rasterizer's Shaders.metal.
 
 #include "ra_winding.glsl"
 

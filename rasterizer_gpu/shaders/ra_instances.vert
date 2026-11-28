@@ -1,7 +1,7 @@
 #version 460 core
 
-// Draws a frame's instances: a fill's cells, & a stroke's outlines, a quad around each segment that meets its neighbors' at a
-// miter. Ported from instances_vertex_main in Rasterizer's Shaders.metal, without images, as SVGs have none
+// Draws a frame's instances: a fill's cells, and a stroke's outlines. Each outline is a quad around one segment, which meets its
+// neighbors' quads at a miter. Ported from instances_vertex_main in Rasterizer's Shaders.metal, without images, as SVGs have none.
 
 #include "ra_data.glsl"
 
@@ -113,7 +113,7 @@ void main() {
       flags = flags | (((pcap && roundCap) || (!pcap && roundJoin)) ? kF0 : 0u);
       flags = flags | (((ncap && roundCap) || (!ncap && roundJoin)) ? kF1 : 0u);
     } else {
-      // The vertex's barycentric coordinates in the control triangle, from which the fragment recovers the control points
+      // The vertex's barycentric coordinates in the control triangle, from which the fragment shader recovers the control points.
       float ex = dx - x2, ey = dy - y2, rdet = 1.0 / (cx * ay - ax * cy);
       v_uvw = vec3((ey * ax - ex * ay) * rdet, (ey * cx - ex * cy) * rdet, 0.0);
 
@@ -121,15 +121,15 @@ void main() {
       flags = flags | ((pcap ? !roundCap : !roundJoin) ? kF0 : 0u);
       flags = flags | ((ncap ? !roundCap : !roundJoin) ? kF1 : 0u);
     }
-    // A stroke thinner than a pixel draws a pixel wide, faded by its width, which is passed negated
+    // A stroke thinner than a pixel draws one pixel wide, faded by its width, which is passed negated.
     v_cover = w != 0.0 && w < 1.0 ? -w : dw;
     flags = flags | (pcap ? kPCap : 0u) | (ncap ? kNCap : 0u);
   } else {
     Cell cell = loadCell(word + 1u);
     dx = isRight ? cell.ux : cell.lx;
     dy = isTop ? cell.uy : cell.ly;
-    // The cell's texel in the accumulation texture, in pixels from its top left, or none for a cell that the fill covers whole.
-    // Cells fill the texture from its top, so edges passes cover fewer rows
+    // The cell's texel in the accumulation texture, in pixels from its top left, or FLT_MAX for a cell that the fill covers whole.
+    // Cells fill the texture from its top, so edges passes cover fewer rows.
     v_uvw = vec3(cell.ox == float(kNullIndex) ? FLT_MAX : dx - (cell.lx - cell.ox), dy - (cell.ly - cell.oy), 0.0);
     v_cover = float(lowShort(loadWord(word + 4u)));
   }

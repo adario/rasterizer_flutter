@@ -1,7 +1,8 @@
 //
-//  RasterizerRenderer.hpp without Metal: the frame buffer is malloc'd, & a host uploads it to the GPU itself. Its
-//  dispatch_apply blocks are ra_portable.h's raParallelFor, which is GCD on Apple. Everything else is as in Rasterizer's
-//  Package/Sources/RasterizerCpp/include/RasterizerRenderer.hpp (https://github.com/mindbrix/Rasterizer, commit 2be4bc16)
+//  RasterizerRenderer.hpp without Metal: the frame buffer is allocated with calloc, and a host uploads it to the GPU itself.
+//  Its dispatch_apply blocks become calls to ra_portable.h's raParallelFor, which uses GCD on Apple platforms. Everything else
+//  is as in Rasterizer's Package/Sources/RasterizerCpp/include/RasterizerRenderer.hpp (https://github.com/mindbrix/Rasterizer,
+//  commit 2be4bc16).
 //
 
 #pragma once
@@ -10,7 +11,7 @@
 #include <chrono>
 #include <new>
 #include <assert.h>
-#include <float.h>      // Which the original gets from Metal.h, & Rasterizer.hpp needs
+#include <float.h>      // Rasterizer.hpp needs it, and the original gets it from Metal.h
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,9 +37,9 @@ struct RenderBuffer {
     void resize(size_t n) {
         if (size() < n || willShrink(n)) {
             size_t length = n * 4 / 3;
-            uint8_t *newBase = (uint8_t *)calloc(length, 1);     // Zeroed, like a new MTLBuffer, so padding matches the native frames
+            uint8_t *newBase = (uint8_t *)calloc(length, 1);     // Zeroed like a new MTLBuffer, so padding matches native frames
             if (newBase == nullptr)
-                throw std::bad_alloc();     // Keeping the old buffer, for ra_render to fail
+                throw std::bad_alloc();     // Keeps the old buffer, and ra_render returns an empty frame
             if (header && header <= size())
                 memcpy(newBase, buffer.base, header);
             free(buffer.base);
@@ -55,11 +56,12 @@ struct RasterizerRenderer {
         contexts.resize(raProcessorCount());
     }
 
-    // A frame uses enough contexts for about kContextSeconds of drawList work each, judged by the last frame's, as each adds a
-    // fixed cost, so small scenes are faster with few. Two at least, as one is slower, & all of them for the first frame
+    // A frame uses enough contexts to give each about kContextSeconds of drawList work, judging by the last frame's total.
+    // Each context adds a fixed cost, so small scenes are faster with few contexts. A frame uses at least two, as one is
+    // slower, and the first frame uses all of them.
     static constexpr double kContextSeconds = 100e-6;
 
-    // Returns the frame's size, the bytes from the buffer's base a host must upload
+    // Returns the frame's size: the number of bytes, from the buffer's base, that a host must upload.
     size_t renderList(const Ra::SceneList& list, float scale, float w, float h, RenderBuffer *renderBuffer) {
         Ra::Buffer *buffer = & renderBuffer->buffer;
         size_t contextCount = drawListSeconds == 0.0 ? contexts.size() : std::min(contexts.size(), std::max(size_t(2), size_t(ceil(drawListSeconds / kContextSeconds))));
@@ -100,7 +102,7 @@ struct RasterizerRenderer {
         return size;
     }
 
-    // Split the list into contiguous draw ranges of equal prepared weight
+    // Splits the list into contiguous draw ranges of equal prepared weight.
     static void writeDivisions(const Ra::SceneList& list, size_t count, size_t *divisions) {
         size_t total = 0, pathsCount = list.pathsCount(), sum = 0, base = 0, j = 0, target;
         for (auto& scene : list.scenes)

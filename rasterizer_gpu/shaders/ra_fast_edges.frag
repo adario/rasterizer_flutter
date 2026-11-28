@@ -1,7 +1,7 @@
 #version 460 core
 
 // Adds the winding of an edge's 2 lines to the accumulation texture, blended additively. Ported from fast_edges_fragment_main in
-// Rasterizer's Shaders.metal
+// Rasterizer's Shaders.metal.
 
 #include "ra_winding.glsl"
 

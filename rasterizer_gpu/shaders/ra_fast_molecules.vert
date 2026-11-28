@@ -1,10 +1,10 @@
 #version 460 core
 
-// Draws a fill's molecule into the accumulation texture, as ra_edges.vert draws an edge. The core draws fills with few pixels per
-// edge from molecules: at import, it stores each path's points once as 16-bit points within the path's bounds, & each contour's
-// bounds as a molecule. Each frame, the GPU then transforms those points, rather than the CPU writing segments. Fast molecules
-// draw their points as lines, up to kFastSegments an instance, as the core picks them when curves are off or too flat to show.
-// Ported from fast_molecules_vertex_main in Rasterizer's Shaders.metal
+// Draws a fill's molecule into the accumulation texture, as ra_edges.vert draws an edge. The core draws fills that have few pixels
+// per edge from molecules. At import, it stores each path's points once, as 16-bit points within the path's bounds, and stores each
+// contour's bounds as a molecule. Each frame, the GPU then transforms those points, instead of the CPU writing segments. Fast
+// molecules draw their points as lines, up to kFastSegments per instance. The core picks them when curves are off or too flat to
+// show. Ported from fast_molecules_vertex_main in Rasterizer's Shaders.metal.
 
 #include "ra_data.glsl"
 
@@ -12,7 +12,7 @@ in vec2 corner;  // The unit corners of a 4-vertex triangle strip: x is the vert
 
 out vec4 v_p0;  // x0, y0, x1, y1
 out vec4 v_p1;  // x2, y2, x3, y3
-out vec4 v_p2;  // x4, y4, & the lines' rightmost x
+out vec4 v_p2;  // x4, y4, and the lines' rightmost x
 
 void main() {
   float dst[10];
@@ -43,8 +43,8 @@ void main() {
     dst[2 + i * 2] = x0, dst[3 + i * 2] = y0;
   }
 
-  // The molecule's right side, from the corner of its bounds that the transform puts rightmost, read without masking out
-  // kPoint16IsCurve, as the Metal shader does
+  // The molecule's right side, from the corner of its bounds that the transform puts rightmost. Like the Metal shader, this reads
+  // the corner without masking out kPoint16IsCurve.
   float molx = float(loadPoint16(molecule + (m.a > 0.0 ? 1u : 0u)) & 0xFFFFu);
   float moly = float(loadPoint16(molecule + (m.c > 0.0 ? 1u : 0u)) >> 16u);
   float ux = ceil(molx * m.a + moly * m.c + m.tx);
@@ -53,7 +53,7 @@ void main() {
   float dy = clamp(corner.y > 0.5 ? ceil(suy) : floor(sly), cell.ly, cell.uy);
   float x = (cell.ox - cell.lx + dx) / frame.size.x * 2.0 - 1.0, offx = 0.5 - dx;
   float y = 1.0 - (cell.oy - cell.ly + dy) / frame.size.y * 2.0, offy = 0.5 - dy;
-  // w is 0, so nothing is drawn, where all the points are one
+  // Where all the points coincide, w is 0, so nothing is drawn.
   gl_Position = vec4(x, y, 1.0, slx == sux && sly == suy ? 0.0 : 1.0);
   for (i = 0; i < kFastSegments + 1; i++)
     dst[i * 2] += offx, dst[i * 2 + 1] += offy;

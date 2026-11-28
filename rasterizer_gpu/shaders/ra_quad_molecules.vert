@@ -1,7 +1,8 @@
 #version 460 core
 
 // Draws a molecule's quadratic, or its line as a quadratic, into the accumulation texture, as ra_fast_molecules.vert draws lines.
-// The core picks these when curves are on & show. Ported from quad_molecules_vertex_main in Rasterizer's Shaders.metal
+// The core picks these when curves are on and big enough to show. Ported from quad_molecules_vertex_main in Rasterizer's
+// Shaders.metal.
 
 #include "ra_data.glsl"
 
@@ -30,7 +31,7 @@ void main() {
   x1 = ix1 * m.a + iy1 * m.c + m.tx, y1 = ix1 * m.b + iy1 * m.d + m.ty;
   if (isCurve) {
     x2 = ix2 * m.a + iy2 * m.c + m.tx, y2 = ix2 * m.b + iy2 * m.d + m.ty;
-    // The middle point is the curve's own, at t = 0.5: the control point is twice it, less the ends' mean
+    // The stored middle point lies on the curve, at t = 0.5, so the control point is twice it minus the mean of the ends.
     x1 = 2.0 * x1 - 0.5 * (x0 + x2), y1 = 2.0 * y1 - 0.5 * (y0 + y2);
   } else {
     x2 = x1, x1 = 0.5 * (x0 + x2);
@@ -39,8 +40,8 @@ void main() {
   slx = min(x1, min(x0, x2)), sly = min(y1, min(y0, y2));
   suy = max(y1, max(y0, y2));
 
-  // The molecule's right side, from the corner of its bounds that the transform puts rightmost, read without masking out
-  // kPoint16IsCurve, as the Metal shader does
+  // The molecule's right side, from the corner of its bounds that the transform puts rightmost. Like the Metal shader, this reads
+  // the corner without masking out kPoint16IsCurve.
   float molx = float(loadPoint16(molecule + (m.a > 0.0 ? 1u : 0u)) & 0xFFFFu);
   float moly = float(loadPoint16(molecule + (m.c > 0.0 ? 1u : 0u)) >> 16u);
   sux = ceil(molx * m.a + moly * m.c + m.tx);

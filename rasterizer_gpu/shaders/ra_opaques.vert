@@ -1,8 +1,8 @@
 #version 460 core
 
-// Draws the opaque parts of a frame's paths, front to back, writing depth, so the GPU skips what's behind them: the cells that a
-// fill covers whole, & opaque strokes' outlines. Ported from opaques_vertex_main in Rasterizer's Shaders.metal, without images, as
-// SVGs have none
+// Draws the opaque parts of a frame's paths front to back, writing depth, so the GPU skips what's behind them. These parts are the
+// cells that a fill covers whole and the outlines of opaque strokes. Ported from opaques_vertex_main in Rasterizer's Shaders.metal,
+// without images, as SVGs have none.
 
 #include "ra_data.glsl"
 
@@ -25,7 +25,8 @@ void main() {
   bool isTop = corner.y > 0.5, isRight = corner.x > 0.5;
 
   if ((izw & kOutlines) != 0u) {
-    // A stroke's segment: the quad around it, inset by half a pixel at its sides & caps, which ra_instances.frag antialiases
+    // A stroke's segment: the quad around it, inset by half a pixel at its sides and caps, leaving that half pixel for
+    // ra_instances.frag to antialias.
     Quadratic quad = loadQuadratic(word + 1u);
     float dw = 0.5 * (loadFloat(path + 18u) - 1.0);
     float x0 = quad.x0, y0 = quad.y0, x1 = quad.x1, y1 = quad.y1, x2 = quad.x2, y2 = quad.y2;

@@ -1,6 +1,7 @@
 // A draw's color, from the colors texture: its own texel, or its gradient's strip, sampled linearly. A linear gradient's tex.x is
-// the position along the strip. A radial one's tex.x & tex.z are the point's coordinates from its center, whose distance is the
-// position. The texture holds the core's BGRA bytes as r8g8b8a8, which every backend supports, so they're swizzled back here
+// the position along the strip. A radial one's tex.x and tex.z are the point's coordinates from its center, and their distance from
+// the center is the position. The texture holds the core's BGRA bytes as r8g8b8a8, which every backend supports, so they're
+// swizzled back here.
 
 uniform sampler2D colors;
 

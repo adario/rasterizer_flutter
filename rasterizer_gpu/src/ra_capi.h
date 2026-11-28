@@ -1,5 +1,5 @@
 //
-//  A flat C API over Ra::Scene, Ra::SceneList & Ra::Buffer, for Dart FFI.
+//  A flat C API over Ra::Scene, Ra::SceneList and Ra::Buffer, for Dart FFI.
 //  Not thread safe: call it from one thread, or guard it.
 //
 
@@ -24,46 +24,47 @@ typedef struct RaList RaList;
 typedef struct RaRenderer RaRenderer;
 typedef struct RaFrameBuffer RaFrameBuffer;
 
-// Ra::Transform: x' = a * x + c * y + tx, y' = b * x + d * y + ty
+// Ra::Transform: x' = a * x + c * y + tx, y' = b * x + d * y + ty.
 typedef struct {
     float a, b, c, d, tx, ty;
 } RaTransform;
 
-// Ra::Bounds. A null bounds has lx = ly = FLT_MAX
+// Ra::Bounds. A null bounds has lx = ly = FLT_MAX.
 typedef struct {
     float lx, ly, ux, uy;
 } RaBounds;
 
-// Ra::Params, whose clear color is BGRA, like Ra::Color
+// Ra::Params. Its clear color is BGRA, like Ra::Color.
 typedef struct {
     bool useClips, useCurves, showOpaques, showOutlines;
     uint8_t clearB, clearG, clearR, clearA;
 } RaParams;
 
-// Ra::Buffer::Type
+// The values of Ra::Buffer::Type.
 enum {
     RA_ENTRY_QUAD_EDGES, RA_ENTRY_FAST_EDGES, RA_ENTRY_FAST_MOLECULES, RA_ENTRY_QUAD_MOLECULES, RA_ENTRY_OPAQUES, RA_ENTRY_INSTANCES,
     RA_ENTRY_SEGMENTS_BASE, RA_ENTRY_INSTANCES_BASE, RA_ENTRY_DISABLE_CLIP, RA_ENTRY_ENABLE_CLIP, RA_ENTRY_CLIP_MASK,
     RA_ENTRY_BLEND_INSTANCES
 };
 
-// Ra::Buffer::Entry: byte offsets into the frame, except for RA_ENTRY_INSTANCES_BASE, whose end is the accumulation rows its group
-// uses, & RA_ENTRY_CLIP_MASK, whose begin packs device bounds & end is the mask's identity
+// Ra::Buffer::Entry. begin and end are byte offsets into the frame, with two exceptions: an RA_ENTRY_INSTANCES_BASE entry's end
+// is the number of accumulation rows its group uses, and an RA_ENTRY_CLIP_MASK entry's begin packs the mask's device bounds and
+// its end is the mask's identity.
 typedef struct {
     uint32_t type, _pad;
     uint64_t begin, end;
 } RaEntry;
 
-// One frame, which stays valid until the next ra_render into its RaFrameBuffer, or its release
+// One frame. It stays valid until the next ra_render into its RaFrameBuffer, or until that buffer is released.
 typedef struct {
     const uint8_t *base;  uint64_t size;            // The bytes to upload
     const RaEntry *entries;  uint64_t entryCount;
-    uint64_t colors, paths, texStrips, p16s;        // Section offsets: colors & paths are in the header, & p16s follow the strips
+    uint64_t colors, paths, texStrips, p16s;        // Section offsets: colors and paths are in the header, p16s after the strips
     uint64_t pathsCount, texCount, headerSize;
     RaParams params;
 } RaFrame;
 
-// The sizes of the structs the shaders read, & the constants they depend on
+// The sizes of the structs that the shaders read, and the constants that the shaders depend on.
 typedef struct {
     uint32_t color, pathData, opaque, instance, edge, segment, point16, entry;
     uint32_t colorTextureWidth, moleculesHeight, fastSegments, stripHeight;
@@ -71,33 +72,34 @@ typedef struct {
 
 RA_EXPORT RaLayout ra_layout(void);
 
-// Parses an SVG file into a new scene, & writes the transform that maps it, y down, into the y-up space of a list. NULL if it can't
-// be parsed
+// Parses an SVG file into a new scene, and writes to ctm the transform that maps the scene, which is y down, into a list's y-up
+// space. ctm may be NULL. Returns NULL if the file can't be parsed or memory runs out.
 RA_EXPORT RaScene *ra_scene_from_svg(const char *path, RaTransform *ctm);
-// The same, from an SVG's bytes, which needn't be null-terminated, for hosts that load them from assets
+// The same, from an SVG's bytes, for hosts that load them from assets. The bytes needn't be null-terminated.
 RA_EXPORT RaScene *ra_scene_from_svg_data(const char *data, uint64_t length, RaTransform *ctm);
-// The OpenGL ES format probe's scene, as ra_scene_from_svg_data makes it from probeSvg, but built without parsing, so that
-// the probe checks the GPU alone. NULL if it runs out of memory
+// The OpenGL ES format probe's scene: the scene that ra_scene_from_svg_data makes from probeSvg, but built without parsing, so
+// that the probe tests only the GPU. Returns NULL if memory runs out.
 RA_EXPORT RaScene *ra_scene_probe(RaTransform *ctm);
 RA_EXPORT void ra_scene_release(RaScene *scene);
 RA_EXPORT uint64_t ra_scene_count(const RaScene *scene);
 RA_EXPORT RaBounds ra_scene_bounds(const RaScene *scene);
-// The SVG's own rectangle in its paths' coordinates, y down: its viewBox, or else from 0, 0 to its width & height
+// The SVG's own rectangle in its paths' coordinates, y down: its viewBox, or if it has none, from 0, 0 to its width and height.
 RA_EXPORT RaBounds ra_scene_svg_bounds(const RaScene *scene);
 
 RA_EXPORT RaList *ra_list_create(void);
 RA_EXPORT void ra_list_release(RaList *list);
-// The list keeps its own reference to the scene. Empty scenes are skipped
+// The list keeps its own reference to the scene. Empty scenes are skipped.
 RA_EXPORT void ra_list_add_scene(RaList *list, RaScene *scene, RaTransform ctm);
 RA_EXPORT void ra_list_set_ctm(RaList *list, RaTransform ctm);
 RA_EXPORT void ra_list_set_params(RaList *list, RaParams params);
 RA_EXPORT RaParams ra_list_params(const RaList *list);
-// The scenes' bounds, through their transforms, but not the list's
+// The scenes' bounds, transformed by their own transforms but not by the list's.
 RA_EXPORT RaBounds ra_list_bounds(const RaList *list);
 
-// One of a list's entries, set in bulk: a scene, its transform, the rectangle in device pixels its draws are clipped to, its
-// opacity, from 0 to 1, which scales its draws' alpha, & its color matrix: 0 for none, else 1 + its index in the list's color
-// matrices
+// One of a list's entries, which ra_list_set_entries sets in bulk. It holds a scene, its transform, the rectangle in device
+// pixels that its draws are clipped to, its opacity from 0 to 1, which scales its draws' alpha, and its color matrix. colorMatrix
+// is 0 for none, otherwise 1 plus the matrix's index in the list's color matrices. A colorMatrix past the last matrix also means
+// none.
 typedef struct {
     RaScene *scene;
     RaTransform ctm;
@@ -106,38 +108,42 @@ typedef struct {
     uint32_t colorMatrix;
 } RaListEntry;
 
-// Sets the color matrices the next entries refer to: count 4 x 4 matrices on premultiplied RGBA, 16 floats each, row by row,
-// their rows & columns r, g, b, a. Each color they transform is clamped from 0 to its alpha
+// Sets the color matrices that the next entries refer to: count 4 x 4 matrices that act on premultiplied RGBA, 16 floats each,
+// row by row, with rows and columns in r, g, b, a order. The list copies them. Each color a matrix transforms is clamped between
+// 0 and its alpha.
 RA_EXPORT void ra_list_set_color_matrices(RaList *list, const float *matrices, uint64_t count);
-// Replaces the list's scenes with the entries', in order, so one call per frame sets them all. Empty scenes are skipped
+// Replaces the list's scenes with the entries' scenes, in order, so one call per frame sets them all. Null and empty scenes are
+// skipped.
 RA_EXPORT void ra_list_set_entries(RaList *list, const RaListEntry *entries, uint64_t count);
 
-// A renderer keeps the per-thread contexts that frames reuse. A host keeps one RaFrameBuffer per frame in flight
+// A renderer keeps the per-thread contexts that frames reuse. A host keeps one RaFrameBuffer per frame in flight.
 RA_EXPORT RaRenderer *ra_renderer_create(void);
 RA_EXPORT void ra_renderer_release(RaRenderer *renderer);
 RA_EXPORT RaFrameBuffer *ra_frame_buffer_create(void);
 RA_EXPORT void ra_frame_buffer_release(RaFrameBuffer *buffer);
 
-// Writes the list's frame for a w x h view in points, at scale device pixels per point, into the buffer
+// Writes the list's frame for a w x h view in points, at scale device pixels per point, into the buffer. Returns an empty frame,
+// with a null base, if it can't be written.
 RA_EXPORT RaFrame ra_render(RaRenderer *renderer, const RaList *list, float w, float h, float scale, RaFrameBuffer *buffer);
 
-// Meshes, for the mesh renderer: an SVG imported once into triangles in its paths' coordinates, y down, as a scene's
+// Meshes, for the mesh renderer: an SVG imported once into triangles, in its paths' coordinates, y down, like a scene's.
 typedef struct RaMesh RaMesh;
 
-// RaMeshPath::type
+// The values of RaMeshPath::type.
 enum { RA_PAINT_COLOR, RA_PAINT_LINEAR, RA_PAINT_RADIAL };
 
-// A gradient's stop: its offset, from 0 to 1 & never below the previous stop's, & its color, unpremultiplied, as SVG
-// interpolates them
+// A gradient's stop: its offset, from 0 to 1 and never below the previous stop's, and its color, unpremultiplied, as SVG
+// interpolates stops.
 typedef struct {
     float offset, r, g, b, a;
 } RaMeshStop;
 
-// One of a mesh's paths, in paint order: a shape's fill or its stroke, its triangles' indices & its paint. A color is r, g, b & a,
-// premultiplied. A gradient's transform maps the SVG's coordinates into the gradient's, where a linear gradient's offset is y,
-// & a radial one's the distance from 0, 0, & its color is its first or last stop's beyond them; its focal point & spread
-// method are ignored, as in scenes. halfWidth is a stroke's, 0 for a fill or a hairline. halo is 1 for a glow's halo, always a
-// color, which covers what's under it as much as its strongest channel, & 0 for the others
+// One of a mesh's paths, in paint order: a shape's fill or stroke, the indices of its triangles, and its paint. A color is r, g,
+// b and a, premultiplied. A gradient's transform maps the SVG's coordinates into the gradient's own. There, a linear gradient's
+// offset is y, a radial gradient's offset is the distance from 0, 0, and beyond the first and last stops the color is that
+// stop's. Like scenes, meshes ignore a gradient's focal point and spread method. halfWidth is half a stroke's width, or 0 for a
+// hairline or any path that isn't a stroke. halo is 1 for a glow's halo and 0 for every other path. A halo is always a color,
+// and it covers what's under it as much as its strongest channel does.
 typedef struct {
     uint32_t type, indexBegin, indexCount, stopBegin, stopCount;
     float r, g, b, a;
@@ -146,13 +152,16 @@ typedef struct {
     uint32_t halo;
 } RaMeshPath;
 
-// A mesh's arrays, valid until its release. Each vertex is vertexFloats floats: x, y & its path's index, as OpenGL ES vertex
-// attributes can't be integers, & in a mesh with strokes (vertexFloats 5) its offset from the point of its stroke's polyline it's
-// built around, x & y in half widths, 0 for those of fills & of strokes' unions. In a mesh with a glow (vertexFloats 6) the offset
-// is followed by its glow: 1 for a draw's own vertices, from 1 at a path's edge to 0 at the edge of its halo, & from 1 up to 2 in
-// the middle of a core. The indices are u16 (indexSize 2) or u32 (4), 3 per triangle, in paint order, those of strokes that overlap themselves their unions'.
-// stripIndices, if stripIndexCount isn't 0, are the same but for opaque strokes that overlap themselves, their strips', for
-// instances drawn without an opacity. bounds are the vertices', & svgBounds as ra_scene_svg_bounds
+// A mesh's arrays, which stay valid until the mesh is released.
+// Each vertex is vertexFloats floats. The first three are x, y and the index of the vertex's path, a float because OpenGL ES
+// vertex attributes can't be integers. In a mesh with strokes (vertexFloats 5) or a glow (vertexFloats 6), the next two are the
+// vertex's offset, x and y in half widths, from the point of its stroke's polyline that it's built around. The offset is 0 for
+// the vertices of fills and of strokes' unions. In a mesh with a glow, the sixth float is the vertex's glow: 1 for a draw's own
+// vertices, from 1 at a path's edge down to 0 at the outer edge of its halo, and from 1 up to 2 in the middle of a core.
+// The indices are u16 (indexSize 2) or u32 (indexSize 4), 3 per triangle, in paint order. A stroke that overlaps itself is
+// indexed as its union. stripIndices, if stripIndexCount isn't 0, are the same indices, except that opaque strokes that overlap
+// themselves are indexed as their strips, for instances drawn without an opacity. bounds are the vertices' bounds, and svgBounds
+// is as ra_scene_svg_bounds.
 typedef struct {
     const float *vertices;  uint64_t vertexCount;
     const void *indices;  uint64_t indexCount;  uint32_t indexSize, vertexFloats;
@@ -162,19 +171,21 @@ typedef struct {
     RaBounds bounds, svgBounds;
 } RaMeshData;
 
-// Imports an SVG's bytes, which needn't be null-terminated, into a new mesh, its curves flattened to within 1/4 of a device pixel
-// when its longer side is maxSize device pixels. NULL if it can't be parsed, or maxSize isn't positive
+// Imports an SVG's bytes into a new mesh, flattening its curves to within 1/4 of a device pixel when its longer side is drawn
+// maxSize device pixels long. The bytes needn't be null-terminated. Returns NULL if they can't be parsed, if maxSize isn't
+// positive and finite, or if memory runs out.
 RA_EXPORT RaMesh *ra_mesh_from_svg_data(const char *data, uint64_t length, float maxSize);
 RA_EXPORT RaMeshData ra_mesh_data(const RaMesh *mesh);
 RA_EXPORT void ra_mesh_release(RaMesh *mesh);
 
-// Paths: plain paths, flattened into polylines in Dart, each drawn with its paint. RaPathDraw::cap & join, as NanoSVG's
-// & Flutter's StrokeCap & StrokeJoin
+// Paths: plain paths, flattened into polylines in Dart, each drawn with its paint. These are the values of RaPathDraw::cap and
+// join, which match NanoSVG's and Flutter's StrokeCap and StrokeJoin.
 enum { RA_CAP_BUTT, RA_CAP_ROUND, RA_CAP_SQUARE };
 enum { RA_JOIN_MITER, RA_JOIN_ROUND, RA_JOIN_BEVEL };
 
-// Paths' polylines, y down: their points, x & y, contour after contour, each contour's count of points & whether it's closed,
-// 1, or open, 0, & each path's count of contours. A closed contour doesn't repeat its first point
+// Paths' polylines, y down. points holds x, y pairs, contour after contour. pointCounts holds each contour's number of points,
+// closed whether each contour is closed (1) or open (0), and contourCounts each path's number of contours. A closed contour
+// doesn't repeat its first point.
 typedef struct {
     const float *points;
     const uint32_t *pointCounts;
@@ -183,38 +194,45 @@ typedef struct {
     uint64_t pathCount;
 } RaContours;
 
-// One draw of a path, in paint order: the index of its path in the contours; its color, as NanoSVG's, r in the low byte & a in
-// the high one, unpremultiplied; its stroke's width, cap, join & miter limit, or a width of 0 for a fill, which closes open
-// contours; whether a fill is even-odd, else non-zero; whether it's a hairline, a stroke of width 0, whatever strokeWidth is,
-// which meshes import & scenes skip; & whether a mesh fills each closed contour on its own instead of their union, a convex
-// one as a fan, so that its triangles can overlap, which scenes ignore
+// One draw of a path, in paint order.
+// path is the index of its path in the contours. color is as NanoSVG's, unpremultiplied, with r in the low byte and a in the high
+// one. strokeWidth, cap, join and miterLimit describe a stroke. A strokeWidth of 0 or less makes the draw a fill, which closes
+// open contours. evenOdd picks a fill's rule: even-odd if set, otherwise non-zero. hairline makes the draw a stroke of width 0,
+// whatever strokeWidth is; meshes import hairlines, and scenes skip them. separate makes a mesh fill each contour on its own,
+// closed, instead of filling their union, and a convex contour as a fan, so that its triangles can overlap. Scenes ignore it.
 typedef struct {
     uint32_t path, color;
     float strokeWidth, miterLimit;
     uint8_t cap, join, evenOdd, hairline, separate;
 } RaPathDraw;
 
-// A new scene of draws of paths, their polylines drawn as lines, whose own rectangle (ra_scene_svg_bounds) is viewBox. Paths with
-// points that aren't finite, & draws of paths that aren't in the contours, are skipped. As for SVGs, the GPU renderer's strokes
-// have a fixed miter limit, & bevel joins are miters
+// A new scene of draws of paths, with their polylines drawn as lines. Its own rectangle (ra_scene_svg_bounds) is viewBox. Paths
+// with points that aren't finite, and draws of paths that aren't in the contours, are skipped. As for SVGs, the GPU renderer's
+// strokes have a fixed miter limit, and bevel joins are drawn as miters. Returns NULL if memory runs out.
 RA_EXPORT RaScene *ra_scene_from_paths(const RaContours *contours, const RaPathDraw *draws, uint64_t drawCount, RaBounds viewBox);
 
-// The glow of a mesh's paths, as a neon tube's: a halo under all their draws, which fades out over radius: from a stroke's centre
-// line, or a fill's contour, in the paths' units, or if inWidths, in line widths: that many times a stroke's width, the widest of a
-// path's strokes, or a fill's shorter edge at each point of a contour, & a hairline, of no width, has none. Its alpha on the path is
-// strength, from 0 to 1, of its color, as RaPathDraw's, if hasColor, else of the color of the path's last draw. A core over each draw
-// turns near white down its middle, whatever strength & color: a stroke's, or if inWidths, a fill's that isn't of a stroked path,
-// inward of each contour neither inside another nor around one, half of the shorter edge at each point. A hairline has none
+// The glow of a mesh's paths, like a neon tube's.
+// A halo goes under all the draws and fades out over radius. For a stroked path, radius is measured from the stroke's centre
+// line, and for a path that's only filled, from its contour. radius is in the paths' units, or if inWidths, in line widths:
+// that many times the widest of the path's strokes, or for a fill, the shorter edge at each point of a contour. So with
+// inWidths, a path whose only strokes are hairlines, which have no width, has no halo. On the path, the halo's alpha is
+// strength, from 0 to 1, times the alpha of its color. That color is color, as RaPathDraw's, if hasColor, otherwise the color
+// of the path's last draw that paints.
+// A core over each draw turns near white down its middle, whatever strength and color are. Every stroke except a hairline has
+// a core. If inWidths, so does a fill of a path that isn't stroked: its core reaches inward from each contour that is neither
+// inside another contour nor around one, by half the shorter edge at each point.
 typedef struct {
     float radius, strength;
     uint32_t color;
     uint8_t hasColor, inWidths;
 } RaGlow;
 
-// A new mesh of the same draws, as an SVG's: round joins & caps within tolerance of their arcs, in the paths' units, & with glow
-// unless it's NULL, or its radius or strength isn't positive. A halo is a path of the mesh, before all the draws' paths, one per
-// path drawn: on both sides of its polylines if a draw strokes it, else outward from each contour, closed, which its winding tells.
-// A core is a path of the mesh right after its draw's. NULL if tolerance isn't positive
+// A new mesh of the same draws, imported as an SVG's are. Round joins and caps stay within tolerance of their arcs, in the paths'
+// units. The mesh has glow unless glow is NULL, its radius isn't positive and finite, or its strength isn't positive. Each path
+// that a draw paints gets one halo, a path of the mesh placed before all the draws' paths. The halo lies on both sides of the
+// path's polylines if a draw strokes the path, otherwise outward from each contour, closed, on the side its orientation tells.
+// Each core is a path of the mesh right after its draw's path. Returns NULL if tolerance isn't positive and finite, or if memory
+// runs out.
 RA_EXPORT RaMesh *ra_mesh_from_paths(const RaContours *contours, const RaPathDraw *draws, uint64_t drawCount, RaBounds viewBox,
                                      float tolerance, const RaGlow *glow);
 

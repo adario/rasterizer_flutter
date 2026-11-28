@@ -1,8 +1,9 @@
 #version 460 core
 
-// Shades an instance: its coverage times its color. A fill's coverage comes from the winding accumulated for its pixel, an
-// outline's from its distances to the stroke's segment. Both fade out at the draw's clip bounds. Blended with one & one minus
-// source alpha. Ported from instances_fragment_main in Rasterizer's Shaders.metal, without images, clip masks or blend modes
+// Shades an instance: its coverage times its color. A fill's coverage comes from the winding accumulated for its pixel, and an
+// outline's from its distances to the stroke's segment. Both fade out at the draw's clip bounds. The result is blended with one and
+// one minus source alpha. Ported from instances_fragment_main in Rasterizer's Shaders.metal, without images, clip masks or blend
+// modes.
 
 #include "ra_winding.glsl"
 #include "ra_paint.glsl"
@@ -18,7 +19,8 @@ flat in uint v_iz;
 out vec4 frag_color;
 
 // A fill's coverage of a pixel in one of its edge cells, from the accumulated winding, or 1 in a cell that it covers whole. The
-// texel is fetched rather than sampled, as sampling would need a clamp-to-zero address mode, which Flutter GPU's samplers lack
+// texel is fetched rather than sampled, because sampling would need a clamp-to-zero address mode, which Flutter GPU's samplers
+// lack.
 float fillCoverage() {
   if (v_uvw.x >= FLT_MAX * 0.5)
     return 1.0;
@@ -45,8 +47,8 @@ void main() {
     } else {
       float x0, y0, x1, y1, x2, y2, d0, dm0, d1, dm1, sqdist, sd0, sd1, cap, cap0, cap1;
 
-      // The barycentric coordinates are affine in screen space, so inverting their derivatives gives the control triangle's
-      // edges, p0 - p2 & p1 - p2, with the fragment at the origin
+      // The barycentric coordinates are affine in screen space, so inverting their derivatives gives the control triangle's edges,
+      // p0 - p2 and p1 - p2, with the fragment at the origin.
       float a = dFdx(v_uvw.x), b = -dFdy(v_uvw.x), c = dFdx(v_uvw.y), d = -dFdy(v_uvw.y), rdet = 1.0 / (a * d - b * c);
       vec2 e0 = vec2(d, -c) * rdet, e1 = vec2(-b, a) * rdet, p2 = -(e0 * v_uvw.x + e1 * v_uvw.y), p0 = p2 + e0, p1 = p2 + e1;
       x0 = p0.x, y0 = p0.y, x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
@@ -72,8 +74,8 @@ void main() {
   } else {
     alpha = fillCoverage();
   }
-  // Fades the instance out over a pixel at its clip bounds. Clips are always on (core.dart's Params): without them, v_clip would
-  // be constant, & inversesqrt(0) is undefined
+  // Fades the instance out over a pixel at its clip bounds. Clips are always on (see Params in core.dart). Without them, v_clip
+  // would be constant, and inversesqrt(0) is undefined.
   float clx = v_clip.x, cly = v_clip.y, a = dFdx(clx), b = dFdy(clx), c = dFdx(cly), d = dFdy(cly);
   float sx = inversesqrt(a * a + b * b), sy = inversesqrt(c * c + d * d);
   float clip = clamp01(0.5 + clx * sx) * clamp01(0.5 + (1.0 - clx) * sx) * clamp01(0.5 + cly * sy) * clamp01(0.5 + (1.0 - cly) * sy);

@@ -1,9 +1,10 @@
 #version 460 core
 
 // Draws an edge into the accumulation texture, where the winding of a fill's cells adds up per pixel. An edge has up to 2 segments,
-// lines or quadratics, which this passes on in its cell's pixel coordinates. It covers the part of the cell right of them & between
-// their heights, which their winding reaches. The texture's rows count from the top, as in Metal, where clip space's +y is a
-// texture's first row. Ported from edges_vertex_main in Rasterizer's Shaders.metal
+// lines or quadratics, which this shader passes on in its cell's pixel coordinates. Its quad covers the part of the cell between
+// the segments' lowest and highest y, from their leftmost x to the cell's right side, which is the area their winding reaches. The
+// texture's rows count from the top, as in Metal, where clip space's +y is the texture's first row. Ported from edges_vertex_main
+// in Rasterizer's Shaders.metal.
 
 #include "ra_data.glsl"
 

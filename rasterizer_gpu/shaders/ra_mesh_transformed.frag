@@ -1,7 +1,8 @@
 #version 460 core
 
-// As ra_mesh.frag, for instances with a color transform, which this applies to each fragment of a gradient. A color path's color
-// was transformed per vertex. A draw's instances share one color transform, scaled by their opacity, in a uniform
+// Like ra_mesh.frag, for instances with a color transform, which this shader applies to each fragment of a gradient. The vertex
+// shader already transformed a color path's color. A draw's instances share one color transform, scaled by their opacity, in a
+// uniform.
 
 #include "ra_mesh.glsl"
 
@@ -14,7 +15,7 @@ uniform TransformInfo {
   vec4 m3;
 } colorTransform;
 
-// The same as ra_mesh.vert's outputs, in the same order
+// The same as ra_mesh.vert's outputs, in the same order.
 in vec2 v_q;
 flat in vec4 v_color;
 flat in vec4 v_stops;

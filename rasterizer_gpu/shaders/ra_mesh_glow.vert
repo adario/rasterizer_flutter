@@ -1,8 +1,8 @@
 #version 460 core
 
-// As ra_mesh_stroked.vert, for meshes with a glow. It also passes on each vertex's glow value, 1 on the path's own outline, as
-// ra_mesh.hpp's Ribbon describes. A halo is light, so it hides what's under it only as much as its color's strongest channel,
-// which is its alpha here. So a halo tinted to black leaves nothing
+// Like ra_mesh_stroked.vert, for meshes with a glow. It also passes on each vertex's glow value, which is 1 on the path's own
+// outline, as ra_mesh.hpp's Ribbon describes. A halo is light, so it hides what's under it only as much as its color's strongest
+// channel, which this shader makes its alpha. So a halo tinted to black draws nothing.
 
 #include "ra_mesh_stroked.glsl"
 

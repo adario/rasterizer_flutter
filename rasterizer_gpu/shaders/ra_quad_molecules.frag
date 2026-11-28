@@ -1,7 +1,7 @@
 #version 460 core
 
 // Adds the winding of a molecule's quadratic to the accumulation texture, blended additively. Ported from
-// quad_molecules_fragment_main in Rasterizer's Shaders.metal
+// quad_molecules_fragment_main in Rasterizer's Shaders.metal.
 
 #include "ra_winding.glsl"
 
