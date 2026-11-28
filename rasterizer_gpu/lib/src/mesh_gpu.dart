@@ -398,9 +398,7 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
     // different pipeline from the last one clears the bindings first, and a
     // draw with the same pipeline binds only what changed. Setting the blend
     // state makes Flutter GPU look the pipeline up again at the next draw,
-    // even with the same values, so it's set only when it changes. Skipping
-    // those calls took 15-20% off the encode time of game frames, on macOS
-    // and an iPhone.
+    // even with the same values, so it's set only when it changes.
     final samePipeline = identical(drawPipeline, _lastPipeline);
     final sameMesh = samePipeline && identical(mesh, _lastMesh);
     if (!samePipeline) {
@@ -459,9 +457,7 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   /// draws.
   ///
   /// On OpenGL ES, a pipeline compiles at its first draw. That stalls the UI
-  /// thread while the renderer is created, and then the raster thread. The
-  /// stalls took 60 ms and 30 ms on the Android emulator, and 230 ms and
-  /// 870 ms on Mesa's llvmpipe in release builds with no shader cache. So on
+  /// thread while the renderer is created, and then the raster thread. So on
   /// OpenGL ES the mesh renderer compiles all its pipelines when it's
   /// created, rather than in whichever frame first draws with each.
   Future<void> warmUp() {

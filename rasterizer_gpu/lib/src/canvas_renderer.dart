@@ -334,9 +334,8 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
       canvas.scale(1 / scale);
     }
     // CanvasKit drops some pictures drawn near this clip's edge, even though
-    // they lie inside it, so on CanvasKit the run draws without the clip, as
-    // Flame's components do. A WebAssembly build uses skwasm, which draws
-    // them.
+    // they lie inside it, so on CanvasKit the run draws without the clip. A
+    // WebAssembly build uses skwasm, which draws them.
     final clipped = !kIsWeb || kIsWasm;
     if (clipped) {
       canvas.clipRect(

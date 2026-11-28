@@ -178,11 +178,7 @@ abstract final class RasterizerGpu() {
   /// - Each renderer compiles its pipelines when it's created, which stalls
   ///   the UI thread and then the raster thread. [RasterizerRenderer.create]
   ///   completes after both are done, so the first frame doesn't pay for
-  ///   them, and an app can show a loader meanwhile. In release builds with
-  ///   no shader cache on Mesa's llvmpipe, this took about 0.55 s on the UI
-  ///   thread and 0.15 s on the raster thread for the GPU renderer, and
-  ///   0.23 s and 0.87 s for the mesh renderer. On the Android emulator, it
-  ///   took about 0.1 s and 50-90 ms, and 60 ms and 30 ms.
+  ///   them, and an app can show a loader meanwhile.
   /// - The first [RasterizerBackend.gpu] renderer created starts a format
   ///   probe. The probe checks that the renderer draws correctly while
   ///   accumulating coverage in r32Float. Where it doesn't, the renderer
@@ -271,8 +267,7 @@ abstract final class RasterizerGpu() {
   /// Whether the canvas renderer draws each scene as a [ui.Picture] of its
   /// paths, recorded once, rather than drawing its paths each time.
   ///
-  /// In a benchmark, pictures halved the UI thread's time and left the raster
-  /// time about the same.
+  /// Pictures take less of the UI thread's time.
   static bool canvasPictures = true;
 
   /// The GPU renderers' shaders, which hook/build.dart builds and pubspec.yaml

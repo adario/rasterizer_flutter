@@ -65,9 +65,7 @@ abstract class ImageRun() extends RasterizerRun {
 
   /// Draws each part's image with [paint].
   ///
-  /// One image draw per part costs less than one atlas draw per page. In a
-  /// benchmark on macOS with a color filter, atlas draws cost 1-3.5 ms of
-  /// raster time, and image draws 0.5 ms.
+  /// One image draw per part costs less than one atlas draw per page.
   void _drawParts(ui.Canvas canvas, double scale, ui.Paint paint) {
     for (final part in parts) {
       canvas.drawImageRect(

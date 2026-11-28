@@ -568,9 +568,6 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       // they all keep it. Shorter groups join the blended draw of the entries
       // around them. That looks the same, as blending an opaque color changes
       // nothing, and a draw costs more to encode than blending a few entries.
-      // A star field of one dot at many opacities would take 69 draws a
-      // frame, and 0.2 ms on an M1, if each change of alpha started a new
-      // draw.
       var first = 0;
       for (final (r, run) in _placed.indexed) {
         gpu.beginPass(run._target!, buffer);

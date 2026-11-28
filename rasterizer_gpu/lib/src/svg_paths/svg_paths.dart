@@ -361,8 +361,8 @@ class SvgPaths(
     return (svg: prepared.toString(), origin: origin ?? ui.Offset.zero);
   }
 
-  // Searched with a RegExp, as String.contains took longer than the rest of
-  // _prepared on a 100 KB SVG.
+  // Searched with a RegExp, which is faster than String.contains on large
+  // SVGs.
   static final _clipPath = RegExp('clip-path');
 
   static final _clipPathAttribute = RegExp(

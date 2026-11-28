@@ -39,7 +39,7 @@ import '../rasterizer_gpu.dart';
 /// that clip, although it may leave out what lies outside the clip's bounds.
 /// That happens when the clip and the transform are in the same save. A
 /// transform made in a save of its own, before what it draws, never causes
-/// this. Flame's components make their transforms that way.
+/// this.
 ///
 /// When a run ends, it places the run at once ([RasterizerRun.place]) and
 /// draws its image before the frame has rendered. So render the frame after

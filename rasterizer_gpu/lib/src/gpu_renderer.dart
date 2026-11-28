@@ -411,10 +411,7 @@ class GpuRenderer(
   /// instances. Each state compiles when it first draws, which stalls the
   /// thread that runs the draw. On OpenGL ES, that's partly the UI thread,
   /// while the renderer is created, and partly the raster thread afterwards.
-  /// On the Android emulator, the states took 110 ms on the UI thread, then
-  /// 50-90 ms on the raster thread. On Mesa's llvmpipe, in release builds with
-  /// no shader cache, they took 550 ms, then 150 ms. These times include the
-  /// format probe's render, which the first renderer starts. So on OpenGL ES,
+  /// So on OpenGL ES,
   /// the GPU renderer compiles all the states when it's created, rather than
   /// at whichever frame first draws with each.
   Future<void> warmUp() {
