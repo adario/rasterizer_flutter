@@ -58,7 +58,7 @@ abstract class RunnerEnemyComponent(
   static const strokeWidths = 2.0;
 
   /// How long it flashes after it comes, in seconds of the game.
-  static const flashTime = 1.5;
+  static const flashTime = 2.0;
 
   /// Where it is along the axis, in tube units.
   double get at;

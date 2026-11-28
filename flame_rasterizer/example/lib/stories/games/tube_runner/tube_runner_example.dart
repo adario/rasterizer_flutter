@@ -90,12 +90,13 @@ abstract class TubeRunnerExample({
     ship's colour, as in Tube Shooter.
 
     READY shows until a tap or a key starts the game. After 4 seconds, and
-    every 4 seconds from then on, an enemy comes at the farthest ring across
-    the tube, on a lane picked at random: a seeder at first, after 30 seconds
-    in the tube, a seeder or a climber, after 60, a zapper too, and after 90,
-    a splitter too, of a kind picked at random. For a second and a half, its
-    lane flashes in the enemy's colour, added to the ship's in the ship's
-    lane, and glows with the enemy and a seeder's spike, fading out: the mesh
+    every 4 seconds from then on, an enemy comes on a lane picked at random:
+    a seeder at first, after 30 seconds in the tube, a seeder or a climber,
+    after 60, a zapper too, and after 90, a splitter too, of a kind picked at
+    random. It comes where it shows as its lane's flash ends, beyond where
+    the tube bends out of sight, or at the farthest ring across the tube, if
+    the lane shows that far. For two seconds, its lane flashes in the enemy's
+    colour, added to the ship's in the ship's lane, and glows with the enemy and a seeder's spike, fading out: the mesh
     renderer draws the glow with RasterizerGlow, only on them, and with the
     other renderers, wider, see-through copies of them stand for it. Enemies
     climb their lanes toward the ship, and go once they pass it. A seeder lays
@@ -113,7 +114,8 @@ abstract class TubeRunnerExample({
     lanes on either side.
 
     The ship's shots fly as fast as Tube Shooter's ahead of it, and go 8
-    units down the tube. As in Tube Shooter, a shot destroys a seeder for 50
+    units down the tube, or until the tube bends them out of sight, and hit
+    only what shows. As in Tube Shooter, a shot destroys a seeder for 50
     points, and leaves its spike, cuts a spike back from its near end for 2
     points, destroys a climber for 100 or a zapper for 200, splits a
     splitter for 150, and destroys a climber's shot. An enemy, a spike or a climber's shot that touches the

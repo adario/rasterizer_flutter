@@ -581,14 +581,16 @@ class RunnerMode({
   /// Over [dt] seconds of the game: fires a shot down the ship's lane every
   /// `PlayerComponent.firePeriod` while it fires, with at most
   /// `PlayerComponent.maxShots` in the tube, as in Tube Shooter, flies the
-  /// shots, and drops those
-  /// [RunnerShotComponent.range] ahead of the ship.
+  /// shots, and drops those [RunnerShotComponent.range] ahead of the ship,
+  /// and those that the tube hid where it last placed them, so that they
+  /// can't hit what doesn't show.
   void _updateShots(double dt) {
     for (final shot in _shots) {
       shot.fly(dt, speed);
     }
     _shots.removeWhere((shot) {
-      final gone = shot.at > _flown + RunnerShotComponent.range;
+      final gone =
+          !shot.isVisible || shot.at > _flown + RunnerShotComponent.range;
       if (gone) {
         shot.removeFromParent();
       }
@@ -610,7 +612,8 @@ class RunnerMode({
 
   /// Resolves the shots' hits, as in Tube Shooter: each shot hits the
   /// nearest spike, enemy or climber's shot in its lane that it reached or
-  /// passed since it last flew. A seeder is at its spike's near end, so the
+  /// passed since it last flew, of the enemies and shots that show where the
+  /// tube last placed them. A seeder is at its spike's near end, so the
   /// spike stands for it. The shot destroys an enemy, and scores, a seeder
   /// leaving its spike, cuts a spike back by `ShooterMode.spikeHit`
   /// from its near end, and scores, or destroys a climber's shot.
@@ -634,6 +637,7 @@ class RunnerMode({
       }
       for (final enemy in _enemies) {
         if (enemy is! RunnerSeederComponent &&
+            enemy.isVisible &&
             enemy.canBeShot &&
             enemy.currentLane == shot.lane &&
             _meet(shot, enemy.previousAt, enemy.at)) {
@@ -642,6 +646,7 @@ class RunnerMode({
       }
       for (final enemyShot in _enemyShots) {
         if (enemyShot.lane == shot.lane &&
+            enemyShot.isVisible &&
             _meet(shot, enemyShot.previousAt, enemyShot.at)) {
           aim(enemyShot, enemyShot.at);
         }
@@ -1028,11 +1033,24 @@ class RunnerMode({
     _tubeFlown = double.nan;
   }
 
-  /// Brings an enemy of [kind], one of [enemyKinds], at the farthest ring
-  /// across the tube, in [lane].
+  /// Brings an enemy of [kind], one of [enemyKinds], in [lane], where it
+  /// comes into sight as its flash ends: past where the tube will hide the
+  /// lane from the ship then, as the ship flies now, by as far as the enemy
+  /// climbs over [RunnerEnemyComponent.flashTime], or at the farthest ring
+  /// across the tube, if nearer.
   @visibleForTesting
   void addEnemy(EnemyKind kind, int lane) {
-    final far = _farRing;
+    const flashTime = RunnerEnemyComponent.flashTime;
+    final sight = endlessTube.sightAlong(
+      lane,
+      _flown + speed * flashTime,
+      view,
+      until: run?.exit ?? double.infinity,
+    );
+    final far = math.min(
+      _farRing,
+      sight + RunnerEnemyComponent.climbSpeed * flashTime,
+    );
     final RunnerEnemyComponent enemy;
     switch (kind) {
       case EnemyKind.seeder:

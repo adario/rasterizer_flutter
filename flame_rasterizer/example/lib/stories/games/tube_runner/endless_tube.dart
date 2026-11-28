@@ -313,13 +313,7 @@ class EndlessTube({var TubeCourse? course}) {
     final tube = view.tube;
     final ship = ringAt(distance);
     final eye = ship.center - ship.forward * Tube.eye;
-    // Twice the outline's signed area: its sign says which way it turns.
-    var turn = 0.0;
-    for (var i = 0; i < tube.laneCount; i++) {
-      final point = tube.points[i];
-      final next = tube.points[tube.pointAfter(i)];
-      turn += point.dx * next.dy - point.dy * next.dx;
-    }
+    final turn = _turnOf(tube);
     if (!identical(_hidingTube, tube)) {
       _hidingTube = tube;
       _hiding = _hidingOf(tube, turn);
@@ -547,6 +541,100 @@ class EndlessTube({var TubeCourse? course}) {
       next: nextLines.quads,
       places: places,
     );
+  }
+
+  /// Returns how far along the axis the eye sees down the middle of [lane]
+  /// of [view]'s tube, with the ship [distance] along it: up to where the
+  /// tube first hides a shape there, as [quadsAt] places it, or else to the
+  /// last ring, or [until].
+  double sightAlong(
+    int lane,
+    double distance,
+    TubeView view, {
+    double until = double.infinity,
+  }) {
+    final tube = view.tube;
+    final ship = ringAt(distance);
+    final eye = ship.center - ship.forward * Tube.eye;
+    final turn = _turnOf(tube);
+    if (!identical(_hidingTube, tube)) {
+      _hidingTube = tube;
+      _hiding = _hidingOf(tube, turn);
+    }
+    final hiders = _hiding!..reset();
+    final middle = tube.middles[lane];
+    List<Point3> outlineOf(Ring ring) => [
+      for (final point in hiders.points) _fromEye(ring.place(point), eye, ship),
+    ];
+    var seen = distance;
+    var outline = outlineOf(_rings.first);
+    for (var k = 0; k < _rings.length; k++) {
+      final ring = _rings[k];
+      final near = ring.index * step;
+      if (near > until) {
+        return until;
+      }
+      hiders.pass(outline, _fromEye(ring.center, eye, ship));
+      if (k + 1 == _rings.length) {
+        return math.max(seen, near);
+      }
+      final after = outlineOf(_rings[k + 1]);
+      if (near + step > distance) {
+        if (!tube.isOpen &&
+            !_facesEye(
+              outline[lane],
+              outline[tube.pointAfter(lane)],
+              after[lane],
+              turn,
+            )) {
+          return seen;
+        }
+        for (var i = 0; i < _sightSamples; i++) {
+          // Off the rings, where an open tube's faces would hide it.
+          final at = near + step * (i + 0.5) / _sightSamples;
+          if (at < distance) {
+            continue;
+          }
+          Point3 seenAt(double at) => _fromEye(
+            _turnTo(ring, at, ring.index).place(middle),
+            eye,
+            ship,
+          );
+          final point = seenAt(at);
+          final ahead = seenAt(at + _look);
+          if (point.z < TubeView.near || ahead.z < TubeView.near) {
+            return seen;
+          }
+          final count = hiders.spansOf(
+            _sight(point),
+            _sight(ahead),
+            nearer: false,
+          );
+          if (count == 0 || hiders.spans[0] > 0) {
+            return seen;
+          }
+          seen = at;
+        }
+      }
+      outline = after;
+    }
+    return seen;
+  }
+
+  /// How many points between each ring and the next [sightAlong] looks at,
+  /// evenly spaced.
+  static const _sightSamples = 4;
+
+  /// Returns twice the signed area of [tube]'s outline: its sign says which
+  /// way the outline turns.
+  static double _turnOf(Tube tube) {
+    var turn = 0.0;
+    for (var i = 0; i < tube.laneCount; i++) {
+      final point = tube.points[i];
+      final next = tube.points[tube.pointAfter(i)];
+      turn += point.dx * next.dy - point.dy * next.dx;
+    }
+    return turn;
   }
 
   /// Returns the point [t] of the way from [a] to [b].

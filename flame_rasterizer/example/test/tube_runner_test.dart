@@ -9,6 +9,7 @@ import 'package:flame_rasterizer_example/commons/game_story.dart';
 import 'package:flame_rasterizer_example/commons/material.dart';
 import 'package:flame_rasterizer_example/commons/svg_renderers.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_climber_component.dart';
+import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_enemy_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_shot_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/components/runner_splitter_component.dart';
 import 'package:flame_rasterizer_example/stories/games/tube_runner/endless_tube.dart';
@@ -409,6 +410,137 @@ void main() {
     expect(turnOf(shipAngle() - from - math.pi / 2), closeTo(0, 0.05));
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  for (final tube in [Tubes.hexagon, Tubes.floor]) {
+    test('on the ${tube.name}, the eye sees down a lane as far as a shape '
+        'there shows', () {
+      final view = TubeView()
+        ..tube = tube
+        ..fit(720, 1);
+      final endless = EndlessTube();
+      var hidden = 0;
+      for (var distance = 0.0; distance < 2400; distance += 30) {
+        endless.advanceTo(distance);
+        for (var lane = 0; lane < tube.laneCount; lane++) {
+          final sight = endless.sightAlong(lane, distance, view);
+          if (sight >= distance + EndlessTube.ahead - EndlessTube.step) {
+            continue;
+          }
+          hidden++;
+          final places = endless
+              .quadsAt(
+                distance,
+                view,
+                marks: [
+                  (lane: lane, at: sight, flip: null, across: null),
+                  (
+                    lane: lane,
+                    at: sight + EndlessTube.step / 4,
+                    flip: null,
+                    across: null,
+                  ),
+                ],
+              )
+              .places;
+          expect(places.first, isNotNull, reason: 'at $distance, $lane');
+          expect(places.last, isNull, reason: 'at $distance, $lane');
+        }
+      }
+      // The tube's bends hide some lanes' far ends.
+      expect(hidden, greaterThan(10));
+    });
+  }
+
+  /// Flies [game]'s ship with no enemies until the tube bends its lane out
+  /// of sight nearer than [RunnerShotComponent.range] ahead, and returns how
+  /// far along the axis the eye sees down the lane.
+  Future<double> flyToBend(WidgetTester tester, TubeRunnerExample game) async {
+    final runner = game.runner..spawning = false;
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    for (var i = 0; i < 5000; i++) {
+      final sight = runner.endlessTube.sightAlong(
+        runner.ship.lane,
+        runner.flown,
+        runner.view,
+      );
+      if (sight < runner.flown + RunnerShotComponent.range - 2) {
+        return sight;
+      }
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    fail('No bend hides the lane');
+  }
+
+  testWidgets('an enemy comes where it shows as its flash ends', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas));
+    final game = await _gameOf(tester);
+    await flyToBend(tester, game);
+    final runner = game.runner
+      ..addEnemy(EnemyKind.seeder, game.runner.ship.lane);
+    final seeder = runner.enemies.single;
+    // Nearer than the farthest ring, beyond the bend.
+    expect(
+      seeder.at,
+      lessThan(runner.flown + EndlessTube.ahead - EndlessTube.ringSpacing),
+    );
+    var shown = double.nan;
+    while (seeder.flash > 0) {
+      await tester.pump(const Duration(milliseconds: 16));
+      if (seeder.isVisible && shown.isNaN) {
+        shown = seeder.flash * RunnerEnemyComponent.flashTime;
+      }
+    }
+    expect(seeder.isVisible, isTrue);
+    // Within half a second of the flash's end.
+    expect(shown, lessThan(0.5));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a shot goes once the tube bends it out of sight, and hits '
+      "nothing that doesn't show", (tester) async {
+    await tester.pumpWidget(_story(SvgRenderer.rasterizerCanvas));
+    final game = await _gameOf(tester);
+    await flyToBend(tester, game);
+    final runner = game.runner
+      ..addEnemy(EnemyKind.climber, game.runner.ship.lane);
+    final climber = runner.enemies.single as RunnerFlipperComponent;
+    // Keeps it just out of sight, within a shot's range, while the ship
+    // fires down its lane.
+    void hide() {
+      final sight = runner.endlessTube.sightAlong(
+        climber.currentLane,
+        runner.flown,
+        runner.view,
+      );
+      climber.at = math.min(
+        sight + EndlessTube.step,
+        runner.flown + RunnerShotComponent.range - EndlessTube.step,
+      );
+      runner.ship.moveBy((climber.currentLane - runner.ship.lane).toDouble());
+    }
+
+    hide();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(climber.isVisible, isFalse);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.space);
+    for (var i = 0; i < 90; i++) {
+      hide();
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(runner.enemies, contains(climber));
+    expect(game.score, 0);
+    // Once it climbs into sight, a shot destroys it.
+    for (var i = 0; i < 1000 && runner.enemies.contains(climber); i++) {
+      runner.ship.moveBy((climber.currentLane - runner.ship.lane).toDouble());
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.space);
+    expect(runner.enemies, isNot(contains(climber)));
+    expect(game.score, EnemyKind.climber.score);
+    await tester.pumpWidget(const SizedBox());
   });
 }
 
