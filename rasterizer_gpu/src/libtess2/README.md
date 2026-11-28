@@ -9,7 +9,7 @@ Licence: SGI Free Software License B, version 2.0, in `LICENSE.txt` and each fil
 ## Patches
 
 1. **Compiled as C++**, as the build hook compiles every source:
-   - `Source/dict.c` casts `dict->frame`, a `void *`, to `TESStesselator *` in its two calls of `dict->leq`. C converts
-     it implicitly.
+   - `Source/dict.c` casts `dict->frame`, a `void *`, to `TESStesselator *` in its two calls of `dict->leq`, as C++
+     requires. C converts it implicitly.
    - `Source/bucketalloc.c` includes `bucketalloc.h`, so that its functions get the C linkage that the header declares,
      which the other files call them with.

@@ -23,12 +23,12 @@ on Metal, but its antialiasing differs from the app's in about 2% of pixels.
 
 For a quick check with no app build, `flutter test --enable-impeller --enable-flutter-gpu` gives `flutter_tester` a
 Flutter GPU context on macOS, where both GPU renderers are then supported and render. Without the flags, their
-support is `noImpeller`. Such a test must be in a package that depends on rasterizer_gpu, as this one is. In
+support is `noImpeller`. Such a test must be in a package that depends on rasterizer_gpu, as this one does. In
 rasterizer_gpu's own `test/`, the shader bundle's asset key has no `packages/rasterizer_gpu/` prefix, so the
 renderers fail with "Failed to initialize ShaderLibrary".
 
-`test/radial_test.dart` runs that way: it checks radial gradients on the pixel column through their centers. It's
-not an integration test, as the bug it checks for showed in `flutter_tester` but not in the app.
+`test/radial_test.dart` runs that way: it checks radial gradients on the pixel column through their centers. It isn't
+an integration test, as the bug it checks for showed in `flutter_tester` but not in the app.
 
 - **Cases** (`lib/goldens.dart`):
   - the tiger fitted, with and without curves, and the sweep's checkpoints, with and without curves;
@@ -41,8 +41,8 @@ not an integration test, as the bug it checks for showed in `flutter_tester` but
   Each image is one run, as drawn into a 1024×768 px viewport, in `goldens/<platform>/<name>.png`.
   - The sets are `macos`, `ios` for devices, `android_emulator` (Vulkan), `android_emulator_gles`, and
     `linux_llvmpipe`: Mesa's CPU renderer in the repository's Linux container, which its image picks with
-    `GALLIUM_DRIVER=llvmpipe`. An Android device would use `android`, and Linux on a GPU `linux`. Neither has goldens
-    yet: record them as below, then list the folder in `pubspec.yaml`'s assets.
+    `GALLIUM_DRIVER=llvmpipe`. An Android device uses `android`, and Linux on a GPU `linux`. Neither has goldens yet:
+    record them as below, then list the folder in `pubspec.yaml`'s assets.
   - The iOS Simulator uses `macos`, as it renders with the Mac's GPU and matches it.
   - An iPhone's GPU rounds differently from the Mac's, by 1/255 on a few pixels, from the same core frames. So devices
     have their own set, recorded on an iPhone 11 Pro (A13).
@@ -51,15 +51,15 @@ not an integration test, as the bug it checks for showed in `flutter_tester` but
 - **Tolerance:** an image passes when at most 1 pixel in 10,000 differs by over 2/255, at most 1% differs at all, and
   none differs by over 16/255. From one render to the next, the core can write a frame's edges in another order, which
   sums their coverage in another order too. That can change a few pixels by several 255ths, or hundreds by 1/255.
-- **The canvas renderer** is tested against the same goldens, except two kinds: curves drawn as line segments
+- **The canvas renderer** is tested against the same goldens, except for two kinds: curves drawn as line segments
   (`_fast`), which it never draws, and `gradients_skewed` (see `../README.md`). It's tested wherever it runs, and the
-  GPU renderer only where it's supported. `BACKEND=gpu` or `BACKEND=canvas` tests only that one.
-  - Its tolerance is looser, as Impeller antialiases with 4x MSAA, and the core with exact coverage. Images are
+  GPU renderer only where it's supported. `--dart-define=BACKEND=gpu` or `BACKEND=canvas` tests only that one.
+  - Its tolerance is looser, as Impeller antialiases with 4× MSAA, and the core with exact coverage. Images are
     compared in 4×4 pixel blocks, which average edges out: at most 0.5% of blocks may differ by over 32/255, and 0.05%
-    by over 64/255. In the first runs, antialiasing alone made at most 0.15% of blocks differ by over 32/255. Drawing
-    curves as line segments, as a stand-in for a real difference, made 1.9% differ.
+    by over 64/255. Antialiasing alone made at most 0.15% of blocks differ by over 32/255, while drawing curves as line
+    segments, as a stand-in for a real difference, made 1.9% differ.
   - It writes its failures as `canvas_<name>.png`, and never writes goldens.
-- **The mesh renderer** has its own goldens, `mesh_<name>.png` in the same folders, as its 4x MSAA edges aren't the
+- **The mesh renderer** has its own goldens, `mesh_<name>.png` in the same folders, as its 4× MSAA edges aren't the
   core's exact coverage. Its cases are those with curves (it draws the same frames without them), the atlas frame, the
   gradients, `paths`, and three of its own:
   - `strokes`: its strips' joins and caps, and translucent strokes that overlap themselves, which must blend once,
@@ -72,34 +72,35 @@ not an integration test, as the bug it checks for showed in `flutter_tester` but
   - It flattens each SVG's curves for the largest size a case draws it at, its `maxSize`: the tiger's for the sweep's
     20× zoom. It fits the tiger by the GPU scene's bounds, the core's, which are looser than its triangles', so both
     renderers draw the same frames.
-  - It checks its renders against its own goldens with the GPU renderer's tolerance, and against the GPU goldens with
-    the canvas renderer's tolerance, so that a golden it records can't hide a wrong shape or
-    colour. When its goldens were first recorded, at most 32 of 49,152 blocks differed from the GPU goldens by over
-    32/255, and 17 by over 64/255.
+  - The test checks its renders against its own goldens with the GPU renderer's tolerance, and against the GPU goldens
+    with the canvas renderer's tolerance, so that a golden it records can't hide a wrong shape or colour. When its
+    goldens were recorded, at most 32 of 49,152 blocks differed from the GPU goldens by over 32/255, and 17 by over
+    64/255.
   - The exceptions are frames that show the tiger's outlines, about 0.14 of a pixel wide at its fit. The mesh renderer
     widens them to its least width, while the GPU renderer draws them as faint lines, so the two differ by more than
-    the tolerance. It checks the tiger's fitted frame, its sweep's frames 90 and 150, and the grid's frames but 59
-    against the mesh goldens only.
+    the tolerance. The test checks the tiger's fitted frame, its sweep's frames 90 and 150, and all of the grid's
+    frames but 59 against the mesh goldens only.
   - It writes its failures as `mesh_<name>.png`, and the diffs of those against the GPU goldens as
     `mesh_<name>_vs_gpu_diff.png`.
 - **Self-consistency:** each of the atlas frame's runs must match the same entries rendered as a frame of their own,
   with at most 1 pixel in 10,000 over 8/255. Nothing over 1/255 may be drawn outside the runs' rectangles.
-- **Where the goldens came from:** the first goldens were checked against the original Metal renderer, given the same
-  frames, before the GPU renderer replaced it. On Metal, they were off by at most 1/255, on at most 5 pixels a page. On
-  the emulator's Vulkan, they were within 1–2/255, but for a few dozen isolated pixels in a frame with curves. Since the
-  core's gradient patches (`../src/core/README.md`), the goldens of the atlas frame and the gradient cases stand for
-  Chrome's renders of the same SVGs instead: within 26/255 on a pixel, at edges, and 6/255 in a 4×4 block. The
-  emulator's and the iPhone's sets were checked against `macos`: within 1/255, but for the iPhone's tiger sweep frame
-  119, with at most 141 pixels over 1/255, by up to 10/255. So a render that matches its golden still matches the
-  original renderer, or Chrome's for gradients.
+- **Where the goldens came from:** the first goldens were checked against Rasterizer's original Metal renderer, given
+  the same frames. On Metal, they were off by at most 1/255, on at most 5 pixels a page. On the emulator's Vulkan, they
+  were within 1–2/255, except for a few dozen isolated pixels in a frame with curves. Since the core's gradient patches
+  (`../src/core/README.md`), the goldens of the atlas frame and the gradient cases stand for Chrome's renders of the
+  same SVGs instead: within 26/255 on a pixel, at edges, and 6/255 in a 4×4 block. The emulator's and the iPhone's sets
+  were checked against `macos`: within 1/255, except in the iPhone's tiger sweep frame 119, where at most 141 pixels
+  differ by over 1/255, by up to 10/255. So a render that matches its golden still matches the original renderer, or
+  Chrome's for gradients.
 - **Updating the goldens** after an intended rendering change:
   1. Run the test with `--dart-define=UPDATE_GOLDENS=true`. On iOS and Android, add `--no-uninstall` too, so that the
      files survive the run.
   2. Run `python3 -I tool/pull_goldens.py macos | android <serial> | ios-simulator <udid> | ios <udid>`. It copies the
      renders into `goldens/<platform>/`, and a failed run's renders and diffs into `build/golden_failures/`.
 
-  In the Linux container, runs don't keep `/tmp`. So point `TMPDIR` into `build/`, at a folder that already exists
-  (an earlier run's `mkdir` will do), and copy the renders out with `linux.py pull`, from the repository's root:
+  In the Linux container, runs don't keep `/tmp`. So point `TMPDIR` at a folder in `build/` that already exists
+  (create it first with a `linux.py run` of `mkdir`), and copy the renders out with `linux.py pull`, from the
+  repository's root:
 
   ```sh
   python3 -I tool/linux/linux.py run -C rasterizer_gpu/example env TMPDIR=/work/rasterizer_gpu/example/build/tmp \
@@ -109,8 +110,8 @@ not an integration test, as the bug it checks for showed in `flutter_tester` but
 
   Then move `build/tmp/goldens_rasterizer_gpu_example/linux_llvmpipe/` into `goldens/`.
 
-  With `GOLDEN_RECORD=true`, the test also writes each frame's atlas pages, core frames and lists, which
-  `tool/pull_goldens.py` copies into `build/golden_record/`. `../tool/compare_frames.py` reads them, to tell the
+  With `--dart-define=GOLDEN_RECORD=true`, the test also writes each frame's atlas pages, core frames and entry lists,
+  which `tool/pull_goldens.py` copies into `build/golden_record/`. `../tool/compare_frames.py` reads them, to tell the
   core's variation from one run to the next apart from a rendering change.
 
 ## Other tests
@@ -136,20 +137,27 @@ indices, multisampled edges with 4 samples and aliased ones with 1, and its run 
 second page, alternate with light ones. It compares the frames around each shrink with a fresh renderer's. It also
 checks that the pages shrink back, are released when unused, and are trimmed.
 
-On OpenGL ES (`IMPELLER_BACKEND=opengles` on the emulator), `format_probe_test` checks that the first GPU renderer
-runs the format probe once, that it passes accumulating in `r32Float`, that a failed probe makes the renderers
-accumulate in `r16g16b16a16Float` and draw right, also when it fails on its pixels, after a renderer drew a frame in
-`r32Float`, that a failure in both formats leaves the GPU renderer drawing and says so, and that the canvas renderer
-draws where textures can't be as wide as the renderers need, and without `RasterizerGpu.allowOpenGles`. Elsewhere, it
-checks that the probe passes when run on its own, and that no renderer runs it. Everywhere, `defer_test` defers the
-app's first frame past 10 s, creates both GPU renderers and renders with them before it, and checks their pixels once
-the frame comes.
+On OpenGL ES (`IMPELLER_BACKEND=opengles` on the emulator), `format_probe_test` checks:
 
-To run them all, with the goldens, on the emulator's Vulkan and OpenGL ES, on macOS and on web, run
-`python3 -I tool/matrix.py > matrix.txt` from the repository's root, in the background. Follow it with
+- that the first GPU renderer runs the format probe once, and that it passes accumulating in `r32Float`;
+- that a failed probe makes the renderers accumulate in `r16g16b16a16Float` and draw right, also when it fails on its
+  pixels after a renderer drew a frame in `r32Float`;
+- that a failure in both formats leaves the GPU renderer drawing, and says so;
+- that the canvas renderer draws where textures can't be as wide as the renderers need, without
+  `RasterizerGpu.allowOpenGles`, and where a renderer's pipelines don't compile within `RasterizerGpu.warmUpTimeout`;
+- that the mesh renderer's `supportDetail` says how its targets are sampled.
+
+Elsewhere, it checks that the probe passes when run on its own, and that no renderer runs it. Everywhere, `defer_test`
+defers the app's first frame past 10 s, creates both GPU renderers and renders with them before it, and checks their
+pixels once the frame comes.
+
+`tool/matrix.py`, from the repository's root, runs the format probe, defer, golden and atlas tests on the emulator's
+Vulkan and OpenGL ES and on macOS, and the golden, opacity and edge tests on web. On the emulator, the golden tests
+run with the GPU renderer only, and the Vulkan atlas test runs only when named, as `vk_atlas`. Run it in the
+background, as `python3 -I tool/matrix.py > matrix.txt`, and follow it with
 `python3 -I tool/follow.py matrix.txt 'STALL|FAIL|passed|failed|FINISHED' FINISHED`. Each `flutter test` runs under a
-watchdog (`tool/device_tests.py`), which kills a run that's silent for 2 minutes, as a GPU app hung on the emulator
-would be. It keeps each run's output in the repository's `build/test_logs/`.
+watchdog (`tool/device_tests.py`), which kills a run that's silent for 2 minutes once its tests have started, as a GPU
+app hung on the emulator would be. It keeps each run's output in the repository's `build/test_logs/`.
 
 On web, `flutter test` doesn't run integration tests. `tool/device_tests.py`'s `chrome` device runs them in headless
 Chrome, with `flutter drive` and the app's `test_driver/integration_test.dart`. For example,
@@ -159,13 +167,13 @@ Chrome, with `flutter drive` and the app's `test_driver/integration_test.dart`. 
   `opacity_test` and `edge_test`.
 - They need Chrome for Testing's chromedriver for the installed Chrome's version, unzipped into the repository's
   `build/chromedriver/` (on an Apple silicon Mac, `chromedriver-mac-arm64/chromedriver`).
-- flutter drive reports only widget tests' failures there: a plain `test` that fails passes. So the tests that run on
-  web use `testWidgets` there (`integration_test/web_test.dart`).
+- flutter drive reports only widget tests' failures there: a plain `test` that fails passes. So on web, the tests use
+  `testWidgets` (`integration_test/web_test.dart`).
 - The tests' lines, and the golden tests' failing images, go to flutter drive's response data. The tool saves it as
   the repository's `build/test_logs/<step>.json`, and the images into `build/test_logs/<step>/`.
 
-In the Linux container (`tool/linux/`, at the repository's root, with Docker), the same tests run with `-d linux`, on
-Impeller's OpenGL ES, on Mesa's llvmpipe. For example:
+In the Linux container (the repository's `tool/linux/`, with Docker), the same tests run with `-d linux`, on Impeller's
+OpenGL ES, on Mesa's llvmpipe. For example:
 
 ```sh
 python3 -I tool/linux/linux.py run -C rasterizer_gpu/example flutter test integration_test/format_probe_test.dart -d linux
@@ -174,6 +182,7 @@ python3 -I tool/linux/linux.py run -C rasterizer_gpu/example flutter test integr
 They run on X11, unless `--wayland` follows `run`: then on Wayland, in weston, where Flutter draws into a subsurface,
 as on most Linux desktops.
 
-The app's `linux/` runner was generated in the container, as the Mac's Flutter doesn't build for Linux, and turns Flutter GPU on in `linux/runner/my_application.cc`.
+The app's `linux/` runner was generated in the container, as the Mac's Flutter doesn't build for Linux. It turns
+Flutter GPU on in `linux/runner/my_application.cc`.
 
 `tiger.svg` and its renders are separately licensed: see `assets/tiger/README.md`.

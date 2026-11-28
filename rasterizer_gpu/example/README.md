@@ -8,10 +8,11 @@ none.
 
 ## Pages
 
-Pick a page with `--dart-define=PAGE=...`:
+Pick a page with `--dart-define=PAGE=...`. The settings below, and `BACKEND` and `DEFER_FIRST_FRAME` under
+[Renderers](#renderers), are dart-defines too:
 
-- `svg`, the default, shows an SVG asset fitted to the page. Drag, pinch or scroll to pan and zoom it, and double tap
-  to reset it. Its settings:
+- `svg`, the default, shows an SVG asset fitted to the page. Drag or pinch to pan and zoom it, scroll to zoom it, and
+  double tap to reset it. Its settings:
   - `SVG` names the asset. The default is `assets/tiger/tiger.svg`.
   - `CURVES=false` draws curves as line segments.
   - `GRID=n` draws the SVG n×n times.
@@ -33,17 +34,17 @@ Timings mean something only in a profile build: `flutter run --profile -d macos 
 - The app logs, on every platform:
   - the renderer's support and backend, in a `RASTERIZER_EXAMPLE support` line;
   - the frames until the page has created its renderer, which on OpenGL ES compiles the renderer's pipelines, and for
-    as long again after it, in a `RASTERIZER_EXAMPLE startup` line: the longest time between frames, how many missed a
-    vsync, and the UI thread's longest stall;
-  - in the meantime, `RASTERIZER_EXAMPLE event` lines: the first rasterized frame, lifecycle changes, and stalls over
-    250 ms.
+    as long again after it, in a `RASTERIZER_EXAMPLE startup` line: the frame count, the longest time between frames,
+    how many missed a vsync, the longest build and raster times, and the UI thread's longest stall;
+  - meanwhile, `RASTERIZER_EXAMPLE event` lines: the first rasterized frame, lifecycle changes, and UI thread stalls
+    over 250 ms.
 
   `DEFER_FIRST_FRAME=n` defers the first frame by n seconds, as a splash screen would.
 - On Android, the app leaves Impeller's backend to Flutter, which picks OpenGL ES on the emulator and on devices whose
-  Vulkan can't work. A debug or profile build with `IMPELLER_BACKEND=vulkan` or `IMPELLER_BACKEND=opengles` asks for
-  that backend, through the manifest; release builds ignore it. A backend asked for crashes at launch where it can't
-  start: Vulkan on some older GPUs, and any backend below API 29, where Flutter renders with Skia. There, the canvas
-  renderer draws.
+  Vulkan can't work. A debug or profile build with the environment variable `IMPELLER_BACKEND=vulkan` or
+  `IMPELLER_BACKEND=opengles` asks for that backend, through the manifest. Release builds ignore it. A backend asked
+  for crashes at launch where it can't start: Vulkan on some older GPUs, and any backend below API 29, where Flutter
+  renders with Skia and the canvas renderer draws.
 - On Linux, Impeller renders with OpenGL ES. The app's runner turns Flutter GPU on in `linux/runner/my_application.cc`.
 - On Windows, Impeller renders with OpenGL ES, through ANGLE. The app's runner turns Flutter GPU on in
   `windows/runner/main.cpp`. Building needs Visual Studio's C++ workload: see Flutter's

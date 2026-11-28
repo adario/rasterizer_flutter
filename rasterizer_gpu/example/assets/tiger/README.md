@@ -8,7 +8,7 @@ https://www.gnu.org/licenses/agpl-3.0.html.
 This copy comes from Rasterizer's test files (https://github.com/mindbrix/Rasterizer, `TestFiles/tiger.svg`, commit
 `2be4bc16`), unchanged.
 
-It's only test data for this example app: its golden tests and its default page. The `goldens/*/*tiger*.png` images
-are renders of it. Neither ships in the rasterizer_gpu package: the `.pubignore` files in `assets/` and `goldens/` keep
-them out of what pub publishes, so a published copy's SVG page says it couldn't load the tiger. An app that bundles
-them, as this example does, must comply with that licence.
+It's only test data for this example app, for its golden tests and its default page. The `goldens/*/*tiger*.png`
+images are renders of it. Neither ships in the rasterizer_gpu package: the `.pubignore` files in `assets/` and
+`goldens/` keep them out of what pub publishes, so a published copy's SVG page says it couldn't load the tiger. An app
+that bundles them, as this example does, must comply with that licence.
