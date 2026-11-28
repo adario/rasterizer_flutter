@@ -15,13 +15,13 @@ Below, `<device>` is `macos`, an iOS udid or `emulator-5554`.
   sprites and text between them. There's also a clipped group, and painted components: some faded in and out with an
   `OpacityEffect`, some tinted, some with their hue turned by a `HueEffect`, some blurred, and 3 that share one paint.
   - `--dart-define=ENGINE=flame_svg` draws them with flame_svg instead.
-  - The demo logs the sizes and bytes of rasterizer_gpu's atlas pages, or of the mesh renderer's run targets, when they
-    change (`RASTERIZER_PAGES`).
+  - The demo logs a `RASTERIZER_PAGES` line with the sizes and bytes of rasterizer_gpu's atlas pages, or of the mesh
+    renderer's run targets, each time they change.
 - **`--dart-define=MODE=check`** runs the check. It draws the game, and the same frame composed with rasterizer_gpu's
   API, with transforms computed from the layout rather than by Flame. It reads both back, and logs
   `FLAME_RASTERIZER check PASS` or `FAIL`. It also fails when less than 1% of the composed frame is drawn, so that two
-  empty frames don't pass. `CHECK_TIME` picks the frame, and so the camera's zoom. Except on web, it
-  saves both images to the temporary directory. In the composed frame:
+  empty frames don't pass. `CHECK_TIME` (3.7 s by default) picks the frame, and so the camera's zoom. Except on web,
+  it saves both images to the temporary directory. In the composed frame:
   - the faded, tinted and hue-turned items draw in one run, with their tint and hue as color transforms, as the game
     folds them;
   - the other painted runs' entries are faded by their paint's opacity, then drawn plainly in a layer with the rest of
@@ -33,8 +33,8 @@ Below, `<device>` is `macos`, an iOS udid or `emulator-5554`.
   supported. It draws each SVG as a picture, or its paths with `--dart-define=CANVAS_PICTURES=false`. On web, the app
   picks the canvas renderer by itself.
   - On the Android emulator's Vulkan with the host GPU and MoltenVK, the check doesn't work (see rasterizer_gpu's
-    README): with Flutter 3.47.9, it hangs, and with Flutter 3.50.0, it fails, as both frames come out black. It isn't
-    checked yet with KosmicKrisp, emulator 37.3's default where the Mac supports Metal 4. Use OpenGL ES, or start the
+    README): with Flutter 3.47.9 it hangs, and with Flutter 3.50.0 it fails, as both frames come out black. It hasn't
+    been run yet with KosmicKrisp, emulator 37.3's default where the Mac supports Metal 4. Use OpenGL ES, or start the
     emulator with `-gpu swiftshader_indirect`.
 - **`flutter test integration_test/check_test.dart -d <device> [--dart-define=BACKEND=atlas|canvas]`** runs the check
   as a test, at 4 times, so at camera zooms from 0.5 to 1.6 times the zoom that fits the world.
@@ -43,10 +43,11 @@ Below, `<device>` is `macos`, an iOS udid or `emulator-5554`.
   compares them: scale 0, mirrored, skewed, clipped, a fixed resolution, perspective, a snapshot, a post process, and
   the game off the pixel grid.
 - **`flutter test integration_test/oversize_test.dart -d <device> [--dart-define=BACKEND=atlas]`** checks a game wider
-  than its renderer takes (`maxViewportSize`), whose vectors render at a lower pixel ratio, to fit.
+  than its renderer allows (`maxViewportSize`), whose vectors render at a lower pixel ratio, to fit.
 - **`python3 -I tool/bench.py <device> <output file>`** runs the benchmark, in profile mode. It runs each engine with
   100 and 1000 vector components, 0, 2 and 9 sprites between them (so 1, 3 and 10 runs), and an animated or fixed zoom.
-  - `--backends mesh,atlas,canvas,canvas_paths` picks rasterizer_gpu's renderers.
+  - `--backends mesh,atlas,canvas,canvas_paths` picks rasterizer_gpu's renderers: only `mesh` by default.
+    `canvas_paths` is the canvas renderer drawing each SVG's paths rather than a picture of them.
   - `--paints 0,1` also benchmarks each case with each component fading at its own rate, so with its own opacity. That
     splits no runs, as flame_rasterizer fades each entry's paths.
   - `--paints 2` tints each component with a `ColorEffect` of its own color and rate, so a new color filter each
@@ -88,9 +89,10 @@ every 0.5 s and draws it each frame, after the vectors.
 ## Android and clean checkouts
 
 On Android, the app leaves Impeller's backend to Flutter, which picks OpenGL ES on the emulator and on devices whose
-Vulkan can't work. A debug or profile build with `IMPELLER_BACKEND=vulkan` or `IMPELLER_BACKEND=opengles` asks for that
-backend, through the manifest; release builds ignore it. A backend asked for crashes at launch where it can't start:
-Vulkan on some older GPUs, and any backend below API 29, where Flutter renders with Skia.
+Vulkan can't work. A debug or profile build made with the environment variable `IMPELLER_BACKEND=vulkan` or
+`IMPELLER_BACKEND=opengles` asks for that backend in its manifest. Release builds ignore it. The app crashes at launch
+where the backend it asks for can't start: Vulkan on some older GPUs, and any backend below API 29, where Flutter
+renders with Skia.
 
 From a clean checkout, build the app once (`flutter build macos`, `flutter build ios`, or
 `flutter build apk --debug --target-platform android-arm64`) before `flutter test`. Otherwise `flutter test` checks the

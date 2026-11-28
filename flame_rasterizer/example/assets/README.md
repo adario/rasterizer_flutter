@@ -1,12 +1,12 @@
 # The example's SVGs
 
 The SVGs in `svgs/` come from [flame_extended_svg](https://github.com/adario/flame_extended_svg), the Flame SVG
-showcase that this example follows. Their author is this repository's, and they're under this repository's MIT
-licence, except Svg Shooter's `rocket_ship.svg`, `missile.svg` and `spaceship_game.svg`, and `tiger.svg`.
+showcase that this example follows. They're by this repository's author, under this repository's MIT licence, except
+Svg Shooter's `rocket_ship.svg`, `missile.svg` and `spaceship_game.svg`, and `tiger.svg`.
 
 The SVGs in `svgs/wireframe/` are Svg Shooter's, made from the SVGs of the same names in `svgs/`. Each is its original's
-silhouette and a few of its shapes, stroked in white, which the game tints. The missile is filled in pale orange,
-`#F5B58A`. Each wireframe is under its original's terms.
+silhouette and a few of its shapes, stroked in white, which the game tints. The missile is filled in pale orange
+instead, `#F5B58A`. Each wireframe is under its original's terms.
 
 ## rocket_ship.svg, missile.svg and spaceship_game.svg: CC0
 
