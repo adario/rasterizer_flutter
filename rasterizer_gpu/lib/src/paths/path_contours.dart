@@ -3,15 +3,15 @@
 // The sampler comes from Flame's `PathMetricExtension.walkContour` and its
 // `_ContourSampler` (packages/flame/lib/src/extensions/path.dart, main at
 // 8fa5abf04), MIT, © 2021 Blue Fire (THIRD_PARTY_NOTICES.md), with Flame's
-// `Offset.distanceToSegmentSquared`. The changes for drawing:
-// - It leaves out what only hitboxes' bounds need: the points where a contour
-//   turns back horizontally or vertically, and the three vertices that a
-//   closed contour always got.
-// - A contour is closed only if its metric is. Flame's also took a contour
-//   that ends where it starts as closed, and dropped its last point. Drawn
-//   open, as Flutter strokes it, that contour lost its last segment.
-// - The sampling step is 4 times the tolerance. That kept every path measured
-//   within the tolerance, while a coarser step strays past it on some curves.
+// `Offset.distanceToSegmentSquared`. The changes made for drawing:
+// - It leaves out the points that only hitbox bounds need: where a contour
+//   turns back horizontally or vertically, and the three vertices that Flame
+//   adds to every closed contour.
+// - A contour is closed only if its metric is. Flame's version also treats a
+//   contour that ends where it starts as closed and drops its last point.
+//   Flutter strokes such a contour as open, so it lost its last segment.
+// - The sampling step is 4 times the tolerance. This kept every measured path
+//   within the tolerance. A coarser step strays past it on some curves.
 
 import 'dart:math' show max, min, sqrt;
 import 'dart:typed_data';
@@ -19,13 +19,13 @@ import 'dart:ui' show Offset, Path, PathMetric, Tangent;
 
 /// Paths' contours, flattened to polylines within a tolerance.
 ///
-/// The GPU renderers draw them as they draw an SVG's paths. A [Path] doesn't
-/// expose its commands, so [Path.computeMetrics] reads its contours back, and
-/// a sampler walks them along their tangents. Each contour keeps its
-/// direction, so holes stay holes with either fill type. It also keeps its
-/// corners, located exactly. An open contour stays open, as a stroke needs,
-/// and a fill closes it. Contours without a length drop out, as
-/// [Path.computeMetrics] skips them.
+/// The GPU renderers draw them the same way as an SVG's paths. A [Path]
+/// doesn't expose its commands, so this class reads its contours back with
+/// [Path.computeMetrics] and samples them along their tangents. Each contour
+/// keeps its direction, so holes stay holes with either fill type. It also
+/// keeps its corners at their exact positions. An open contour stays open, as
+/// a stroke needs, and a fill closes it. Contours of zero length are left
+/// out, as [Path.computeMetrics] skips them.
 final class PathContours._(
   /// The polylines' points, x then y, contour after contour, in the paths'
   /// units. A closed contour's first point isn't repeated at its end.
@@ -40,7 +40,8 @@ final class PathContours._(
   /// Each path's number of contours, in the paths' order.
   final Int32List contourCounts,
 ) {
-  /// Flattens [paths]' contours to within [tolerance] of them, in their units.
+  /// Creates the contours of [paths], flattened to within [tolerance] of them
+  /// in the paths' units.
   ///
   /// Throws [ArgumentError] if [tolerance] isn't a positive finite number.
   factory PathContours(Iterable<Path> paths, {required double tolerance}) {
@@ -81,11 +82,12 @@ final class PathContours._(
     );
   }
 
-  /// Creates the contours of polygons, as one path's closed contours, without
-  /// changing them: [vertices], x then y, polygon after polygon, and each
-  /// polygon's [vertexCounts].
+  /// Creates the contours of polygons, unchanged, as the closed contours of
+  /// one path.
   ///
-  /// It keeps both lists without copying them, so they mustn't change.
+  /// [vertices] holds the points, x then y, polygon after polygon, and
+  /// [vertexCounts] holds each polygon's number of vertices. The contours keep
+  /// both lists without copying them, so the lists mustn't change.
   factory PathContours.polygons(Float32List vertices, Int32List vertexCounts) =>
       PathContours._(
         vertices,
@@ -98,16 +100,16 @@ final class PathContours._(
 /// The sampling step, as a multiple of the tolerance.
 const _samplingPerTolerance = 4;
 
-/// The most sampling steps in one contour. A longer contour gets a longer
-/// step.
+/// The maximum number of sampling steps in one contour. Longer contours get
+/// longer steps.
 const _maxSteps = 1 << 20;
 
 /// Returns [metric]'s contour as a polyline within [tolerance] of it, and
 /// whether it's closed.
 ///
-/// The sampler keeps the contour within a sixth of [tolerance] of its samples.
-/// The polyline then keeps the corners, and only the samples it needs to stay
-/// within [tolerance].
+/// The sampler keeps the line through its samples within a sixth of
+/// [tolerance] of the contour. The polyline then keeps the corners, and only
+/// the samples it needs to stay within [tolerance].
 ({List<Offset> polyline, bool isClosed}) _flatten(
   PathMetric metric,
   double tolerance,
@@ -135,14 +137,15 @@ const _maxSteps = 1 << 20;
 /// Removes the [points] that lie within [tolerance] of the edge that replaces
 /// them, extending each edge as far as that allows.
 ///
-/// This needs fewer points than splitting at the farthest point, which halves
-/// stretches that would fit in one and a half edges.
+/// This needs fewer points than splitting at the farthest point, as the
+/// Douglas-Peucker algorithm does, which halves stretches that would fit in
+/// one and a half edges.
 ///
-/// [anchors] holds the ascending indices of the points to keep. It simplifies
-/// each stretch between two anchors on its own, the one that wraps around a
-/// [closed] contour's end included. An open contour also keeps its ends. A
-/// closed one with fewer than two anchors keeps its anchor, or its first
-/// point, and the point farthest from it.
+/// [anchors] holds the ascending indices of the points to keep. Each stretch
+/// between two anchors is simplified on its own, including the one that wraps
+/// around the end of a [closed] contour. An open contour also keeps its ends.
+/// A closed contour with fewer than two anchors keeps its anchor (or its
+/// first point) and the point farthest from it.
 List<Offset> _simplify(
   List<Offset> points,
   List<int> anchors, {
@@ -193,12 +196,12 @@ List<Offset> _simplify(
   ];
 }
 
-/// Returns the farthest index after [from], up to [to], whose edge from [from]
-/// keeps the points between them within the tolerance.
+/// Returns the farthest index after [from], up to [to], such that the edge
+/// from [from] to it keeps the points between them within the tolerance.
 ///
-/// It doubles the stride until an edge fails, then bisects, so it may miss a
-/// farther index that fits. Indices past the end of [points] wrap around, for
-/// a closed contour's last stretch.
+/// It doubles the stride until an edge fails and then bisects, so it may miss
+/// a farther index that fits. Indices past the end of [points] wrap around,
+/// which handles a closed contour's last stretch.
 int _reach(List<Offset> points, int from, int to, double toleranceSquared) {
   var reached = from + 1;
   var failed = -1;
@@ -274,10 +277,10 @@ double _distanceToSegmentSquared(Offset point, Offset from, Offset to) {
 /// [_maxDeviation] of it, with as few tangent lookups as it can.
 ///
 /// It predicts the stride to the next sample from how much the contour bent
-/// over the previous one. So it crosses straight stretches in a few lookups,
-/// and follows tight curves in strides shorter than the step. A sample that
-/// turns out to be too far ahead waits in [_ahead] until the walk reaches it.
-/// [anchors] collects the corners' indices.
+/// over the previous stride. This way it crosses straight stretches in a few
+/// lookups and follows tight curves in strides shorter than the step. A
+/// sample that turns out to be too far ahead waits in [_ahead] until the walk
+/// reaches it. [anchors] collects the indices of the corners.
 class _ContourSampler(
   final PathMetric _metric,
   final double _step,
@@ -286,7 +289,7 @@ class _ContourSampler(
   /// The longest stride, in steps.
   static const _maxStepsPerStride = 32;
 
-  /// The shortest stride, as a fraction of the step: 1 in 4.
+  /// The shortest stride is the step divided by this: a quarter of the step.
   static const _subdivisionsPerStep = 4;
 
   /// The samples, in order along the contour. A closed contour's first point
@@ -296,12 +299,12 @@ class _ContourSampler(
   /// The ascending indices of the corners in [points].
   final List<int> anchors = [];
 
-  /// Whether the contour is closed, once [sample] has run.
+  /// Whether the contour is closed, set by [sample].
   bool isClosed = false;
 
   /// The longest stride over a curved stretch.
   ///
-  /// A feature that the length check of a curved stretch misses is at most a
+  /// The length check over a curved stretch misses only features at most a
   /// 25th of the stretch deep. That depth must stay within the tolerance,
   /// which is 6 times [_maxDeviation].
   late final double _maxCurveStride = 150 * _maxDeviation;
@@ -309,7 +312,7 @@ class _ContourSampler(
   final List<Tangent> _ahead = [];
   final List<double> _aheadOffsets = [];
 
-  /// A lookup that [_addCorner] made this round, between the samples. It
+  /// A tangent that [_addCorner] looked up between the samples this round. It
   /// joins [_ahead] if the stride shrinks.
   Tangent? _spare;
   double _spareOffset = 0;
@@ -323,8 +326,8 @@ class _ContourSampler(
     if (first == null) {
       return;
     }
-    // On flat stretches the strides grow past the step. A closed contour caps
-    // them too, to keep its three steps.
+    // Strides grow past the step on flat stretches. A closed contour also caps
+    // them at a third of its length, to keep at least three steps.
     final maxStride = _metric.isClosed
         ? min(_step * _maxStepsPerStride, length / 3)
         : _step * _maxStepsPerStride;
@@ -403,11 +406,12 @@ class _ContourSampler(
     _close(first, from);
   }
 
-  /// Joins a closed contour's end to its start: the same point, possibly with
-  /// different tangents, so a corner if they differ.
+  /// Joins a closed contour's end to its start.
   ///
-  /// Only a contour whose metric is closed counts as closed. One that ends
-  /// where it starts without being closed stays open, so it keeps both ends.
+  /// It drops the end point, which repeats the start, and makes the start a
+  /// corner if the tangents there differ. Only a contour whose metric is
+  /// closed counts as closed. A contour that ends where it starts without
+  /// being closed stays open and keeps both ends.
   void _close(Tangent first, Tangent last) {
     isClosed = points.length > 1 && _metric.isClosed;
     if (!isClosed) {
@@ -447,22 +451,23 @@ class _ContourSampler(
   }
 
   /// Returns how far the contour between the two samples bends away from the
-  /// chord between them, as a share of [_maxDeviation].
+  /// chord between them, as a multiple of [_maxDeviation].
   ///
   /// The stretch is flat enough when this is at most 1. It's infinite when a
-  /// tangent points back along the chord.
+  /// tangent doesn't point forward along the chord, or when the stretch fails
+  /// one of the checks below.
   ///
-  /// When both tangents line up with the chord, the stretch is a line, unless
-  /// something hides between the samples. A stretch of length `arc` between
-  /// two points can't leave the ellipse with them as its foci, whose
-  /// semi-minor axis is `sqrt(arc² - chord²) / 2`. Lengths are exact along
-  /// lines, so that settles it.
+  /// When both tangents line up with the chord, the stretch is a straight
+  /// line unless something hides between the samples. A stretch of length
+  /// `arc` between two points can't leave the ellipse that has them as its
+  /// foci, whose semi-minor axis is `sqrt(arc² - chord²) / 2`. Lengths are
+  /// exact along lines, so this check settles it.
   ///
-  /// Along curves, lengths are off by up to a third over short stretches. So
-  /// there the bend comes from the tangents: a curve whose end tangents make
-  /// the angles `a` and `b` with its chord strays about `chord * (a + b) / 8`
-  /// from it. Its length only has to be plausible. That, with
-  /// [_maxCurveStride], limits what could hide between the samples.
+  /// Along curves, lengths are off by up to a third over short stretches, so
+  /// there the bend comes from the tangents instead. A curve whose end
+  /// tangents make the angles `a` and `b` with its chord strays about
+  /// `chord * (a + b) / 8` from it. Its length only has to be plausible. That
+  /// check and [_maxCurveStride] limit what could hide between the samples.
   double _bend(Tangent from, Tangent to, double arc) {
     final dx = to.position.dx - from.position.dx;
     final dy = to.position.dy - from.position.dy;
@@ -491,8 +496,8 @@ class _ContourSampler(
   /// Adds the corner between the two samples, and the `to` sample, if the
   /// contour between them is two straight lines. Returns whether it did.
   ///
-  /// That's the case when the legs from the samples to where their tangent
-  /// lines meet add up to the contour's length between them.
+  /// That's the case when the legs from the samples to the point where their
+  /// tangent lines meet add up to the contour's length between them.
   bool _addCorner(double fromOffset, Tangent from, Tangent to, double arc) {
     final fromVector = from.vector;
     final toVector = to.vector;

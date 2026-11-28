@@ -8,40 +8,41 @@ import '../rasterizer_gpu.dart';
 /// Wraps a canvas for one frame, so that scenes drawn with [drawScene] go
 /// into a [RasterizerFrame].
 ///
-/// Scenes drawn one after another make up a run: the renderer draws them as
-/// one image, at the run's place in the paint order. It draws everything else
-/// straight into the wrapped canvas.
+/// Scenes drawn one after another make up a run ([RasterizerRun]): the
+/// renderer draws them as one image, at the run's place in the paint order.
+/// It draws everything else directly into the wrapped canvas.
 ///
 /// A run ends when:
-/// - the canvas draws anything else, as it must draw the run's image first.
-/// - the clip changes, by a clip, a saveLayer or a restore that undoes one.
-///   It draws the run's image under the canvas state at the run's end, which
-///   must clip it as its entries were clipped.
-/// - [drawScene] takes another paint, as it draws the run's image with one
-///   paint.
+/// - the canvas draws anything else, because it must draw the run's image
+///   first.
+/// - the clip changes through a clip, a saveLayer, or a restore that undoes
+///   one. The run's image is drawn under the canvas state at the run's end,
+///   which must clip it as its entries were clipped.
+/// - [drawScene] gets a paint that draws differently, because the run's
+///   image is drawn with one paint.
 ///
-/// Transforms don't end runs, as each entry has its own. So runs only split
-/// where other content comes between scenes, where a clip or layer
+/// Transforms don't end runs, because each entry has its own. So runs split
+/// only where other content comes between scenes, where a clip or layer
 /// separates them, or where their paints differ.
 ///
 /// A run renders only within the bounds of the clip it's drawn under
 /// ([RasterizerFrame.addRun]'s `clip`), unless its paint has an image or
 /// mask filter, or it's warped.
 ///
-/// A scene drawn under a transform with perspective is drawn in perspective,
-/// in its run. With the GPU renderer, it's a run of its own instead, whose
-/// image the canvas draws warped by the perspective: see [drawScene].
+/// A scene drawn under a transform with perspective is drawn in perspective
+/// within its run. With the GPU renderer, it gets a run of its own instead,
+/// whose image the canvas draws warped by the perspective: see [drawScene].
 ///
 /// When a run ends while the canvas's transform can't be inverted, as under a
-/// scale of 0, it draws the run once a restore undoes that transform. If that
-/// restore also undoes a clip over the run, it draws the run without that
-/// clip, though it may leave out what lies outside the clip's bounds. That
-/// happens when the clip and the transform are in one save. A
-/// transform made in a save of its own, before what it draws, never does
-/// this. Flame's components make theirs that way.
+/// scale of 0, it draws the run after a restore undoes that transform. If
+/// that restore also undoes a clip over the run, it draws the run without
+/// that clip, although it may leave out what lies outside the clip's bounds.
+/// That happens when the clip and the transform are in the same save. A
+/// transform made in a save of its own, before what it draws, never causes
+/// this. Flame's components make their transforms that way.
 ///
 /// When a run ends, it places the run at once ([RasterizerRun.place]) and
-/// draws its image, before the frame has rendered. So render the frame after
+/// draws its image before the frame has rendered. So render the frame after
 /// [end], before Flutter rasterizes the painting. With the canvas renderer,
 /// it draws the run's paths at once instead.
 ///
@@ -66,10 +67,10 @@ class RasterizerCanvas() implements ui.Canvas {
   // the default paint.
   ui.Paint? _runPaint;
 
-  // Maps recorder space, the canvas's own, to the viewport's device pixels,
-  // as a, b, c, d, tx and ty. It's the inverse of the canvas's transform at
-  // [begin], which includes the viewport's offset in its layer, then the
-  // device pixel ratio.
+  // Maps recorder space (the canvas's own coordinates) to the viewport's
+  // device pixels, as a, b, c, d, tx and ty. It's the inverse of the canvas's
+  // transform at [begin], which includes the viewport's offset in its layer,
+  // followed by the device pixel ratio.
   double _pa = 1, _pb = 0, _pc = 0, _pd = 1, _ptx = 0, _pty = 0;
 
   // The canvas's transform at [begin].
@@ -82,7 +83,7 @@ class RasterizerCanvas() implements ui.Canvas {
   // frame then covers no pixels, and scenes aren't added to it.
   bool _singularBase = false;
 
-  // Per save since [begin], whether it clips, by a clip or as a layer.
+  // For each save since [begin], whether it clips, with a clip or as a layer.
   // Restoring a save that clips ends the current run.
   final List<bool> _clips = [];
 
@@ -99,8 +100,8 @@ class RasterizerCanvas() implements ui.Canvas {
 
   /// Whether it draws runs under perspective as warped images.
   ///
-  /// True warps them for every renderer, and false for none. Null, the
-  /// default, warps them only for the GPU renderer. [begin] reads it.
+  /// When true, it warps them for every renderer; when false, for none. Null,
+  /// the default, warps them only for the GPU renderer. [begin] reads it.
   @visibleForTesting
   bool? warpPerspective;
 
@@ -113,10 +114,10 @@ class RasterizerCanvas() implements ui.Canvas {
   /// ([RasterizerRun.addProjective]). So with it, [drawScene] draws
   /// perspective by warping runs' images.
   ///
-  /// It draws runs' images with [filterQuality]. With the default, none,
-  /// they're sharp at the device's pixel ratio. A [pixelRatio] below that, as
-  /// for a viewport larger than the renderer takes
-  /// ([RasterizerRenderer.maxViewportSize]), scales them up, and
+  /// It samples runs' images with [filterQuality]. With the default,
+  /// [ui.FilterQuality.none], they're sharp at the device's pixel ratio. A
+  /// [pixelRatio] below that, as for a viewport larger than the renderer
+  /// accepts ([RasterizerRenderer.maxViewportSize]), scales them up, and
   /// [ui.FilterQuality.low] smooths them.
   void begin(
     ui.Canvas canvas,
@@ -168,28 +169,29 @@ class RasterizerCanvas() implements ui.Canvas {
   /// canvas's current ones: (x, y) goes to (a * x + c * y + tx,
   /// b * x + d * y + ty).
   ///
-  /// [paint]'s color's alpha fades each of the scene's paths, so paths that
-  /// overlap show through each other, unlike in a sprite. It doesn't draw a
-  /// scene whose alpha is 0. The paint's other fields apply as a sprite's do:
-  /// it draws the run as one image with its color filter, blend mode, image
-  /// filter, mask filter and inverted colors.
+  /// The alpha of [paint]'s color fades each of the scene's paths, so
+  /// overlapping paths show through each other, unlike in a sprite. A paint
+  /// alpha of 0 draws nothing. The paint's other fields apply as they do to a
+  /// sprite: the run is drawn as one image with the paint's color filter,
+  /// blend mode, image filter, mask filter and inverted colors.
   ///
-  /// Entries share a run while those fields draw alike, whatever their alphas.
-  /// Another paint ends the run. A paint that only fades (srcOver, no
-  /// filters) makes the run draw with no paint. So does a paint whose only
-  /// filter is a color filter that a [RasterizerColorTransform] made, such as
-  /// a tint. It filters the scene's paths instead, which gives the same
-  /// pixels, so tinted scenes share runs too.
+  /// Entries share a run as long as those fields match, whatever their
+  /// alphas. A paint that differs in them ends the run. A paint that only
+  /// fades (srcOver, with no filters and no inverted colors) makes the run
+  /// draw with no paint. So does a paint whose only filter is a color filter
+  /// that a [RasterizerColorTransform] created, such as a tint. That filter
+  /// applies to the scene's paths instead, which gives the same pixels, so
+  /// tinted scenes share runs too.
   ///
   /// Under a transform with perspective, the mesh and canvas renderers draw
-  /// the scene in perspective, in the current run. The GPU renderer ends the
-  /// current run, and gives the scene a run of its own, ended at once. It
-  /// renders the scene with the transform's affine part, scaled to the
-  /// perspective's scale at the scene's center. It then draws the run's image
-  /// warped by the transform after that affine part's inverse, which puts
-  /// each of the image's points where the perspective puts them. It resamples
-  /// the image with [ui.FilterQuality.low]. It doesn't draw what the affine
-  /// part puts outside the viewport.
+  /// the scene in perspective within the current run. With the GPU renderer,
+  /// it ends the current run and gives the scene a run of its own, which it
+  /// ends at once. It renders the scene with the transform's affine part,
+  /// scaled to the perspective's scale at the scene's center. It then draws
+  /// the run's image under that affine part's inverse followed by the full
+  /// transform, which puts each of the image's points where the perspective
+  /// puts them. It resamples the image with [ui.FilterQuality.low], and
+  /// leaves out whatever the affine part puts outside the viewport.
   void drawScene(
     RasterizerScene scene,
     double a,
@@ -218,8 +220,8 @@ class RasterizerCanvas() implements ui.Canvas {
     final warped = _warpPerspective && (g != 0 || h != 0 || i != 1);
     if (warped) {
       _endRun();
-      // Runs that ended still wait, so the transform can't be inverted: what's
-      // drawn covers no pixels.
+      // Ended runs are still waiting, so the transform can't be inverted, and
+      // what's drawn covers no pixels.
       if (_pending.isNotEmpty) {
         return;
       }
@@ -291,11 +293,10 @@ class RasterizerCanvas() implements ui.Canvas {
 
   /// Ends the current run and draws its image at once, warped.
   ///
-  /// The run's one entry was rendered with the affine transform [a], [b], [c],
-  /// [d], [tx] and [ty], in place of the canvas's current transform, which has
-  /// perspective.
-  /// It draws the image under the current transform, after that affine one's
-  /// inverse, then the base.
+  /// The run's single entry was rendered with the affine transform [a], [b],
+  /// [c], [d], [tx] and [ty] instead of the canvas's current transform, which
+  /// has perspective. It draws the image under the current transform, after
+  /// that affine transform's inverse and then the base.
   void _endWarped(
     double a,
     double b,
@@ -333,9 +334,9 @@ class RasterizerCanvas() implements ui.Canvas {
   ///
   /// [h0] to [h8] give the homography by rows, from x, y and 1 to x, y and w.
   /// The result is its inverse, then the base's 2D affine part. It's null if
-  /// the homography can't be inverted: below a millionth of the base's
+  /// the homography can't be inverted. Below a millionth of the base's
   /// determinant (a scale of about 1/1000), the inverse loses precision, and
-  /// what's drawn covers about a pixel at most. It's null for NaN too.
+  /// what's drawn covers at most about a pixel. It's also null for NaN.
   Float64List? _toBase(
     double h0,
     double h1,
@@ -384,12 +385,13 @@ class RasterizerCanvas() implements ui.Canvas {
       ..[15] = i6 * b12 + i7 * b13 + i8;
   }
 
-  // The run's copy of the paint is opaque, as each entry has its own opacity.
+  // The run's copy of the paint is opaque, because each entry has its own
+  // opacity.
   //
-  // As clips end runs, the run is drawn under the current clip, so it's
-  // clipped to its bounds, unless the paint can spread what lies outside
-  // them in. A warped run renders in other pixels than the viewport's, so it
-  // isn't.
+  // Because clips end runs, the run is drawn under the current clip, so it's
+  // clipped to the clip's bounds, unless the paint can spread content from
+  // outside them into them. A warped run renders into pixels other than the
+  // viewport's, so it isn't clipped.
   RasterizerRun _startRun(ui.Paint? paint, {bool warped = false}) {
     _runPaint = paint == null ? null : _layerPaint(paint);
     final spreads =
@@ -423,7 +425,8 @@ class RasterizerCanvas() implements ui.Canvas {
     );
   }
 
-  /// Draws vector content into [canvas] with [paint], as [drawScene] takes it.
+  /// Draws vector content into [canvas] with [paint], applying the paint as
+  /// [drawScene] does.
   ///
   /// It's for a canvas that isn't a [RasterizerCanvas], such as a picture's.
   /// [draw] draws the content with each path's alpha scaled by the opacity
@@ -465,11 +468,11 @@ class RasterizerCanvas() implements ui.Canvas {
       paint.maskFilter == null &&
       !paint.invertColors;
 
-  /// Returns [paint]'s color filter as a transform that each path takes, with
-  /// the same pixels, or null.
+  /// Returns [paint]'s color filter as a transform applied to each path,
+  /// giving the same pixels, or null.
   ///
-  /// It's null unless the filter is one that [RasterizerColorTransform] made,
-  /// and the only field that makes [paint] not a default one
+  /// It's null unless [RasterizerColorTransform] created the filter, and the
+  /// filter is the only field that keeps [paint] from being a default paint
   /// ([_isDefaultPaint]). [paint] then draws a scene as no paint would, with
   /// its paths filtered.
   static RasterizerColorTransform? _pathColorTransform(ui.Paint paint) {
@@ -486,8 +489,8 @@ class RasterizerCanvas() implements ui.Canvas {
 
   /// Returns the paint of the layer that [paint] draws a scene into.
   ///
-  /// It copies the fields that apply as a sprite's do. It's opaque, as
-  /// [paint]'s alpha fades each path instead.
+  /// It copies the fields that apply as they do to a sprite. It's opaque,
+  /// because [paint]'s alpha fades each path instead.
   static ui.Paint _layerPaint(ui.Paint paint) => ui.Paint()
     ..colorFilter = paint.colorFilter
     ..blendMode = paint.blendMode
@@ -525,15 +528,16 @@ class RasterizerCanvas() implements ui.Canvas {
     _drawPending();
   }
 
-  /// Draws the runs that ended, each with its paint, in the canvas's space as
-  /// at [begin].
+  /// Draws the runs that ended, each with its paint, in the canvas's space at
+  /// [begin].
   ///
-  /// It can't while the canvas's transform can't be inverted to get back
-  /// there, as under a scale of 0, such as one animated from or to zero. The
-  /// runs then wait for the restore that undoes that transform. What's drawn
-  /// meanwhile covers no pixels, so it still draws them before anything that
-  /// shows. As clips end runs, they're drawn under the clip they ended under,
-  /// unless that restore undoes it too: see [RasterizerCanvas].
+  /// It can't do so while the canvas's transform can't be inverted to get
+  /// back there, as under a scale of 0, such as one animated from or to zero.
+  /// The runs then wait for the restore that undoes that transform. Anything
+  /// drawn meanwhile covers no pixels, so the runs are still drawn before
+  /// anything visible. Because clips end runs, the runs are drawn under the
+  /// clip they ended under, unless that restore undoes it too: see
+  /// [RasterizerCanvas].
   void _drawPending() {
     if (_pending.isEmpty) {
       return;

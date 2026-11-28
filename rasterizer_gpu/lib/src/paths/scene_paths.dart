@@ -1,9 +1,10 @@
-// The plain paths or polygons, and their paints, that
+// Holds the plain paths or polygons, with their paints, that
 // RasterizerScene.fromPaths and fromPolygons copy. The canvas renderer draws
-// them with dart:ui. The GPU renderers flatten each path into contours once,
+// them with dart:ui. The GPU renderers flatten each path into contours once
 // and use polygons as they are.
 //
-// This file uses no dart:ffi, as the canvas renderer also draws on the web.
+// This file doesn't use dart:ffi, because the canvas renderer also draws on
+// the web.
 
 import 'dart:math' show max;
 import 'dart:ui' as ui;
@@ -20,9 +21,10 @@ import 'path_contours.dart';
 
 /// Returns why the GPU renderers can't draw with [paint], or null if they can.
 ///
-/// They draw a color in sRGB, with [ui.BlendMode.srcOver] and antialiasing,
-/// as a fill or as a stroke of a positive width. [ScenePaths] keeps only those
-/// fields of a paint.
+/// They draw only a plain sRGB color, with [ui.BlendMode.srcOver] and
+/// antialiasing, as a fill or as a stroke of a positive width. [ScenePaths]
+/// copies only those fields of a paint, and a stroke's cap, join and miter
+/// limit.
 String? undrawable(ui.Paint paint) {
   if (paint.shader != null) {
     return 'A shader';
@@ -51,8 +53,8 @@ String? undrawable(ui.Paint paint) {
   final width = paint.strokeWidth;
   if (paint.style == ui.PaintingStyle.stroke &&
       (!width.isFinite || width <= 0)) {
-    // A hairline is a device pixel wide under any transform, so it can't be
-    // imported once.
+    // A hairline stays one device pixel wide under any transform, so a single
+    // import can't fit every scale it's drawn at.
     return 'A stroke ${width == 0 ? 'hairline' : 'width of $width'}';
   }
   return null;
@@ -60,8 +62,9 @@ String? undrawable(ui.Paint paint) {
 
 /// The paths or polygons of a path scene, and their paints, in paint order.
 ///
-/// It keeps a copy of each paint, which the canvas renderer draws with, and
-/// each distinct path or polygons once, to make into contours.
+/// It keeps a copy of each paint, for the canvas renderer to draw with. It
+/// keeps each distinct path or set of polygons once, for the GPU renderers to
+/// turn into contours.
 class ScenePaths._(
   /// The distinct shapes, in the order they're first drawn: each a [ui.Path]
   /// or [RasterizerPolygons].
@@ -83,7 +86,8 @@ class ScenePaths._(
   /// their union (see `RasterizerScene.fromPolygons`).
   final bool separate,
 ) implements CanvasPaths {
-  /// Keeps [paths]' paths and copies their paints.
+  /// Creates the scene paths of [paths], keeping the paths and copying their
+  /// paints.
   ///
   /// Throws [ArgumentError] for a paint that the GPU renderers can't draw
   /// ([undrawable]).
@@ -98,8 +102,8 @@ class ScenePaths._(
     false,
   );
 
-  /// Keeps the polygons of [polygons] and copies their paints, as
-  /// [ScenePaths.new] does with paths.
+  /// Creates the scene paths of [polygons], keeping the polygons and copying
+  /// their paints, as [ScenePaths.new] does with paths.
   factory ScenePaths.polygons(
     List<RasterizerPaintedPolygons> polygons, {
     RasterizerGlow? glow,
@@ -115,11 +119,11 @@ class ScenePaths._(
     separate,
   );
 
-  /// Keeps the shapes of [draws] and copies their paints. [boundsOf] returns
-  /// a shape's bounds.
+  /// Creates the scene paths of [draws], keeping the shapes and copying their
+  /// paints.
   ///
-  /// Throws [ArgumentError] for a paint that the GPU renderers can't draw,
-  /// and names its draw as an item of [name].
+  /// [boundsOf] returns a shape's bounds. Throws [ArgumentError] for a paint
+  /// that the GPU renderers can't draw, naming its draw as an item of [name].
   factory ScenePaths._of(
     List<({Object shape, ui.Paint paint})> draws,
     ui.Rect Function(Object shape) boundsOf,
@@ -156,8 +160,8 @@ class ScenePaths._(
         ..strokeMiterLimit = miterLimitOf(paint);
       paints.add(copy);
       final stroke = copy.style == ui.PaintingStyle.stroke ? copy : null;
-      // An empty shape's bounds are zero, so they would stretch the bounds to
-      // the origin.
+      // An empty shape has zero bounds, which would stretch the bounds to the
+      // origin.
       final b = boundsOf(shape);
       if (b == ui.Rect.zero) {
         continue;
@@ -180,17 +184,19 @@ class ScenePaths._(
     );
   }
 
-  /// Each path's contours, at the last tolerance it was flattened to, kept
-  /// while the path lives. Polygons need no flattening, so their contours
-  /// fit any tolerance.
+  /// Each path's contours, at the last tolerance it was flattened to, kept for
+  /// as long as the path lives. Polygons need no flattening, so their
+  /// contours fit any tolerance.
   ///
   /// It assumes that paths and polygons don't change.
   static final _contours = Expando<({double tolerance, PathContours contours})>(
     'contours',
   );
 
-  /// Each draw's path and paint, for the canvas renderer. It's made the first
-  /// time it's read, and so are the paths of polygons.
+  /// Each draw's path and paint, for the canvas renderer.
+  ///
+  /// The list, and the paths of any polygons, are made the first time it's
+  /// read.
   late final List<VectorPath> draws = [
     for (final (i, paint) in paints.indexed)
       VectorPath(
@@ -229,12 +235,12 @@ class ScenePaths._(
 
   /// Returns the tolerance to flatten the paths to, in their units.
   ///
-  /// It's 1/4 of a device pixel when [viewBox]'s longer side, or the widest
-  /// stroke if that's wider, spans [maxSize] device pixels. It's at least 16
-  /// float steps of the farthest coordinate. A finer tolerance would flatten a
-  /// tiny path down to each sample's rounding error, or its round joins and
-  /// caps into thousands of triangles. libtess can take seconds to tessellate
-  /// those, or never finish.
+  /// It's a quarter of a device pixel when the longer side of [viewBox], or
+  /// the widest stroke if that's wider, spans [maxSize] device pixels. It's
+  /// never below 16 float steps of the coordinate farthest from 0. A finer
+  /// tolerance would flatten a tiny path down to each sample's rounding error,
+  /// or turn its round joins and caps into thousands of triangles. libtess can
+  /// take seconds to tessellate those, or never finish.
   double tolerance(double maxSize) {
     var side = max(viewBox.width, viewBox.height);
     for (final paint in paints) {
@@ -256,11 +262,11 @@ class ScenePaths._(
   /// Float32s hold the contours' points and the meshes' vertices.
   static const _floatSteps = 16 / (1 << 23);
 
-  /// Returns the contours of each of [shapes]. It flattens a path to the
-  /// [tolerance] for [maxSize], and takes polygons as they are.
+  /// Returns the contours of each of [shapes].
   ///
-  /// A path that any scene already flattened to the same tolerance reuses
-  /// its contours. Polygons always reuse theirs.
+  /// It flattens each path to the [tolerance] for [maxSize] and takes
+  /// polygons as they are. A path that any scene already flattened to the
+  /// same tolerance reuses those contours. Polygons always reuse theirs.
   List<PathContours> contours(double maxSize) {
     final tolerance = this.tolerance(maxSize);
     return [for (final shape in shapes) _contoursOf(shape, tolerance)];

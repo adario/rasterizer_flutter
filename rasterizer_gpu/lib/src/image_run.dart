@@ -21,16 +21,17 @@ abstract class ImageRun() extends RasterizerRun {
     if (paint == null) {
       return _drawParts(canvas, scale, plain);
     }
-    // Drawing the images with the paint gives the pixels of a layer with that
-    // paint, without the layer's offscreen pass. A layer is still needed:
+    // Drawing the images with the paint gives the same pixels as a layer
+    // with that paint, without the layer's offscreen pass. A layer is still
+    // needed:
     // - unbounded, for an image or mask filter, which reaches outside the
-    //   images;
-    // - for several parts, with a blend mode that changes what's under
-    //   transparent pixels, as the gaps between the parts are.
-    // The last takes a layer bounded to the parts, and clipped to those
-    // bounds too, as Impeller takes a layer's bounds only as a hint. A srcIn
-    // layer cleared the whole canvas around the parts, where an image drawn
-    // with srcIn clears only its own rectangle.
+    //   images.
+    // - for several parts with a blend mode that changes what's under
+    //   transparent pixels, such as the gaps between the parts.
+    // The second case takes a layer bounded to the parts and also clipped to
+    // those bounds, because Impeller treats a layer's bounds only as a hint.
+    // An unclipped srcIn layer clears the whole canvas around the parts,
+    // whereas an image drawn with srcIn clears only its own rectangle.
     final filtered = paint.imageFilter != null || paint.maskFilter != null;
     if (filtered) {
       canvas.saveLayer(null, paint);
@@ -64,9 +65,9 @@ abstract class ImageRun() extends RasterizerRun {
 
   /// Draws each part's image with [paint].
   ///
-  /// An image per part costs less than an atlas draw per page. In a benchmark
-  /// on macOS, with a color filter, atlas draws cost 1-3.5 ms of raster time,
-  /// and images 0.5 ms.
+  /// One image draw per part costs less than one atlas draw per page. In a
+  /// benchmark on macOS with a color filter, atlas draws cost 1-3.5 ms of
+  /// raster time, and image draws 0.5 ms.
   void _drawParts(ui.Canvas canvas, double scale, ui.Paint paint) {
     for (final part in parts) {
       canvas.drawImageRect(
@@ -88,7 +89,8 @@ abstract class ImageRun() extends RasterizerRun {
     return _scaled(r, scale);
   }
 
-  /// Returns [r], from device pixels to units of [scale] device pixels.
+  /// Returns [r] converted from device pixels to units of [scale] device
+  /// pixels.
   static ui.Rect _scaled(ui.Rect r, double scale) => scale == 1
       ? r
       : ui.Rect.fromLTRB(
@@ -115,7 +117,7 @@ abstract class ImageRun() extends RasterizerRun {
       ui.Paint()..filterQuality = quality,
   ];
 
-  /// The fields of the caller's paint that apply to an image, copied into it
-  /// for each draw.
+  /// A reused paint, into which each draw copies the fields of the caller's
+  /// paint that apply to an image.
   static final _paint = ui.Paint();
 }

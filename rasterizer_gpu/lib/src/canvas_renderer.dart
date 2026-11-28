@@ -14,7 +14,7 @@ import 'viewport_clip.dart';
 /// A scene that the canvas renderer draws with dart:ui: an SVG parsed in
 /// Dart, or plain paths.
 class CanvasScene._(final CanvasPaths paths) implements RasterizerScene {
-  /// Parses [bytes] as SVG data in UTF-8.
+  /// Creates a scene by parsing [bytes] as SVG data in UTF-8.
   ///
   /// Throws [ArgumentError] if they aren't parseable SVG data.
   factory CanvasScene(Uint8List bytes) {
@@ -45,7 +45,7 @@ class CanvasScene._(final CanvasPaths paths) implements RasterizerScene {
   @override
   ui.Rect get viewBox => paths.viewBox;
 
-  /// What [draw] can paint, in the scene's coordinates
+  /// The area that [draw] can paint, in the scene's coordinates
   /// ([CanvasPaths.paintedBounds]).
   ui.Rect get paintedBounds => paths.paintedBounds;
 
@@ -55,8 +55,8 @@ class CanvasScene._(final CanvasPaths paths) implements RasterizerScene {
   /// Draws the paths into [canvas], in the scene's coordinates.
   ///
   /// [opacity] scales each path's alpha, and [colorFilter] filters its color.
-  /// With [RasterizerGpu.canvasPictures], an [opacity] of 1 and no filter, it
-  /// draws a picture of the paths, recorded once.
+  /// With [RasterizerGpu.canvasPictures] on, an [opacity] of 1 and no filter,
+  /// it draws a picture of the paths that it records once.
   void draw(
     ui.Canvas canvas, {
     double opacity = 1,
@@ -88,8 +88,8 @@ class CanvasScene._(final CanvasPaths paths) implements RasterizerScene {
   }
 }
 
-/// The canvas renderer: each run draws its entries' paths straight into the
-/// canvas it's drawn into.
+/// The canvas renderer: each run draws its entries' paths directly into the
+/// canvas that the run is drawn into.
 ///
 /// It has no atlas, so a frame's [CanvasFrame.render] does nothing, and runs
 /// have no images.
@@ -209,7 +209,7 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
   int _count = 0;
   bool _placed = false;
 
-  // The pixels its clip leaves it.
+  // The pixels that its clip leaves visible.
   PixelRect _clip = (left: 0, top: 0, right: 0, bottom: 0);
 
   // A matrix for Canvas.transform, whose 2D projective part each entry
@@ -321,11 +321,11 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     if (_count == 0) {
       return;
     }
-    // Make the layer in the canvas's units, as the GPU renderer draws its
-    // image, so the paint's filters, such as a blur's sigma, are in those
-    // units. Impeller applies them with the transform at the layer's restore,
-    // while Skia does at its save. So the scale is saved and restored inside
-    // the layer.
+    // Make the layer in the canvas's units, as the GPU renderer does for its
+    // image, so that the paint's filters, such as a blur's sigma, are in
+    // those units. Impeller applies them with the transform at the layer's
+    // restore, while Skia uses the transform at its save. So the scale is
+    // saved and restored inside the layer.
     if (paint != null) {
       canvas.saveLayer(_layerBounds(paint, scale), paint);
     }
@@ -333,9 +333,10 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
     if (scale != 1) {
       canvas.scale(1 / scale);
     }
-    // CanvasKit drops some pictures drawn near this clip's edge, though they
-    // lie inside it, so it draws without it, as Flame's components do. A
-    // WebAssembly build draws with skwasm, which draws them.
+    // CanvasKit drops some pictures drawn near this clip's edge, even though
+    // they lie inside it, so on CanvasKit the run draws without the clip, as
+    // Flame's components do. A WebAssembly build uses skwasm, which draws
+    // them.
     final clipped = !kIsWeb || kIsWasm;
     if (clipped) {
       canvas.clipRect(
@@ -388,11 +389,11 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
   /// Returns the bounds of a layer drawn with [paint] around the entries, in
   /// units of [scale] device pixels, or null for no bounds.
   ///
-  /// A layer costs its area, so the bounds are what the entries can paint, a
-  /// device pixel wider for antialiasing. An entry with a corner behind the
-  /// eye takes in the viewport, which the entries are clipped to. The bounds
-  /// are null if [paint] has an image or a mask filter, which can draw outside
-  /// its content.
+  /// A layer's cost grows with its area, so the bounds are what the entries
+  /// can paint, one device pixel wider for antialiasing. For an entry with a
+  /// corner behind the eye, they include the whole viewport, which the
+  /// entries are clipped to. The bounds are null if [paint] has an image or a
+  /// mask filter, which can draw outside its content.
   ui.Rect? _layerBounds(ui.Paint paint, double scale) {
     if (paint.imageFilter != null || paint.maskFilter != null) {
       return null;
@@ -431,7 +432,7 @@ class CanvasRun._(final CanvasFrame _frame, @override final int index)
 
   /// Returns the bounds of what entry [i] can paint, in the viewport.
   ///
-  /// With a corner behind the eye, they take in the viewport too.
+  /// With a corner behind the eye, they include the whole viewport.
   ({double left, double top, double right, double bottom}) _paintedInViewport(
     int i,
   ) {

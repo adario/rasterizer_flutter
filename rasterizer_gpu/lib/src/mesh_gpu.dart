@@ -10,8 +10,8 @@ import 'core.dart' as ra;
 /// A mesh's GPU buffers, uploaded once: its vertices, its indices in paint
 /// order, and its paints, as ra_mesh.glsl reads them.
 ///
-/// The buffers are hostVisible, as Flutter GPU can't copy into devicePrivate
-/// buffers. The scene keeps them for its lifetime.
+/// The buffers are hostVisible, because Flutter GPU can't copy into
+/// devicePrivate buffers. The scene keeps them for its lifetime.
 class MeshBuffers._(
   final gpu.BufferView vertices,
   final gpu.BufferView indices,
@@ -73,8 +73,8 @@ class MeshBuffers._(
     );
   }
 
-  /// The log2 of the paints texture's longest row, 1024 texels, as
-  /// kPaintWidthLog2 in ra_mesh.glsl.
+  /// The base-2 log of the paints texture's longest row, 1024 texels. It
+  /// matches kPaintWidthLog2 in ra_mesh.glsl.
   static const paintWidthLog2 = 10;
 
   /// Returns the paints texture: each path's 3 texels, then each stop's 2, as
@@ -131,9 +131,10 @@ class MeshTarget() {
   ui.Image? image;
 }
 
-/// The buffer for one frame in flight's instance records.
+/// The buffer for the instance records of one frame in flight.
 ///
-/// The buffer is hostVisible, and reused unless the GPU may still read it.
+/// The buffer is hostVisible, and it's reused unless the GPU may still read
+/// it.
 class MeshInstances() {
   gpu.DeviceBuffer? buffer;
 
@@ -145,12 +146,14 @@ class MeshInstances() {
 ///
 /// Each run is one render pass into its own target. The target is
 /// multisampled with [samples] where offscreen MSAA is supported, as in
-/// flame_3d, else aliased. Each draw is one mesh, instanced. It reads its
-/// instances from a [gpu.VertexStepMode.instance] buffer. GPUs draw instances
-/// in order, one after another, so paint order holds.
+/// flame_3d, and aliased otherwise. Each draw is one instanced mesh, which
+/// reads its instances from a [gpu.VertexStepMode.instance] buffer. GPUs draw
+/// instances in order, one after another, so paint order holds.
 class MeshGpu(gpu.ShaderLibrary library, int samples) {
-  /// Loads the mesh shaders from [library] and makes their pipelines, with
+  /// Creates a mesh drawer with the mesh shaders from [library], and
   /// [samples] per pixel where offscreen MSAA is supported.
+  ///
+  /// It creates the pipelines at once, except [glowPipeline].
   this
     : vertex = library['RaMeshVertex']!,
       strokedVertex = library['RaMeshStrokedVertex']!,
@@ -176,11 +179,11 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   /// the opacity.
   static const instanceFloats = 28, instanceBytes = 4 * instanceFloats;
 
-  /// The step that targets are sized in: the step of the mesh renderer's
-  /// `AtlasPages`.
+  /// The step that targets' sizes are multiples of, which the mesh
+  /// renderer's `AtlasPages` uses.
   ///
-  /// So runs that change size a little, as moving entries make them, keep
-  /// their targets.
+  /// This way, runs that change size a little, as moving entries make them
+  /// do, keep their targets.
   static const targetStep = 64;
 
   /// Targets' samples per pixel, 1 or 4, as Flutter GPU allows: 1 unless
@@ -200,10 +203,11 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
       strokedPipeline,
       strokedTransformedPipeline;
 
-  /// The pipeline for meshes with a glow, made at the first one's draw, so
-  /// games without any don't pay for it. On OpenGL ES, [warmUp] makes it.
+  /// The pipeline for meshes with a glow, made at the first such mesh's draw
+  /// so that apps without glows don't pay for it. On OpenGL ES, [warmUp]
+  /// makes it.
   ///
-  /// It has no variant for color transforms, as only gradients need one, and a
+  /// It has no variant for color transforms: only gradients need one, and a
   /// glow's paths are all colors.
   late final gpu.RenderPipeline glowPipeline = context.createRenderPipeline(
     glowVertex,
@@ -211,8 +215,8 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
     vertexLayout: _layout(stroked: true, glow: true),
   );
 
-  /// The targets' format, as GpuRenderer.colorFormat: the context's default,
-  /// or b8g8r8a8UNormInt where it reports unknown.
+  /// The targets' format, the same as `GpuRenderer.colorFormat`: the
+  /// context's default, or b8g8r8a8UNormInt where the default is unknown.
   final gpu.PixelFormat colorFormat =
       gpu.gpuContext.defaultColorFormat == gpu.PixelFormat.unknown
       ? gpu.PixelFormat.b8g8r8a8UNormInt
@@ -224,8 +228,9 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   /// A stroke's least half width on screen, in pixels.
   ///
   /// 4x MSAA's samples lie in rows at most 0.56 of a pixel apart, at slopes of
-  /// 1/2 and 2. A thinner line can miss all of a pixel's samples. Aliased, a
-  /// line must be a pixel wide to reach the center of every pixel it crosses.
+  /// 1/2 and 2, so a thinner line can miss all of a pixel's samples. Without
+  /// MSAA, a line must be a pixel wide to reach the center of every pixel it
+  /// crosses.
   double get leastHalfWidth => multisampled ? 0.28 : 0.5;
 
   /// How many times it has allocated targets.
@@ -237,7 +242,8 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
 
   /// Makes [target]'s texture [width] x [height], the size of its run's page.
   ///
-  /// It reallocates the texture if its size differs, larger or smaller.
+  /// It reallocates the texture if its size differs, whether larger or
+  /// smaller.
   void fit(MeshTarget target, int width, int height) {
     final texture = target.texture;
     if (texture != null && texture.width == width && texture.height == height) {
@@ -250,8 +256,9 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
       format: colorFormat,
     );
     // Write the texture once, which puts it in a defined layout before its
-    // first render pass, as GpuRenderer does with its targets. The bytes come
-    // from the texture's own size, as a format's pixels may not be 4 bytes.
+    // first render pass, as GpuRenderer does with its targets. The byte count
+    // comes from the texture's own size, as a format's pixels may not be 4
+    // bytes.
     target.texture!.overwrite(
       ByteData(target.texture!.getBaseMipLevelSizeInBytes()),
     );
@@ -280,13 +287,14 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
     return n;
   }
 
-  /// Begins a frame, whose uniforms share the host buffer, by resetting it.
+  /// Begins a frame by resetting the host buffer, which the frame's uniforms
+  /// share.
   void beginFrame() => hostBuffer.reset();
 
   /// Uploads [count] instance records from [records] into [instances]'
   /// buffer, and returns the buffer.
   ///
-  /// It makes a new buffer if the old one is too small, or if the GPU may
+  /// It creates a new buffer if the old one is too small, or if the GPU may
   /// still read it.
   gpu.DeviceBuffer upload(
     MeshInstances instances,
@@ -358,10 +366,10 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
 
   /// Draws [mesh] once per instance, for [count] instances from [first].
   ///
-  /// With [blend], it draws source over. Without, it replaces what's below,
-  /// for opaque instances of an opaque mesh. Tile-based GPUs then shade only
-  /// the fragments on top. [strips] draws [mesh]'s strip indices, for
-  /// instances that keep its alpha.
+  /// With [blend], it draws source over. Without it, the draw replaces what's
+  /// below, for opaque instances of an opaque mesh, and tile-based GPUs then
+  /// shade only the fragments on top. [strips] draws [mesh]'s strip indices,
+  /// for instances that keep its alpha.
   ///
   /// [colorTransform] holds the color transform rows that the instances share,
   /// scaled by their opacity. Their gradients' fragments read it as a uniform.
@@ -386,12 +394,13 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
         : (transformed ? transformedPipeline : pipeline);
     final pass = _pass;
     // A pass's bindings persist across draws, and binding a slot replaces only
-    // the same shader's binding, not another shader's. So a draw with another
-    // pipeline than the last clears them first, and one with the same
-    // pipeline binds only what changed. Setting the blend state makes Flutter
-    // GPU look the pipeline up again at the next draw, even with the same
-    // values, so it's set only when it changes. Skipping those calls took
-    // 15-20% off the frames' encode time in the games, on macOS and an iPhone.
+    // the same shader's binding, not another shader's. So a draw with a
+    // different pipeline from the last one clears the bindings first, and a
+    // draw with the same pipeline binds only what changed. Setting the blend
+    // state makes Flutter GPU look the pipeline up again at the next draw,
+    // even with the same values, so it's set only when it changes. Skipping
+    // those calls took 15-20% off the encode time of game frames, on macOS
+    // and an iPhone.
     final samePipeline = identical(drawPipeline, _lastPipeline);
     final sameMesh = samePipeline && identical(mesh, _lastMesh);
     if (!samePipeline) {
@@ -446,15 +455,15 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
   }
 
   /// Draws once with each of its pipelines into a scratch target, which
-  /// compiles those not compiled yet, and completes once the GPU has run the
+  /// compiles any not compiled yet, and completes after the GPU has run the
   /// draws.
   ///
-  /// On OpenGL ES, a pipeline compiles at its first draw, which stalls the UI
-  /// thread as the renderer is made, and the raster thread after. That took
-  /// 60 ms, then 30 ms, on the Android emulator. On Mesa's llvmpipe, it took
-  /// 230 ms, then 870 ms, in release builds with no shader cache. So the mesh
-  /// renderer compiles them all as it's made there, rather than at whichever
-  /// frame first draws each.
+  /// On OpenGL ES, a pipeline compiles at its first draw. That stalls the UI
+  /// thread while the renderer is created, and then the raster thread. The
+  /// stalls took 60 ms and 30 ms on the Android emulator, and 230 ms and
+  /// 870 ms on Mesa's llvmpipe in release builds with no shader cache. So on
+  /// OpenGL ES the mesh renderer compiles all its pipelines when it's
+  /// created, rather than in whichever frame first draws with each.
   Future<void> warmUp() {
     gpu.BufferView view(TypedData data) {
       final buffer = context.createDeviceBufferWithCopy(
@@ -507,9 +516,9 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
     final transform = Float32List(16);
     for (final stroked in [false, true]) {
       draw(mesh(stroked: stroked), 0, 1, blend: true);
-      // Opaque meshes draw without blending, which some drivers, llvmpipe's
-      // among them, compile shaders again for. Few have gradients with a
-      // color transform, so those compile at their first frame.
+      // Opaque meshes draw without blending, and some drivers, llvmpipe among
+      // them, compile shaders again for that. Few meshes have gradients with
+      // a color transform, so those pipelines compile at their first frame.
       draw(mesh(stroked: stroked), 0, 1, blend: false);
       draw(
         mesh(stroked: stroked),
@@ -530,9 +539,9 @@ class MeshGpu(gpu.ShaderLibrary library, int samples) {
 
   /// Submits the pass.
   ///
-  /// For a frame's [last] pass, it marks [instances]' buffer busy until the
-  /// GPU has run the pass. Passes run in order, so the earlier ones have run
-  /// too by then.
+  /// For a frame's [last] pass, it marks [instances]' buffer as busy until
+  /// the GPU has run the pass. Passes run in order, so the earlier ones have
+  /// run by then too.
   void endPass(MeshInstances instances, {required bool last}) {
     final commandBuffer = _commandBuffer!;
     _commandBuffer = null;

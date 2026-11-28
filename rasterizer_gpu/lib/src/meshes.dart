@@ -13,17 +13,20 @@ import 'mesh_gpu.dart';
 import 'viewport_clip.dart';
 
 // The mesh renderer. It imports SVGs and plain paths once into meshes, whose
-// triangles stay in GPU buffers. Each frame, it draws them under their
-// entries' transforms, each run into its own target.
+// triangles stay in GPU buffers. Each frame, it draws the scenes added to
+// each run (the run's entries), with their transforms, into a target texture
+// of the run's own.
 
-/// A scene imported into a mesh, for the mesh renderer: an SVG or plain
+/// A scene imported into a mesh for the mesh renderer: an SVG or plain
 /// paths.
 ///
-/// Its triangles are in the scene's units. They stay in GPU buffers from the
-/// first time a run adds the scene until it's disposed of. Made without a GPU,
-/// as in unit tests, it still has the import's bounds and counts.
+/// Its triangles are in the scene's units. They're uploaded to GPU buffers
+/// the first time a run adds the scene, and stay there until the scene is
+/// disposed of. A scene made without a GPU, as in unit tests, still has the
+/// import's bounds and counts.
 class MeshScene(ra.Mesh mesh) implements RasterizerScene {
-  /// Keeps [mesh] until a run first adds the scene, which uploads it.
+  /// Creates a scene of [mesh], which it keeps until a run first adds the
+  /// scene and uploads it.
   this
     : _mesh = mesh,
       bounds = _rect(mesh.bounds),
@@ -41,22 +44,22 @@ class MeshScene(ra.Mesh mesh) implements RasterizerScene {
   @override
   final ui.Rect bounds, viewBox;
 
-  /// The number of the mesh's [ra.Mesh.paths], so a glow's halos and cores
-  /// count.
+  /// The number of the mesh's [ra.Mesh.paths], which includes a glow's halos
+  /// and cores.
   @override
   final int pathCount;
 
-  /// The import, until it's uploaded.
+  /// The imported mesh, until it's uploaded.
   ra.Mesh? _mesh;
   MeshBuffers? _buffers;
 
-  /// For tests: the import, until it's uploaded.
+  /// For tests: the imported mesh, until it's uploaded.
   @visibleForTesting
   ra.Mesh? get debugMesh => _mesh;
 
   /// The scene's buffers, uploaded when a run first adds the scene.
   ///
-  /// Null once the scene is disposed of, or if it has no triangles.
+  /// Null after the scene is disposed of, or if it has no triangles.
   MeshBuffers? get _uploaded {
     final mesh = _mesh;
     if (mesh != null) {
@@ -86,18 +89,20 @@ class MeshScene(ra.Mesh mesh) implements RasterizerScene {
       : ui.Rect.fromLTRB(b.lx, b.ly, b.ux, b.uy);
 }
 
-/// The mesh renderer: it renders each run into its own target.
+/// The mesh renderer, which renders each run into a target texture of its
+/// own.
 ///
-/// The targets come from a pool per frame in flight. So a frame's images stay
-/// valid for [slots] frames, until it renders into its targets again.
-/// Targets have the samples per pixel asked for, 1 or 4, where offscreen MSAA
-/// is supported, else 1.
+/// Each of the [slots] frames in flight has its own pool of targets. So a
+/// frame's images stay valid for [slots] frames, until the renderer renders
+/// into that pool again. Targets have the requested samples per pixel, 1 or
+/// 4, where offscreen MSAA is supported, else 1.
 ///
-/// A run's targets are one size in every frame in flight, so they share a
-/// multisampled texture. They're sized as atlas pages are, one page per run
-/// ([AtlasPages]). They grow at once. They shrink at the end of a window of
-/// 120 frames that all needed below [shrinkBelow] of their area, or after a
-/// viewport change. It releases a run's targets that no frame needed for a
+/// A run's targets have the same size in every frame in flight, so they
+/// share one multisampled texture. They're sized as atlas pages are, with one
+/// page per run ([AtlasPages]). They grow at once. They shrink at the end of
+/// a window of 120 frames that all needed less than [shrinkBelow] of their
+/// area, or at the end of the first window after a viewport change. The
+/// renderer releases the targets of runs that no frame needed for a whole
 /// window.
 class MeshRenderer(
   gpu.ShaderLibrary library,
@@ -110,10 +115,10 @@ class MeshRenderer(
       _instances = List.generate(slots, (_) => MeshInstances());
 
   /// A run's targets shrink at the end of a window whose frames all needed
-  /// below this share of their area.
+  /// less than this fraction of their area.
   ///
-  /// It's more than atlas pages' half, so a run that covered the viewport,
-  /// then much less of it, gives most of its target back.
+  /// It's higher than the atlas pages' 0.5, so a run that covered the
+  /// viewport and then much less of it gives most of its target back.
   static const shrinkBelow = 0.75;
 
   @override
@@ -135,7 +140,7 @@ class MeshRenderer(
   int _frames = 0, _resizes = 0;
   bool _disposed = false, _trimPending = false;
 
-  /// The one frame, which each [beginFrame] reuses.
+  /// The single frame, which every [beginFrame] reuses.
   late final MeshFrame _frame = MeshFrame._(this);
 
   /// Targets' samples per pixel: 1 unless offscreen MSAA is supported.
@@ -161,8 +166,8 @@ class MeshRenderer(
     return n;
   }
 
-  /// Compiles its pipelines now, rather than at the frames that first draw
-  /// with each, and completes once the GPU has run them ([MeshGpu.warmUp]).
+  /// Compiles its pipelines now, rather than in the first frame that draws
+  /// with each, and completes after the GPU has run them ([MeshGpu.warmUp]).
   Future<void> warmUp() => _gpu.warmUp();
 
   @override
@@ -181,12 +186,12 @@ class MeshRenderer(
     _gpu.releaseMultisampled(const []);
   }
 
-  /// Ends a [width] x [height] frame whose runs needed targets of the [needs]
-  /// sizes.
+  /// Ends a [width] x [height] frame whose runs needed targets of the sizes
+  /// in [needs].
   ///
   /// At the end of a window, the targets' sizes shrink. It releases the
   /// targets of runs that no frame had for a window, and the multisampled
-  /// textures of sizes that no target has any more.
+  /// textures whose size no target has any more.
   void _endFrame(int width, int height, List<RasterizerPixelSize> needs) {
     _sizes.endFrame(width, height, needs);
     var released = _gpu.resizes != _resizes;
@@ -233,11 +238,11 @@ class MeshRenderer(
   }
 }
 
-/// A mesh renderer's frame: its runs' entries, which [render] renders into
-/// each run's own target.
+/// A mesh renderer's frame: the entries of its runs, which [render] renders
+/// into each run's own target.
 ///
-/// [MeshRenderer.beginFrame]'s `curves` doesn't apply, as the import flattened
-/// the meshes' curves.
+/// [MeshRenderer.beginFrame]'s `curves` has no effect, as the import already
+/// flattened the meshes' curves.
 class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
   final List<MeshRun> _runs = [];
   int _runCount = 0, _width = 0, _height = 0, _slot = 0, _frame = 0;
@@ -246,9 +251,9 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
   // The margin around a run's entries' bounds, in pixels.
   static const _margin = 1;
 
-  // How far past its bounds, in pixels, ra_mesh_stroked.vert can push a
-  // stroke: the largest least half width, 0.5, times the longest offset it
-  // counts, 4.
+  // How far, in pixels, ra_mesh_stroked.vert can push a stroke past its
+  // bounds: the largest `MeshGpu.leastHalfWidth`, 0.5, times the longest
+  // offset that the shader counts, 4.
   static const _strokeReach = 2.0;
 
   // The runs placed with something to draw, which take the slot's targets in
@@ -297,7 +302,7 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     _scenes.clear();
     _colorTransforms.clear();
     _placed.clear();
-    // A new list, as the renderer's pages keep the last frame's.
+    // A new list, because the renderer's pages keep the last frame's list.
     _needs = [];
     pageSizes.clear();
     _frame = ++renderer._frames;
@@ -365,10 +370,10 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       minY = y0 + (dyw < 0 ? dyw : 0) + (dyh < 0 ? dyh : 0);
       maxY = y0 + (dyw > 0 ? dyw : 0) + (dyh > 0 ? dyh : 0);
     } else {
-      // Projected, the bounds are the corners' if all are in front of the
-      // eye. If only some are, or one is so close to the eye's plane that it
-      // projects to infinity, they're the viewport. If none are, the entry is
-      // clipped away.
+      // Under a projection, the bounds are the projected corners' bounds if
+      // all corners are in front of the eye. If only some are, or one is so
+      // close to the eye's plane that it projects to infinity, the bounds are
+      // the viewport. If none are, the entry is clipped away.
       minX = minY = double.infinity;
       maxX = maxY = double.negativeInfinity;
       var behind = 0;
@@ -416,7 +421,7 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       maxX += _strokeReach;
       maxY += _strokeReach;
     }
-    // Off the clip, or NaN.
+    // Skip entries outside the clip, or with NaN bounds.
     final clip = run._clip;
     if (!(maxX > clip.left &&
         maxY > clip.top &&
@@ -458,11 +463,11 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     run._entries.add(i);
   }
 
-  /// Places [run] in the slot's next target.
+  /// Places [run] in the next target of the frame's slot.
   ///
-  /// The run covers its entries' bounds with the margin, rounded out and
-  /// clipped to its clip. Its target is the size of its page, which fits
-  /// that.
+  /// The run covers its entries' bounds plus the margin, rounded out to whole
+  /// pixels and clipped to the run's clip. Its target is the size of its
+  /// page, which fits that area.
   void _place(MeshRun run) {
     run._placed = true;
     if (run._entries.isEmpty) {
@@ -546,23 +551,26 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
       uploadMicros = watch.elapsedMicroseconds;
       watch.reset();
       // Consecutive entries that show the same scene make one draw. For an
-      // opaque mesh, or one with strips, the draw splits where entries start
-      // or stop keeping the scene's alpha. An opaque mesh's entries that keep
-      // it draw without blending. A mesh's entries that keep it draw its
-      // strips, which keep the least width, and the others its strokes'
-      // unions, as a strip would blend twice where it overlaps itself. For a
-      // mesh with gradients, the draw also splits where entries start or stop
-      // having a color transform, or change it. Only entries with one read it
-      // for each fragment, as their draw's uniform.
+      // opaque mesh, or a mesh with strips, the draw splits where entries
+      // start or stop keeping the scene's alpha. Entries of an opaque mesh
+      // that keep its alpha draw without blending. Entries of a mesh with
+      // strips that keep its alpha draw the strips, which keep strokes at
+      // their least width on screen. The other entries draw the strokes'
+      // unions instead, as a strip would blend twice where it overlaps
+      // itself. For a mesh with gradients, the draw also splits where entries
+      // start or stop having a color transform, or where it changes. Only
+      // draws of entries with a color transform get it as a uniform, which
+      // each fragment reads.
       //
-      // An opaque mesh without strips or gradients gives its own unblended
-      // draw only to a run of [_leastUnblended] or more entries that keep its
-      // alpha, or to a run of all the scene's consecutive entries. Its
-      // shorter runs join the blended draw of the entries around them. That
-      // looks the same, as blending an opaque color changes nothing, and a
-      // draw costs more to encode than blending a few entries. A star field
-      // of one dot at many opacities would take 69 draws a frame, and 0.2 ms
-      // on an M1, if each change of alpha started a new draw.
+      // An opaque mesh without strips or gradients gives an unblended draw of
+      // its own only to [_leastUnblended] or more consecutive entries that
+      // keep its alpha, or to all of the scene's consecutive entries when
+      // they all keep it. Shorter groups join the blended draw of the entries
+      // around them. That looks the same, as blending an opaque color changes
+      // nothing, and a draw costs more to encode than blending a few entries.
+      // A star field of one dot at many opacities would take 69 draws a
+      // frame, and 0.2 ms on an M1, if each change of alpha started a new
+      // draw.
       var first = 0;
       for (final (r, run) in _placed.indexed) {
         gpu.beginPass(run._target!, buffer);
@@ -635,11 +643,11 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     }
   }
 
-  /// Writes entry [i]'s instance record at [k], its transform moved from the
-  /// viewport to its run's target at [ox], [oy].
+  /// Writes entry [i]'s instance record at index [k], with its transform moved
+  /// from the viewport to its run's target at [ox], [oy].
   ///
-  /// x - ox is ((a - ox g) x + (c - ox h) y + tx - ox w) over w's row, and
-  /// the same goes for y.
+  /// x - ox is ((a - ox g) x + (c - ox h) y + tx - ox w) divided by the
+  /// third row, g x + h y + w, and likewise for y.
   void _write(int k, int i, double ox, double oy) {
     final o = MeshGpu.instanceFloats * k, t = 9 * i, r = _records, m = _ctms;
     final g = m[t + 6], h = m[t + 7], w = m[t + 8];
@@ -673,9 +681,9 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
     return true;
   }
 
-  /// The fewest consecutive entries that keep the alpha of an opaque mesh
-  /// without strips or gradients, among entries that don't, that get their
-  /// own draw without blending.
+  /// The fewest consecutive entries of an opaque mesh without strips or
+  /// gradients that keep its alpha and get an unblended draw of their own,
+  /// when other entries of the scene around them don't keep it.
   static const _leastUnblended = 8;
 
   /// Returns how many consecutive entries of [entries], from [j] on, show
@@ -715,8 +723,8 @@ class MeshFrame._(final MeshRenderer _renderer) implements RasterizerFrame {
 class MeshRun._(final MeshFrame _frame, @override final int index)
     extends ImageRun {
   // The run's entries and their bounds in the viewport, and the pixels its
-  // clip leaves it, with the margin. Once placed, its target and its place in
-  // the viewport.
+  // clip leaves it, margin included. After it's placed, its target and its
+  // position in the viewport.
   final List<int> _entries = [];
   double _lx = double.infinity,
       _ly = double.infinity,

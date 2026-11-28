@@ -3,8 +3,8 @@ import 'dart:typed_data';
 import '../rasterizer_gpu.dart';
 import 'paths/scene_paths.dart';
 
-// This file replaces atlas.dart where dart:ffi isn't available, as on web.
-// There, only the canvas renderer works.
+// This file replaces atlas.dart where dart:ffi isn't available, as on the
+// web. There, only the canvas renderer works.
 
 String? contextError;
 

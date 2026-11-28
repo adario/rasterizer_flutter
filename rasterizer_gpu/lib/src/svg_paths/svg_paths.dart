@@ -7,42 +7,45 @@ import 'package:xml/xml_events.dart';
 import '../canvas_paths.dart';
 import 'vector_graphics_compiler_extensions.dart';
 
-/// An SVG's paths, parsed in Dart by vector_graphics_compiler, to draw with a
-/// [ui.Canvas]: the canvas renderer's scenes.
+/// An SVG's paths, parsed in Dart by vector_graphics_compiler and drawn with
+/// a [ui.Canvas], for the canvas renderer's scenes.
 ///
-/// Based on SvgPaths, which this package's author wrote for flame_svg and
-/// Flame didn't merge. It drops that class's hitboxes, animations and Flame
-/// types, and draws as the core's scenes do:
-/// - It imports only paths, as the core's NanoSVG does. It removes clip paths
-///   before parsing. It skips masks' own shapes, patterns' tiles and the
-///   shapes painted with patterns. It doesn't import text or images.
-/// - It multiplies opacity into the paints' colors, as the core does, where
-///   vector_graphics_compiler draws it as layers.
+/// It's based on the SvgPaths class that this package's author wrote for
+/// flame_svg, which Flame didn't merge. It drops that class's hitboxes,
+/// animations and Flame types, and draws the way scenes of the native
+/// Rasterizer core do:
+/// - It imports only paths, as the core's NanoSVG parser does. It removes
+///   clip paths before parsing. It skips the shapes of masks, the tiles of
+///   patterns and the shapes painted with patterns. It doesn't import text or
+///   images.
+/// - It multiplies opacity into the paints' colors, as the core does.
+///   vector_graphics_compiler draws opacity as layers instead.
 /// - It doesn't fill paths without an area, such as a line with SVG's default
-///   fill. A canvas would paint a hairline, which shows under their strokes
-///   once those are translucent.
+///   fill. A canvas would paint a hairline for that fill, which shows under
+///   the path's stroke when the stroke is translucent.
 /// - It draws in the SVG's coordinates. vector_graphics_compiler moves their
-///   origin to the viewBox's, so [draw] moves it back.
+///   origin to the viewBox's origin, so [draw] moves it back.
 class SvgPaths(
   String svg, {
 
-  /// Whether to merge consecutive paths with the same paint, which keeps the
-  /// SVG's paint order.
+  /// Whether to merge consecutive paths with the same paint into one.
   ///
-  /// It doesn't merge paths with both a fill and a stroke, with another fill
-  /// type, or whose bounds with their strokes overlap those of a path merged
-  /// so far.
+  /// Merging only consecutive paths keeps the SVG's paint order. It doesn't
+  /// merge paths that have both a fill and a stroke, paths with a different
+  /// fill type, or paths whose bounds with their strokes overlap those of a
+  /// path already in the merge.
   final bool merge = true,
 }) implements CanvasPaths {
-  /// Parses [svg], and with [merge], merges consecutive paths with the same
-  /// paint into one.
+  /// Creates the paths of [svg], merging consecutive paths with the same
+  /// paint into one if [merge] is true.
   ///
   /// Throws if [svg] can't be parsed.
   this {
     _import(svg);
   }
 
-  /// The paths, in paint order. Their 0, 0 is the viewBox's origin, [origin].
+  /// The paths, in paint order. Their 0, 0 lies at the viewBox's origin,
+  /// [origin].
   final List<VectorPath> paths = [];
 
   /// Where the paths' 0, 0 lies in the SVG's coordinates: its viewBox's
@@ -54,14 +57,15 @@ class SvgPaths(
   @override
   late final ui.Rect viewBox;
 
-  /// The paths' bounds in the SVG's coordinates, with half their strokes'
-  /// widths, as the core computes them, or [ui.Rect.zero] if there are none.
+  /// The paths' bounds in the SVG's coordinates, grown by half their strokes'
+  /// widths as the core computes them, or [ui.Rect.zero] if there are no
+  /// paths.
   @override
   late final ui.Rect bounds;
 
-  /// What [draw] can paint, in the SVG's coordinates: the paths' bounds with
-  /// all of their strokes, joins and caps, or [ui.Rect.zero] if there are
-  /// none.
+  /// The area that [draw] can paint, in the SVG's coordinates: the paths'
+  /// bounds grown to take in all of their strokes, joins and caps, or
+  /// [ui.Rect.zero] if there are no paths.
   @override
   late final ui.Rect paintedBounds;
 
@@ -103,8 +107,8 @@ class SvgPaths(
     viewBox = origin & ui.Size(instructions.width, instructions.height);
 
     // The converted paints, by paint ID and opacity, and the converted paths,
-    // by path ID and paint. vector_graphics_compiler shares a path among the
-    // draws with the same path data, so each converts once.
+    // by path ID and paint. vector_graphics_compiler shares one path among the
+    // draws with the same path data, so each path is converted once.
     final paints = <({int paintId, double opacity}), VectorPaint>{};
     // The same paints without their fills, for paths without an area.
     final unfilled = <VectorPaint, VectorPaint>{};
@@ -112,10 +116,10 @@ class SvgPaths(
 
     // The consecutive paths to merge, added to [paths] when the run ends.
     // Merging only consecutive paths keeps the SVG's paint order. Merging only
-    // paths whose bounds with their strokes don't overlap keeps their look.
-    // Overlapping contours of a merged path could cancel each other out,
-    // depending on their direction and fill type. Overlapping translucent
-    // paints wouldn't add up either.
+    // paths whose bounds with their strokes don't overlap keeps their look:
+    // overlapping contours of a merged path could cancel each other out,
+    // depending on their direction and fill type, and overlapping translucent
+    // paints wouldn't add up.
     final run = <VectorPath>[];
     final runBounds = <ui.Rect>[];
     // The union of their bounds. A path that misses it can't overlap any of
@@ -142,9 +146,9 @@ class SvgPaths(
       runPaint = null;
     }
 
-    // How deep the commands are in a mask or a pattern, whose own shapes are
-    // skipped. A mask's shapes only say which parts of its content show, and
-    // a pattern's shapes are its tile.
+    // How deeply the commands are nested in a mask or a pattern, whose own
+    // shapes are skipped. A mask's shapes only say which parts of its content
+    // show, and a pattern's shapes are its tile.
     var skipDepth = 0;
     // The product of the opacities of the layers the commands are in, and its
     // value before each save, which each restore pops.
@@ -205,7 +209,7 @@ class SvgPaths(
       if (paint.isFilled && !instructions.paths[pathId].hasArea) {
         paint = unfilled[paint] ??= VectorPaint(stroke: paint.stroke);
       }
-      // Skip paths that paint nothing, such as with a gradient without
+      // Skip paths that paint nothing, such as a path with a gradient without
       // colors, or with only a fill and no area.
       if (!paint.isFilled && !paint.isStroked) {
         continue;
@@ -217,8 +221,8 @@ class SvgPaths(
 
       // Paths with both a fill and a stroke aren't merged: a merged path paints
       // its fill for all its paths, then its stroke, which would change the
-      // paint order. Paths with another fill type aren't merged either, as a
-      // merged path has only one.
+      // paint order. Paths with a different fill type aren't merged either, as
+      // a merged path has only one.
       final canMerge = merge && !(paint.isFilled && paint.isStroked);
       final b = _paintedBounds(path);
       if (!canMerge ||
@@ -274,20 +278,20 @@ class SvgPaths(
   }
 
   /// Returns [svg], edited so that vector_graphics_compiler parses it into the
-  /// core's paths, and the root `<svg>`'s viewBox origin.
+  /// same paths as the core, and the viewBox origin of the root `<svg>`.
   ///
   /// vector_graphics_compiler parses that origin the same way, but only to
-  /// move the paths by it. The edits:
+  /// move the paths by it. The edits are:
   /// - The root gets SVG's default stroke width, 1, unless it sets one.
   ///   vector_graphics_compiler scales a stroke's width by its transform only
-  ///   when the SVG sets the width. It gives other strokes a width of 1 after
-  ///   the transform, while the core's NanoSVG scales the default 1 too. Set
-  ///   on the root, the default is inherited as set, and scaled. It goes
-  ///   before the root's other attributes, so the root's `style` still
-  ///   overrides it.
-  /// - Clip-path attributes go, in `style` too, as NanoSVG ignores them.
-  ///   vector_graphics_compiler would draw a group once per clip path, where a
-  ///   `<clipPath>` mixes clip rules.
+  ///   when the SVG sets the width, and gives other strokes a width of 1 after
+  ///   the transform. The core's NanoSVG scales the default width of 1 too.
+  ///   Set on the root, the default is inherited as a set width, so it's
+  ///   scaled. It goes before the root's other attributes, so the root's
+  ///   `style` still overrides it.
+  /// - Clip-path attributes are removed, including those in `style`, as
+  ///   NanoSVG ignores them. vector_graphics_compiler would draw a group once
+  ///   per clip path when a `<clipPath>` mixes clip rules.
   static ({String svg, ui.Offset origin}) _prepared(String svg) {
     final edits = <({int start, int stop, String tag})>[];
     ui.Offset? origin;
@@ -365,8 +369,8 @@ class SvgPaths(
     r"""\sclip-path\s*=\s*("[^"]*"|'[^']*')""",
   );
 
-  // Matches clip-path in a style attribute's value, the only place left in a
-  // tag once _clipPathAttribute's matches are gone.
+  // Matches clip-path in a style attribute's value, the only place it can be
+  // left in a tag after _clipPathAttribute's matches are removed.
   static final _clipPathStyle = RegExp(r"""clip-path\s*:[^;"']*;?""");
 }
 
@@ -399,8 +403,8 @@ class VectorPath(final ui.Path path, final VectorPaint paint) {
   /// Draws [path] with [paint], its alpha scaled by [opacity] and its color
   /// filtered by [colorFilter].
   ///
-  /// The paint color's alpha scales a gradient's too. It restores the paint
-  /// afterwards, as the canvas reads it when it draws.
+  /// The paint color's alpha scales a gradient's alpha too. It restores the
+  /// paint afterwards: the canvas reads the paint only during the draw call.
   void _drawPath(
     ui.Canvas canvas,
     ui.Paint paint,

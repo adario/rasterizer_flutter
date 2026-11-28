@@ -1,37 +1,37 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-/// Groups a GPU run's entries into parts, by their rectangles.
+/// Groups a GPU run's entries into parts by their rectangles.
 ///
 /// Entries whose rectangles overlap share a part, and so do chains of such
-/// entries. So entries in different parts never touch. A part's rectangle is
+/// entries, so entries in different parts never touch. A part's rectangle is
 /// the union of its entries' rectangles. A new entry joins every part its
 /// rectangle overlaps, then every part that the grown rectangle overlaps.
 ///
 /// A sweep over the entries' left edges compares each entry only with the
-/// parts still open there, and union-find tracks which parts were joined.
-/// Two parts' rectangles may still overlap. That's harmless, as each part's
-/// rectangle in the atlas holds only its own entries.
+/// parts still open at that edge, and union-find tracks which parts were
+/// joined. Two parts' rectangles may still overlap. That's harmless, because
+/// each part's rectangle in the atlas holds only its own entries.
 ///
-/// Parts that overlap can add up to more area than their bounding box, as a
-/// run's entries spread over the viewport do. The entries are then one part,
-/// that box: it takes no more of the atlas, and packs into a smaller page
-/// than the parts would, side by side on its shelves.
+/// Overlapping parts can add up to more area than their bounding box, as
+/// when a run's entries spread over the viewport. The entries then become one
+/// part, that box. It takes no more of the atlas, and it packs into a smaller
+/// page than the parts would side by side on the page's shelves (rows).
 class AtlasParts() {
-  // Per entry, by its position in the sorted ids: its union-find parent, and
-  // once the parts are added, the part index of its root.
+  // Indexed by an entry's position in the sorted ids: its union-find parent
+  // and, after the parts are added, the part index of a root entry.
   Int32List _parents = Int32List(256), _parts = Int32List(256);
 
-  // The open and the done parts, 5 ints each: their rectangle (lx, ly, ux,
-  // uy) and the position of one of their entries in the sorted ids.
+  // The open and the finished parts, 5 ints each: the rectangle (lx, ly, ux,
+  // uy), then the position of one of the part's entries in the sorted ids.
   final List<int> _active = [], _done = [];
 
   /// Groups the entries [ids] into parts.
   ///
   /// [rects] holds each entry's rectangle by id, 4 ints each: lx, ly, ux, uy.
-  /// None may be empty. This sorts [ids] in place by left edge. It passes
-  /// each part's rectangle to [addPart], which returns the part's index, then
-  /// each entry's id and part index to [setPart].
+  /// No rectangle may be empty. This sorts [ids] in place by left edge. It
+  /// passes each part's rectangle to [addPart], which returns the part's
+  /// index, then each entry's id and part index to [setPart].
   void group(
     Int32List rects,
     List<int> ids,
@@ -76,7 +76,7 @@ class AtlasParts() {
       }
       active.length = j;
       // Joins the parts the entry overlaps, then those its grown rectangle
-      // overlaps, until there are none.
+      // overlaps, until no part overlaps it.
       for (var merged = true; merged;) {
         merged = false;
         for (var m = 0; m < active.length; m += 5) {
@@ -122,8 +122,8 @@ class AtlasParts() {
     }
   }
 
-  /// Makes the [n] entries [ids] one part, the bounding box of the [parts],
-  /// if that box's area is less than the parts' areas added up.
+  /// Makes the [n] entries [ids] one part, the bounding box of [parts], if
+  /// that box's area is less than the parts' total area.
   ///
   /// Returns whether it did.
   static bool _oneBox(

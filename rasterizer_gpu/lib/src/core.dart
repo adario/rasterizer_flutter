@@ -1,9 +1,10 @@
-/// The Rasterizer core, through FFI: SVG and path scenes, scene lists, and the
-/// frames that a GPU host draws.
+/// The native Rasterizer core, through FFI: SVG and path scenes, scene lists,
+/// and the frames that a GPU host draws.
 ///
 /// rasterizer_gpu.dart renders them. This library is internal and native
-/// only: it imports dart:ffi, so the package imports it behind
-/// `dart.library.ffi`. The package's tests and example use it to check frames.
+/// only: it imports dart:ffi, so the package imports it only where
+/// `dart.library.ffi` is available. The package's tests and example app use
+/// it to check frames.
 library;
 
 import 'dart:ffi';
@@ -41,8 +42,8 @@ extension on Bounds {
 
 Bounds _bounds(raw.RaBounds n) => Bounds(n.lx, n.ly, n.ux, n.uy);
 
-/// Converts an ARGB color, as Flutter's, to NanoSVG's ABGR, with r in the low
-/// byte.
+/// Converts an ARGB color, as Flutter stores it, to NanoSVG's ABGR, which has
+/// red in the low byte.
 int _abgr(int argb) =>
     (argb & 0xFF00FF00) | (argb >> 16 & 0xFF) | (argb & 0xFF) << 16;
 
@@ -51,28 +52,28 @@ int _abgr(int argb) =>
 /// Draws come in paint order. Each one either fills its path, which closes
 /// the path's open contours, or strokes it.
 class const PathDraw({
-  /// The index of its path, counting the paths of the contours' lists one
-  /// list after the other.
+  /// The index of its path, counting through the paths of each
+  /// [PathContours] in the list, one after the other.
   required final int path,
 
-  /// Its color, as Flutter's ARGB, unpremultiplied.
+  /// Its color, as unpremultiplied ARGB, like Flutter's.
   required final int color,
 
   /// Its stroke's width, or 0 for a fill.
   final double strokeWidth = 0,
 
-  /// Its stroke's miter limit. The GPU renderer uses a fixed one instead, as
-  /// for SVGs.
+  /// Its stroke's miter limit. The GPU renderer ignores it and uses a fixed
+  /// limit, as it does for SVGs.
   final double miterLimit = 4,
 
   /// Its stroke's cap.
   final StrokeCap cap = StrokeCap.butt,
 
-  /// Its stroke's join. The GPU renderer draws bevel joins as miters, as for
-  /// SVGs.
+  /// Its stroke's join. The GPU renderer draws bevel joins as miters, as it
+  /// does for SVGs.
   final StrokeJoin join = StrokeJoin.miter,
 
-  /// Whether a fill uses the even-odd rule, else the non-zero one.
+  /// Whether a fill uses the even-odd rule instead of the non-zero one.
   final bool evenOdd = false,
 
   /// Whether it's a hairline: a stroke of width 0, whatever [strokeWidth] is.
@@ -89,42 +90,47 @@ class const PathDraw({
 
 /// A glow around the paths of a [Mesh.fromPaths], like a neon tube's.
 ///
+/// A glow adds a halo under each path, and a core over strokes and, with
+/// [inWidths], over fills.
+///
 /// A halo lies under all of a path's draws. If a draw strokes the path, the
 /// halo spreads on both sides of the path's polylines. Otherwise it spreads
-/// outward from each contour, closed, as the contour's winding tells. So a
-/// hole's halo lies inside the fill, where it's hidden. A halo fades out from
-/// the path's edge to its own edge, and halos that overlap add up. A halo is
-/// light: it covers what's under it as much as its color's strongest channel.
-/// So a black halo, or one tinted to black, leaves nothing.
+/// outward from each contour, closed, in the direction that the contour's
+/// winding gives. So a hole's halo lies inside the fill, where it's hidden. A
+/// halo fades out from the path's edge to its own edge, and overlapping halos
+/// add up. A halo is light: it covers what's under it as much as its color's
+/// strongest channel. So a black halo, or one tinted to black, has no effect.
 ///
-/// Over each draw, a core turns near white down its middle and keeps the
-/// draw's color at its edges. A core under about 2.7 pixels wide keeps the
-/// draw's color throughout. A stroke's core runs along it. With [inWidths],
-/// which makes a fill a line, a fill gets a core too, if no draw strokes its
-/// path. That core reaches inward from each contour that's neither inside
-/// another nor around one, by half the shorter edge at each point. A hairline
-/// has no core. Drawn with an opacity, a core shows over its draw.
+/// A core turns near white down the middle of its draw and keeps the draw's
+/// color at its edges. A core narrower than about 2.7 pixels keeps the draw's
+/// color throughout. A stroke's core runs along the stroke. With [inWidths],
+/// which treats a fill as a line, a fill also gets a core if no draw strokes
+/// its path. That core reaches inward from each contour that's neither inside
+/// another contour nor around one, by half the shorter edge at each point. A
+/// hairline has no core. When drawn with an opacity, a core shows over its
+/// draw.
 ///
 /// A glow whose [radius] or [strength] isn't positive doesn't show, and is the
 /// same as no glow.
 class const Glow({
-  /// How far its halo reaches, from a stroke's centre line or from a fill's
+  /// How far its halo reaches, from a stroke's center line or from a fill's
   /// contour.
   required final double radius,
 
-  /// Its halo's alpha at the path's edge, from 0 to 1, of its color. Just
-  /// outside the path, the halo starts fading out from 0.6 of that.
+  /// Its halo's alpha at the path's edge, as a fraction from 0 to 1 of its
+  /// color's alpha. Just outside the path, the halo starts fading out from
+  /// 0.6 of that.
   final double strength = 1,
 
-  /// Its halo's color, as Flutter's ARGB, unpremultiplied, or null for the
-  /// color of the path's last draw.
+  /// Its halo's color, as unpremultiplied ARGB like Flutter's, or null for
+  /// the color of the path's last draw.
   final int? color,
 
-  /// Whether [radius] is in line widths, else in the paths' units.
+  /// Whether [radius] is in line widths instead of the paths' units.
   ///
-  /// A stroked path's line width is its widest stroke's. A fill's is its
-  /// shorter edge at each point of a contour, which only measures a line's
-  /// width in a thin shape. A hairline, of no width, gets no halo.
+  /// A stroked path's line width is the width of its widest stroke. A fill's
+  /// is its shorter edge at each point of a contour, which measures a line's
+  /// width only in a thin shape. A hairline has no width, so it gets no halo.
   final bool inWidths = false,
 }) {
   Pointer<raw.RaGlow> _toNative(Arena arena) {
@@ -139,8 +145,8 @@ class const Glow({
   }
 }
 
-/// Calls [f] with [contours] and [draws] copied into native memory, the
-/// contours' lists one after the other.
+/// Calls [f] with [contours] and [draws] copied into native memory, with the
+/// [PathContours] one after the other.
 ///
 /// Throws an [ArgumentError] if a draw's path isn't among the contours' paths.
 T _withPaths<T>(
@@ -159,7 +165,7 @@ T _withPaths<T>(
       throw ArgumentError.value(draw.path, 'path', 'Not among the contours');
     }
   }
-  // An allocation of 0 bytes may return null, so each allocates at least 1
+  // An allocation of 0 bytes may return null, so each array gets at least 1
   // item.
   return using((arena) {
     final xy = arena<Float>(points + 1);
@@ -206,7 +212,7 @@ T _withPaths<T>(
 
 /// The core's Ra::Params, which tune how it writes a list's frames.
 ///
-/// Its clear color is ARGB, as Flutter's. Clips are always on, as the
+/// Its clear color is ARGB, like Flutter's. Clips are always on, because the
 /// instances shader's clip coverage is undefined without them.
 class const Params({
   final bool useCurves = true,
@@ -268,7 +274,7 @@ class Scene._(
     _finalizer.attach(this, _handle.cast(), detach: this);
   }
 
-  /// Parses the SVG file at [path].
+  /// Creates a scene by parsing the SVG file at [path].
   ///
   /// Throws an [ArgumentError] if it can't be parsed.
   factory Scene.fromSvg(String path) {
@@ -295,7 +301,7 @@ class Scene._(
     });
   }
 
-  /// Parses an SVG's bytes, such as an asset's.
+  /// Creates a scene by parsing an SVG's [bytes], such as an asset's.
   ///
   /// Throws an [ArgumentError] if they can't be parsed.
   factory Scene.fromSvgBytes(Uint8List bytes) {
@@ -322,8 +328,8 @@ class Scene._(
     });
   }
 
-  /// The OpenGL ES format probe's scene: [probeSvg]'s, built without
-  /// parsing it, so that the probe checks the GPU alone.
+  /// Creates the scene of the OpenGL ES format probe, [probeSvg], built
+  /// without parsing it so that the probe tests only the GPU.
   factory Scene.probe() {
     return using((arena) {
       final ctm = arena<raw.RaTransform>();
@@ -346,12 +352,12 @@ class Scene._(
     });
   }
 
-  /// Creates a scene of [draws] of [contours]' paths, the contours' lists one
-  /// after the other.
+  /// Creates a scene of [draws] of the paths in [contours], taken one after
+  /// the other.
   ///
-  /// The paths' polylines draw as lines, in the paths' coordinates, y down.
-  /// The scene's [svgBounds] are [viewBox]. Paths with points that aren't
-  /// finite don't draw.
+  /// The paths' polylines draw as straight lines, in the paths' coordinates,
+  /// y down. The scene's [svgBounds] are [viewBox]. Paths with points that
+  /// aren't finite aren't drawn.
   ///
   /// Throws an [ArgumentError] if a draw's path isn't among the contours'
   /// paths.
@@ -432,9 +438,9 @@ class const MeshPath({
   /// A gradient's transform from the SVG's coordinates into the gradient's
   /// own.
   ///
-  /// There, a linear gradient's offset is y, and a radial one's is the
-  /// distance from 0, 0. Beyond the first and last stops, the color is
-  /// theirs.
+  /// In the gradient's coordinates, a linear gradient's offset is y, and a
+  /// radial gradient's offset is the distance from 0, 0. Before the first
+  /// stop and after the last, the color is that stop's color.
   required final Transform gradient,
 
   /// The index of a gradient's first stop in [Mesh.stops], 5 floats each.
@@ -450,13 +456,14 @@ class const MeshPath({
   required final bool isHalo,
 });
 
-/// An SVG, or plain paths' polylines, imported once into triangles.
+/// An SVG or plain paths' polylines, imported once into triangles.
 ///
-/// The triangles are in the paths' coordinates, y down, as a [Scene]'s. The
-/// import tessellates fills with their winding rule, and outlines strokes with
-/// their joins, caps and dashes. So each path's triangles in [indices] are its
-/// coverage, and never overlap. Its arrays are copies, so it keeps nothing
-/// native.
+/// The triangles are in the paths' coordinates, y down, as a [Scene]'s are.
+/// The import tessellates fills with their winding rule and outlines strokes
+/// with their joins, caps and dashes. So each path's triangles in [indices]
+/// cover exactly its area, and they don't overlap unless its draw is
+/// [PathDraw.separate]. The mesh's arrays are copies, so it holds no native
+/// memory.
 class Mesh._(raw.RaMeshData n) {
   this
     : vertices = _floats(n.vertices, n.vertexCount * n.vertexFloats),
@@ -472,10 +479,11 @@ class Mesh._(raw.RaMeshData n) {
       bounds = _bounds(n.bounds),
       svgBounds = _bounds(n.svgBounds);
 
-  /// Imports an SVG's bytes.
+  /// Creates a mesh by importing an SVG's [bytes].
   ///
-  /// It flattens the SVG's curves to within 1/4 of a device pixel when its
-  /// longer side is [maxSize] device pixels, the largest size it's drawn at.
+  /// It flattens the SVG's curves to within 1/4 of a device pixel when the
+  /// SVG's longer side spans [maxSize] device pixels, the largest size it's
+  /// drawn at.
   ///
   /// Throws an [ArgumentError] if the bytes can't be parsed, or [maxSize]
   /// isn't a positive finite number.
@@ -499,20 +507,20 @@ class Mesh._(raw.RaMeshData n) {
     return _copied(handle);
   }
 
-  /// Imports [draws] of [contours]' paths, the contours' lists one after the
-  /// other.
+  /// Creates a mesh by importing [draws] of the paths in [contours], taken
+  /// one after the other.
   ///
-  /// It imports them as [Mesh.fromSvgBytes] imports an SVG's shapes. Round
-  /// joins and caps stay within [tolerance] of their arcs, in the paths'
-  /// units. The mesh's [svgBounds] are [viewBox]. It leaves out paths with
-  /// points that aren't finite.
+  /// It imports them the way [Mesh.fromSvgBytes] imports an SVG's shapes.
+  /// Round joins and caps stay within [tolerance] of their arcs, in the
+  /// paths' units. The mesh's [svgBounds] are [viewBox]. It leaves out paths
+  /// with points that aren't finite.
   ///
-  /// With [glow], each path drawn gets a halo, which comes in [paths] before
-  /// all the draws' own paths. Each draw gets a core, which comes right after
-  /// the draw's own path.
+  /// With [glow], each path that's drawn gets a halo, which comes in [paths]
+  /// before all the draws' own paths. Each draw gets a core, which comes
+  /// right after the draw's own path.
   ///
   /// Throws an [ArgumentError] if a draw's path isn't among the contours'
-  /// paths, or [tolerance] isn't positive.
+  /// paths, or if [tolerance] isn't a positive finite number.
   factory Mesh.fromPaths(
     List<PathContours> contours,
     List<PathDraw> draws,
@@ -585,13 +593,14 @@ class Mesh._(raw.RaMeshData n) {
   ///
   /// Each vertex holds x, y and its path's index, all floats, as OpenGL ES
   /// vertex attributes can't be integers. In a mesh with strokes, an offset
-  /// follows: x and y in half widths, from the point of the stroke's polyline
+  /// follows: x and y in half widths, from the point on the stroke's polyline
   /// that the vertex is built around. The offset is 0 for the vertices of
   /// fills and of strokes' unions.
   ///
-  /// In a mesh with a [Glow], the vertex's glow comes last. It's 1 for a
-  /// draw's own vertices. It goes from 1 at a path's edge to 0 at its halo's
-  /// edge, and from 1 up to 2 in the middle of a core.
+  /// In a mesh with a [Glow], the vertex's glow value comes last. It's 1 for
+  /// a draw's own vertices. Across a halo, it goes from 1 at the path's edge
+  /// to 0 at the halo's edge. Across a core, it goes from 1 at the edges up
+  /// to 2 in the middle.
   final Float32List vertices;
 
   /// The number of floats per vertex in [vertices]: 3, 5 in a mesh with
@@ -600,16 +609,17 @@ class Mesh._(raw.RaMeshData n) {
 
   /// The triangles' indices, 3 each, in paint order.
   ///
-  /// They're a [Uint16List] when each index is below 0xFFFF, which some APIs
-  /// keep for primitive restart, else a [Uint32List]. A stroke that overlaps
-  /// itself comes as its union, whose vertices have no offsets.
+  /// They're a [Uint16List] when every index is below 0xFFFF, a value that
+  /// some APIs reserve for primitive restart, else a [Uint32List]. A stroke
+  /// that overlaps itself comes as its union, whose vertices have no offsets.
   final TypedData indices;
 
-  /// The same as [indices], but with opaque strokes that overlap themselves
-  /// as their strips, or null if there are none.
+  /// The same as [indices], except that opaque strokes that overlap
+  /// themselves come as strips, or null if there are no such strokes.
   ///
-  /// Only those strokes differ. Their strips have offsets. They're for
-  /// instances drawn without an opacity, where the overlaps can't show.
+  /// Only those strokes differ. A stroke's strips follow its polyline, and
+  /// their vertices have offsets. They're for instances drawn without an
+  /// opacity, where the overlaps can't show.
   final TypedData? stripIndices;
 
   /// Its paths, in paint order.
@@ -627,8 +637,8 @@ class Mesh._(raw.RaMeshData n) {
   int get vertexCount => vertices.length ~/ vertexFloats;
   int get indexCount => indices.lengthInBytes ~/ indices.elementSizeInBytes;
 
-  /// Whether every path is opaque: its color's alpha, or each of its
-  /// gradient's stops' alpha, is 1.
+  /// Whether every path is opaque: its color's alpha, or the alpha of each of
+  /// its gradient's stops, is 1.
   ///
   /// A mesh with a [Glow] never is, as its halos fade out whatever their
   /// alpha.
@@ -709,17 +719,18 @@ class SceneList() implements Finalizable {
   /// - its color matrix, as a uint32 at [entryColorMatrix]: 0 for none, else
   ///   1 + the matrix's index in [setColorMatrices]' matrices.
   ///
-  /// The scenes mustn't be disposed of before this call. The list then keeps
-  /// its own references. It skips empty scenes. Its frames skip the scenes
-  /// whose opacity is 0, or whose matrix makes them transparent.
+  /// The scenes mustn't be disposed of before this call, after which the list
+  /// keeps its own references. It skips empty scenes. Its frames skip the
+  /// scenes whose opacity is 0, or whose color matrix makes them transparent.
   void setEntries(Pointer<Uint8> entries, int count) =>
       raw.ra_list_set_entries(_live, entries, count);
 
   /// Sets the color matrices that the next [setEntries]' entries refer to.
   ///
-  /// [matrices] holds [count] 4 x 4 matrices on premultiplied RGBA, 16 floats
-  /// each, row by row. Their rows and columns are r, g, b and a. The core
-  /// clamps each color they transform from 0 to its alpha.
+  /// [matrices] holds [count] 4 x 4 matrices that act on premultiplied RGBA,
+  /// 16 floats each, row by row. Their rows and columns are r, g, b and a.
+  /// The core clamps each color channel they transform to between 0 and the
+  /// color's alpha.
   void setColorMatrices(Pointer<Float> matrices, int count) =>
       raw.ra_list_set_color_matrices(_live, matrices, count);
 
@@ -765,8 +776,8 @@ class FrameBuffer() implements Finalizable {
 
   Pointer<raw.RaFrameBufferHandle> _handle;
 
-  /// Counts the renders into the buffer, and its dispose, so a [Frame] can
-  /// tell that its bytes were overwritten.
+  /// Counts the renders into the buffer and its disposal, so that a [Frame]
+  /// can tell when its bytes have been overwritten.
   int _generation = 0;
 
   Pointer<raw.RaFrameBufferHandle> get _live =>
@@ -873,7 +884,7 @@ enum EntryType() {
 ///
 /// For byte ranges, [begin] and [end] are offsets into [Frame.bytes]. An
 /// [EntryType.instancesBase]'s begin is the offset of its pass's instances,
-/// and its end tells the accumulation rows that its group uses. An
+/// and its end gives the accumulation rows that its group uses. An
 /// [EntryType.clipMask]'s begin packs its device bounds, and its end is the
 /// mask's identity.
 class const Entry(final EntryType type, final int begin, final int end) {
@@ -913,9 +924,9 @@ class Frame._(raw.RaFrame n, final FrameBuffer _buffer, final int _generation) {
 
   /// A view of the frame buffer's native memory.
   ///
-  /// It's valid until the next render into the buffer, or the buffer's
-  /// dispose. After that, this getter throws. Don't keep the view: a view
-  /// read before then still points at that memory afterwards.
+  /// It's valid until the next render into the buffer, or until the buffer is
+  /// disposed of, after which this getter throws. Don't keep the view: a view
+  /// read earlier still points at that memory afterwards.
   Uint8List get bytes => _generation == _buffer._generation
       ? _bytes
       : throw StateError('Frame overwritten by a later render');

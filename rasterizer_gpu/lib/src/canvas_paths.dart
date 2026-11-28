@@ -2,11 +2,11 @@ import 'dart:ui' as ui;
 
 /// Returns [paint]'s miter limit.
 ///
-/// dart:ui's setter stores the limit less its default, 4, and its getter
-/// returns what's stored (Flutter 3.47). So a new paint's limit reads 0, and
-/// copying the getter's value to another paint takes 4 off its limit. It
-/// measures the offset once, on a paint whose limit it sets, in case Flutter
-/// fixes this.
+/// dart:ui's setter stores the limit minus its default of 4, and its getter
+/// returns the stored value (Flutter 3.47). So a new paint's limit reads 0,
+/// and copying the getter's value to another paint lowers its limit by 4.
+/// This function measures the offset once, on a paint whose limit it sets,
+/// in case Flutter fixes this.
 double miterLimitOf(ui.Paint paint) =>
     paint.strokeMiterLimit + _miterLimitOffset;
 
@@ -30,7 +30,7 @@ abstract interface class CanvasPaths() {
 
   /// The area that [draw] can paint.
   ///
-  /// It holds the paths with all of their strokes, joins and caps. It's
+  /// It covers the paths with all of their strokes, joins and caps. It's
   /// [ui.Rect.zero] if there are no paths.
   ui.Rect get paintedBounds;
 

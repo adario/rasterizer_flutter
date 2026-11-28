@@ -20,15 +20,16 @@ import 'paths/scene_paths.dart';
 import 'format_probe.dart';
 import 'viewport_clip.dart';
 
-// The GPU renderer, and the entry points of both GPU renderers: the core,
-// through FFI, and Flutter GPU. rasterizer_gpu.dart imports this file where
-// dart:ffi is available, else gpu_stub.dart, which has the same functions.
+// The GPU renderer, and the entry points that both GPU renderers use into
+// the core (through FFI) and Flutter GPU. rasterizer_gpu.dart imports this
+// file where dart:ffi is available, and gpu_stub.dart, which has the same
+// functions, elsewhere.
 
-/// Flutter GPU's error, when checkSupport found no context, or textures too
-/// small.
+/// Flutter GPU's error when [checkSupport] found no context, or found that
+/// Flutter GPU can't create large enough textures.
 String? contextError;
 
-/// Whether Impeller renders with OpenGL ES, as checkSupport found.
+/// Whether Impeller renders with OpenGL ES, as [checkSupport] found.
 bool openGles = false;
 
 /// The format the GPU renderer accumulates coverage in.
@@ -65,8 +66,8 @@ String get formatDetail =>
 String get meshDetail =>
     gpu.gpuContext.doesSupportOffscreenMSAA ? '4× multisampled' : 'aliased';
 
-/// How many times [resetFormatProbe] ran, so that a probe it forgot doesn't
-/// write its result after.
+/// How many times [resetFormatProbe] has run, so that a probe started before
+/// a reset doesn't write its result afterwards.
 int _probeResets = 0;
 
 /// Forgets the format probe and its result, for RasterizerGpu's tests.
@@ -79,17 +80,18 @@ void resetFormatProbe() {
 
 /// The largest size of atlas pages, mesh targets and viewports.
 ///
-/// That's RasterizerRenderer.maxAtlasSize, but 4096 on OpenGL ES. OpenGL ES
-/// only guarantees 2048, and Flutter GPU doesn't tell the device's maximum.
-/// The data texture is 4096 wide.
+/// That's RasterizerRenderer.maxAtlasSize, except on OpenGL ES, where it's
+/// 4096. OpenGL ES guarantees only 2048, and Flutter GPU doesn't report the
+/// device's maximum. The data texture is 4096 wide.
 int maxPageSize = RasterizerRenderer.maxAtlasSize;
 
 /// Returns whether Flutter GPU can render here, for both GPU renderers.
 ///
-/// On OpenGL ES, it returns [RasterizerSupport.openGles]: the renderers draw
-/// there only with RasterizerGpu.allowOpenGles. There, it first makes a
-/// texture [textureWidth] pixels wide, which is [maxPageSize] but for tests,
-/// and returns [RasterizerSupport.smallTextures] if Flutter GPU can't.
+/// On OpenGL ES, it returns [RasterizerSupport.openGles], and the renderers
+/// draw there only with RasterizerGpu.allowOpenGles. Before that, it creates
+/// a texture [textureWidth] pixels wide, which is [maxPageSize] except in
+/// tests, and returns [RasterizerSupport.smallTextures] if Flutter GPU can't
+/// create it.
 RasterizerSupport checkSupport(int textureWidth) {
   if (!Platform.isMacOS &&
       !Platform.isIOS &&
@@ -121,7 +123,7 @@ RasterizerSupport checkSupport(int textureWidth) {
     openGles = true;
     maxPageSize = 4096;
     // Impeller refuses a texture larger than the device allows, so creating
-    // it throws. It's the data texture's format.
+    // one throws. This texture has the data texture's format.
     try {
       context.createTexture(
         gpu.StorageMode.devicePrivate,
@@ -139,24 +141,29 @@ RasterizerSupport checkSupport(int textureWidth) {
   return RasterizerSupport.supported;
 }
 
-/// The format probe: checks that the GPU renderer draws right accumulating
-/// coverage in r32Float, else in r16g16b16a16Float, and completes with null
-/// if r32Float passed, else with why each format failed.
+/// Runs the format probe, which checks that the GPU renderer draws correctly
+/// when it accumulates coverage in r32Float, or else in r16g16b16a16Float.
 ///
-/// It renders [probeSvg]'s scene with curves and without, built without
-/// parsing it (`src/ra_probe_scene.hpp`), so that it checks the GPU alone: a
-/// parser's bug would fail it as if the GPU drew wrongly. It renders before
-/// it returns, then reads the pixels back through a canvas, alongside the
-/// app's frames. With [apply], an r32Float failure makes
-/// [accumulationFormat] r16g16b16a16Float, which renderers switch to at their
-/// next frame. That's at once if rendering throws, as creating an r32Float
-/// texture does where the format isn't supported. Otherwise it's once the
-/// pixels are read back, so the frames rendered meanwhile may be wrong. The
-/// probe then checks r16g16b16a16Float the same way. If that fails too, the
+/// Completes with null if r32Float passed, else with why each format failed.
+///
+/// It renders [probeSvg]'s scene with curves and without. The scene is built
+/// without parsing (`src/ra_probe_scene.hpp`), so the probe checks the GPU
+/// alone: a parser bug would otherwise fail it as if the GPU drew wrongly.
+/// It renders before it returns, then reads the pixels back through a
+/// canvas, alongside the app's frames.
+///
+/// With [apply], an r32Float failure sets [accumulationFormat] to
+/// r16g16b16a16Float, which renderers switch to at their next frame. That
+/// happens at once if rendering throws, as creating an r32Float texture does
+/// where the format isn't supported. Otherwise it happens after the pixels
+/// are read back, so the frames rendered meanwhile may be wrong. The probe
+/// then checks r16g16b16a16Float the same way. If that fails too, the
 /// renderers keep drawing, wrongly, and only RasterizerGpu.supportDetail
-/// says so. For tests, [fail] names formats to treat as failing, as
-/// RasterizerGpu.debugFailFormatProbe does. It runs wherever the renderer
-/// can, as tests check it on Metal and Vulkan too.
+/// reports it.
+///
+/// For tests, [fail] names formats to treat as failing, as
+/// RasterizerGpu.debugFailFormatProbe does. The probe runs wherever the
+/// renderer can, because tests also check it on Metal and Vulkan.
 Future<String?> probeFormat(
   gpu.ShaderLibrary library,
   Set<String> fail, {
@@ -188,7 +195,7 @@ Future<String?> probeFormat(
   });
 }
 
-/// Runs [then] on [result]: at once if it's a value, else once it completes.
+/// Runs [then] on [result]: at once if it's a value, else when it completes.
 Future<String?> _then(
   FutureOr<String?> result,
   FutureOr<String?> Function(String? failure) then,
@@ -196,10 +203,12 @@ Future<String?> _then(
     ? result.then(then)
     : Future.sync(() => then(result));
 
-/// Probes [format]: returns its failure at once if [fail] names it or
-/// rendering throws, else a future of its pixels' failure, or of null.
+/// Probes [format], and returns its failure at once if [fail] names it or
+/// rendering throws.
 ///
-/// Where [fail] names it followed by ` pixels`, the pixels fail once read.
+/// Otherwise it returns a future of the pixels' failure, or of null if they
+/// pass. When [fail] names the format followed by ` pixels`, the pixels fail
+/// after they're read.
 FutureOr<String?> _probe(
   gpu.ShaderLibrary library,
   gpu.PixelFormat format,
@@ -219,17 +228,17 @@ FutureOr<String?> _probe(
   }
 }
 
-/// Renders [probeSvg]'s scene accumulating in [format], with curves and
-/// without, and returns a future of the failure, or of null if its pixels
+/// Renders [probeSvg]'s scene with curves and without, accumulating in
+/// [format], and returns a future of the failure, or of null if the pixels
 /// are as expected.
 ///
-/// It renders before it returns, so rendering's exceptions are thrown at
-/// once. The pixels are read back after.
+/// It renders before it returns, so rendering exceptions are thrown at once.
+/// The pixels are read back afterwards.
 Future<String?> _renderProbe(
   gpu.ShaderLibrary library,
   gpu.PixelFormat format,
 ) {
-  // Built without parsing, so that a parser's bug doesn't fail the GPU.
+  // Built without parsing, so that a parser bug can't fail the GPU check.
   final scene = AtlasScene(ra.Scene.probe());
   final AtlasRenderer renderer;
   try {
@@ -271,7 +280,7 @@ Future<String?> _renderProbe(
 
 /// Reads [part]'s image back through a canvas, and checks it.
 ///
-/// Returns null if its pixels are [probeSvg]'s, else the failure.
+/// Returns null if its pixels match [probeSvg], else the failure.
 Future<String?> _checkPart(RasterizerRunPart? part) async {
   if (part == null) {
     return 'nothing rendered';
@@ -314,7 +323,8 @@ Future<String?> _checkPart(RasterizerRunPart? part) async {
   );
 }
 
-/// Runs the format probe on its own, as [probeFormat] does without `apply`.
+/// Runs the format probe without applying its result: [probeFormat] with
+/// `apply` false.
 Future<String?> debugProbeFormat(Set<String> fail) async =>
     probeFormat(await _library(), fail, apply: false);
 
@@ -335,12 +345,12 @@ RasterizerScene parseScene(Uint8List bytes) =>
 
 /// Creates a GPU renderer with [slots] frames in flight.
 ///
-/// RasterizerRenderer.create only calls this where the renderer is supported.
-/// On OpenGL ES, the first one starts the format probe, with [fail] as
-/// [probeFormat]'s, and each compiles its pipelines as it's made, and
-/// completes once the GPU has run them ([GpuRenderer.warmUp]). If it hasn't
-/// within [timeout], it disposes of the renderer and throws
-/// [TimeoutException].
+/// RasterizerRenderer.create calls this only where the renderer is supported.
+/// On OpenGL ES, the first renderer starts the format probe, passing [fail]
+/// to [probeFormat]. Each renderer there also compiles its pipelines when
+/// it's created, and this completes after the GPU has run them
+/// ([GpuRenderer.warmUp]). If that takes longer than [timeout], it disposes
+/// of the renderer and throws [TimeoutException].
 Future<RasterizerRenderer> createRenderer(
   int slots,
   Set<String> fail,
@@ -357,7 +367,7 @@ Future<RasterizerRenderer> createRenderer(
   return renderer;
 }
 
-/// Waits for [warmUp], [renderer]'s, for up to [timeout], else disposes of
+/// Waits up to [timeout] for [renderer]'s [warmUp], else disposes of
 /// [renderer] and throws [TimeoutException].
 Future<void> _warmUp(
   RasterizerRenderer renderer,
@@ -374,8 +384,8 @@ Future<void> _warmUp(
 
 /// Imports an SVG's [bytes] as a scene for the mesh renderer.
 ///
-/// It flattens the curves for the largest size the scene is drawn at: its
-/// longer side [maxSize] device pixels.
+/// It flattens the curves for the largest size the scene is drawn at, when
+/// its longer side is [maxSize] device pixels.
 RasterizerScene parseMeshScene(Uint8List bytes, double maxSize) =>
     MeshScene(ra.Mesh.fromSvgBytes(bytes, maxSize: maxSize));
 
@@ -418,7 +428,7 @@ ra.Glow? _glow(RasterizerGlow? glow) => glow == null
 
 ra.Bounds _bounds(ui.Rect r) => ra.Bounds(r.left, r.top, r.right, r.bottom);
 
-/// Returns [paths]' draws for the core: a stroke or a fill each.
+/// Returns [paths]' draws for the core, each a stroke or a fill.
 List<ra.PathDraw> _pathDraws(ScenePaths paths) => [
   for (final (i, paint) in paths.paints.indexed)
     if (paint.style == ui.PaintingStyle.stroke)
@@ -441,11 +451,11 @@ List<ra.PathDraw> _pathDraws(ScenePaths paths) => [
 
 /// Creates a mesh renderer with [slots] frames in flight.
 ///
-/// Its targets have [samples] per pixel where offscreen MSAA is supported.
-/// It's only called where the renderer is supported, as [createRenderer] is.
-/// On OpenGL ES, it compiles its pipelines as it's made, and completes once
-/// the GPU has run them ([MeshGpu.warmUp]), or throws as [createRenderer]
-/// does after [timeout].
+/// Its targets have [samples] samples per pixel where offscreen MSAA is
+/// supported. Like [createRenderer], it's called only where the renderer is
+/// supported. On OpenGL ES, the renderer compiles its pipelines when it's
+/// created, and this completes after the GPU has run them ([MeshGpu.warmUp]).
+/// After [timeout], it throws as [createRenderer] does.
 Future<RasterizerRenderer> createMeshRenderer(
   int slots,
   int samples,
@@ -490,15 +500,18 @@ class AtlasScene(final ra.Scene scene) implements RasterizerScene {
 
 /// The GPU renderer.
 ///
-/// Once per frame, it renders all of the frame's runs into atlas pages. Each
-/// run then draws as images, from its parts' rectangles there.
+/// Once per frame, it renders all the frame's runs into atlas pages:
+/// textures that hold each run's parts, the groups of its overlapping
+/// entries ([AtlasParts]). Each run then draws as images of its parts'
+/// rectangles on those pages.
 ///
-/// It keeps [slots] frames in flight, each with its own atlas textures. So a
-/// frame's images stay valid until [slots] frames later, when it renders into
-/// its textures again.
+/// It keeps [slots] frames in flight, each with its own atlas textures, so a
+/// frame's images stay valid for [slots] frames, until it renders into the
+/// same textures again.
 ///
-/// It accumulates coverage in [accumulationFormat], and follows it when the
-/// format probe changes it, unless it's made with a [_format] of its own.
+/// It accumulates coverage in [accumulationFormat], and switches format when
+/// the format probe changes it, unless it was created with its own
+/// [_format].
 class AtlasRenderer._(
   gpu.ShaderLibrary library,
   @override final int slots, [
@@ -518,16 +531,17 @@ class AtlasRenderer._(
   final ra.Renderer _renderer = ra.Renderer();
   ra.FrameBuffer _buffer = ra.FrameBuffer();
   final ra.SceneList _list = ra.SceneList();
-  // Per frame in flight, each page's target. Per page, its depth and
+  // Each page's target, per frame in flight, then each page's depth and
   // accumulation. Both lists have as many pages as [_sizes].
   final List<List<_PageTargets>> _slotPages;
   final List<SharedTargets> _shared = [];
   final AtlasPages _sizes = AtlasPages(maxPageSize);
   int _frames = 0;
 
-  // After a frame whose runs were placed as they ended: the page extents its
-  // runs would need, packed together. The next frame's pages grow to these
-  // first, as runs placed as they end go onto pages that already exist.
+  // After a frame in which runs were placed early, with
+  // [RasterizerRun.place]: the page extents its runs would need, packed
+  // together. The next frame's pages first grow to these, because runs placed
+  // early go onto pages that already exist.
   List<RasterizerPixelSize> _planned = const [];
 
   @override
@@ -608,8 +622,9 @@ class AtlasRenderer._(
   /// Whether to write each frame into a new, zeroed buffer, and upload it
   /// through a new staging buffer and data texture.
   ///
-  /// Reused ones hold an earlier frame's bytes past the frame's own. Fresh ones
-  /// check that the shaders read only what the core writes.
+  /// Reused buffers hold an earlier frame's bytes past the current frame's
+  /// own, so fresh ones check that the shaders read only what the core
+  /// writes.
   bool debugFreshFrameBuffers = false;
 
   /// For tests: the format of the first page's accumulation, or null before
@@ -667,12 +682,13 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   bool _curves = true, _rendered = false;
 
   // The margin around each entry's bounds, for miters and antialiasing, and
-  // the gap between parts in the atlas, so filtering never reads a
-  // neighbour.
+  // the gap between parts in the atlas, so that filtering never reads a
+  // neighboring part.
   static const _margin = 2, _gap = 1;
 
-  // For placing runs as they end: how many were placed, the sizes and images
-  // of the pages used so far, and the shelf being filled.
+  // For placing runs early: how many were placed, the sizes and images of
+  // the pages used so far, and the position and height of the shelf being
+  // filled.
   int _placedCount = 0;
   final List<RasterizerPixelSize> _placedSizes = [];
   final List<ui.Image> _placedImages = [];
@@ -682,8 +698,9 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   // transform (6 doubles: a b c d tx ty), its opacity, its color transform
   // (0, or 1 + its index in [_colorTransforms]) and its run's index. Then its
   // rectangle in the viewport (4 ints: lx ly ux uy): its bounds with the
-  // margin, rounded out and clipped to the viewport. Then the next of its
-  // run's entries with a rectangle, or -1, and its part, or -1.
+  // margin, rounded out and clipped to its run's clip within the viewport.
+  // Then the next of its run's entries that has a rectangle, or -1, and its
+  // part, or -1.
   final List<ra.Scene> _scenes = [];
   Float64List _ctms = Float64List(6 * 256);
   Float32List _opacities = Float32List(256);
@@ -698,7 +715,8 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   Int32List _parts = Int32List(7 * 64);
   int _partCount = 0;
 
-  // Groups a run's entries into parts, with its list of their ids.
+  // Groups a run's entries into parts, and the list of the entry ids that it
+  // groups.
   final AtlasParts _grouper = AtlasParts();
   final List<int> _groupIds = [];
 
@@ -820,7 +838,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     if (r.isEmpty) {
       return;
     }
-    // The bounds' corners through the transform, in the viewport.
+    // The box around the bounds' transformed corners, in the viewport.
     final x0 = a * r.left + c * r.top + tx, y0 = b * r.left + d * r.top + ty;
     final dxw = a * r.width,
         dyw = b * r.width,
@@ -842,7 +860,8 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     if (maxY > run._uy) {
       run._uy = maxY;
     }
-    // Its rectangle, clamped first, as huge bounds don't round to ints.
+    // The entry's rectangle. The box is clamped first, because huge values
+    // don't round to ints.
     if (!(minX.isFinite && minY.isFinite && maxX.isFinite && maxY.isFinite)) {
       return;
     }
@@ -894,7 +913,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     final List<RasterizerPixelSize> sizes;
     List<RasterizerPixelSize>? pageExtents;
     if (_placedCount == 0) {
-      // No run was placed as it ended: packs them all together, onto pages
+      // No run was placed early, so this packs them all together onto pages
       // sized to fit.
       final extents = pageExtents = _pack(assign: true);
       sizes = [
@@ -903,8 +922,8 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
       ];
       renderer._keepPages();
     } else {
-      // Some runs were placed as they ended, onto pages at their sizes when
-      // first used. Places the rest now.
+      // Some runs were placed early, onto pages that keep the size they had
+      // when first used. This places the rest now.
       for (final run in runs) {
         if (!run._placed) {
           _place(run);
@@ -952,7 +971,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
       run._setParts(images);
     }
     // What the runs needed, packed together, for AtlasPages.endFrame. When
-    // runs were placed as they ended, the next frame's pages grow to it too.
+    // runs were placed early, the next frame's pages also grow to it.
     final needs = pageExtents ?? (renderer._planned = _pack(assign: false));
     renderer._sizes.endFrame(_width, _height, needs);
     renderer._release();
@@ -1010,13 +1029,14 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
 
   /// Packs the runs' parts onto shelves, and returns the pages' extents.
   ///
-  /// Parts go in run order, each run's tallest first. When a page is full, a
-  /// new one starts. With [assign], it places the parts where it packs them.
+  /// A shelf is a row of parts, as tall as its tallest part. Parts go in run
+  /// order, each run's tallest first. When a page is full, a new one starts.
+  /// With [assign], it also places each part where it packs it.
   ///
-  /// A shelf is about as wide as the side of a square with the parts' area,
-  /// rounded up to [RasterizerRenderer.atlasStep], and at least as wide as the
-  /// widest part. So a page's area is about the parts', rather than as wide
-  /// as the viewport.
+  /// A shelf is about as wide as the side of a square with the parts' total
+  /// area, rounded up to [RasterizerRenderer.atlasStep], and at least as wide
+  /// as the widest part. So a page's area stays close to the parts' area,
+  /// instead of the page being as wide as the viewport.
   List<RasterizerPixelSize> _pack({required bool assign}) {
     final maxSize = maxPageSize;
     var area = 0, widest = 0;
@@ -1074,11 +1094,11 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
 
   /// Places [run]'s parts, tallest first, after the parts placed so far.
   ///
-  /// They go on the current page's shelves, as wide as the page, else on the
-  /// next page. Pages keep the sizes that [_begin] gave them from the last
-  /// frame's needs. A page that's new, or too small for a part, grows before
-  /// its first part goes on it. That's safe, as no image of the page has been
-  /// handed out yet this frame.
+  /// They go on the current page's shelves, which are as wide as the page, or
+  /// else on the next page. Pages keep the sizes that [_begin] gave them from
+  /// the last frame's needs. A new page, or one too small for the first part
+  /// that goes on it, grows before that part goes on. That's safe, because no
+  /// image of the page has been handed out yet this frame.
   void _place(AtlasRun run) {
     run._placed = true;
     _placedCount++;
@@ -1110,7 +1130,7 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
     run._setParts(_placedImages);
   }
 
-  /// Returns page [p]'s size this frame, fixed once the page is used.
+  /// Returns page [p]'s size this frame, which is fixed after its first use.
   ///
   /// When the frame first uses the page, this grows it to fit a [w] x [h]
   /// part, and hands out its image.
@@ -1119,9 +1139,9 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
       return _placedSizes[p];
     }
     final renderer = _renderer, sizes = renderer._sizes;
-    // A page that no earlier frame sized is at least the viewport's size, so
-    // a first frame's runs don't spread over many pages. It shrinks to what
-    // frames need once a window of them is done.
+    // A page that no earlier frame sized starts at least as large as the
+    // viewport, so a first frame's runs don't spread over many pages. It
+    // shrinks to what frames need at the end of a window ([AtlasPages]).
     final size = p == sizes.length
         ? sizes.fit(p, w > _width ? w : _width, h > _height ? h : _height)
         : sizes.fit(p, w, h);
@@ -1142,13 +1162,14 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   }
 
   /// Writes the entries of the parts on [page] as RaListEntry structs, and
-  /// sets them as the list's, along with the color transforms' matrices.
+  /// sets them as the list's entries, along with the color transforms'
+  /// matrices.
   ///
-  /// The page's texture is [textureHeight] high. Each entry's transform is
-  /// followed by its part's move from the viewport to its atlas rectangle, in
-  /// the core's device space, where y is up:
+  /// The page's texture is [textureHeight] pixels high. Each entry's
+  /// transform is followed by the move of its part from the viewport to the
+  /// part's atlas rectangle, in the core's device space, where y points up:
   /// x' = x - vx + ax, y' = textureHeight - (y - vy + ay). The entry's device
-  /// clip is that rectangle.
+  /// clip is that atlas rectangle.
   void _writeEntries(int page, int textureHeight) {
     final count = _scenes.length;
     if (count > _nativeCapacity) {
@@ -1238,9 +1259,9 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   /// Returns the transform the core draws entry [i] with, and its device clip,
   /// as the last [render] wrote them, rounded to floats.
   ///
-  /// The transform is a b c d tx ty in device space, and the clip lx ly ux uy.
-  /// Null before [render], or for an entry in no part. For tools that render
-  /// the same list natively.
+  /// The transform is a b c d tx ty in device space, and the clip is lx ly ux
+  /// uy. Returns null before [render], or for an entry that's in no placed
+  /// part. Tools use this to render the same list natively.
   ({List<double> transform, List<double> clip})? coreEntry(int i) {
     final q = _entryParts[i];
     if (!_rendered || q < 0 || _parts[7 * q] < 0) {
@@ -1301,13 +1322,14 @@ class AtlasFrame._(final AtlasRenderer _renderer) implements RasterizerFrame {
   }
 }
 
-/// A run of the GPU renderer, drawn as images, from its parts' rectangles in
-/// the frame's atlas pages.
+/// A run of the GPU renderer, drawn as images of its parts' rectangles in the
+/// frame's atlas pages.
 class AtlasRun._(final AtlasFrame _frame, @override final int index)
     extends ImageRun {
-  // Its entries' bounds in the viewport, the pixels its clip leaves it, with
-  // the margin, its first and last entries with a rectangle, or -1, and once
-  // grouped, the range of its parts among the frame's.
+  // Its entries' bounds in the viewport, and the viewport pixels that its
+  // clip, widened by the margin, leaves it. Its first and last entries that
+  // have a rectangle, or -1. After grouping, the range of its parts among the
+  // frame's.
   double _lx = double.infinity,
       _ly = double.infinity,
       _ux = double.negativeInfinity,
@@ -1378,10 +1400,11 @@ class AtlasRun._(final AtlasFrame _frame, @override final int index)
     RasterizerColorTransform? colorTransform,
   }) => _frame._add(this, scene, a, b, c, d, tx, ty, opacity, colorTransform);
 
-  /// Adds [scene] as [add] does, for affine transforms only: g and h must be
-  /// 0.
+  /// Adds [scene] as [add] does, for affine transforms only: [g] and [h] must
+  /// be 0.
   ///
-  /// w is then the constant i, which divides the rest.
+  /// The w coordinate is then the constant [i], which divides the other
+  /// terms.
   @override
   void addProjective(
     RasterizerScene scene,
@@ -1402,8 +1425,8 @@ class AtlasRun._(final AtlasFrame _frame, @override final int index)
         'The GPU renderer only draws affine transforms: g and h must be 0',
       );
     }
-    // Where w isn't positive, the whole scene is behind the eye. Added with
-    // no opacity, it's still checked, but not drawn.
+    // When w isn't positive, the whole scene is behind the eye. Adding it
+    // with zero opacity still checks it, but doesn't draw it.
     final s = 1 / i;
     _frame._add(
       this,
@@ -1420,21 +1443,22 @@ class AtlasRun._(final AtlasFrame _frame, @override final int index)
   }
 }
 
-/// A frame in flight's textures for one atlas page, and the image of its
-/// target.
+/// The textures of one atlas page for one frame in flight, and the image of
+/// its target.
 class _PageTargets() {
   final RenderTargets targets = RenderTargets();
   gpu.Texture? _texture;
   ui.Image? _image;
 
-  /// Returns the image of [texture], making it again only when the texture
+  /// Returns the image of [texture], creating a new one only when the texture
   /// changed.
   ui.Image image(gpu.Texture texture) {
     if (!identical(texture, _texture)) {
       _texture = texture;
-      // The replaced image was this page's in the last frame of this frame in
-      // flight, slots frames ago. RasterizerRunPart.image is valid only until
-      // now. A picture that drew it keeps its own reference.
+      // The replaced image is the one this page had `slots` frames ago, the
+      // last time this frame-in-flight slot rendered. RasterizerRunPart.image
+      // is valid only until this point. A picture that drew it keeps its own
+      // reference.
       _image?.dispose();
       _image = texture.asImage();
     }

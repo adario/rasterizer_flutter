@@ -8,7 +8,7 @@ import 'svg_paths.dart';
 // multiplied into the paints' colors.
 //
 // Based on the file of the same name that this package's author wrote for
-// flame_svg, along with SvgPaths. Flame didn't merge it.
+// flame_svg along with SvgPaths, which Flame didn't merge.
 
 /// Returns [color] as a dart:ui color, with [opacity] multiplied into its
 /// alpha.
@@ -85,10 +85,10 @@ extension GradientConverter on Gradient {
   /// Returns this gradient as a dart:ui one, with [opacity] multiplied into its
   /// colors.
   ///
-  /// Returns null if it has no colors, as SVG then paints nothing with it, or
-  /// if it's neither linear nor radial. Its bounds must already be applied, as
-  /// in parsed [VectorInstructions]: its [Gradient.unitMode] is then
-  /// [GradientUnitMode.transformed].
+  /// Returns null if it has no colors, since SVG then paints nothing with it,
+  /// or if it's neither linear nor radial. Its bounds must already be applied,
+  /// as they are in parsed [VectorInstructions], where its [Gradient.unitMode]
+  /// is [GradientUnitMode.transformed].
   ui.Gradient? toUiGradient([double opacity = 1]) {
     assert(
       unitMode == null || unitMode == GradientUnitMode.transformed,
@@ -142,9 +142,9 @@ extension PaintConverter on Paint {
   /// Returns this paint's stroke as a dart:ui paint, with [opacity] multiplied
   /// into its color.
   ///
-  /// Returns null if the stroke paints nothing: if there's none, if its width
-  /// is 0, or if its gradient has no colors. A stroke with no width, or a
-  /// negative one, gets SVG's default width, 1.
+  /// Returns null if the stroke paints nothing: if there's no stroke, if its
+  /// width is 0, or if its gradient has no colors. A stroke with no width, or
+  /// a negative one, gets SVG's default width, 1.
   ui.Paint? toStrokedUiPaint([double opacity = 1]) {
     final s = stroke;
     final w = s?.width;
@@ -162,8 +162,8 @@ extension PaintConverter on Paint {
       ..strokeWidth = width
       ..color = _color(s.color, shader == null ? opacity : 1)
       ..shader = shader;
-    // With no miter limit, the paint keeps the engine's default. Setting the
-    // value that dart:ui's getter reads back would change it (miterLimitOf).
+    // Without a miter limit, the paint keeps the engine's default. Setting the
+    // value that dart:ui's getter returns would change it (see miterLimitOf).
     final m = s.miterLimit;
     if (m != null) {
       p.strokeMiterLimit = m;
@@ -182,7 +182,7 @@ extension PaintConverter on Paint {
   /// Returns this paint's fill as a dart:ui paint, with [opacity] multiplied
   /// into its color.
   ///
-  /// Returns null if the fill paints nothing: if there's none, or if its
+  /// Returns null if the fill paints nothing: if there's no fill, or if its
   /// gradient has no colors.
   ui.Paint? toFilledUiPaint([double opacity = 1]) {
     final f = fill;
@@ -225,9 +225,10 @@ extension PathConverter on Path {
 
   /// Whether any of this path's contours encloses an area.
   ///
-  /// That is, whether a contour's points, its curves' control points included,
-  /// aren't all on one line. In SVG, a fill of a path with no area paints
-  /// nothing. A canvas, on Skia and Impeller, paints a hairline instead.
+  /// That is, whether the points of any contour, including its curves'
+  /// control points, aren't all on one line. In SVG, a fill of a path with no
+  /// area paints nothing. A canvas, on Skia and Impeller, paints a hairline
+  /// instead.
   bool get hasArea {
     double x0 = 0, y0 = 0, dx = 0, dy = 0;
     var direction = false;

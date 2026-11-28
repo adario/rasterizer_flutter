@@ -1,8 +1,8 @@
-// Bindings for src/ra_capi.h, written by hand. The structs mirror the C ones.
-// In C, static_asserts check those against the core's types.
+// Hand-written bindings for src/ra_capi.h. The structs mirror the C structs,
+// and static_asserts in C check those against the core's types.
 // ignore_for_file: non_constant_identifier_names
 // The Opaque and Struct subclasses mirror C types, and Dart never constructs
-// them. So they keep their plain declarations.
+// them, so they keep plain declarations instead of primary constructors.
 // ignore_for_file: use_primary_constructors
 
 import 'dart:ffi';
@@ -187,7 +187,7 @@ external RaBounds ra_list_bounds(Pointer<RaListHandle> list);
 /// Sets the list's color matrices, which the next entries refer to.
 ///
 /// [matrices] holds [count] 4 x 4 matrices, 16 floats each. An entry picks
-/// one at [listEntryColorMatrix].
+/// one with its color matrix field, at offset [listEntryColorMatrix].
 @Native<Void Function(Pointer<RaListHandle>, Pointer<Float>, Uint64)>(
   isLeaf: true,
 )
@@ -200,9 +200,9 @@ external void ra_list_set_color_matrices(
 /// Replaces the list's scenes with [entries], in order.
 ///
 /// [entries] holds [count] RaListEntry structs of [listEntrySize] bytes each.
-/// Each one holds a scene pointer, a RaTransform and a RaBounds, the clip in
-/// device pixels. Then come a float opacity and a uint32 color matrix: 0 for
-/// none, or 1 + the matrix's index in the list's color matrices.
+/// Each one holds a scene pointer, a RaTransform, a RaBounds clip in device
+/// pixels, a float opacity and a uint32 color matrix. The color matrix is 0
+/// for none, or 1 + the matrix's index in the list's color matrices.
 @Native<Void Function(Pointer<RaListHandle>, Pointer<Uint8>, Uint64)>(
   isLeaf: true,
 )
@@ -293,8 +293,8 @@ final class RaMeshData extends Struct {
   @Uint64()
   external int pathCount;
 
-  /// The gradients' RaMeshStop structs: 5 floats each, an offset, then r, g,
-  /// b and a.
+  /// The gradients' stops, as RaMeshStop structs of 5 floats each: an offset,
+  /// then r, g, b and a.
   external Pointer<Float> stops;
   @Uint64()
   external int stopCount;

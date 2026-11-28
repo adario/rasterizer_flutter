@@ -14,7 +14,7 @@ PixelRect viewportClip(ui.Rect? clip, int width, int height, int margin) {
   if (!(clip.left <= clip.right && clip.top <= clip.bottom)) {
     return (left: 0, top: 0, right: 0, bottom: 0);
   }
-  // Clamped first, as huge values don't round to ints.
+  // Clamp first, because huge values don't round to ints.
   final w = width.toDouble(), h = height.toDouble();
   return (
     left: (clip.left.clamp(0.0, w).floor() - margin).clamp(0, width),

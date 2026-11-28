@@ -1,9 +1,10 @@
-/// The core's affine transforms and bounds, written in Dart for core.dart.
+/// Dart versions of the core's affine transforms and bounds, for core.dart.
 ///
-/// They match the C++ core's `Ra::Transform` and `Ra::Bounds`, without FFI.
+/// They match the C++ core's `Ra::Transform` and `Ra::Bounds` without going
+/// through FFI.
 library;
 
-/// An affine transform, as the core's `Ra::Transform`.
+/// An affine transform, like the core's `Ra::Transform`.
 ///
 /// It maps (x, y) to (a * x + c * y + tx, b * x + d * y + ty).
 class const Transform(
@@ -34,7 +35,7 @@ class const Transform(
   String toString() => 'Transform($a, $b, $c, $d, $tx, $ty)';
 }
 
-/// Axis-aligned bounds, as the core's `Ra::Bounds`.
+/// Axis-aligned bounds, like the core's `Ra::Bounds`.
 class const Bounds(
   final double lx,
   final double ly,

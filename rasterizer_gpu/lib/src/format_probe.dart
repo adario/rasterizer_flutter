@@ -10,10 +10,10 @@ import 'dart:typed_data';
 /// A change here needs the same change there, which
 /// `test/probe_scene_test.dart` checks.
 ///
-/// Drawn by the GPU renderer, its paths make each kind of entry that the core
-/// writes for SVGs: opaques (the opaque paths' inner cells), instances, fast
-/// and quad edges, and fast and quad molecules (the small paths). Back to
-/// front:
+/// When the GPU renderer draws it, its paths produce each kind of entry that
+/// the core writes for SVGs: opaques (the inner cells of opaque paths),
+/// instances, fast and quad edges, and fast and quad molecules (from the
+/// small paths). From back to front:
 /// - A: a red rectangle, opaque.
 /// - B: a blue circle at half opacity, over A, so instances blend over
 ///   opaques.
@@ -22,7 +22,8 @@ import 'dart:typed_data';
 /// - D: a magenta ring, opaque. Two concentric circles, filled even-odd, leave
 ///   its hole empty.
 /// - E: a yellow disc at half opacity. Two concentric circles in the same
-///   direction, filled non-zero, wind its middle twice, which must draw once.
+///   direction, filled non-zero, wind its middle twice, which must still
+///   draw once.
 /// - F and G: a small cyan square, and a small orange circle at 80% opacity.
 ///   They make molecules.
 const probeSvg = '''
@@ -57,7 +58,7 @@ const _Colour _red = (red: 255, green: 0, blue: 0, alpha: 255),
 /// The pixels to check, each with the paths over it, back to front.
 ///
 /// Each one lies at least 3 pixels from every path's edge, so its colour is
-/// exact, but for rounding. Some still lie near an edge, in the cells where
+/// exact except for rounding. Some still lie near an edge, in the cells where
 /// that edge's coverage accumulates.
 const List<({int x, int y, List<_Colour> layers})> _probes = [
   (x: 4, y: 4, layers: []),
@@ -89,14 +90,14 @@ Iterable<({int x, int y})> get probePixels =>
 /// for the rounding of alpha and of blending to 8 bits.
 const _tolerance = 3;
 
-/// Checks the scene's render, premultiplied, over transparent.
+/// Checks the scene's rendered pixels, premultiplied, over transparent.
 ///
 /// [rect] is the part of the scene in [rgba], in the scene's pixels. It lies
 /// at [x0], [y0] in [rgba], which has [stride] bytes per row. The scene's
 /// pixels outside [rect] count as transparent.
 ///
-/// Returns null if every probe matches, else a description of the first that
-/// doesn't.
+/// Returns null if every probe matches, or else a description of the first
+/// one that doesn't.
 String? checkProbePixels(
   Uint8List rgba,
   int stride,

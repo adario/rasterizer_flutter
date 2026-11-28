@@ -1,24 +1,29 @@
 /// Renders SVG scenes with one of three renderers ([RasterizerBackend]).
 ///
-/// - The GPU renderer uses Rasterizer's core and Flutter GPU. It works where
-///   Impeller gives Flutter GPU a Metal or Vulkan context, and an OpenGL ES
-///   one while [RasterizerGpu.allowOpenGles] is on, as it is by default. Its
-///   support is then [RasterizerSupport.supported]. Once per frame, it
-///   renders all of the frame's runs ([RasterizerRun]) into one atlas image.
-///   It then draws each run from its rectangle with
-///   [ui.Canvas.drawImageRect], at the run's place in the app's paint order.
-/// - The canvas renderer is the fallback everywhere else. It parses scenes in
-///   Dart, and each run draws its scenes' paths with [ui.Canvas.drawPath],
-///   straight into the canvas it's drawn into. It works wherever Flutter
-///   does, web included.
-/// - The mesh renderer is made for games. It imports each SVG once into
-///   triangles, which stay in GPU buffers. It renders each run with Flutter
-///   GPU into an image of its own, then draws it as the GPU renderer does. It
-///   works where the GPU renderer does. Scenes and renderers made with
-///   `gpu: RasterizerBackend.mesh` use it where it's supported, else the
-///   canvas renderer.
+/// Each frame holds runs ([RasterizerRun]). A run is a group of entries,
+/// each a scene ([RasterizerScene]) with a transform, that's drawn as one
+/// unit at one place in the app's paint order.
 ///
-/// They have the same API:
+/// - The GPU renderer uses Rasterizer's native core and Flutter GPU. It
+///   works where Impeller gives Flutter GPU a Metal or Vulkan context, or an
+///   OpenGL ES context while [RasterizerGpu.allowOpenGles] is on (the
+///   default). There, its support is [RasterizerSupport.supported]. Once per
+///   frame, it renders all of the frame's runs into an atlas: a few large
+///   textures, called pages, that it packs the runs' rectangles into. It
+///   then draws each run from its rectangles with [ui.Canvas.drawImageRect],
+///   at the run's place in the app's paint order.
+/// - The canvas renderer is the fallback everywhere else. It parses scenes in
+///   Dart, and each run draws its scenes' paths with [ui.Canvas.drawPath]
+///   directly into the canvas that the run is drawn into. It works wherever
+///   Flutter does, including on the web.
+/// - The mesh renderer is made for games. It imports each SVG once, turning
+///   it into triangles that stay in GPU buffers. It renders each run with
+///   Flutter GPU into its own image, then draws that image as the GPU
+///   renderer does. It works wherever the GPU renderer does. Scenes and
+///   renderers created with `gpu: RasterizerBackend.mesh` use it where it's
+///   supported, and the canvas renderer elsewhere.
+///
+/// All three have the same API:
 ///
 /// ```dart
 /// final frame = renderer.beginFrame(widthPx, heightPx);
@@ -48,16 +53,17 @@ enum RasterizerSupport() {
   /// It can render here.
   supported,
 
-  /// The platform isn't macOS, iOS, 64-bit Android, Linux or Windows, as with
-  /// 32-bit Android or web.
+  /// The platform isn't macOS, iOS, 64-bit Android, Linux or Windows, as is
+  /// the case on 32-bit Android or the web.
   unsupportedPlatform,
 
   /// Flutter renders with Skia, not Impeller.
   noImpeller,
 
-  /// Impeller doesn't give Flutter GPU a context, as it isn't turned on.
+  /// Impeller doesn't give Flutter GPU a context, because Flutter GPU isn't
+  /// turned on.
   ///
-  /// These turn it on:
+  /// To turn it on, set:
   /// - on iOS and macOS, `FLTEnableFlutterGPU` in Info.plist.
   /// - on Android, `io.flutter.embedding.android.EnableFlutterGPU` in the
   ///   manifest. This package's manifest sets it.
@@ -68,21 +74,21 @@ enum RasterizerSupport() {
   /// Impeller renders with OpenGL ES, and [RasterizerGpu.allowOpenGles] is
   /// off.
   ///
-  /// Android falls back to OpenGL ES without Vulkan, and on devices whose
-  /// Vulkan driver Flutter blocks, such as the emulator's. Linux always uses
-  /// it.
+  /// Android falls back to OpenGL ES on devices without Vulkan, and on
+  /// devices whose Vulkan driver Flutter blocks, such as the emulator's.
+  /// Linux always uses OpenGL ES.
   ///
-  /// `io.flutter.embedding.android.ImpellerBackend` set to `vulkan` in the
-  /// app's Android manifest asks for Vulkan anyway. Only debug and profile
-  /// builds read it: release builds ignore it.
+  /// Setting `io.flutter.embedding.android.ImpellerBackend` to `vulkan` in
+  /// the app's Android manifest asks for Vulkan anyway. Only debug and
+  /// profile builds read this setting; release builds ignore it.
   openGles,
 
-  /// Impeller renders with OpenGL ES, but can't make textures 4096 pixels
-  /// wide, as both GPU renderers need. OpenGL ES only guarantees 2048.
+  /// Impeller renders with OpenGL ES, but can't make the 4096-pixel-wide
+  /// textures that both GPU renderers need. OpenGL ES only guarantees 2048.
   smallTextures,
 
-  /// Impeller renders with OpenGL ES, and a renderer made for it didn't
-  /// finish compiling its pipelines within [RasterizerGpu.warmUpTimeout], so
+  /// Impeller renders with OpenGL ES, and a GPU renderer didn't finish
+  /// compiling its pipelines within [RasterizerGpu.warmUpTimeout], so
   /// [RasterizerRenderer.create] made the canvas renderer instead.
   warmUpTimeout,
 }
@@ -105,25 +111,26 @@ enum RasterizerBackend() {
   /// The mesh renderer, made for games.
   ///
   /// NanoSVG parses each SVG once. The renderer flattens its curves for the
-  /// largest size it draws the SVG at, and libtess2 turns its fills and
+  /// largest size it will draw the SVG at, and libtess2 turns its fills and
   /// stroke outlines into triangles, which stay in GPU buffers. Each frame
-  /// then only writes its entries' transforms, and renders each run into an
-  /// image of its own.
+  /// then only writes its entries' transforms and renders each run into its
+  /// own image.
   ///
   /// The images are 4× multisampled where Flutter GPU supports offscreen
-  /// MSAA, else aliased. With [RasterizerRenderer.create]'s `meshSamples` of
-  /// 1, they're aliased everywhere. As with the other renderers, it ignores an
-  /// SVG's clip paths.
+  /// MSAA, and aliased elsewhere. With `meshSamples: 1` in
+  /// [RasterizerRenderer.create], they're aliased everywhere. Like the other
+  /// renderers, it ignores an SVG's clip paths.
   ///
   /// It works only where `RasterizerGpu.of(RasterizerBackend.mesh).support`
-  /// is [RasterizerSupport.supported]: where the GPU renderer's is.
+  /// is [RasterizerSupport.supported], which is wherever the GPU renderer's
+  /// support is too.
   mesh,
 }
 
-/// The GPU renderers' support, and the options that all renderers share.
+/// The GPU renderers' support and the options that all renderers share.
 ///
-/// Each GPU renderer has its own state, from [of]. Members that share a name
-/// with one of [RasterizerGpuBackend]'s are the GPU renderer's,
+/// [of] returns each GPU renderer's own state. Members named like members of
+/// [RasterizerGpuBackend] give the state of the GPU renderer,
 /// [RasterizerBackend.gpu].
 abstract final class RasterizerGpu() {
   /// Returns the state of the GPU renderer [gpu]: [RasterizerBackend.gpu] or
@@ -143,10 +150,10 @@ abstract final class RasterizerGpu() {
   static final _gpu = RasterizerGpuBackend._(RasterizerBackend.gpu);
   static final _mesh = RasterizerGpuBackend._(RasterizerBackend.mesh);
 
-  /// Whether Flutter GPU can render here, which both GPU renderers need.
+  /// Whether Flutter GPU can render here, as both GPU renderers need.
   ///
-  /// It's checked once. Off Impeller, getting Flutter GPU's context throws, so
-  /// the check looks at whether Impeller is on first.
+  /// It's checked once. Without Impeller, getting Flutter GPU's context
+  /// throws, so the check first looks at whether Impeller is on.
   static RasterizerSupport get _context =>
       _contextSupport ??= native.checkSupport(debugCheckedTextureWidth);
   static RasterizerSupport? _contextSupport;
@@ -158,43 +165,47 @@ abstract final class RasterizerGpu() {
   static String? get supportDetail => _gpu.supportDetail;
 
   /// Whether Impeller renders with OpenGL ES, whether or not the GPU renderers
-  /// do.
+  /// draw there ([allowOpenGles]).
   static bool get openGles {
     _context;
     return native.openGles;
   }
 
-  /// Lets the GPU renderers draw on OpenGL ES.
+  /// Whether the GPU renderers may draw on OpenGL ES.
   ///
-  /// It's on by default. They then draw there from the first frame, as on
-  /// Metal and Vulkan, but for two steps:
-  /// - each renderer compiles its pipelines as it's made, which stalls the UI
-  ///   thread, then the raster thread. [RasterizerRenderer.create] completes
-  ///   once both are done, so the first frame doesn't pay for them, and an
-  ///   app can show a loader meanwhile. In release builds with no shader
-  ///   cache, on Mesa's llvmpipe, the GPU renderer's took about 0.55 s and
-  ///   0.15 s, and the mesh renderer's 0.23 s and 0.87 s. On the Android
-  ///   emulator, they took about 0.1 s and 50-90 ms, and 60 ms and 30 ms.
-  /// - the first GPU renderer made starts a format probe, which checks that it
-  ///   draws right while accumulating coverage in r32Float. Where it doesn't,
-  ///   the renderer accumulates in r16g16b16a16Float instead: at once where
-  ///   r32Float textures can't be made, else once the probe has read its
-  ///   pixels back, so its first frames may be wrong. The probe then checks
-  ///   r16g16b16a16Float too. [RasterizerGpuBackend.supportDetail] says what
-  ///   the probe found.
+  /// It's on by default. The GPU renderers then draw on OpenGL ES from the
+  /// first frame, as on Metal and Vulkan, except for two extra steps:
+  /// - Each renderer compiles its pipelines when it's created, which stalls
+  ///   the UI thread and then the raster thread. [RasterizerRenderer.create]
+  ///   completes after both are done, so the first frame doesn't pay for
+  ///   them, and an app can show a loader meanwhile. In release builds with
+  ///   no shader cache on Mesa's llvmpipe, this took about 0.55 s on the UI
+  ///   thread and 0.15 s on the raster thread for the GPU renderer, and
+  ///   0.23 s and 0.87 s for the mesh renderer. On the Android emulator, it
+  ///   took about 0.1 s and 50-90 ms, and 60 ms and 30 ms.
+  /// - The first [RasterizerBackend.gpu] renderer created starts a format
+  ///   probe. The probe checks that the renderer draws correctly while
+  ///   accumulating coverage in r32Float. Where it doesn't, the renderer
+  ///   accumulates in r16g16b16a16Float instead. It switches at once where
+  ///   r32Float textures can't be made, and otherwise after the probe has
+  ///   read its pixels back, so its first frames may be wrong. The probe then
+  ///   checks r16g16b16a16Float too. [RasterizerGpuBackend.supportDetail]
+  ///   says what the probe found. The mesh renderer runs no probe.
   ///
   /// Support checks one more thing: that textures can be 4096 pixels wide, as
   /// the GPU renderers need. OpenGL ES only guarantees 2048. Where they can't,
   /// support is [RasterizerSupport.smallTextures], and the canvas renderer
-  /// draws. Nothing else is checked. A driver that draws wrongly, in either
-  /// format, draws wrongly, with no fallback to the canvas renderer, and one
-  /// that crashes crashes the app. One that never finishes compiling the
-  /// pipelines falls back to the canvas renderer after [warmUpTimeout],
-  /// unless it holds the UI thread meanwhile.
-  /// Both GPU renderers have only been tried on the Android emulator's OpenGL
-  /// ES and on Mesa's llvmpipe on Linux, not on a device's own driver. Turn it
-  /// off to draw with the canvas renderer on OpenGL ES. Scenes and renderers
-  /// read it as they're made, so set it before.
+  /// draws. Nothing else is checked. If a driver draws wrongly in both
+  /// formats, the renderer keeps drawing wrongly, with no fallback to the
+  /// canvas renderer, and a driver that crashes crashes the app. A driver
+  /// that never finishes compiling the pipelines falls back to the canvas
+  /// renderer after [warmUpTimeout], unless it blocks the UI thread
+  /// meanwhile.
+  ///
+  /// Both GPU renderers have only been tested on the Android emulator's
+  /// OpenGL ES and on Mesa's llvmpipe on Linux, not on a device's own driver.
+  /// Turn this off to draw with the canvas renderer on OpenGL ES. Scenes and
+  /// renderers read it when they're created, so set it before creating them.
   static bool allowOpenGles = true;
 
   /// How long [RasterizerRenderer.create] waits for a GPU renderer to compile
@@ -206,23 +217,24 @@ abstract final class RasterizerGpu() {
 
   /// For tests: what the format probe treats as failing.
   ///
-  /// It holds accumulation formats, by Flutter GPU's PixelFormat names, such
-  /// as `r32Float`. A format in it fails at once. One followed by ` pixels`,
-  /// such as `r32Float pixels`, fails once its pixels are read back, as a
-  /// driver that draws it wrongly does.
+  /// It holds accumulation formats by their Flutter GPU `PixelFormat` names,
+  /// such as `r32Float`. A listed format fails at once. A format followed by
+  /// ` pixels`, such as `r32Float pixels`, fails after its pixels are read
+  /// back, as with a driver that draws it wrongly.
   @visibleForTesting
   static Set<String> debugFailFormatProbe = {};
 
-  /// For tests: how wide a texture support checks that Flutter GPU can make
-  /// on OpenGL ES.
+  /// For tests: the texture width that the support check makes sure Flutter
+  /// GPU can create on OpenGL ES.
   ///
-  /// It's 4096, the widest the GPU renderers' textures get there. Wider than
-  /// the device allows, support is [RasterizerSupport.smallTextures].
+  /// It's 4096 by default, the widest that the GPU renderers' textures get
+  /// there. When it's wider than the device allows, support is
+  /// [RasterizerSupport.smallTextures].
   @visibleForTesting
   static int debugCheckedTextureWidth = 4096;
 
-  /// For tests: the OpenGL ES format probe that the first GPU renderer made
-  /// started, if any.
+  /// For tests: the OpenGL ES format probe that the first
+  /// [RasterizerBackend.gpu] renderer started, if any.
   ///
   /// It completes with the probe's failure, or null if it passed.
   @visibleForTesting
@@ -238,10 +250,11 @@ abstract final class RasterizerGpu() {
     native.resetFormatProbe();
   }
 
-  /// For tests: runs the format probe on its own wherever the GPU renderer is
-  /// supported, Metal and Vulkan included, without changing its format.
+  /// For tests: runs the format probe by itself wherever the GPU renderer is
+  /// supported, including on Metal and Vulkan, without changing the
+  /// renderer's format.
   ///
-  /// Returns null if it passed, else why it didn't.
+  /// Returns null if it passed, or else why it failed.
   @visibleForTesting
   static Future<String?> debugProbeFormat() =>
       native.debugProbeFormat(debugFailFormatProbe);
@@ -258,8 +271,8 @@ abstract final class RasterizerGpu() {
   /// Whether the canvas renderer draws each scene as a [ui.Picture] of its
   /// paths, recorded once, rather than drawing its paths each time.
   ///
-  /// In a benchmark, pictures halved the UI thread's time, for about the same
-  /// raster time.
+  /// In a benchmark, pictures halved the UI thread's time and left the raster
+  /// time about the same.
   static bool canvasPictures = true;
 
   /// The GPU renderers' shaders, which hook/build.dart builds and pubspec.yaml
@@ -271,10 +284,10 @@ abstract final class RasterizerGpu() {
 /// One of the GPU renderers, [RasterizerBackend.gpu] or
 /// [RasterizerBackend.mesh], from [RasterizerGpu.of].
 ///
-/// It tells whether the renderer can render here. Scenes and renderers made
-/// with it as their `gpu` and no backend ([RasterizerScene.fromSvg],
-/// [RasterizerRenderer.create]) use it where it's supported, else the canvas
-/// renderer.
+/// It tells whether that renderer can render here. Scenes and renderers
+/// created with it as their `gpu` and no `backend` ([RasterizerScene.fromSvg],
+/// [RasterizerRenderer.create]) use it where it's supported, and the canvas
+/// renderer elsewhere.
 final class RasterizerGpuBackend._(
   /// Which GPU renderer it is.
   final RasterizerBackend gpu,
@@ -282,9 +295,9 @@ final class RasterizerGpuBackend._(
   /// Whether it can render here.
   ///
   /// On OpenGL ES, it's [RasterizerSupport.supported] while
-  /// [RasterizerGpu.allowOpenGles] is on, else [RasterizerSupport.openGles],
-  /// or [RasterizerSupport.warmUpTimeout] once a renderer made for it timed
-  /// out.
+  /// [RasterizerGpu.allowOpenGles] is on, and [RasterizerSupport.openGles]
+  /// otherwise. It becomes [RasterizerSupport.warmUpTimeout] after a renderer
+  /// of this kind timed out while compiling its pipelines.
   RasterizerSupport get support {
     final context = RasterizerGpu._context;
     if (context != RasterizerSupport.openGles || !RasterizerGpu.allowOpenGles) {
@@ -295,7 +308,7 @@ final class RasterizerGpuBackend._(
         : RasterizerSupport.warmUpTimeout;
   }
 
-  /// The [RasterizerGpu.warmUpTimeout] that a renderer made for it exceeded,
+  /// The [RasterizerGpu.warmUpTimeout] that a renderer of this kind exceeded,
   /// if any.
   Duration? _timedOut;
 
@@ -303,10 +316,12 @@ final class RasterizerGpuBackend._(
   ///
   /// It's Flutter GPU's error when [support] is
   /// [RasterizerSupport.noFlutterGpu] or [RasterizerSupport.smallTextures].
-  /// On OpenGL ES, it says how the renderer draws there: for the GPU
-  /// renderer, the format it accumulates coverage in and what the format probe
-  /// found ([RasterizerGpu.allowOpenGles]), and for the mesh renderer, whether
-  /// its targets are multisampled.
+  /// On OpenGL ES, it says how the renderer draws there. For the GPU
+  /// renderer, that's the format it accumulates coverage in and what the
+  /// format probe found ([RasterizerGpu.allowOpenGles]). For the mesh
+  /// renderer, it's whether its targets are multisampled. It also says when
+  /// [RasterizerGpu.allowOpenGles] is off or the pipelines timed out.
+  /// Otherwise it's null.
   String? get supportDetail => switch (RasterizerGpu._context) {
     RasterizerSupport.noFlutterGpu ||
     RasterizerSupport.smallTextures => native.contextError,
@@ -323,7 +338,8 @@ final class RasterizerGpuBackend._(
     _ => null,
   };
 
-  /// The backend that scenes and renderers made for it without one use.
+  /// The backend that scenes and renderers use when they're created with
+  /// this as their `gpu` and no `backend`.
   ///
   /// It's this renderer where it's supported, unless
   /// [RasterizerGpu.forceCanvas] is set. Otherwise it's the canvas renderer.
@@ -336,7 +352,7 @@ final class RasterizerGpuBackend._(
 /// An SVG's outline, for hitboxes: its paths as one [ui.Path].
 ///
 /// It parses the SVG in Dart, as the canvas renderer does, whatever the
-/// backend, and ignores clips, as the renderers do.
+/// backend. Like the renderers, it ignores clips.
 class SvgOutline._(
   /// The SVG's paths, in its coordinates, x right and y down.
   ///
@@ -349,7 +365,7 @@ class SvgOutline._(
   /// It's the same as its scenes' [RasterizerSceneRect.rect].
   final ui.Rect rect,
 ) {
-  /// Parses an SVG's bytes.
+  /// Creates an outline by parsing an SVG's bytes.
   ///
   /// Throws [ArgumentError] if it can't parse them.
   factory SvgOutline.fromSvg(Uint8List bytes) {
@@ -386,29 +402,31 @@ class SvgOutline._(
   }
 }
 
-/// A neon tube's glow around the paths of a [RasterizerScene.fromPaths].
+/// A glow like a neon tube's around the paths of a scene from
+/// [RasterizerScene.fromPaths] or [RasterizerScene.fromPolygons].
 ///
 /// Only the mesh renderer draws it. The GPU and canvas renderers draw the
 /// same paths without it.
 ///
-/// Each path gets a halo under all of its draws, which fades out from the
-/// path's edge to the halo's own. If one of the path's draws strokes it, the
-/// halo spreads on both sides of its polylines. Otherwise it spreads outward
-/// from each contour, so the fill hides a hole's halo. Halos that
-/// overlap add up, within a path as between entries. A halo is light: it
-/// covers what's under it as much as its color's strongest channel. So a
-/// black halo, or one tinted to black, leaves nothing.
+/// Each path gets a halo under all of its draws. The halo fades out from the
+/// path's edge to its own outer edge. If one of the path's draws strokes the
+/// path, the halo spreads on both sides of its polylines. Otherwise, it
+/// spreads outward from each contour, so the fill hides the halo of a hole.
+/// Overlapping halos add up, both within a path and between entries. A halo
+/// adds light: it covers what's under it only as much as its color's
+/// strongest channel. So a black halo, or one tinted to black, is invisible.
 ///
-/// Each stroke also gets a core over it, which turns near white down its
-/// middle and keeps the stroke's color at its edges. Strokes under some 2.7
-/// pixels wide get no core. With [RasterizerGlow.widths], fills get a core
-/// too.
+/// Each stroke also gets a core drawn over it, which turns nearly white along
+/// its middle and keeps the stroke's color at its edges. Strokes narrower
+/// than about 2.7 pixels get no core. With [RasterizerGlow.widths], fills get
+/// a core too.
 ///
-/// Halos and cores are triangles made at import, and drawn with the scene. So
-/// a glow takes no layer or pass per path, and an entry's opacity and color
-/// transform apply to it. When an entry is faded, its cores show over their
-/// draws. Changing a glow takes another import. A glow of no radius or
-/// strength is the same as none.
+/// Halos and cores are triangles that the scene creates once, when it's
+/// imported, and draws with its paths. So a glow takes no extra layer or pass
+/// per path, and an entry's opacity and color transform apply to it. When an
+/// entry is faded, its cores show over their draws. Changing a glow means
+/// creating the scene again. A glow with a radius or strength of 0 is the
+/// same as no glow.
 class const RasterizerGlow._(
   /// How far the halo reaches, from a stroke's centre line or a fill's
   /// contour.
@@ -416,10 +434,11 @@ class const RasterizerGlow._(
   /// It's in the paths' units, or with [inWidths], in line widths.
   final double radius, {
 
-  /// The halo's alpha on the path, from 0 to 1, as a fraction of its color's.
-  ///
-  /// Just outside the path, it fades from 0.6 of that. A core has its draw's
+  /// The halo's alpha on the path, from 0 to 1, as a fraction of its color's
   /// alpha.
+  ///
+  /// Just outside the path, the halo fades out from 0.6 of that. A core has
+  /// its draw's alpha.
   final double strength = 1,
 
   /// The halo's color, or null for the color of the path's last draw.
@@ -437,21 +456,21 @@ class const RasterizerGlow._(
       ),
       assert(strength >= 0 && strength <= 1, 'strength must be 0 to 1');
 
-  /// Creates a glow reaching [radius], in the paths' units, as a stroke's width
-  /// is.
+  /// Creates a glow that reaches [radius] in the paths' units, the units of a
+  /// stroke's width.
   const RasterizerGlow(double radius, {double strength = 1, ui.Color? color})
     : this._(radius, strength: strength, color: color);
 
-  /// Creates a glow reaching [widths] line widths, so it follows lines that
-  /// taper.
+  /// Creates a glow that reaches [widths] line widths, so it follows lines
+  /// that taper.
   ///
   /// For a stroked path, a line width is the widest of the path's strokes.
   /// For a fill, it's the fill's shorter edge at each point of a contour,
-  /// which measures a line's width only in a thin shape. So a fill counts as
-  /// a line, and gets a core too, unless a draw strokes its path. That core
-  /// lies inward of each contour that's neither inside another nor around
-  /// one, and reaches half of the shorter edge at each point. A hairline, of
-  /// no width, gets neither a halo nor a core.
+  /// which matches a line's width only in a thin shape. So a fill counts as a
+  /// line and gets a core too, unless one of the path's draws strokes it.
+  /// That core lies inside each contour that is neither inside another
+  /// contour nor around one, and reaches half of the shorter edge at each
+  /// point. A hairline, which has no width, gets neither a halo nor a core.
   const RasterizerGlow.widths(
     double widths, {
     double strength = 1,
@@ -475,16 +494,18 @@ class const RasterizerGlow._(
 typedef RasterizerPaintedPath = ({ui.Path path, ui.Paint paint});
 
 /// A shape made of one or more polygons, which a scene draws as it draws a
-/// path. Polygons have no curves, so the GPU renderers draw them without
-/// first flattening them into lines, as they must do with a path.
-/// [RasterizerScene.fromPolygons] makes a scene of them.
+/// path.
+///
+/// Polygons have no curves, so the GPU renderers draw them without first
+/// flattening them into lines, as they must with a path.
+/// [RasterizerScene.fromPolygons] creates a scene of them.
 ///
 /// [vertices] holds the x and then the y of each vertex, polygon after
 /// polygon, with x to the right and y down. [vertexCounts] holds the number
 /// of vertices of each polygon. Each polygon closes by itself, so don't
 /// repeat its first vertex at its end. The class keeps both lists without
 /// copying them, so don't change them, just as you mustn't change a path
-/// after importing it.
+/// after creating a scene from it.
 class RasterizerPolygons(
   final Float32List vertices,
   final Int32List vertexCounts,
@@ -533,7 +554,9 @@ class RasterizerPolygons(
   }();
 
   /// The polygons as a path, for the canvas renderer and other dart:ui
-  /// drawing. It's made the first time it's read.
+  /// drawing.
+  ///
+  /// It's created the first time it's read.
   late final ui.Path path = () {
     final path = ui.Path();
     var offset = 0;
@@ -555,27 +578,32 @@ typedef RasterizerPaintedPolygons = ({
   ui.Paint paint,
 });
 
-/// An SVG's paths, or plain paths with their paints, that any number of a
-/// frame's entries can draw, each with its own transform.
+/// An SVG's paths, or plain paths with their paints, ready to draw.
+///
+/// Any number of a frame's entries can draw the same scene, each with its own
+/// transform. An entry is one placement of a scene in a run, added with
+/// [RasterizerRun.add].
 ///
 /// A scene is parsed for one backend, and only that backend's renderers can
 /// draw it.
 abstract class RasterizerScene {
-  /// Parses an SVG's bytes, such as an asset's, for [backend].
+  /// Creates a scene by parsing an SVG's bytes, such as an asset's, for
+  /// [backend].
   ///
-  /// By default, [backend] is the choice of the GPU renderer [gpu],
-  /// [RasterizerBackend.gpu] or [RasterizerBackend.mesh]: [gpu] where it's
-  /// supported, else the canvas renderer ([RasterizerGpuBackend.backend]).
+  /// By default, the GPU renderer [gpu] ([RasterizerBackend.gpu] or
+  /// [RasterizerBackend.mesh]) chooses [backend]: [gpu] where it's supported,
+  /// and the canvas renderer elsewhere ([RasterizerGpuBackend.backend]).
   /// Throws if it can't parse the bytes.
   ///
-  /// When [backend], or else [gpu], is the mesh renderer, [maxSize] is
-  /// required and must be positive, even if the canvas renderer ends up
-  /// chosen. It's the most that the SVG's longer side is drawn at, in device
-  /// pixels. The mesh renderer flattens the SVG's curves for it, to within 1/4
-  /// of a pixel.
-  /// Other renderers ignore it.
+  /// When [backend] is the mesh renderer, or [backend] is null and [gpu] is,
+  /// [maxSize] is required and must be positive and finite, even if the
+  /// canvas renderer ends up chosen. It's the largest size, in device pixels,
+  /// that the SVG's longer side is drawn at. The mesh renderer flattens the
+  /// SVG's curves to within 1/4 of a pixel at that size. Other renderers
+  /// ignore it.
   ///
-  /// [dispose], or else a finalizer, frees a GPU scene's native memory.
+  /// [dispose] frees a GPU scene's native memory, or a finalizer does if you
+  /// don't call it.
   factory RasterizerScene.fromSvg(
     Uint8List bytes, {
     RasterizerBackend? backend,
@@ -605,39 +633,42 @@ abstract class RasterizerScene {
     }
   }
 
-  /// Creates a scene of plain paths, each drawn with its paint, in paint
-  /// order, for [backend] or [gpu], as with [fromSvg].
+  /// Creates a scene of plain paths, each drawn with its paint in list order,
+  /// for [backend] or [gpu] as with [fromSvg].
   ///
-  /// A shape's path, with its paint or each of the paints it's drawn with, is
-  /// an example. A fill fills its path with the path's [ui.Path.fillType],
-  /// with open contours closed. A stroke strokes its path, with open contours
-  /// left open. Coordinates are the paths', x right and y down, and the
-  /// [viewBox] is their bounds, without their strokes.
+  /// For example, each element can be a shape's path with one of the paints
+  /// it's drawn with. A fill fills its path with the path's
+  /// [ui.Path.fillType] and closes open contours. A stroke strokes its path
+  /// and leaves open contours open. Coordinates are the paths' own, with x
+  /// right and y down, and the [viewBox] is the paths' bounds, not counting
+  /// their strokes.
   ///
-  /// The GPU renderers read each path's contours back with
-  /// [ui.Path.computeMetrics]. They flatten them once into polylines, to
-  /// within 1/4 of a device pixel when the [viewBox]'s longer side is
-  /// [maxSize] device pixels. [maxSize] is the most it's drawn at, and is
-  /// required whichever the renderer. So paths count as immutable: changing
-  /// one after it's imported gives undefined results. The GPU renderers keep
-  /// drawing it as it was. The canvas renderer draws it as it was when it
-  /// recorded it as a picture, or else as it is.
+  /// The GPU renderers read each path's contours with
+  /// [ui.Path.computeMetrics] and flatten them once into polylines, to within
+  /// 1/4 of a device pixel when the [viewBox]'s longer side is [maxSize]
+  /// device pixels. [maxSize] is the largest size the scene is drawn at, and
+  /// it's required for every renderer.
   ///
-  /// A path keeps its contours while it lives, for the next scene of it with
-  /// the same tolerance, such as one with other paints. Contours without a
-  /// length are left out, as [ui.Path.computeMetrics] leaves them out. So a
-  /// dot drawn as a line of no length with round caps isn't drawn. It copies
-  /// the paints' fields. As for SVGs, the GPU renderer's strokes have
-  /// a fixed miter limit, and it draws bevel joins as miters.
+  /// Treat the paths as immutable: changing one after creating the scene
+  /// gives undefined results. The GPU renderers keep drawing it as it was.
+  /// The canvas renderer draws it as it was when it recorded it as a picture
+  /// ([RasterizerGpu.canvasPictures]), and otherwise as it is.
   ///
-  /// Only the mesh renderer draws a [glow]. Its scene's [pathCount] then
-  /// counts each path's halo and each draw's core, and its [bounds] reach the
-  /// halos.
+  /// Each path keeps its contours while it lives, for the next scene made
+  /// from it with the same tolerance, such as one with other paints. Contours
+  /// of zero length are left out, as [ui.Path.computeMetrics] leaves them
+  /// out. So a dot drawn as a zero-length line with round caps doesn't show.
+  /// The scene copies the paints' fields. As with SVGs, the GPU renderer's
+  /// strokes have a fixed miter limit, and it draws bevel joins as miters.
   ///
-  /// Throws [ArgumentError] if [maxSize] isn't positive. It also throws for a
-  /// paint that the GPU renderers can't draw ([canDraw]), whatever the
-  /// backend, so that a scene draws the same with each. A GPU scene's native
-  /// memory is freed as [fromSvg]'s is.
+  /// Only the mesh renderer draws a [glow]. A mesh scene's [pathCount] then
+  /// also counts each path's halo and each draw's core, and its [bounds]
+  /// include the halos.
+  ///
+  /// Throws [ArgumentError] if [maxSize] isn't positive and finite. Whatever
+  /// the backend, it also throws for a paint that the GPU renderers can't
+  /// draw ([canDraw]), so that a scene looks the same with every renderer. A
+  /// GPU scene's native memory is freed as with [fromSvg].
   factory RasterizerScene.fromPaths(
     List<RasterizerPaintedPath> paths, {
     RasterizerBackend? backend,
@@ -659,8 +690,8 @@ abstract class RasterizerScene {
     );
   }
 
-  /// Creates a scene of polygons, each drawn with its paint, in paint order,
-  /// as [fromPaths] does with paths.
+  /// Creates a scene of polygons, each drawn with its paint in list order, as
+  /// [fromPaths] does with paths.
   ///
   /// The GPU renderers use the polygons' vertices directly, without
   /// flattening anything. Fills use the non-zero rule. The canvas renderer
@@ -668,10 +699,10 @@ abstract class RasterizerScene {
   ///
   /// With [separate], the mesh renderer fills each polygon on its own instead
   /// of filling their union, and fills a convex polygon as a fan of
-  /// triangles. That's much faster for many polygons. But where polygons
+  /// triangles. That's much faster for many polygons. However, where polygons
   /// overlap, their triangles overlap too, and the overlap shows when an
-  /// entry draws the scene with an opacity, or with colors or glows that
-  /// aren't opaque. The other renderers ignore [separate].
+  /// entry draws the scene with an opacity below 1, or with colors or glows
+  /// that aren't opaque. The other renderers ignore [separate].
   ///
   /// Throws [ArgumentError] as [fromPaths] does.
   factory RasterizerScene.fromPolygons(
@@ -707,15 +738,16 @@ abstract class RasterizerScene {
     RasterizerBackend.canvas => CanvasScene.fromPaths(paths),
   };
 
-  /// Returns whether the GPU renderers can draw a path with [paint], in
+  /// Returns whether the GPU renderers can draw a path with [paint] in
   /// [fromPaths].
   ///
-  /// They can draw a fill, or a stroke of positive width, in an sRGB color,
+  /// They can draw a fill, or a stroke of positive width, in an sRGB color
   /// with [ui.BlendMode.srcOver] and antialiasing. The paint can't have a
-  /// shader, a color, mask or image filter, or [ui.Paint.invertColors]. A
-  /// hairline, a stroke of width 0, is a device pixel wide under any
-  /// transform, so they can't import it once. A [ui.Canvas] can still draw
-  /// what they can't.
+  /// shader, a color filter, a mask filter, an image filter or
+  /// [ui.Paint.invertColors]. A hairline (a stroke of width 0) is one device
+  /// pixel wide under any transform, so they can't turn it into geometry
+  /// once, when the scene is created. A [ui.Canvas] can still draw what they
+  /// can't.
   static bool canDraw(ui.Paint paint) => undrawable(paint) == null;
 
   /// The backend it's parsed for, whose renderers draw it.
@@ -725,16 +757,17 @@ abstract class RasterizerScene {
   /// coordinates: x right, y down.
   ///
   /// They're empty if it has no paths. A mesh scene's bounds are its
-  /// triangles', which can be tighter than the GPU and canvas renderers'. The
-  /// tiger's are 474.2 × 490.0 with the mesh renderer, against 478.5 × 506.9.
-  /// So each renderer places an SVG fitted by its bounds differently, while
-  /// [viewBox] is the same for all.
+  /// triangles' bounds, which can be tighter than those of the GPU and canvas
+  /// renderers. For the Ghostscript tiger, they're 474.2 × 490.0 with the
+  /// mesh renderer and 478.5 × 506.9 with the others. So an SVG fitted by its
+  /// bounds lands slightly differently with each renderer, while [viewBox] is
+  /// the same for all.
   ui.Rect get bounds;
 
   /// The SVG's own rectangle, in its coordinates.
   ///
-  /// It's the SVG's viewBox, or else from 0, 0 to its width and height. Its
-  /// paths can draw outside it, as [bounds] shows.
+  /// It's the SVG's viewBox, or else the rectangle from (0, 0) to its width
+  /// and height. Its paths can draw outside it, as [bounds] shows.
   ui.Rect get viewBox;
 
   /// The number of draws it makes: each path's fill and stroke.
@@ -744,10 +777,10 @@ abstract class RasterizerScene {
   /// coordinates, as the canvas renderer does.
   ///
   /// [opacity] scales each path's alpha, and [colorTransform]'s filter
-  /// filters each path's color. It draws into any canvas, such as a
-  /// picture's, under any transform, with no frame or renderer. Only scenes
-  /// that draw with the canvas renderer have paths: it throws [StateError]
-  /// unless [backend] is [RasterizerBackend.canvas].
+  /// filters each path's color. It draws into any canvas, such as a picture
+  /// recorder's, under any transform, without a frame or renderer. Only
+  /// canvas scenes keep their paths, so it throws [StateError] unless
+  /// [backend] is [RasterizerBackend.canvas].
   void drawPaths(
     ui.Canvas canvas, {
     double opacity = 1,
@@ -756,16 +789,17 @@ abstract class RasterizerScene {
 
   /// Frees its memory.
   ///
-  /// Frames it was added to keep their own references once rendered. But
-  /// don't dispose of it between [RasterizerRun.add] and
-  /// [RasterizerFrame.render], nor before drawing a canvas run that draws it.
+  /// Frames that it was added to keep their own references to it after they
+  /// render. Don't dispose of it between [RasterizerRun.add] and
+  /// [RasterizerFrame.render], though, nor before drawing a canvas run that
+  /// draws it.
   void dispose();
 }
 
 /// The rectangle that a [RasterizerScene] is drawn from.
 extension RasterizerSceneRect on RasterizerScene {
-  /// The rectangle that the scene is drawn from, in its coordinates, such as
-  /// to fit it to a size.
+  /// The rectangle that the scene is drawn from, in its coordinates, for
+  /// example to fit it to a size.
   ///
   /// It's the scene's [RasterizerScene.viewBox]. For an SVG with neither a
   /// viewBox nor a size, it's its paths' [RasterizerScene.bounds] instead.
@@ -780,32 +814,33 @@ ui.Rect _drawnRect(ui.Rect viewBox, ui.Rect bounds) =>
 ///
 /// A GPU renderer keeps [slots] frames in flight, each with its own atlas
 /// textures. So a frame's images stay valid until [slots] frames later, when
-/// it renders into its textures again. 2 are enough for frames drawn as
-/// they're built, as Flutter rasterizes a frame before it builds the one
-/// after next. An app that takes an image of a frame later, such as with
-/// `RepaintBoundary.toImage` after the frame, needs 3.
+/// the renderer renders into those textures again. Two slots are enough for
+/// frames drawn as they're built, because Flutter rasterizes a frame before
+/// it builds the one after next. An app that takes an image of a frame
+/// later, such as with `RepaintBoundary.toImage` after the frame, needs 3.
 abstract class RasterizerRenderer() {
   /// Creates a renderer for [backend].
   ///
-  /// By default, [backend] is the GPU renderer [gpu]'s choice, as with
+  /// By default, the GPU renderer [gpu] chooses [backend], as with
   /// [RasterizerScene.fromSvg]. For a GPU renderer, it throws
   /// [UnsupportedError] unless that renderer's support ([RasterizerGpu.of]) is
   /// [RasterizerSupport.supported].
   ///
-  /// [meshSamples] are the mesh renderer's samples per pixel, 1 or 4, as
-  /// Flutter GPU allows. With 4, its runs' targets are multisampled where
-  /// Flutter GPU supports offscreen MSAA, so their edges are antialiased. With
-  /// 1, or where offscreen MSAA isn't supported, they're aliased, which costs
-  /// the GPU less.
+  /// [meshSamples] is the mesh renderer's number of samples per pixel: 1 or
+  /// 4, the values Flutter GPU allows. With 4, its runs' targets are
+  /// multisampled where Flutter GPU supports offscreen MSAA, so their edges
+  /// are antialiased. With 1, or where offscreen MSAA isn't supported,
+  /// they're aliased, which costs the GPU less.
   ///
-  /// On OpenGL ES, a GPU renderer compiles its pipelines as it's made, and
-  /// the future completes once they've compiled, on the UI thread and then
-  /// on the raster thread ([RasterizerGpu.allowOpenGles]). If they haven't
-  /// within [RasterizerGpu.warmUpTimeout], it completes with the canvas
-  /// renderer, and the GPU renderer's support becomes
-  /// [RasterizerSupport.warmUpTimeout], so that scenes made after without a
-  /// backend are for the canvas renderer. Scenes made before are for the GPU
-  /// renderer, which the canvas renderer can't draw: make them after.
+  /// On OpenGL ES, a GPU renderer compiles its pipelines when it's created,
+  /// first on the UI thread and then on the raster thread
+  /// ([RasterizerGpu.allowOpenGles]), and the future completes after they've
+  /// compiled. If they haven't compiled within [RasterizerGpu.warmUpTimeout],
+  /// the future completes with a canvas renderer instead. The GPU renderer's
+  /// support then becomes [RasterizerSupport.warmUpTimeout], so scenes
+  /// created afterwards without a backend are canvas scenes. Scenes created
+  /// before are GPU scenes, which the canvas renderer can't draw, so create
+  /// scenes after the renderer.
   static Future<RasterizerRenderer> create({
     int slots = 2,
     RasterizerBackend? backend,
@@ -845,22 +880,23 @@ abstract class RasterizerRenderer() {
     }
   }
 
-  /// The most that the GPU renderer's atlas pages, and so its viewports,
-  /// measure a side.
+  /// The longest side, in pixels, of the GPU renderer's atlas pages, and so
+  /// of its viewports.
   ///
   /// Vulkan devices commonly support it, and Metal always does. On OpenGL ES,
-  /// the limit is 4096 instead, as Flutter GPU doesn't tell the device's
+  /// the limit is 4096 instead, as Flutter GPU doesn't report the device's
   /// maximum.
   static const maxAtlasSize = 8192;
 
-  /// The step that atlas pages are sized in.
+  /// The step, in pixels, that atlas page sizes are multiples of.
   ///
   /// Pages grow at once to what a frame needs. They shrink at most once every
-  /// 120 frames, to the largest that those frames needed, if that's below
-  /// half a page's area. If the viewport changed size meanwhile, as with a
-  /// rotation or a window resize, they shrink to that whatever it is.
-  /// [trimAtlas] shrinks them too. The renderer releases pages that no frame
-  /// needed for 120 frames. Each change reallocates a page's textures.
+  /// 120 frames, to the largest size that those frames needed, if that's
+  /// below half a page's area. If the viewport changed size meanwhile, as
+  /// with a rotation or a window resize, they shrink to that size whatever
+  /// its area. [trimAtlas] shrinks them too. The renderer releases pages that
+  /// no frame has needed for 120 frames. Each change reallocates a page's
+  /// textures.
   static const atlasStep = 256;
 
   /// The backend it renders with.
@@ -875,15 +911,15 @@ abstract class RasterizerRenderer() {
   /// renderers. It's null for the canvas renderer, which takes any size.
   int? get maxViewportSize;
 
-  /// How many times atlas pages have changed size, frame after frame.
+  /// How many times atlas pages have changed size, over all frames so far.
   ///
   /// Each change reallocates their textures. For the mesh renderer, it counts
   /// how many times the renderer has allocated its runs' targets. It's 0 for
   /// the canvas renderer, which has neither.
   int get atlasResizes;
 
-  /// The bytes that its atlas pages' textures hold now, estimated from their
-  /// formats.
+  /// The current size of its atlas pages' textures in bytes, estimated from
+  /// their formats.
   ///
   /// The textures are each in-flight frame's target, and each page's depth
   /// and accumulation textures. For the mesh renderer, they're its runs'
@@ -891,23 +927,23 @@ abstract class RasterizerRenderer() {
   /// which has none.
   int get atlasBytes;
 
-  /// Shrinks the atlas pages to the last frame's needs now, and releases the
-  /// pages it didn't need.
+  /// Shrinks the atlas pages to the last frame's needs at once, and releases
+  /// the pages that frame didn't need.
   ///
   /// Call it when an app knows its frames got lighter, such as at a level
   /// change or when leaving a zoomed view. Later frames grow the pages again
-  /// as they need, each growth a reallocation. Called between [beginFrame]
-  /// and [RasterizerFrame.render], it waits for that frame, and uses its
-  /// needs. The mesh renderer releases its runs' targets, which later frames
-  /// allocate again as they need. The canvas renderer does nothing.
+  /// as needed, and each growth reallocates textures. When called between
+  /// [beginFrame] and [RasterizerFrame.render], it waits for that frame and
+  /// uses its needs. The mesh renderer releases its runs' targets, which
+  /// later frames allocate again as needed. The canvas renderer does nothing.
   void trimAtlas();
 
   /// Begins a frame for a [width] x [height] viewport in device pixels, and
-  /// ends the last one.
+  /// ends the previous one.
   ///
-  /// Entries' transforms map their scene's coordinates to the viewport's, x
-  /// right and y down. [curves] has the GPU renderer draw curves as
-  /// quadratics, else as line segments.
+  /// Entries' transforms map their scene's coordinates to the viewport's,
+  /// with x right and y down. With [curves], the GPU renderer draws curves as
+  /// quadratics; without it, as line segments.
   ///
   /// The GPU and mesh renderers take viewports up to [maxViewportSize] a
   /// side: [maxAtlasSize], or 4096 on OpenGL ES. The canvas renderer takes
@@ -916,18 +952,18 @@ abstract class RasterizerRenderer() {
 
   /// Frees its native memory and GPU resources.
   ///
-  /// Don't use it, its frame or its runs' images after.
+  /// Don't use it, its frame or its runs' images afterwards.
   void dispose();
 }
 
 /// A width and height, in pixels.
 typedef RasterizerPixelSize = ({int width, int height});
 
-/// One frame's runs.
+/// One frame's runs, rendered together.
 ///
 /// Add entries to its runs, [render] it once, then draw each run. A renderer
-/// reuses its frame object, so a frame is only valid until
-/// the next [RasterizerRenderer.beginFrame].
+/// reuses its frame object, so a frame is only valid until the next
+/// [RasterizerRenderer.beginFrame].
 abstract class RasterizerFrame() {
   /// The backend that draws it: its renderer's [RasterizerRenderer.backend].
   RasterizerBackend get backend;
@@ -944,7 +980,7 @@ abstract class RasterizerFrame() {
   /// The frame's runs, in the order [addRun] added them.
   Iterable<RasterizerRun> get runs;
 
-  /// Adds a new run, which is drawn on its own.
+  /// Adds a run, which is drawn on its own.
   ///
   /// Entries in one run overlap in the order [RasterizerRun.add] added them.
   ///
@@ -952,18 +988,18 @@ abstract class RasterizerFrame() {
   /// show, such as the bounds of the clip it's drawn under. The run then
   /// skips entries that paint nothing in it, and the GPU and mesh renderers
   /// render only what's in it, within a pixel or two. So a paint that spreads
-  /// the run's image, such as a blur, loses what lay outside it.
+  /// the run's image, such as a blur, loses what was outside the clip.
   RasterizerRun addRun({ui.Rect? clip});
 
-  /// Renders all of its runs, which then have their images.
+  /// Renders all of its runs, which gives them their images.
   ///
   /// The GPU renderer packs the runs' rectangles into atlas pages, and renders
   /// each page once. The mesh renderer renders each run into its own target.
   /// The canvas renderer has nothing to render.
   void render();
 
-  /// The time [render] took to write the frame on the CPU, packing and entries
-  /// included, in microseconds.
+  /// The time [render] took to write the frame on the CPU, including packing
+  /// and entries, in microseconds.
   ///
   /// It's 0 for the canvas renderer.
   int get cpuMicros;
@@ -986,49 +1022,51 @@ abstract class RasterizerFrame() {
   List<RasterizerPixelSize> get pageSizes;
 }
 
-/// A color filter applied to each of an entry's paths, rather than to its run
-/// as a layer, with the same pixels.
+/// A color filter applied to each of an entry's paths rather than to its run
+/// as a layer, giving the same pixels.
 ///
 /// It's a filter that's linear in premultiplied color and keeps alpha, so it
 /// commutes with compositing and antialiasing. Entries with different color
-/// transforms share a run.
+/// transforms can share a run.
 ///
-/// [mode] and [matrix] make one, with its [filter], from:
+/// [mode] and [matrix] create one, with its [filter], from:
 /// - [ui.ColorFilter.mode] with [ui.BlendMode.srcATop] (a tint), `dst` or
 ///   `clear`, and an sRGB color. Tints are exact.
-/// - [ui.ColorFilter.matrix] whose alpha row is (0, 0, 0, 1, 0), and whose
-///   color rows' alpha column is 0. Greyscale, sepia, a hue rotation and a
-///   saturation are examples, offsets included. The renderers clamp such a
-///   matrix's results to 0 to 1 per path rather than per pixel. That differs
-///   where paths that it takes out of range overlap translucently, antialiased
-///   edges between paths included. A hue rotation of 2 radians differs there
-///   by up to 40/255.
+/// - [ui.ColorFilter.matrix] whose alpha row is (0, 0, 0, 1, 0) and whose
+///   color rows have 0 in the alpha column. Examples include greyscale,
+///   sepia, hue rotation and saturation, with or without offsets. The
+///   renderers clamp such a matrix's results to the range 0 to 1 per path
+///   rather than per pixel. The result differs from a layer's where paths
+///   that the matrix takes out of range overlap translucently, including at
+///   antialiased edges between paths. A hue rotation of 2 radians differs
+///   there by up to 40/255.
 ///
 /// Modes that scale alpha, such as `modulate`, `srcIn`, `dstIn` and `dstOut`,
 /// can't be color transforms. Applied to each path, they would let
 /// overlapping paths show through each other, as an entry's opacity does.
 ///
 /// A [ui.ColorFilter] can't be read back: its fields are private, and profile
-/// and release builds strip dart:ui's `toString`. So [of] only knows the
-/// filters that [mode] and [matrix] made.
+/// and release builds strip dart:ui's `toString`. So [of] only recognizes the
+/// filters that [mode] and [matrix] created.
 class RasterizerColorTransform._(
-  /// Its filter, which [of] knows.
+  /// Its filter, which [of] maps back to this transform.
   ///
-  /// Set on a layer's paint, it gives the pixels that this transform gives
+  /// On a layer's paint, it gives the same pixels that this transform gives
   /// path by path.
   final ui.ColorFilter filter,
 
-  /// The 4 x 4 matrix that it applies to premultiplied colors, row by row.
+  /// The 4 x 4 matrix, row by row, that it applies to premultiplied colors.
   ///
   /// Its rows and columns are r, g, b and a. Each color channel is then
-  /// clamped from 0 to the alpha. It can't be modified, as [filter] can't.
+  /// clamped between 0 and the alpha. It's unmodifiable, like [filter].
   final Float32List values,
 ) {
   this {
     _known[filter] = this;
   }
 
-  /// Returns [ui.ColorFilter.mode] of [color] and [mode], with its transform.
+  /// Returns the transform for [ui.ColorFilter.mode] with [color] and [mode],
+  /// holding that filter.
   ///
   /// Returns null if it can't be a transform: see [RasterizerColorTransform].
   static RasterizerColorTransform? mode(ui.Color color, ui.BlendMode mode) {
@@ -1044,8 +1082,8 @@ class RasterizerColorTransform._(
           );
   }
 
-  /// Returns [ui.ColorFilter.matrix] of [values], 20 of them, row by row, with
-  /// its transform.
+  /// Returns the transform for [ui.ColorFilter.matrix] with [values], 20 of
+  /// them row by row, holding that filter.
   ///
   /// Returns null if it can't be a transform: see [RasterizerColorTransform].
   static RasterizerColorTransform? matrix(List<double> values) {
@@ -1067,11 +1105,11 @@ class RasterizerColorTransform._(
 
   static final _known = Expando<RasterizerColorTransform>();
 
-  /// Returns [color] as this transform makes it, as a path of that color takes
-  /// its [filter].
+  /// Returns [color] after this transform, as [filter] would color a path of
+  /// that color.
   ///
   /// It applies [values] to the premultiplied color, then clamps each color
-  /// channel from 0 to the alpha.
+  /// channel between 0 and the alpha.
   ui.Color apply(ui.Color color) {
     final m = values, a = color.a;
     final r = color.r * a, g = color.g * a, b = color.b * a;
@@ -1090,8 +1128,8 @@ class RasterizerColorTransform._(
     );
   }
 
-  /// Returns the matrix of the mode filter of color (r, g, b) at alpha t, the
-  /// source, over a pixel, the destination, both premultiplied.
+  /// Returns the matrix of the mode filter for the source color (r, g, b) at
+  /// alpha t over a destination pixel, both premultiplied.
   static Float32List? _modeMatrix(
     double t,
     double r,
@@ -1122,8 +1160,10 @@ class RasterizerColorTransform._(
     return m;
   }
 
-  /// Returns the matrix on premultiplied colors of [v], a 5 x 4 matrix on
-  /// unpremultiplied ones with offsets from 0 to 255, or null.
+  /// Returns [v] as a matrix on premultiplied colors, or null.
+  ///
+  /// [v] is a 5 x 4 matrix on unpremultiplied colors, with offsets from 0 to
+  /// 255.
   ///
   /// It's null unless [v] keeps alpha and its colors don't depend on alpha.
   /// Then c' = M·c + o becomes C' = M·C + o·A once premultiplied.
@@ -1148,17 +1188,17 @@ class RasterizerColorTransform._(
 /// A part of a GPU run, in one rectangle of an atlas page.
 ///
 /// A part holds a group of the run's entries whose bounds, grown by a margin,
-/// overlap in a chain. No other entry of the run overlaps them. A mesh run
-/// has one part, its target: [page] is the target's index among the frame's
-/// targets.
+/// overlap in a chain, and that no other entry of the run overlaps. A mesh
+/// run has one part, its target, and [page] is the target's index among the
+/// frame's targets.
 class const RasterizerRunPart(
   /// The index of the atlas page it's in.
   final int page,
 
   /// The atlas page it's in.
   ///
-  /// It's valid until [RasterizerRenderer.slots] frames later, and only drawn
-  /// once the frame has rendered.
+  /// It stays valid until [RasterizerRenderer.slots] frames later, and holds
+  /// the run's pixels only after the frame has rendered.
   final ui.Image image,
 
   /// Its rectangle in [image], in device pixels.
@@ -1170,7 +1210,8 @@ class const RasterizerRunPart(
 
 /// A run of entries, drawn on its own.
 ///
-/// The GPU renderer draws it as images, from its parts' rectangles in the
+/// A run is drawn as one unit, at one place in the app's paint order. The
+/// GPU renderer draws it as images, from its parts' rectangles in the
 /// frame's atlas. The mesh renderer draws its target. The canvas renderer
 /// draws its entries' paths.
 abstract class RasterizerRun() {
@@ -1179,44 +1220,44 @@ abstract class RasterizerRun() {
 
   /// Its parts, for GPU runs, after [place] or [RasterizerFrame.render].
   ///
-  /// The parts lie apart from each other in the viewport. So a run of entries
-  /// scattered over the viewport takes only their area of the atlas, not the
-  /// viewport's. A mesh run has one part, its target. A run has none if it
-  /// has nothing to draw, and canvas runs have none.
+  /// The parts don't overlap in the viewport. So a run of entries scattered
+  /// over the viewport takes up only their area of the atlas, not the whole
+  /// viewport's. A mesh run has one part, its target. A run that has nothing
+  /// to draw has no parts, and neither do canvas runs.
   List<RasterizerRunPart> get parts;
 
   /// Whether it has nothing to draw.
   ///
-  /// That's when it has no entries, or, for GPU runs once placed, none in the
-  /// viewport.
+  /// That's when it has no entries, or, for a placed GPU run, no entries in
+  /// the viewport.
   bool get isEmpty;
 
   /// Ends it, so it can be drawn before the frame renders.
   ///
-  /// That lets it be drawn while painting, as long as the frame renders
-  /// before the painting is rasterized. It places GPU runs in the frame's
-  /// atlas now, rather than at [RasterizerFrame.render], which sets their
-  /// [parts]. They go onto pages sized for what the last frame's runs needed.
-  /// So a run that doesn't fit on one page goes to the next, which is one
-  /// more page to render.
+  /// That lets an app draw it while painting, as long as the frame renders
+  /// before the painting is rasterized. For GPU runs, it places the run in
+  /// the frame's atlas at once rather than at [RasterizerFrame.render], which
+  /// sets its [parts]. Placed runs go onto pages sized for what the previous
+  /// frame's runs needed. So a run that doesn't fit on one page goes onto the
+  /// next, which adds a page to render.
   void place();
 
-  /// Adds [scene], drawn with an affine transform from its coordinates to the
-  /// viewport's.
+  /// Adds an entry that draws [scene] with an affine transform from its
+  /// coordinates to the viewport's.
   ///
   /// The transform maps (x, y) to (a * x + c * y + tx, b * x + d * y + ty), in
   /// device pixels with y down. Entries added later draw over earlier ones.
   /// [scene] must have been parsed for the renderer's backend.
   /// [addProjective] adds a scene with a perspective.
   ///
-  /// [opacity], from 0 to 1, scales the alpha of each of its paths, so paths
-  /// that overlap show through each other, unlike with a layer. Entries with
-  /// different opacities share the run. It skips an entry whose opacity is
-  /// 0.
+  /// [opacity], from 0 to 1, scales the alpha of each of the scene's paths,
+  /// so overlapping paths show through each other, unlike with a layer.
+  /// Entries with different opacities can share the run. It skips an entry
+  /// whose opacity is 0.
   ///
-  /// [colorTransform] filters the color of each of its paths. That gives the
-  /// same pixels as a layer with its filter around the entry. Entries with
-  /// different color transforms share the run.
+  /// [colorTransform] filters the color of each of the scene's paths. That
+  /// gives the same pixels as a layer with its filter around the entry.
+  /// Entries with different color transforms can share the run.
   void add(
     RasterizerScene scene,
     double a,
@@ -1229,8 +1270,8 @@ abstract class RasterizerRun() {
     RasterizerColorTransform? colorTransform,
   });
 
-  /// Adds [scene] as [add] does, with a projective transform, as a
-  /// perspective gives.
+  /// Adds [scene] as [add] does, with a projective transform such as a
+  /// perspective.
   ///
   /// The transform maps (x, y) to ((a * x + c * y + tx) / w,
   /// (b * x + d * y + ty) / w), where w = g * x + h * y + i. Points where w
@@ -1239,9 +1280,9 @@ abstract class RasterizerRun() {
   ///
   /// The mesh and canvas renderers draw any such transform. The GPU renderer
   /// only takes affine ones, where g and h are 0, and throws [ArgumentError]
-  /// otherwise. It renders its entries without perspective, so the canvas
-  /// applies its transform's perspective to the run's images instead, sampled
-  /// with [RasterizerRun.draw]'s `filterQuality`.
+  /// otherwise. It renders its entries without perspective. Instead, a
+  /// perspective in the canvas's transform applies to the run's images,
+  /// sampled with [RasterizerRun.draw]'s `filterQuality`.
   void addProjective(
     RasterizerScene scene,
     double a,
@@ -1284,25 +1325,28 @@ abstract class RasterizerRun() {
     );
   }
 
-  /// Draws it into [canvas], whose units are [scale] device pixels, such as a
-  /// device pixel ratio, with its viewport's origin at the canvas's.
+  /// Draws it into [canvas], with its viewport's origin at the canvas's
+  /// origin.
+  ///
+  /// Each of the canvas's units is [scale] device pixels, such as a device
+  /// pixel ratio.
   ///
   /// [paint] applies to the run as a layer's paint would. A canvas run draws
   /// its paths into a layer with it. A GPU run draws its parts' images with
-  /// it, which gives the same pixels. It draws them into a layer instead on
-  /// Linux, for an image or mask filter, and for a blend mode that changes
-  /// what's under transparent pixels, across several parts. A color filter
-  /// that colors transparent pixels colors each part's rectangle, not the
-  /// run's whole bounds: both are its entries' bounds with a margin.
+  /// it, which gives the same pixels. It draws them into a layer instead for
+  /// an image or mask filter, and, when the run has several parts, for a
+  /// blend mode that changes what's under transparent pixels. A color filter
+  /// that colors transparent pixels colors each part's rectangle rather than
+  /// the run's whole bounds. Both are the entries' bounds plus a margin.
   ///
-  /// A canvas run draws its entries as they are when it's drawn, so only until
-  /// the next [RasterizerRenderer.beginFrame].
+  /// A canvas run draws its entries as they are when it's drawn, so draw it
+  /// before the next [RasterizerRenderer.beginFrame].
   ///
-  /// [filterQuality] samples a GPU run's image. The default,
-  /// [ui.FilterQuality.none], takes the nearest pixel, as it draws the image
-  /// pixel for pixel. Use [ui.FilterQuality.low] for a canvas whose transform
-  /// resamples it, such as one with perspective. A canvas run draws its paths,
-  /// and ignores it.
+  /// [filterQuality] sets how a GPU run's image is sampled. The default,
+  /// [ui.FilterQuality.none], takes the nearest pixel, which suits drawing
+  /// the image pixel for pixel. Use [ui.FilterQuality.low] for a canvas whose
+  /// transform resamples it, such as one with perspective. A canvas run draws
+  /// its paths and ignores it.
   void draw(
     ui.Canvas canvas, {
     double scale = 1,

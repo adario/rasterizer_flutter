@@ -4,23 +4,24 @@ import '../rasterizer_gpu.dart' show RasterizerPixelSize, RasterizerRenderer;
 
 /// The sizes of a renderer's pages, without their textures.
 ///
-/// The GPU renderer keeps the textures of its atlas pages alongside. The mesh
-/// renderer has a page per run, the size of the run's target, the same in
-/// every frame in flight.
+/// The GPU renderer keeps the textures of its atlas pages itself. The mesh
+/// renderer uses one page per run: the size of the run's target, which is the
+/// same in every frame in flight.
 ///
-/// Pages are sized in multiples of [step]. They grow at once to what a frame
-/// needs. They shrink rarely, as reallocating their textures stalls. On the
-/// Android emulator's Vulkan, reallocating them back and forth frame by frame
+/// Page sizes are multiples of [step]. A page grows at once to what a frame
+/// needs. It shrinks rarely, because reallocating its textures stalls. On the
+/// Android emulator's Vulkan, reallocating them back and forth every frame
 /// also garbled frames or hung the GPU.
 ///
 /// So a page shrinks at most once every [window] frames. At the end of each
-/// window, it shrinks to the largest size those frames needed, if that's
-/// below [shrinkBelow] of its area. If the viewport changed size during the
-/// window, as with a rotation or a window resize, it shrinks to that size
-/// whatever it is. [trim] shrinks the pages to the last frame's needs at once.
+/// window, it shrinks to the largest size those frames needed, if that size
+/// is below [shrinkBelow] of its area. When the viewport changes size, as
+/// with a rotation or a window resize, a new window starts. At its end, the
+/// page shrinks to what that window's frames needed, however little that
+/// saves. [trim] shrinks the pages to the last frame's needs at once.
 ///
-/// It releases a page that no frame needed for [window] frames, from the last
-/// page down.
+/// It releases the last page once no frame has needed it for [window]
+/// frames, then the page before it, and so on.
 class AtlasPages(
   final int maxSize, {
   final int window = 120,
@@ -34,9 +35,10 @@ class AtlasPages(
 
   final List<int> _widths = [], _heights = [], _idle = [];
 
-  // The viewport's size, the window's frames so far, whether the viewport
-  // changed during the window, and per page, the largest extents those frames
-  // needed. Then the last frame's needs, for [trim].
+  // The viewport's size, the number of frames in the current window, and
+  // whether a viewport change started that window. Per page, the largest
+  // extents the window's frames needed, and the last frame's needs, for
+  // [trim].
   RasterizerPixelSize? _viewport;
   int _windowFrames = 0;
   bool _changed = false;
@@ -52,7 +54,7 @@ class AtlasPages(
 
   /// Grows page [p] to fit [w] x [h], and returns its size.
   ///
-  /// [p] equal to [length] adds a new page, at that size.
+  /// When [p] equals [length], this adds a new page of that size.
   RasterizerPixelSize fit(int p, int w, int h) {
     if (p == length) {
       _widths.add(0);
@@ -67,11 +69,11 @@ class AtlasPages(
     return this[p];
   }
 
-  /// Ends a frame for a [width] x [height] viewport, whose runs, packed
-  /// together, needed pages of the [needs] extents.
+  /// Ends a frame for a [width] x [height] viewport.
   ///
-  /// At the end of a window, this shrinks the pages. It also releases the
-  /// pages that no frame needed for [window] frames.
+  /// [needs] holds the extents of the pages that the frame's runs needed,
+  /// packed together. At the end of a window, this shrinks the pages. It
+  /// also releases the last pages that no frame needed for [window] frames.
   void endFrame(int width, int height, List<RasterizerPixelSize> needs) {
     _lastNeeds = needs;
     final viewport = (width: width, height: height);
@@ -145,6 +147,7 @@ class AtlasPages(
     _idle.removeLast();
   }
 
-  /// Returns [v] rounded up to a multiple of [step], from [step] to [maxSize].
+  /// Returns [v] rounded up to a multiple of [step], clamped from [step] to
+  /// [maxSize].
   int _up(int v) => ((v + step - 1) ~/ step * step).clamp(step, maxSize);
 }

@@ -11,20 +11,21 @@ import 'package:vector_math/vector_math.dart' as vm;
 ///
 /// It does what the draw loop of the original Rasterizer's RasterizerLayer
 /// does with Metal (https://github.com/mindbrix/Rasterizer), and its shaders
-/// port that project's Shaders.metal. It draws opaques, instances, and fast
-/// and quad edges and molecules, so frames written with useCurves true or
-/// false. Frames with clip masks or blend instances throw, as SVGs have none.
+/// port that project's Shaders.metal. It draws opaques, instances, and the
+/// fast and quad kinds of edges and molecules, so it handles frames written
+/// with useCurves either true or false. Frames with clip masks or blend
+/// instances throw, since SVGs have neither.
 ///
-/// Its callers own the textures. Each frame in flight needs its own
-/// [RenderTargets], as a frame's image shows while later frames render, and
-/// the GPU may still read its textures. The [SharedTargets], depth and
-/// accumulation, are only used within a frame's command buffers, so frames in
-/// flight can share them.
+/// Callers own the textures. Each frame in flight needs its own
+/// [RenderTargets], because a frame's image stays on screen while later
+/// frames render, and the GPU may still be reading its textures. The
+/// [SharedTargets], depth and accumulation, are used only within a frame's
+/// command buffers, so frames in flight can share them.
 ///
-/// Edges' coverage accumulates in [accumulationFormat]: r32Float, or
+/// The edges' coverage accumulates in [accumulationFormat]: r32Float, or
 /// r16g16b16a16Float where the OpenGL ES format probe found that r32Float
 /// can't be blended into (RasterizerGpu.allowOpenGles). Changing it
-/// reallocates the accumulation at the next frame.
+/// reallocates the accumulation texture at the next frame.
 class GpuRenderer(
   gpu.ShaderLibrary library, {
   var gpu.PixelFormat accumulationFormat = gpu.PixelFormat.r32Float,
@@ -70,8 +71,8 @@ class GpuRenderer(
     clearPipeline = context.createRenderPipeline(clearVertex, clearFragment);
   }
 
-  /// The base-2 log of the data texture's width in texels, as kDataWidthLog2
-  /// in ra_defs.glsl.
+  /// The base-2 log of the data texture's width in texels, matching
+  /// kDataWidthLog2 in ra_defs.glsl.
   static const dataWidthLog2 = 12;
 
   /// The bytes in a row of the data texture, 16 per texel.
@@ -80,24 +81,24 @@ class GpuRenderer(
   final gpu.GpuContext context = gpu.gpuContext;
   late final gpu.HostBuffer hostBuffer = context.createHostBuffer();
 
-  /// The targets' format: the context's default, read as the renderer is
-  /// made.
+  /// The targets' format: the context's default, read when the renderer is
+  /// created.
   ///
-  /// A context that reports PixelFormat.unknown, which texture creation
-  /// rejects, gets b8g8r8a8UNormInt instead, Metal's default.
+  /// When the context reports PixelFormat.unknown, which texture creation
+  /// rejects, this is b8g8r8a8UNormInt, Metal's default, instead.
   final gpu.PixelFormat colorFormat =
       gpu.gpuContext.defaultColorFormat == gpu.PixelFormat.unknown
       ? gpu.PixelFormat.b8g8r8a8UNormInt
       : gpu.gpuContext.defaultColorFormat;
 
-  /// The depth attachment's format: the context's default, read as
-  /// [colorFormat] is.
+  /// The depth attachment's format: the context's default, read when the
+  /// renderer is created, as [colorFormat] is.
   ///
   /// That's d32FloatS8UInt on Metal, and d24UnormS8Uint on OpenGL ES, whose
-  /// backend doesn't map d32FloatS8UInt. A context that reports
-  /// PixelFormat.unknown gets d32FloatS8UInt. Depths are
-  /// 0.1 * (path index + 1) / path count, so 24 bits tell over a million paths
-  /// apart.
+  /// backend doesn't map d32FloatS8UInt. When the context reports
+  /// PixelFormat.unknown, this is d32FloatS8UInt. Depths are
+  /// 0.1 * (path index + 1) / path count, so 24 bits can tell over a million
+  /// paths apart.
   final gpu.PixelFormat depthFormat =
       gpu.gpuContext.defaultDepthStencilFormat == gpu.PixelFormat.unknown
       ? gpu.PixelFormat.d32FloatS8UInt
@@ -150,7 +151,7 @@ class GpuRenderer(
   /// The core wrote [frame] for a [width] x [height] view in device pixels,
   /// and the target has that size. [shared] holds the depth and accumulation
   /// textures. It reuses the target's texture when it renders into [slot]
-  /// again.
+  /// again at the same size.
   gpu.Texture render(
     ra.Frame frame,
     RenderTargets slot,
@@ -182,17 +183,17 @@ class GpuRenderer(
       (clear >> 24 & 0xFF) / 255,
     ];
 
-    // A new render pass begins when the kind of pass changes, and for a new
-    // group's edges. RenderPass has no end(), so a pass's encoder stays open
-    // until its command buffer is submitted. So each pass has its own command
-    // buffer, submitted in order.
+    // A new render pass begins when the kind of pass changes, and for each
+    // new group's edges. RenderPass has no end(), so a pass's encoder stays
+    // open until its command buffer is submitted. So each pass gets its own
+    // command buffer, and they're submitted in order.
     //
     // Impeller's Vulkan backend reuses a texture's first render pass, with its
-    // load actions, for all its later ones. It also begins every depth
-    // attachment in an undefined layout. So drawable passes always load the
-    // target, and the first one draws the clear color over it. Only opaques
-    // write depth, so each drawable pass clears the depth, then redraws the
-    // opaques so far into it, depth only.
+    // load actions, for all later passes on it. It also begins every depth
+    // attachment in an undefined layout. So drawable passes (into the target)
+    // always load the target, and the first one draws the clear color over
+    // it. Only opaques write depth, so each drawable pass clears the depth,
+    // then redraws the opaques drawn so far into it, depth only.
     gpu.CommandBuffer? commandBuffer;
     late gpu.RenderPass pass;
     _PassKind? passKind;
@@ -201,8 +202,8 @@ class GpuRenderer(
     final opaques = <({ra.Entry entry, int segmentsWord, int instancesWord})>[];
 
     // Draws [entry]'s instances with [pipeline]. [fragmentBindings] binds the
-    // fragment shader's textures, after the pipeline. A pass's bindings
-    // persist across draws, and binding a slot replaces only the same
+    // fragment shader's textures after the pipeline is bound. A pass's
+    // bindings persist across draws, and binding a slot replaces only that
     // shader's binding, not another shader's, so each draw clears them first.
     void draw(
       gpu.RenderPipeline pipeline,
@@ -238,7 +239,7 @@ class GpuRenderer(
     }
 
     // Draws the opaques' colors and depth. With [blend], it blends their
-    // colors with that equation instead, such as _keepColor, which keeps the
+    // colors with that equation instead: _keepColor, for example, keeps the
     // target's colors.
     void drawOpaques(
       ra.Entry entry,
@@ -322,8 +323,8 @@ class GpuRenderer(
         case ra.EntryType.segmentsBase:
           segmentsWord = entry.begin ~/ 4;
         case ra.EntryType.instancesBase:
-          // Its end gives the accumulation rows its group's edges use. For
-          // now, edges passes render all the rows.
+          // Its end gives the accumulation rows that its group's edges use.
+          // Edges passes ignore it and render all the rows.
           instancesWord = entry.begin ~/ 4;
         case ra.EntryType.disableClip || ra.EntryType.enableClip:
           break;
@@ -339,8 +340,9 @@ class GpuRenderer(
             ra.EntryType.fastEdges ||
             ra.EntryType.fastMolecules ||
             ra.EntryType.quadMolecules:
-          // Each group's edges begin with its quad edges. They begin a new
-          // edges pass once the instances have read the last one.
+          // Each group's edges start with its quad edges. Those begin a new
+          // edges pass, unless the current pass is an edges pass that no
+          // instances have read yet.
           if (entry.type == ra.EntryType.quadEdges &&
               (passKind != _PassKind.edges || edgesRead)) {
             beginPass(_PassKind.edges);
@@ -401,20 +403,20 @@ class GpuRenderer(
     return target;
   }
 
-  /// Draws once with each pipeline state that [render] draws with, into
-  /// scratch textures, which compiles those not compiled yet, and completes
-  /// once the GPU has run the draws.
+  /// Draws once into scratch textures with each pipeline state that [render]
+  /// uses, and completes after the GPU has run the draws.
   ///
-  /// The states are: clear, opaques without and with blending, the four kinds
-  /// of edges and molecules, and instances. Each compiles when it first draws,
-  /// which stalls the thread that runs the draw. On OpenGL ES, that's partly
-  /// the UI thread, as the renderer is made, and partly the raster thread,
-  /// after. The states took 110 ms on the UI thread on the Android emulator,
-  /// then 50-90 ms on the raster thread. On Mesa's llvmpipe, they took 550
-  /// ms, then 150 ms, in release builds with no shader cache. These times
-  /// include the format probe's render, which the first renderer starts. So
-  /// the GPU renderer compiles them all as it's made there, rather than at
-  /// whichever frame first draws each.
+  /// This compiles the states that aren't compiled yet: clear, opaques
+  /// without and with blending, the four kinds of edges and molecules, and
+  /// instances. Each state compiles when it first draws, which stalls the
+  /// thread that runs the draw. On OpenGL ES, that's partly the UI thread,
+  /// while the renderer is created, and partly the raster thread afterwards.
+  /// On the Android emulator, the states took 110 ms on the UI thread, then
+  /// 50-90 ms on the raster thread. On Mesa's llvmpipe, in release builds with
+  /// no shader cache, they took 550 ms, then 150 ms. These times include the
+  /// format probe's render, which the first renderer starts. So on OpenGL ES,
+  /// the GPU renderer compiles all the states when it's created, rather than
+  /// at whichever frame first draws with each.
   Future<void> warmUp() {
     final done = Completer<void>();
     for (var step = 0; step < 8; step++) {
@@ -424,8 +426,8 @@ class GpuRenderer(
     return done.future;
   }
 
-  /// Draws with pipeline state [step] of [warmUp]'s 8, and calls [completed]
-  /// once the GPU has run the draw.
+  /// Draws with pipeline state [step], one of [warmUp]'s 8, and calls
+  /// [completed] after the GPU has run the draw.
   ///
   /// Each step must set the same states that [render] sets for that draw.
   void _warmUp(int step, [void Function(bool success)? completed]) {
@@ -528,8 +530,8 @@ class GpuRenderer(
         sampler: _colorSampler,
       );
     }
-    // A draw of 0 instances doesn't compile its pipeline, so this draws 1,
-    // from zeroed data.
+    // A draw of 0 instances doesn't compile its pipeline, so this draws 1
+    // instance from zeroed data.
     pass.bindUniform(
       vertex.getUniformSlot('FrameInfo'),
       hostBuffer.emplace(ByteData(64)),
@@ -573,7 +575,8 @@ class GpuRenderer(
   /// Sizes [slot]'s target and [shared]'s depth and accumulation to [width] x
   /// [height], and returns the target.
   ///
-  /// The GPU renderer hands out the target's image before it renders.
+  /// The GPU renderer hands out the target's image before it renders into
+  /// the target.
   gpu.Texture target(
     RenderTargets slot,
     SharedTargets shared,
@@ -603,8 +606,8 @@ class GpuRenderer(
       // Writes the new texture once, which puts it in a defined layout before
       // its first render pass. Impeller's Vulkan backend reuses that pass for
       // later ones, so they would all begin in an undefined layout otherwise.
-      // The bytes come from the texture's own size, as a format's pixels may
-      // not be 4 bytes, as with wide gamut.
+      // The byte count comes from the texture's own size, because a format's
+      // pixels may not be 4 bytes, as with wide gamut formats.
       slot.target!.overwrite(
         ByteData(slot.target!.getBaseMipLevelSizeInBytes()),
       );
@@ -630,20 +633,20 @@ class GpuRenderer(
 
   /// Uploads [frame] for [slot], and returns its data and colors textures.
   ///
-  /// The frame's bytes go in one copy into [slot]'s staging buffer. A blit
-  /// then copies them into the data texture, as whole rows. It also copies
-  /// the paths' colors and the gradient strips, which are among those bytes,
-  /// into the colors texture, kColorTextureWidth texels a row, as
+  /// One copy puts the frame's bytes into [slot]'s staging buffer. A blit
+  /// then copies them into the data texture as whole rows. It also copies the
+  /// paths' colors and the gradient strips, which are among those bytes, into
+  /// the colors texture at kColorTextureWidth texels per row, as
   /// RasterizerLayer does.
   ///
   /// The data texture and its staging buffer grow to 4/3 of the rows a frame
   /// needs. They shrink as the core's buffer does: when they're over 1 MB and
-  /// over 5 times what the frame needs. It blits only the frame's rows. The
-  /// rows past them hold an earlier frame's data, which the shaders never
-  /// read, as they read rows by index.
+  /// at least 6 times what the frame needs. The blit copies only the frame's
+  /// rows. The rows past them hold an earlier frame's data, which the shaders
+  /// never read, because they read rows by index.
   ///
-  /// The colors texture has exactly the frame's rows, as the shaders compute
-  /// their coordinates from its height.
+  /// The colors texture has exactly the frame's rows, because the shaders
+  /// compute their coordinates from its height.
   ({gpu.Texture data, gpu.Texture colors}) _upload(
     RenderTargets slot,
     ra.Frame frame,
