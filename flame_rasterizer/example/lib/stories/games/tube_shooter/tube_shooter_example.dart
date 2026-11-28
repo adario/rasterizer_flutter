@@ -57,17 +57,22 @@ abstract class TubeShooterExample({
     the Renderer knob picks; with Flame SVG, Flame's PathComponent does.
 
     Move the ship round the rim of the tube with the arrow keys, A and D, by
-    dragging left and right, or a lane per scroll of the mouse wheel. On a
-    Steam Deck, a trackpad set to Steam Input's Scroll Wheel mode turns it
-    round as a finger circles. Fire down its lane with the space bar, or while
-    dragging. Enter, or a double tap, purges the tube once a round. Tap or
-    press a key to start a round, and to go on after losing a ship.
+    dragging left and right, or by a lane per scroll of the mouse wheel. On
+    Android and iOS, a finger that circles round the tube's centre moves it
+    instead. On a Steam Deck, a trackpad set to Steam Input's Scroll Wheel
+    mode turns it round as a finger circles. Fire down its lane with the
+    space bar, or while dragging. Enter, or a double tap, destroys all the
+    enemies in the tube, one time per round. Tap or press a key to start a
+    round, and to continue after losing a ship.
 
-    Five kinds of enemies climb the tube. Once they're gone, the ship drops
-    down its lane to the next of eight tubes, and any spike left in that lane
-    destroys it. Each round is 5% faster than the last, and a game that starts
-    at a later level goes as fast as if it had started at the first. After
-    Game Over, a new game starts at the round reached, as fast.
+    Five kinds of enemies climb the tube. When they're all gone, the ship
+    drops down its lane, and any spike left in that lane destroys it. Then it
+    flies down Tube Runner's endless tube, by that game's rules, while the
+    round's enemies come again in the same order. After them, it flies out
+    onto the rim of the next of ten tubes. Each round is 5% faster than the
+    last, and a game that starts at a later level is as fast as if it had
+    started at the first. After Game Over, a new game starts at the round
+    reached, as fast.
 
     The game makes some paths again every frame, such as the tube's during the
     zoom. It shares others among many components, such as the enemies'
@@ -75,13 +80,11 @@ abstract class TubeShooterExample({
     glow with them, and the other renderers draw it with a shader over the
     world. The Level knob shows the round's level, and starts a new game at
     the level it picks. The other knobs turn the sounds on and off, zoom the
-    camera and change the game's speed. After each round's drop, the ship
-    flies on down Tube Runner's endless tube, by its rules, as the round's
-    enemies come again in the same order, then out of it, onto the next
-    round's rim. A new renderer's game goes on with the same round, ship,
-    enemies and shots, from where they were, but a run's next round starts.
-    The bar under the game shows the renderer, the frame times, the
-    renderer's own numbers and the paths made each second.
+    camera and change the game's speed. A new renderer's game continues from
+    where the old one was, with the same round, ship, enemies and shots. If
+    the ship was flying out of a run onto the next rim, that round starts
+    again from its zoom. The bar under the game shows the renderer, the frame
+    times, the renderer's own numbers and the paths made each second.
 
     Inspired by Atari's Tempest (1981).
   ''';

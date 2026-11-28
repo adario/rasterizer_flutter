@@ -74,7 +74,8 @@ class RunnerEnemyShotComponent(final int lane, var double at)
   this : super(priority: 2);
 
   /// How fast it climbs its lane along the axis, in tube units a second:
-  /// half as fast again as the climber that fires it.
+  /// faster than the climber that fires it, which climbs at
+  /// `RunnerEnemyComponent.climbSpeed`.
   static const speed = 1.5;
 
   /// Where it was along the axis before it last climbed.

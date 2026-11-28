@@ -86,17 +86,20 @@ abstract class RevolutePinballExample({
 
   static const description = '''
     A pinball with the bodies of Revolute Joint Svgs. A key or a tap starts
-    it, and drops 10 bodies over a wheel. Once each is in a bucket, gone
-    through the drain, or at rest, the wheel turns the other way, amber until
-    it's at full speed, and the next 10 drop. Left, A or Left Shift, Right, D
-    or Right Shift, or a tap in the bottom third's left or right half flips a
-    flipper. On a Steam Deck, Steam Input can bind the triggers to the Shift
-    keys. A body coming to rest in a bucket scores by its area and the
-    bucket's fill, once. Drained bodies take energy, until the game is over:
-    then the table goes on, without the flippers, drops or scores. A full
-    bucket gives its bodies' area back, empties, and kicks the other's bodies
-    up and out. The Drops knob picks the next drops' bodies: mixed, only
-    balls or only SVGs. The Sound knob turns sounds on and off.
+    the game and drops 10 bodies over a wheel. When each of them is in a
+    bucket, has drained, or is at rest, the wheel turns the other way, amber
+    until it reaches full speed, and the next 10 drop. Left, A or Left Shift
+    flips the left flipper, and Right, D or Right Shift the right one. So
+    does a touch in the left or right half of the bottom third. On a Steam
+    Deck, Steam Input can bind the triggers to the Shift keys. A body scores
+    one time, when it comes to rest in a bucket: the bigger the body and the
+    fuller the bucket, the more it scores. Each drained body takes energy by
+    its area. When the energy runs out, the game is over, and the table keeps
+    moving with no flippers, drops or scores. A full bucket gives back the
+    energy its bodies would take if drained, empties, and kicks the bodies
+    in the other bucket up and out. The Drops knob picks the bodies of the
+    next drops: mixed, only balls or only SVGs. The Sound knob turns the
+    sounds on and off.
   ''';
 
   /// The Drops knob's value, which applies from the next drop.
