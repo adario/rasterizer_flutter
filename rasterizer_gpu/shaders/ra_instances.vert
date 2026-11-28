@@ -138,7 +138,7 @@ void main() {
   gl_Position = vec4(x, y, z, 1.0);
   bool useClips = (frame.flags.x & kParamUseClips) != 0u;
   v_clip = useClips ? vec2(dx * clip.a + dy * clip.c + clip.tx, dx * clip.b + dy * clip.d + clip.ty) : vec2(0.5);
-  v_iz = iz | flags;
+  v_iz = iz | flags | (isRadial ? kIsRadial : 0u);
 
   uint tw = kColorTextureWidth, th = (frame.counts.y + tw) / tw, texCount = frame.counts.z;
   if (isGradient) {

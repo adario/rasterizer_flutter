@@ -80,5 +80,5 @@ void main() {
   float sx = inversesqrt(a * a + b * b), sy = inversesqrt(c * c + d * d);
   float clip = clamp01(0.5 + clx * sx) * clamp01(0.5 + (1.0 - clx) * sx) * clamp01(0.5 + cly * sy) * clamp01(0.5 + (1.0 - cly) * sy);
 
-  frag_color = alpha * clip * paintColor(v_tex);
+  frag_color = alpha * clip * paintColor(v_tex, (v_iz & kIsRadial) != 0u);
 }

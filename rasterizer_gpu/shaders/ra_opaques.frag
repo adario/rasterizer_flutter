@@ -5,9 +5,10 @@
 #include "ra_paint.glsl"
 
 in vec3 v_tex;
+flat in uint v_isRadial;
 
 out vec4 frag_color;
 
 void main() {
-  frag_color = paintColor(v_tex);
+  frag_color = paintColor(v_tex, v_isRadial != 0u);
 }

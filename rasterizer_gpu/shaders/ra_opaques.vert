@@ -9,6 +9,7 @@
 in vec2 corner;  // The unit corners of a 4-vertex triangle strip: x is the vertex index & 1, y is the index >> 1
 
 out vec3 v_tex;
+flat out uint v_isRadial;  // 1 for a radial gradient, else 0
 
 void main() {
   uint count = frame.counts.w, pathCount = frame.counts.y, texCount = frame.counts.z;
@@ -60,6 +61,7 @@ void main() {
   uint tw = kColorTextureWidth, th = (pathCount + tw) / tw;
   uint tiz = showOpaques ? iz : pathCount;
   v_tex = vec3((0.5 + float(tiz % tw)) / float(tw), (0.5 + float(tiz / tw)) / float(th + texCount), 0.0);
+  v_isRadial = showOpaques && isRadial ? 1u : 0u;
   if (showOpaques && isGradient) {
     uint texIdx = loadWord(path + 19u);
     v_tex.x = x * texCtm.b + y * texCtm.d + texCtm.ty;

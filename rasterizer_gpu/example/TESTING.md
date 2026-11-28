@@ -27,6 +27,9 @@ support is `noImpeller`. Such a test must be in a package that depends on raster
 rasterizer_gpu's own `test/`, the shader bundle's asset key has no `packages/rasterizer_gpu/` prefix, so the
 renderers fail with "Failed to initialize ShaderLibrary".
 
+`test/radial_test.dart` runs that way: it checks radial gradients on the pixel column through their centers. It's
+not an integration test, as the bug it checks for showed in `flutter_tester` but not in the app.
+
 - **Cases** (`lib/goldens.dart`):
   - the tiger fitted, with and without curves, and the sweep's checkpoints, with and without curves;
   - the sweep of a 4×4 grid of tigers, with curves;
